@@ -15,7 +15,7 @@ role: Ph.D. Student
 # Organizations/Affiliations
 organizations:
 - name: University of Southern California
-  url: ""
+  url: "https://www.usc.edu"
 
 # Short bio (displayed in user profile at end of posts)
 bio: My research interests include autonomous robots, simulators, and motion planning.
