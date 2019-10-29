@@ -27,8 +27,9 @@ interests:
 
 education:
   courses:
-  - course: PhD in Artificial Intelligence
+  - course: PhD Computer Science
     institution: University of Southern California
+    adviser: Gaurav Sukhatme
     year: 2021 (expected)
   - course: MSc Computer Science (Intelligent Robotics)
     institution: University of Southern California
