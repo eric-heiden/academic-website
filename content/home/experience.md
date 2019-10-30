@@ -3,7 +3,7 @@
 widget = "experience"  # See https://sourcethemes.com/academic/docs/page-builder/
 headless = true  # This file represents a page section.
 active = true  # Activate this widget? true/false
-weight = 40  # Order that this section will appear.
+weight = 90  # Order that this section will appear.
 
 title = "Experience"
 subtitle = ""
@@ -18,27 +18,48 @@ date_format = "Jan 2006"
 #   Leave `date_end` empty if it's your current employer.
 #   Begin/end multi-line descriptions with 3 quotes `"""`.
 [[experience]]
-  title = "CEO"
-  company = "GenCoin"
-  company_url = ""
-  location = "California"
-  date_start = "2017-01-01"
-  date_end = ""
-  description = """
-  Responsibilities include:
-  
-  * Analysing
-  * Modelling
-  * Deploying
-  """
+  title = "Research intern"
+  company = "NASA Jet Propulsion Laboratory (JPL)"
+  company_url = "https://jpl.nasa.gov"
+  location = "Pasadena, CA"
+  date_start = "2018-05-01"
+  date_end = "2018-08-01"
+  description = """Researched representations and algorithms enabling autonomy of novel robot platforms."""
 
 [[experience]]
-  title = "Professor"
-  company = "University X"
-  company_url = ""
-  location = "California"
+  title = "Research Assistant"
+  company = "Information Sciences Institute (ISI)"
+  company_url = "https://isi.edu"
+  location = "Marina del Rey, CA"
   date_start = "2016-01-01"
-  date_end = "2016-12-31"
-  description = """Taught electronic engineering and researched semiconductor physics."""
+  date_end = "2017-05-01"
+  description = """Built large-scale information retrieval system for gaining information about >300k firms from company web pages."""
+
+[[experience]]
+  title = "Software Engineering Intern"
+  company = "Two Sigma Investments"
+  company_url = "https://twosigma.com"
+  location = "New York, NY"
+  date_start = "2016-05-01"
+  date_end = "2016-08-01"
+  description = """Added support for parallel computing platform _Apache Spark_ to the data science toolbox _Beaker Notebook_ (now _BeakerX_)."""
+
+[[experience]]
+  title = "Software Engineering Intern"
+  company = "Microsoft"
+  company_url = "https://microsoft.com"
+  location = "New York, NY"
+  date_start = "2016-05-01"
+  date_end = "2016-08-01"
+  description = """Built business intelligence dashboard and language processing tools for software engineering teams."""
+
+[[experience]]
+  title = "Research Assistant"
+  company = "University of Rostock"
+  company_url = "https://uni-rostock.de"
+  location = "Rostock, Germany"
+  date_start = "2012-10-01"
+  date_end = "2014-06-01"
+  description = """Designed software tools and assisted with research projects in ubiquitous computing, bioinformatics, and web services."""
 
 +++

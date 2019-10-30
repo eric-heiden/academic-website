@@ -21,8 +21,9 @@ organizations:
 bio: My research interests include autonomous robots, simulators, and motion planning.
 
 interests:
-- Autonomous robots
+- Robot learning
 - Physics simulators
+- Autonomous robots
 - Task and Motion Planning
 
 education:
