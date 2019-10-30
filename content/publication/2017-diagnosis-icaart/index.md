@@ -3,8 +3,8 @@
 
 title: "Concept and Realization of a Diagnostic System for Smart Environments"
 authors: ["Eric Heiden", "Sebastian Bader", "Thomas Kirste"]
-date: 2017-01-01
-doi: ""
+date: 2017-02-01
+doi: "10.5220/0006257903180329"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T17:10:02-07:00

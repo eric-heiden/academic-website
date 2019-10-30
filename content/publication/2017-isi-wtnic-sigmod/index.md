@@ -3,8 +3,8 @@
 
 title: "Web Text-based Network Industry Classifications: Preliminary Results"
 authors: ["Eric Heiden", "Gerard Hoberg", "Craig A. Knoblock", "Palak Modi", "Gordon Phillips", "Gaurangi Raul", "Pedro Szekely"]
-date: 2017-01-01
-doi: ""
+date: 2017-05-01
+doi: "10.1145/3077240.3077245"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T16:44:40-07:00
@@ -19,7 +19,7 @@ publication_types: ["4"]
 publication: "SIGMOD Workshop on Data Science for Macro-Modeling with Financial and Economic Datasets (DSMM)"
 publication_short: ""
 
-abstract: ""
+abstract: "Studies of market structure and product market competition are important in many disciplines, such as economics, finance, accounting and management. Reliable data for such studies is easily available for public firms (e.g., 10-K filings), but no reliable data exists for private firms. In this work we propose to mine the Internet Archive Wayback Machine, a digital archive of the World Wide Web, to build a database of 300,000 companies to support analyses of market structure, product market competition, and innovation. The goal of the WTNIC project is to download pages from the archive to build a profile for each company, and to use machine learning techniques to define similarity between companies based on similarity of their product and service offerings. This paper describes the challenges that must be overcome, our approach to overcome these challenges, and some preliminary results."
 
 # Summary. An optional shortened abstract.
 summary: ""

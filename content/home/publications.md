@@ -65,3 +65,6 @@ subtitle = ""
  # CSS class.
  css_class = ""
 +++
+
+[<div class="see-all">See all publications
+<i class="fas fa-angle-right"></i></div>](/publication)
