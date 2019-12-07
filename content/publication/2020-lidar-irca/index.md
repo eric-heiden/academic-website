@@ -68,3 +68,6 @@ projects: ["ids"]
 #   Otherwise, set `slides: ""`.
 slides: ""
 ---
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">So what did the car actually see?<br>Well, it turns out at first it looked like an obstacle so it slowed down some, then it decided that nah, there&#39;s nothing and lifted it&#39;s &quot;foot&quot; off the brakes, huh? <a href="https://t.co/bun4mrxKOZ">pic.twitter.com/bun4mrxKOZ</a></p>&mdash; green (@greentheonly) <a href="https://twitter.com/greentheonly/status/1202782357046079489?ref_src=twsrc%5Etfw">December 6, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script> 
+
+<blockquote class="twitter-tweet" data-conversation="none"><p lang="en" dir="ltr">Now we wondered what would happen if we remove the foil? Well, pretty much the same thing only this time autopilot actually sped up before impact after initially slowing down some and did not disengage until I stomped on the brakes. <a href="https://t.co/NgszJwO2zh">pic.twitter.com/NgszJwO2zh</a></p>&mdash; green (@greentheonly) <a href="https://twitter.com/greentheonly/status/1202782421005017093?ref_src=twsrc%5Etfw">December 6, 2019</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script> 
