@@ -57,9 +57,9 @@ date_format = "Jan 2006"
   title = "Software Engineering Intern"
   company = "Microsoft"
   company_url = "https://microsoft.com"
-  location = "New York, NY"
-  date_start = "2016-05-01"
-  date_end = "2016-08-01"
+  location = "Dublin, Ireland"
+  date_start = "2014-09-01"
+  date_end = "2015-03-01"
   description = """Built business intelligence dashboard and language processing tools for software engineering teams."""
 
 [[experience]]
