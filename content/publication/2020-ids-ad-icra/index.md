@@ -13,10 +13,10 @@ publishDate: 2019-10-29T19:51:34-07:00
 # Legend: 0 = Uncategorized; 1 = Conference paper; 2 = Journal article;
 # 3 = Preprint / Working Paper; 4 = Report; 5 = Book; 6 = Book section;
 # 7 = Thesis; 8 = Patent
-publication_types: ["1"]
+publication_types: ["3"]
 
 # Publication name and optional abbreviated publication name.
-publication: "Under review at International Conference on Robotics and Automation (ICRA) 2020"
+publication: ""
 publication_short: ""
 
 abstract: "A key ingredient to achieving intelligent behavior is physical understanding that equips robots with the ability to reason about the effects of their actions in a dynamic environment. Several methods have been proposed to learn dynamics models from data that inform model-based control algorithms. While such learning-based approaches can model locally observed behaviors, they fail to generalize to more complex dynamics and under long time horizons.
