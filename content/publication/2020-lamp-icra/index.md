@@ -16,7 +16,7 @@ publishDate: 2019-10-29T19:06:51-07:00
 publication_types: ["1"]
 
 # Publication name and optional abbreviated publication name.
-publication: "Under review at International Conference on Robotics and Automation (ICRA) 2020"
+publication: "International Conference on Robotics and Automation (ICRA) 2020"
 publication_short: ""
 
 abstract: ""
