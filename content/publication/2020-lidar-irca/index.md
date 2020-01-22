@@ -16,7 +16,7 @@ publishDate: 2019-10-29T15:33:15-07:00
 publication_types: ["1"]
 
 # Publication name and optional abbreviated publication name.
-publication: "Under review at International Conference on Robotics and Automation (ICRA) 2020"
+publication: "International Conference on Robotics and Automation (ICRA) 2020"
 publication_short: ""
 
 abstract: "Light Detection and Ranging (LIDAR) sensors play an important role in the perception stack of autonomous robots, supplying mapping and localization pipelines with depth measurements of the environment.
