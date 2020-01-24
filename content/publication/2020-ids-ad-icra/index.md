@@ -37,7 +37,7 @@ featured: true
 #   icon_pack: fab
 #   icon: twitter
 
-url_pdf:
+url_pdf: https://arxiv.org/abs/2001.08539
 url_code:
 url_dataset:
 url_poster:
