@@ -19,7 +19,7 @@ publication_types: ["1"]
 publication: "International Conference on Robotics and Automation (ICRA) 2020"
 publication_short: ""
 
-abstract: ""
+abstract: "Simultaneous Localization and Mapping (SLAM) in large-scale, unknown, and complex subterranean environments is a challenging problem. Sensors must operate in off-nominal conditions; uneven and slippery terrains make wheel odometry inaccurate, while long corridors without salient features make exteroceptive sensing ambiguous and prone to drift; finally, spurious loop closures that are frequent in environments with repetitive appearance, such as tunnels and mines, could result in a significant distortion of the entire map. These challenges are in stark contrast with the need to build highly-accurate 3D maps to support a wide variety of applications, ranging from disaster response to the exploration of underground extraterrestrial worlds. This paper reports on the implementation and testing of a lidar-based multi-robot SLAM system developed in the context of the DARPA Subterranean Challenge. We present a system architecture to enhance subterranean operation, including an accurate lidar-based front-end, and a flexible and robust back-end that automatically rejects outlying loop closures. We present an extensive evaluation in large-scale, challenging subterranean environments, including the results obtained in the Tunnel Circuit of the DARPA Subterranean Challenge. Finally, we discuss potential improvements, limitations of the state of the art, and future research directions."
 
 # Summary. An optional shortened abstract.
 summary: ""
@@ -36,7 +36,7 @@ featured: false
 #   icon_pack: fab
 #   icon: twitter
 
-url_pdf:
+url_pdf: "https://arxiv.org/abs/2003.01744"
 url_code:
 url_dataset:
 url_poster:
@@ -49,7 +49,7 @@ url_video:
 # To use, add an image named `featured.jpg/png` to your page's folder. 
 # Focal points: Smart, Center, TopLeft, Top, TopRight, Left, Right, BottomLeft, Bottom, BottomRight.
 image:
-  caption: ""
+  caption: "Two autonomous ground rovers (Husky A200) explore the network of underground tunnels at the Arch mines."
   focal_point: ""
   preview_only: false
 
