@@ -33,7 +33,7 @@ date_format = "Jan 2006"
   location = "Mountain View, CA"
   date_start = "2020-01-13"
   date_end = "2020-05-08"
-  description = """Ongoing research on [https://github.com/google-research/tiny-differentiable-simulator](differentiable rigid-body simulators)."""
+  description = """Ongoing research on [differentiable rigid-body simulators](https://github.com/google-research/tiny-differentiable-simulator)."""
   
 [[experience]]
   title = "Research Intern"
