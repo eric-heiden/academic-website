@@ -55,6 +55,9 @@ social:
 - icon: github
   icon_pack: fab
   link: https://github.com/eric-heiden
+- icon: twitter
+  icon_pack: fab
+  link: https://twitter.com/eric_heiden
 - icon: linkedin
   icon_pack: fab
   link: https://www.linkedin.com/in/eheiden
