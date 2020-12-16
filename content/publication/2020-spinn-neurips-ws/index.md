@@ -56,7 +56,7 @@ url_video: https://youtu.be/hGphZbMDbYA
 # To use, add an image named `featured.jpg/png` to your page's folder. 
 # Focal points: Smart, Center, TopLeft, Top, TopRight, Left, Right, BottomLeft, Bottom, BottomRight.
 image:
-  caption: "Golf simulation augmented by a neural network to learn air resistance"
+  caption: ""
   focal_point: ""
   preview_only: false
 
@@ -75,4 +75,4 @@ projects: ["ids"]
 slides: ""
 ---
 
-<img src=featured.gif/>
+<img src=training.gif/>
