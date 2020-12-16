@@ -1,19 +1,18 @@
 ---
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
-title: "Real2Sim Transfer using Differentiable Physics"
+title: "Sparse-Input Neural Network Augmentations for Differentiable Simulators"
 authors:
 - "Eric Heiden"
 - "David Millard"
+- "Erwin Coumans"
 - "Gaurav S. Sukhatme"
-author_notes:
-- "Equal contribution"
-- "Equal contribution"
-date: 2019-06-01
+
+date: 2020-11-09
 doi: ""
 
 # Schedule page publish date (NOT publication's date).
-publishDate: 2019-10-29T17:00:53-07:00
+publishDate: 2020-11-09T15:33:15-07:00
 
 # Publication type.
 # Legend: 0 = Uncategorized; 1 = Conference paper; 2 = Journal article;
@@ -22,17 +21,19 @@ publishDate: 2019-10-29T17:00:53-07:00
 publication_types: ["4"]
 
 # Publication name and optional abbreviated publication name.
-publication: "R:SS Workshop on Closing the Reality Gap in Sim2real Transfer for Robotic Manipulation"
-publication_short: ""
+publication: "NeurIPS 2020 [Workshop: Differentiable computer vision, graphics, and physics in machine learning](https://montrealrobotics.ca/diffcvgp/)"
+publication_short: "DiffCVGP Workshop"
 
-abstract: "Accurate simulations allow modern machine learning techniques to be applied to robotics problems, with sample-collection runtimes orders of magnitudes faster than the real world. Current reinforcement learning approaches require laborious manual calibration of carefully designed models, or, in a model-free context, vast amounts of training data to acquire such accurate models from real-world trials. In this work, we introduce a new layer in the deep learning toolbox that imposes a strong inductive bias to generate physically accurate predictions of rigid-body dynamics and allows for the automatic inference of system parameters given an ad-hoc model description."
+abstract: "Differentiable simulators provide an avenue for closing the sim2real gap by enabling the use of efficient, gradient-based optimization algorithms to find the simulation parameters that best fit the observed sensor readings.
+Nonetheless, these analytical models can only predict the dynamical behavior of systems they have been designed for.
+In this work, we study the augmentation of a differentiable rigid-body physics engine via neural networks that is able to learn nonlinear relationships between dynamic quantities and can thus learn effects not accounted for in the traditional simulator. By optimizing with a sparse-group lasso penalty, we are able to reduce the neural augmentations to the necessary inputs that are needed in the learned models of the simulator while achieving highly accurate predictions."
 
 # Summary. An optional shortened abstract.
 summary: ""
 
 tags: []
 categories: []
-featured: false
+featured: true
 
 # Custom links (optional).
 #   Uncomment and edit lines below to show custom links.
@@ -42,20 +43,20 @@ featured: false
 #   icon_pack: fab
 #   icon: twitter
 
-url_pdf: "2019-ids-real2sim-rss-ws.pdf"
-url_code:
+url_pdf:
+url_code: https://github.com/google-research/tiny-differentiable-simulator
 url_dataset:
-url_poster:
-url_project:
+url_poster: poster.pdf
+url_project: https://sites.google.com/usc.edu/neuralsim
 url_slides:
 url_source:
-url_video:
+url_video: https://youtu.be/hGphZbMDbYA
 
 # Featured image
 # To use, add an image named `featured.jpg/png` to your page's folder. 
 # Focal points: Smart, Center, TopLeft, Top, TopRight, Left, Right, BottomLeft, Bottom, BottomRight.
 image:
-  caption: "Online probabilistic estimation of the lengths of a three-link compound pendulum using a Gaussian Mixture Model."
+  caption: "Golf simulation augmented by a neural network to learn air resistance"
   focal_point: ""
   preview_only: false
 
@@ -73,3 +74,5 @@ projects: ["ids"]
 #   Otherwise, set `slides: ""`.
 slides: ""
 ---
+
+<img src=featured.gif/>

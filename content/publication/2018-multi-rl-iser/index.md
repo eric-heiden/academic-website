@@ -2,7 +2,20 @@
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
 title: "Scaling simulation-to-real transfer by learning composable robot skills"
-authors: ["Ryan C. Julian*", "Eric Heiden*", "Zhanpeng He", "Hejia Zhang", "Stefan Schaal", "Joseph J. Lim", "Gaurav S. Sukhatme", "Karol Hausman"]
+
+authors:
+- "Ryan C. Julian"
+- "Eric Heiden"
+- "Zhanpeng He"
+- "Hejia Zhang"
+- "Stefan Schaal"
+- "Joseph J. Lim"
+- "Gaurav S. Sukhatme"
+- "Karol Hausman"
+author_notes:
+- "Equal contribution"
+- "Equal contribution"
+
 date: 2018-11-01
 doi: ""
 

@@ -2,7 +2,16 @@
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
 title: "Heterogeneous Sensor Fusion via Confidence-rich 3D Grid Mapping: Application to Physical Robots"
-authors: ["Eric Heiden*", "Daniel Pastor*", "Pradyumna Vyshnav", "Ali-akbar Agha-mohammadi"]
+
+authors:
+- "Eric Heiden"
+- "Daniel Pastor"
+- "Pradyumna Vyshnav"
+- "Ali-akbar Agha-mohammadi"
+author_notes:
+- "Equal contribution"
+- "Equal contribution"
+
 date: 2018-11-01
 doi: ""
 

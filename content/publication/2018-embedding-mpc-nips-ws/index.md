@@ -2,7 +2,20 @@
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
 title: "Simulator Predictive Control: Using Learned Task Representations and MPC for Zero-Shot Generalization and Sequencing"
-authors: ["Zhanpeng He*", "Ryan Julian*", "Eric Heiden", "Hejia Zhang", "Stefan Schaal", "Joseph Lim", "Gaurav S. Sukhatme", "Karol Hausman"]
+
+authors:
+- "Zhanpeng He"
+- "Ryan Julian"
+- "Eric Heiden"
+- "Hejia Zhang"
+- "Stefan Schaal"
+- "Joseph Lim"
+- "Gaurav S. Sukhatme"
+- "Karol Hausman"
+author_notes:
+- "Equal contribution"
+- "Equal contribution"
+
 date: 2018-11-01
 doi: ""
 

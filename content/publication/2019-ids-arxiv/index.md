@@ -2,7 +2,14 @@
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
 title: "Interactive Differentiable Simulation"
-authors: ["Eric Heiden*", "David Millard*", "Hejia Zhang", "Gaurav S. Sukhatme"]
+authors:
+- "Eric Heiden"
+- "David Millard"
+- "Hejia Zhang"
+- "Gaurav S. Sukhatme"
+author_notes:
+- "Equal contribution"
+- "Equal contribution"
 date: 2019-05-01
 doi: ""
 

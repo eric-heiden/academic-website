@@ -4,7 +4,7 @@
 title: "Scaling simulation-to-real transfer by learning composable robot skills"
 authors: ["Ryan C. Julian", "Eric Heiden", "Zhanpeng He", "Hejia Zhang", "Stefan Schaal", "Joseph J. Lim", "Gaurav S. Sukhatme", "Karol Hausman"]
 date: 2019-10-29T20:15:43-07:00
-doi: ""
+doi: "10.1177/0278364920944474"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T20:15:43-07:00
@@ -16,7 +16,7 @@ publishDate: 2019-10-29T20:15:43-07:00
 publication_types: ["2"]
 
 # Publication name and optional abbreviated publication name.
-publication: "Invited submission to International Journal of Robotics Research"
+publication: "International Journal of Robotics Research"
 publication_short: ""
 
 abstract: "We present a strategy for simulation-to-real transfer, which builds on recent advances in robot skill decomposition. 
@@ -42,14 +42,14 @@ featured: false
 #   icon_pack: fab
 #   icon: twitter
 
-url_pdf:
-url_code: "https://github.com/ryanjulian/embed2learn"
+url_pdf: https://journals.sagepub.com/doi/abs/10.1177/0278364920944474
+url_code: https://github.com/ryanjulian/embed2learn
 url_dataset:
 url_poster:
 url_project:
 url_slides:
 url_source:
-url_video: "https://youtu.be/Syr2RQTHqTs"
+url_video: https://youtu.be/Syr2RQTHqTs
 
 # Featured image
 # To use, add an image named `featured.jpg/png` to your page's folder. 

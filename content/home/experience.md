@@ -23,7 +23,7 @@ date_format = "Jan 2006"
   company_url = "https://www.nvidia.com/en-us/research/robotics/"
   location = "Seattle, WA"
   date_start = "2020-05-18"
-  date_end = "2020-08-14"
+  date_end = ""
   description = """ """
 
 [[experience]]
