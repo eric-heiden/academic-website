@@ -19,7 +19,7 @@ publishDate: 2020-07-11T20:15:43-07:00
 publication_types: ["4"]
 
 # Publication name and optional abbreviated publication name.
-publication: "RSS Pioneers Workshop"
+publication: "RSS Pioneers 2020 Workshop"
 publication_short: ""
 
 abstract: ""
