@@ -27,7 +27,7 @@ publishDate: 2020-03-12T20:15:43-07:00
 publication_types: ["2"]
 
 # Publication name and optional abbreviated publication name.
-publication: "To be published at IEEE Robotics and Automation Letters 2021"
+publication: "To be published at IEEE Robotics and Automation Letters (RA-L) 2021 and presented at ICRA 2021"
 publication_short: ""
 
 abstract: "Planning smooth and energy-efficient motions for wheeled mobile robots is a central task in applications ranging from autonomous driving to service and intralogistic robotics. Over the past decades, a wide variety of sampling-based motion planners, extend functions, and path-improvement techniques have been proposed for such systems. Choosing the best combination of components that fit an application is a tedious task, even for expert users. With the goal of aiding researchers in designing novel planning algorithms and evaluating path finding solutions, we present Bench-MR: the first open-source sampling-based motion-planning benchmark designed for nonholonomic, wheeled mobile robots.
