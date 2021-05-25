@@ -15,7 +15,7 @@ author_notes:
 - "Equal contribution"
 
 date: 2020-03-12T20:15:43-07:00
-doi: ""
+doi: "10.1109/LRA.2021.3068913"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2020-03-12T20:15:43-07:00
@@ -39,7 +39,7 @@ summary: ""
 
 tags: []
 categories: []
-featured: false
+featured: true
 
 # Custom links (optional).
 #   Uncomment and edit lines below to show custom links.
@@ -49,14 +49,14 @@ featured: false
 #   icon_pack: fab
 #   icon: twitter
 
-url_pdf:
+url_pdf: https://ieeexplore.ieee.org/document/9387068
 url_code: https://github.com/robot-motion/bench-mr
 url_dataset:
 url_poster:
-url_project: "https://robot-motion.github.io/mpb"
+url_project: https://robot-motion.github.io/bench-mr/
 url_slides:
 url_source:
-url_video:
+url_video: https://youtu.be/dktHfgmnE_M
 
 # Featured image
 # To use, add an image named `featured.jpg/png` to your page's folder. 
@@ -80,3 +80,5 @@ projects: ["tamp"]
 #   Otherwise, set `slides: ""`.
 slides: ""
 ---
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/dktHfgmnE_M" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
