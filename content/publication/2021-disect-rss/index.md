@@ -1,13 +1,14 @@
 ---
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
-title: "NeuralSim: Augmenting Differentiable Simulators with Neural Networks"
+title: "DiSECt: A Differentiable Simulation Engine for Autonomous Robotic Cutting"
 authors:
 - "Eric Heiden"
-- "David Millard"
-- "Erwin Coumans"
-- "Yizhou Sheng"
-- "Gaurav S. Sukhatme"
+- "Miles Macklin"
+- "Yashraj Narang"
+- "Dieter Fox"
+- "Animesh Garg"
+- "Fabio Ramos"
 date: 2021-06-03
 doi: ""
 
