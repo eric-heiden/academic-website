@@ -21,10 +21,10 @@ date_format = "Jan 2006"
   title = "Deep Learning Intern"
   company = "NVIDIA"
   company_url = "https://www.nvidia.com/en-us/research/robotics/"
-  location = "Seattle, WA"
+  location = "Seattle, WA (Remote)"
   date_start = "2020-05-18"
   date_end = ""
-  description = """ """
+  description = """Closing the sim2real gap in robotic cutting via [differentiable physics](https://diff-cutting-sim.github.io/)"""
 
 [[experience]]
   title = "Research Intern"
