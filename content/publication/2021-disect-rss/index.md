@@ -8,7 +8,6 @@ authors:
 - "Erwin Coumans"
 - "Yizhou Sheng"
 - "Gaurav S. Sukhatme"
-author_notes:
 date: 2021-06-03
 doi: ""
 
