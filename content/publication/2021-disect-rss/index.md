@@ -46,9 +46,9 @@ url_pdf: https://arxiv.org/abs/2105.12244
 url_code: 
 url_dataset:
 url_poster:
-url_project: https://diff-cutting-sim.github.io/
+url_project:
 url_slides:
-url_source:
+url_source: https://diff-cutting-sim.github.io/
 url_video: https://youtu.be/p_vu7shu9Bc
 
 # Featured image
