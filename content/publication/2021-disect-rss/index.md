@@ -10,7 +10,7 @@ authors:
 - "Animesh Garg"
 - "Fabio Ramos"
 date: 2021-06-03
-doi: ""
+doi: "10.15607/RSS.2021.XVII.067"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2021-06-03T15:33:15-07:00
@@ -49,7 +49,7 @@ url_poster:
 url_project:
 url_slides:
 url_source: https://diff-cutting-sim.github.io/
-url_video: https://youtu.be/p_vu7shu9Bc
+url_video: https://youtu.be/zUjdNR6kpfI
 
 # Featured image
 # To use, add an image named `featured.jpg/png` to your page's folder. 
@@ -74,4 +74,4 @@ projects: ["ids"]
 slides: ""
 ---
 
-<iframe width="720" height="405" src="https://www.youtube.com/embed/p_vu7shu9Bc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="720" height="405" src="https://www.youtube.com/embed/zUjdNR6kpfI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
