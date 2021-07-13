@@ -74,6 +74,6 @@ projects: ["ids"]
 slides: ""
 ---
 
-<a href="https://thespoon.tech/researchers-create-simulator-to-help-robots-wield-knives/">Blog post on NVIDIA developer blog</a>
+<a href="https://developer.nvidia.com/blog/nvidia-research-disect-a-differentiable-simulation-engine-for-autonomous-robotic-cutting/">Blog post on NVIDIA developer blog</a>
 
 <iframe width="720" height="405" src="https://www.youtube.com/embed/zUjdNR6kpfI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
