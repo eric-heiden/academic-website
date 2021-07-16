@@ -2,7 +2,7 @@
 # Documentation: https://sourcethemes.com/academic/docs/managing-content/
 
 title: "Interactive Differentiable Simulation"
-summary: "Overcome sim2real gap using differentiable simulators that are continuously updated from measurements."
+summary: "Reduce reality gap in robotics through differentiable simulators which are updated continuously from real-world measurements"
 authors: []
 tags: []
 categories: []
@@ -42,4 +42,4 @@ slides: ""
 
 <img align="right" src="featured.png" width="200"/>
 
-As a strategy to overcome the sim2real gap, I am investigating how differentiable simulators of sensors and rigid body dynamics can be implemented and applied to complex control problems.
+I am investigating how differentiable simulators can help us reduce the simulation-reality gap. The end-to-end differentiability of such simulators allows us to efficiently optimize their parameters, which means the physics engine can be incorporated into learning-based architectures. By augmenting the original physics engine with neural networks, even unmodeled effects can be captured by such learning-based simulator (see [NeuralSim](https://eric-heiden.com/publication/2021-neuralsim-icra/)).
