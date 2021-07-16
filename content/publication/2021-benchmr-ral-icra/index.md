@@ -52,7 +52,7 @@ links:
 - name: Website
   url: https://robot-motion.github.io/bench-mr/
 
-url_pdf: "Bench-MR.pdf"
+url_pdf:
 url_code: https://github.com/robot-motion/bench-mr
 url_dataset:
 url_poster:
