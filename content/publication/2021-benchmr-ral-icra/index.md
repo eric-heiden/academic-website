@@ -48,12 +48,15 @@ featured: true
 #   url: https://twitter.com
 #   icon_pack: fab
 #   icon: twitter
+links:
+- name: Website
+  url: https://robot-motion.github.io/bench-mr/
 
-url_pdf: https://ieeexplore.ieee.org/document/9387068
+url_pdf: Bench-MR.pdf
 url_code: https://github.com/robot-motion/bench-mr
 url_dataset:
 url_poster:
-url_project: https://robot-motion.github.io/bench-mr/
+url_project:
 url_slides: "Bench-MR-ICRA-2021.pdf"
 url_source:
 url_video: https://youtu.be/dktHfgmnE_M

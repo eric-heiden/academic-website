@@ -43,12 +43,15 @@ featured: true
 #   url: https://twitter.com
 #   icon_pack: fab
 #   icon: twitter
+links:
+- name: Website
+  url: https://sites.google.com/usc.edu/neuralsim
 
 url_pdf: https://arxiv.org/abs/2011.04217
 url_code: https://github.com/google-research/tiny-differentiable-simulator
 url_dataset:
 url_poster:
-url_project: https://sites.google.com/usc.edu/neuralsim
+url_project:
 url_slides:
 url_source:
 url_video: https://youtu.be/hGphZbMDbYA
