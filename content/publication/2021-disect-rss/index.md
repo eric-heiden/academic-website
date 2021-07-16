@@ -45,8 +45,8 @@ featured: true
 links:
 - name: Website
   url: https://diff-cutting-sim.github.io
-  icon_pack: fab
-  icon: globe
+- name: Blog post
+  url: https://developer.nvidia.com/blog/nvidia-research-disect-a-differentiable-simulation-engine-for-autonomous-robotic-cutting/
 
 url_pdf: https://arxiv.org/abs/2105.12244
 url_code: 
