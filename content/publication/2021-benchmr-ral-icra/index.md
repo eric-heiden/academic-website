@@ -27,7 +27,7 @@ publishDate: 2020-03-12T20:15:43-07:00
 publication_types: ["2"]
 
 # Publication name and optional abbreviated publication name.
-publication: "IEEE Robotics and Automation Letters (RA-L) 2021 and presented at ICRA 2021"
+publication: "IEEE Robotics and Automation Letters (RA-L) 2021 and presented at ICRA 2021 and the ICAPS 2021 Workshop on Planning and Robotics (PlanRob)"
 publication_short: ""
 
 abstract: "Planning smooth and energy-efficient motions for wheeled mobile robots is a central task in applications ranging from autonomous driving to service and intralogistic robotics. Over the past decades, a wide variety of sampling-based motion planners, extend functions, and path-improvement techniques have been proposed for such systems. Choosing the best combination of components that fit an application is a tedious task, even for expert users. With the goal of aiding researchers in designing novel planning algorithms and evaluating path finding solutions, we present Bench-MR: the first open-source sampling-based motion-planning benchmark designed for nonholonomic, wheeled mobile robots.
@@ -55,11 +55,11 @@ links:
 url_pdf:
 url_code: https://github.com/robot-motion/bench-mr
 url_dataset:
-url_poster:
+url_poster: "bench-mr-icaps-poster.pdf"
 url_project:
 url_slides: "Bench-MR-ICRA-2021.pdf"
 url_source:
-url_video: https://youtu.be/dktHfgmnE_M
+url_video: https://youtu.be/vri3VBId0kc
 
 # Featured image
 # To use, add an image named `featured.jpg/png` to your page's folder. 
@@ -84,6 +84,10 @@ projects: ["tamp"]
 slides: ""
 ---
 
+## Presentation at the [ICAPS 2021 PlanRob Workshop](https://icaps21.icaps-conference.org/workshops/PlanRob/)
+
+<iframe width="720" height="405" src="https://www.youtube-nocookie.com/embed/vri3VBId0kc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
 ## Presentation at ICRA 2021
 
-<iframe width="720" height="405" src="https://www.youtube.com/embed/dktHfgmnE_M" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="720" height="405" src="https://www.youtube-nocookie.com/embed/dktHfgmnE_M" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
