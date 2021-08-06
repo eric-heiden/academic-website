@@ -78,7 +78,7 @@ authors:
 - "Joel Burdick"
 
 date: 2021-08-06T20:15:43-07:00
-doi: "10.1109/LRA.2021.3068913"
+doi: 
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2021-03-12T20:15:43-07:00
