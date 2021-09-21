@@ -30,7 +30,7 @@ education:
   courses:
   - course: PhD Computer Science
     institution: University of Southern California
-    year: 2021 (expected)
+    year: 2022 (expected)
   - course: MSc Computer Science (Intelligent Robotics)
     institution: University of Southern California
     year: 2017
