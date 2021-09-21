@@ -21,10 +21,10 @@ publishDate: 2021-09-20T15:33:15-07:00
 publication_types: ["1"]
 
 # Publication name and optional abbreviated publication name.
-publication: "International Conference on Robotics and Automation (ICRA) 2021"
+publication: "International Conference on Robotics and Automation (ICRA) 2022"
 publication_short: ""
 
-abstract: " To accurately reproduce measurements from the real world, simulators need to have an adequate model of the physical system and require the parameters of the model be identified.
+abstract: "To accurately reproduce measurements from the real world, simulators need to have an adequate model of the physical system and require the parameters of the model be identified.
 
 We address the latter problem of estimating parameters through a Bayesian inference approach that approximates a posterior distribution over simulation parameters given real sensor measurements. By extending the commonly used Gaussian likelihood model for trajectories via the multiple-shooting formulation, our chosen particle-based inference algorithm Stein Variational Gradient Descent is able to identify highly nonlinear, underactuated systems. We leverage GPU code generation and differentiable simulation to evaluate the likelihood and its gradient for many particles in parallel.
 
