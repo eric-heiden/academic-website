@@ -49,7 +49,7 @@ links:
   url: https://developer.nvidia.com/blog/nvidia-research-disect-a-differentiable-simulation-engine-for-autonomous-robotic-cutting/
 
 url_pdf: https://arxiv.org/abs/2105.12244
-url_code: 
+url_code: https://github.com/NVlabs/DiSECt
 url_dataset:
 url_poster: poster.pdf
 url_project:
@@ -79,6 +79,8 @@ projects: ["ids"]
 #   Otherwise, set `slides: ""`.
 slides: ""
 ---
+
+<b>Update from 10/20/2021:</> we released the source code and a dataset of high-quality simulations from Ansys LS-DYNA at [https://github.com/NVlabs/DiSECt](https://github.com/NVlabs/DiSECt)
 
 ## Presentation at RSS 2021
 
