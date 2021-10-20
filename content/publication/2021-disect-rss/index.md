@@ -80,7 +80,7 @@ projects: ["ids"]
 slides: ""
 ---
 
-<b>Update from 10/20/2021:</> we released the source code and a dataset of high-quality simulations from Ansys LS-DYNA at [https://github.com/NVlabs/DiSECt](https://github.com/NVlabs/DiSECt)
+<b>Update from 10/20/2021:</b> we released the source code and a dataset of high-quality simulations from Ansys LS-DYNA at [https://github.com/NVlabs/DiSECt](https://github.com/NVlabs/DiSECt)
 
 ## Presentation at RSS 2021
 
