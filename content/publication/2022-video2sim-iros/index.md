@@ -12,7 +12,7 @@ date: 2022-03-21
 doi: ""
 
 # Schedule page publish date (NOT publication's date).
-publishDate: 2022-03-21T15:33:15-07:00
+publishDate: 2022-03-20T15:33:15-07:00
 
 # Publication type.
 # Legend: 0 = Uncategorized; 1 = Conference paper; 2 = Journal article;
