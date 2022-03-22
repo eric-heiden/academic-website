@@ -44,7 +44,7 @@ links:
 - name: Website
   url: https://eric-heiden.github.io/video2sim/
 
-url_pdf: https://arxiv.org/abs/?
+url_pdf: https://arxiv.org/abs/2203.10488
 url_code:
 url_dataset:
 url_poster:
