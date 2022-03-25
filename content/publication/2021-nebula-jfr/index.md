@@ -3,7 +3,9 @@
 
 title: "NeBula: Quest for Robotic Autonomy in Challenging Environments; TEAM CoSTAR at the DARPA Subterranean Challenge"
 
-authors: "Ali Agha et al."
+authors:
+- "Ali Agha"
+- "et al."
 
 date: 2021-08-06T20:15:43-07:00
 doi: 
