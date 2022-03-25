@@ -27,7 +27,7 @@ publication_short: ""
 abstract: "Being able to reproduce physical phenomena ranging from light interaction to contact mechanics, simulators are becoming increasingly useful in more and more application domains where real-world interaction or labeled data are difficult to obtain. Despite recent progress, significant human effort is needed to configure simulators to accurately reproduce real-world behavior. We introduce a pipeline that combines inverse rendering with differentiable simulation to create digital twins of real-world articulated mechanisms from depth or RGB videos. Our approach automatically discovers joint types and estimates their kinematic parameters, while the dynamic properties of the overall mechanism are tuned to attain physically accurate simulations. Control policies optimized in our derived simulation transfer successfully back to the original system, as we demonstrate on a simulated system. Further, our approach accurately reconstructs the kinematic tree of an articulated mechanism being manipulated by a robot, and highly nonlinear dynamics of a real-world coupled pendulum mechanism."
 
 # Summary. An optional shortened abstract.
-summary: "Learn simulators from depth or RGB video."
+summary: 'We present a pipeline to learn simulators from depth or RGB video. The "URDF" of a mechanism is reconstructed, and the simulation parameters are inferred through Bayesian inference.'
 
 tags: []
 categories: []

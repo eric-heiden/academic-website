@@ -75,6 +75,7 @@ user_groups:
 ---
 
 I am a Ph.D. candidate at the [Robotic Embedded Systems Lab (RESL)](http://robotics.usc.edu/resl) advised by [Gaurav S. Sukhatme](http://robotics.usc.edu/~gaurav/) at the [University of Southern California (USC)](http://www.usc.edu"). I am supported by a [Google PhD Fellowship](https://ai.googleblog.com/2020/10/announcing-2020-google-phd-fellows.html).
+
 My research is focused on representations and algorithms that equip robots with the ability to act autonomously in uncertain environments while building models that allow them to make long-term plans. I am investigating novel robot simulators as semantic models of the world that can be updated from measurements. The resulting representation is parameterized by physically meaningful variables and enables approaches in task and motion planning that react to changes in the environment.
 
-Before pursuing my Ph.D., I received my Master's degree from USC where I worked as research assistant at RESL and at the [Information Sciences Institute (ISI)](http://www.isi.edu/home) with [Craig Knoblock](http://usc-isi-i2.github.io/knoblock/) and [Pedro Szekeley](http://usc-isi-i2.github.io/szekely/). Previously, I obtained my Bachelor's degree from the [University of Rostock](https://www.uni-rostock.de/) (Germany) under the guidance of [Sebastian Bader](https://www.mmis.informatik.uni-rostock.de/staff/#c700759) and [Thomas Kirste](https://www.mmis.informatik.uni-rostock.de/staff/#c698787).
+Before pursuing my Ph.D., I received a Master's degree from USC, and a Bachelor's degree from the [University of Rostock](https://www.uni-rostock.de/) (Germany).
