@@ -4,7 +4,7 @@
 title: "Planning High-speed Safe Trajectories in Confidence-rich Maps"
 authors: ["Eric Heiden", "Karol Hausman", "Gaurav S. Sukhatme", "Ali-akbar Agha-mohammadi"]
 date: 2017-11-01
-doi: ""
+doi: "10.1109/IROS.2017.8206120"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T19:34:44-07:00
@@ -45,7 +45,7 @@ url_code:
 url_dataset:
 url_poster:
 url_project:
-url_slides:
+url_slides: 2017-planning-slides.pdf
 url_source:
 url_video:
 
