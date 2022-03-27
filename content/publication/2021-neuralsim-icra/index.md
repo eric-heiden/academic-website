@@ -12,7 +12,7 @@ author_notes:
 - "Equal contribution"
 - "Equal contribution"
 date: 2020-11-09
-doi: ""
+doi: "10.1109/ICRA48506.2021.9560935"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2020-11-09T15:33:15-07:00
