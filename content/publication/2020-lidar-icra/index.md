@@ -4,7 +4,7 @@
 title: "Physics-based Simulation of Continuous-Wave LIDAR for Localization, Calibration and Tracking"
 authors: ["Eric Heiden", "Ziang Liu", "Ragesh K. Ramachandran", "Gaurav S. Sukhatme"]
 date: 2019-10-29
-doi: ""
+doi: "10.1109/ICRA40945.2020.9197138"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T15:33:15-07:00
@@ -42,7 +42,7 @@ url_code:
 url_dataset:
 url_poster:
 url_project:
-url_slides:
+url_slides: 2020-lidar-slides.pdf
 url_source:
 url_video: https://youtu.be/hGphZbMDbYA
 
