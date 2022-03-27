@@ -51,9 +51,9 @@ links:
 url_pdf: https://arxiv.org/abs/2109.08815
 url_code:
 url_dataset:
-url_poster:
+url_poster: 2022-pds-poster.pdf
 url_project:
-url_slides:
+url_slides: 2022-pds-slides.pdf
 url_source:
 url_video: https://youtu.be/QfhsWlKbfYM
 
