@@ -4,7 +4,7 @@
 title: "Confidence-rich Grid Mapping"
 authors: ["Ali-akbar Agha-mohammadi", "Eric Heiden", "Karol Hausman", "Gaurav S. Sukhatme"]
 date: 2017-11-01
-doi: ""
+doi: "10.1007/978-3-030-28619-4_45"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T17:57:19-07:00
