@@ -4,7 +4,7 @@
 title: "LAMP: Large-Scale Autonomous Mapping and Positioning for Exploration of Perceptually-Degraded Subterranean Environments"
 authors: ["Kamak Ebadi", "Yun Chang", "Matteo Palieri", "Alex Stephens", "Alex Hatteland", "Eric Heiden", "Abhishek Thakur", "Benjamin Morrell", "Luca Carlone", "Ali-akbar Agha-mohammadi"]
 date: 2019-10-29T19:06:51-07:00
-doi: ""
+doi: "10.1109/ICRA40945.2020.9197082"
 
 # Schedule page publish date (NOT publication's date).
 publishDate: 2019-10-29T19:06:51-07:00
