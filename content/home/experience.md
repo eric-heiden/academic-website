@@ -18,12 +18,21 @@ date_format = "Jan 2006"
 #   Leave `date_end` empty if it's your current employer.
 #   Begin/end multi-line descriptions with 3 quotes `"""`.
 [[experience]]
+  title = "Research Scientist"
+  company = "NVIDIA"
+  company_url = "https://www.nvidia.com/en-us/research/robotics/"
+  location = "Seattle, WA (Remote)"
+  date_start = "2022-06-06"
+  date_end = ""
+  description = """Closing the sim2real gap in robotics"""
+
+[[experience]]
   title = "Deep Learning Intern"
   company = "NVIDIA"
   company_url = "https://www.nvidia.com/en-us/research/robotics/"
   location = "Seattle, WA (Remote)"
   date_start = "2020-05-18"
-  date_end = ""
+  date_end = "2022-05-13"
   description = """Closing the sim2real gap in robotic cutting via [differentiable physics](https://diff-cutting-sim.github.io/)"""
 
 [[experience]]
