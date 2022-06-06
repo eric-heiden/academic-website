@@ -10,12 +10,12 @@ authors:
 superuser: true
 
 # Role/position
-role: Ph.D. Candidate
+role: Research Scientist
 
 # Organizations/Affiliations
 organizations:
-- name: University of Southern California
-  url: "https://www.usc.edu"
+- name: NVIDIA
+  url: "https://www.nvidia.com"
 
 # Short bio (displayed in user profile at end of posts)
 bio: My research interests include autonomous robots, simulators, and motion planning.
