@@ -47,11 +47,11 @@ links:
 url_pdf: https://arxiv.org/abs/2203.10488
 url_code:
 url_dataset:
-url_poster:
+url_poster: poster.pdf
 url_project:
-url_slides:
+url_slides: slides.pdf
 url_source:
-url_video: 
+url_video: https://youtu.be/g7edzB7qo98
 
 # Featured image
 # To use, add an image named `featured.jpg/png` to your page's folder. 
