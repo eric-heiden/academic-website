@@ -60,7 +60,7 @@ url_video: https://youtu.be/tkl_lywZ94o
 # To use, add an image named `featured.jpg/png` to your page's folder. 
 # Focal points: Smart, Center, TopLeft, Top, TopRight, Left, Right, BottomLeft, Bottom, BottomRight.
 image:
-  caption: "Example grasps generated for the MANO hand"
+  caption: "Example grasps generated for the MANO and Allegro hand"
   focal_point: ""
   preview_only: false
 
