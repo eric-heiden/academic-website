@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newton Determinism Report</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1b1f27;
+      --muted: #5c6675;
+      --line: #d9dee7;
+      --paper: #f7f5f0;
+      --panel: #ffffff;
+      --ok: #087f5b;
+      --ok-bg: #dff7ed;
+      --warn: #a15c00;
+      --warn-bg: #fff2cc;
+      --bad: #a33a3a;
+      --bad-bg: #ffe2df;
+      --blue: #2456a6;
+      --teal: #0f766e;
+      --shadow: 0 18px 50px rgba(37, 43, 56, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    header {
+      padding: 46px clamp(18px, 4vw, 64px) 28px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(120deg, rgba(36, 86, 166, 0.13), transparent 34%),
+        linear-gradient(300deg, rgba(15, 118, 110, 0.12), transparent 38%),
+        #fffdf8;
+    }
+    .hero {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 32px;
+      align-items: end;
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--teal);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      max-width: 860px;
+      font-size: clamp(2.45rem, 6vw, 5.2rem);
+      line-height: 0.95;
+    }
+    .lead {
+      margin: 20px 0 0;
+      max-width: 780px;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.18rem);
+      line-height: 1.55;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .summary-tile {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: var(--shadow);
+    }
+    .summary-tile.emphasis {
+      border-color: rgba(36, 86, 166, 0.32);
+      background: linear-gradient(180deg, rgba(36, 86, 166, 0.06), rgba(255, 255, 255, 0.98));
+    }
+    .summary-tile span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .summary-tile strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 1.75rem;
+      line-height: 1;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 34px clamp(18px, 4vw, 64px) 64px;
+    }
+    .band {
+      margin: 0 0 34px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .band h2, .section-title {
+      margin: 0 0 14px;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+    }
+    .findings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .finding {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .finding.ok { border-left: 5px solid var(--ok); }
+    .finding.warn { border-left: 5px solid var(--warn); }
+    .finding.bad { border-left: 5px solid var(--bad); }
+    .finding h3 {
+      margin: 0 0 8px;
+      font-size: 1.12rem;
+    }
+    .finding p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .method-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .method {
+      border-left: 4px solid var(--blue);
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .method strong { display: block; margin-bottom: 5px; }
+    .method p { margin: 0; color: var(--muted); line-height: 1.45; }
+    .scenario {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.05fr) minmax(320px, 0.95fr);
+      gap: 22px;
+      align-items: stretch;
+      margin: 0 0 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .media {
+      min-height: 320px;
+      background: #151821;
+      display: flex;
+      flex-direction: column;
+    }
+    video {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 320px;
+      object-fit: cover;
+      background: #151821;
+    }
+    .video-caption {
+      margin: 0;
+      padding: 10px 14px 14px;
+      color: #d7dbe7;
+      background: #151821;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+    .scenario-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .scenario-heading h2 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.7vw, 2rem);
+    }
+    .scenario-body p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 78px;
+      background: #fbfcfd;
+    }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 7px;
+      font-size: 1.18rem;
+      overflow-wrap: anywhere;
+    }
+    .solver-cards {
+      display: grid;
+      gap: 10px;
+    }
+    .solver-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcfd;
+    }
+    .solver-card.ok { border-left: 5px solid var(--ok); }
+    .solver-card.warn { border-left: 5px solid var(--warn); }
+    .solver-card.bad { border-left: 5px solid var(--bad); }
+    .solver-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+    .solver-card-head h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+    .solver-summary {
+      margin: 10px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .solver-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .solver-stats div {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      min-height: 74px;
+    }
+    .solver-stats span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .solver-stats strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 1rem;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .error-log {
+      margin: 14px 0 0;
+      padding: 12px;
+      background: #161923;
+      color: #f4f7ff;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.83rem;
+      line-height: 1.45;
+    }
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 78px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .pill.ok { color: var(--ok); background: var(--ok-bg); }
+    .pill.warn { color: var(--warn); background: var(--warn-bg); }
+    .pill.bad { color: var(--bad); background: var(--bad-bg); }
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 960px;
+    }
+    th, td {
+      padding: 13px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    th {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      background: #fbfcfd;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .list-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .list-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .list-card h3 {
+      margin: 0 0 10px;
+      font-size: 1.15rem;
+    }
+    .list-card p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .list-card ul {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    footer {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 clamp(18px, 4vw, 64px) 42px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    @media (max-width: 980px) {
+      .hero, .scenario, .list-grid { grid-template-columns: 1fr; }
+      .findings-grid { grid-template-columns: 1fr; }
+      .method-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .solver-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      header { padding-top: 34px; }
+      main { padding-top: 24px; }
+      .method-grid, .metrics, .summary-grid, .solver-stats { grid-template-columns: 1fr; }
+      .scenario-body { padding: 18px; }
+      .media, video { min-height: 230px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Newton determinism harness</p>
+        <h1>Run to run physics determinism report</h1>
+        <p class="lead">
+          8 Newton scenarios were replayed in independent subprocesses with
+          <code>wp.config.deterministic = "run_to_run"</code>.
+          The videos are captured from headless <code>ViewerGL.get_frame()</code>; the verdicts
+          come from byte hashes of final physics state arrays. The full report covers the physics scenarios registered for this report. Contact scenarios use <code>CollisionPipeline(deterministic=True)</code> for contact ordering.
+        </p>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-tile emphasis"><span>Scenarios</span><strong>8</strong></div>
+        <div class="summary-tile"><span>Solver pairs</span><strong>17</strong></div>
+        <div class="summary-tile"><span>Bit-exact</span><strong>16</strong></div>
+        <div class="summary-tile"><span>Drift</span><strong>1</strong></div>
+        <div class="summary-tile"><span>Failures</span><strong>0</strong></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="band">
+      <h2>What This Run Shows</h2>
+      <div class="findings-grid">
+        
+        <article class="finding ok">
+          <p class="eyebrow">Key finding</p>
+          <h3>Replay health</h3>
+          <p>All 17 solver pairs completed 2 independent subprocess replays.</p>
+        </article>
+
+        <article class="finding warn">
+          <p class="eyebrow">Key finding</p>
+          <h3>Run-to-run verdict</h3>
+          <p>1 of 17 solver pair(s) still diverged under wp.config.deterministic=&#x27;run_to_run&#x27;.</p>
+        </article>
+
+        <article class="finding warn">
+          <p class="eyebrow">Key finding</p>
+          <h3>Largest remaining gap</h3>
+          <p>Diffsim Cloth COM / semi_implicit drifts the most: initial_particle_qd_grad = 2.235e-08.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="band">
+      <h2>Method</h2>
+      <div class="method-grid">
+        <div class="method">
+          <strong>Independent replays</strong>
+          <p>2 subprocess runs per supported scenario/solver pair.</p>
+        </div>
+        <div class="method">
+          <strong>Canonical hash</strong>
+          <p>Hashes include <code>body_q</code>, <code>body_qd</code>, <code>joint_q</code>, and <code>joint_qd</code>.</p>
+        </div>
+        <div class="method">
+          <strong>Fixed workload</strong>
+          <p>60 frames, 4 substeps, 60 Hz, seed 0, world count 2.</p>
+        </div>
+        <div class="method">
+          <strong>Deterministic contacts</strong>
+          <p>Contact scenarios use <code>CollisionPipeline(deterministic=True)</code> with the report's global Warp determinism mode.</p>
+        </div>
+        <div class="method">
+          <strong>Visual capture</strong>
+          <p>Representative videos use one world and MP4 frames read through <code>ViewerGL.get_frame()</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Scenario Videos And Statistics</h2>
+      
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_xpbd_poster.png">
+              <source src="assets/falling_cube_xpbd.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              xpbd video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">falling_cube</p>
+                  <h2>Falling Cube</h2>
+                </div>
+                <p>Single free rigid body floor contact. Useful for detecting tiny contact drift after impact.</p>
+                <div class="metrics">
+                  
+        <div class="metric">
+          <span>Final height mean</span>
+          <strong>0.15 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Final height range</span>
+          <strong>0.15-0.15 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Awake bodies</span>
+          <strong>0</strong>
+        </div>
+
+        <div class="metric">
+          <span>Mean speed</span>
+          <strong>2.801e-04 m/s</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>featherstone</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>32.163 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>mujoco</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>77.886 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>18.842 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>xpbd</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>15.013 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/box_stack_xpbd_poster.png">
+              <source src="assets/box_stack_xpbd.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              xpbd video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">box_stack</p>
+                  <h2>Box Stack</h2>
+                </div>
+                <p>Twenty jittered boxes with many contacts. A compact stress case for ordering and reductions.</p>
+                <div class="metrics">
+                  
+        <div class="metric">
+          <span>COM drift</span>
+          <strong>0.002 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Kinetic energy proxy</span>
+          <strong>1924.727</strong>
+        </div>
+
+        <div class="metric">
+          <span>Contact samples</span>
+          <strong>6</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>38</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>mujoco</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>77.442 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>xpbd</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>16.561 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/domino_chain_xpbd_poster.png">
+              <source src="assets/domino_chain_xpbd.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              xpbd video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">domino_chain</p>
+                  <h2>Domino Chain</h2>
+                </div>
+                <p>Sequential impacts amplify small timing changes into visible propagation differences.</p>
+                <div class="metrics">
+                  
+        <div class="metric">
+          <span>Fallen dominos</span>
+          <strong>0</strong>
+        </div>
+
+        <div class="metric">
+          <span>Last-domino time</span>
+          <strong>not reached</strong>
+        </div>
+
+        <div class="metric">
+          <span>First angle</span>
+          <strong>14.324 deg</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tracked fall events</span>
+          <strong>0</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>mujoco</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>42.152 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>xpbd</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>14.384 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/arm_7dof_featherstone_poster.png">
+              <source src="assets/arm_7dof_featherstone.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              featherstone video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">arm_7dof</p>
+                  <h2>7-DOF Arm</h2>
+                </div>
+                <p>Franka arm tracks deterministic sinusoidal PD targets from a fixed base.</p>
+                <div class="metrics">
+                  
+        <div class="metric">
+          <span>Max target error</span>
+          <strong>0.14 rad</strong>
+        </div>
+
+        <div class="metric">
+          <span>Mean target error</span>
+          <strong>0.14 rad</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak PD torque</span>
+          <strong>4.751 N*m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>0</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>featherstone</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>26.121 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>mujoco</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>73.339 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>xpbd</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>38.69 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/humanoid_featherstone_poster.png">
+              <source src="assets/humanoid_featherstone.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              featherstone video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">humanoid</p>
+                  <h2>Humanoid Standing</h2>
+                </div>
+                <p>Unitree H1 holds a standing pose; drift or falling exposes articulated-contact robustness issues.</p>
+                <div class="metrics">
+                  
+        <div class="metric">
+          <span>Final root height</span>
+          <strong>0.723 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Fell worlds</span>
+          <strong>0</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max COM XY drift</span>
+          <strong>0.198 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>28</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>featherstone</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>27.468 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>mujoco</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>67.639 s</strong></div>
+      </div>
+      
+    </article>
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>xpbd</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>27.061 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_ball_semi_implicit_poster.png">
+              <source src="assets/diffsim_ball_semi_implicit.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              semi_implicit video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_ball</p>
+                  <h2>Diffsim Ball</h2>
+                </div>
+                <p>Differentiable particle target with wall and floor contacts; core includes loss and initial-velocity gradients. Diffsim ball target gradient inspired by ``example_diffsim_ball``.</p>
+                <div class="metrics">
+                  
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>13.663 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_cloth_com_semi_implicit_poster.png">
+              <source src="assets/diffsim_cloth_com_semi_implicit.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              semi_implicit video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_cloth_com</p>
+                  <h2>Diffsim Cloth COM</h2>
+                </div>
+                <p>Small differentiable cloth target; COM uses an atomic accumulation before backpropagating gradients. Small cloth gradient scenario inspired by ``example_diffsim_cloth``.</p>
+                <div class="metrics">
+                  
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card warn">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill warn">DRIFT</span>
+      </div>
+      <p class="solver-summary">2 unique hashes across 2 subprocess runs; largest core drift in initial_particle_qd_grad (2.235e-08); CUDA graph.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>2</strong></div>
+        <div><span>Dominant core drift</span><strong>initial_particle_qd_grad (2.235e-08)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>2.235e-08</strong></div>
+        <div><span>Duration</span><strong>11.325 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+                
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_spring_cage_semi_implicit_poster.png">
+              <source src="assets/diffsim_spring_cage_semi_implicit.mp4" type="video/mp4">
+            </video>
+            <p class="video-caption">
+              semi_implicit video, 240 frames encoded at 24 fps
+              (960x540, stride 1).
+            </p>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_spring_cage</p>
+                  <h2>Diffsim Spring Cage</h2>
+                </div>
+                <p>Differentiable spring-cage target; core includes loss and spring rest-length gradients. Spring rest-length gradient inspired by ``example_diffsim_spring_cage``.</p>
+                <div class="metrics">
+                  
+                </div>
+                <div class="solver-cards">
+                  
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>10.163 s</strong></div>
+      </div>
+      
+    </article>
+                </div>
+              </div>
+            </article>
+    </section>
+
+    <section class="band">
+      <h2>Solver Matrix</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Solver</th>
+              <th>Verdict</th>
+              <th>Unique hashes</th>
+              <th>Dominant core signal</th>
+              <th>Max core diff</th>
+              <th>Dominant extra signal</th>
+              <th>Max extras diff</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+            <tr>
+              <td>7-DOF Arm</td>
+              <td><code>featherstone</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>26.121 s</td>
+            </tr>
+
+            <tr>
+              <td>7-DOF Arm</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>73.339 s</td>
+            </tr>
+
+            <tr>
+              <td>7-DOF Arm</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>38.69 s</td>
+            </tr>
+
+            <tr>
+              <td>Box Stack</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>77.442 s</td>
+            </tr>
+
+            <tr>
+              <td>Box Stack</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>16.561 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Ball</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>final_particle_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>13.663 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Cloth COM</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill warn">DRIFT</span></td>
+              <td>2</td>
+              <td>initial_particle_qd_grad (2.235e-08)</td>
+              <td>2.235e-08</td>
+              <td>-</td>
+              <td>0</td>
+              <td>11.325 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Spring Cage</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>final_particle_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>10.163 s</td>
+            </tr>
+
+            <tr>
+              <td>Domino Chain</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>42.152 s</td>
+            </tr>
+
+            <tr>
+              <td>Domino Chain</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>14.384 s</td>
+            </tr>
+
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>featherstone</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>32.163 s</td>
+            </tr>
+
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>77.886 s</td>
+            </tr>
+
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>18.842 s</td>
+            </tr>
+
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>15.013 s</td>
+            </tr>
+
+            <tr>
+              <td>Humanoid Standing</td>
+              <td><code>featherstone</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>27.468 s</td>
+            </tr>
+
+            <tr>
+              <td>Humanoid Standing</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>67.639 s</td>
+            </tr>
+
+            <tr>
+              <td>Humanoid Standing</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>body_q (0)</td>
+              <td>0</td>
+              <td>-</td>
+              <td>0</td>
+              <td>27.061 s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="band">
+      <h2>Observed Gaps And Scope</h2>
+      <div class="list-grid">
+        <div class="list-card">
+          <h3>Observed gaps in this run</h3>
+          <p>These notes are generated from the actual solver results above rather than a static message.</p>
+          <ul>
+            <li>Diffsim Cloth COM / semi_implicit: 2 unique hashes across 2 runs; dominant core drift in initial_particle_qd_grad = 2.235e-08; execution = CUDA graph.</li>
+          </ul>
+        </div>
+        <div class="list-card">
+          <h3>What the report does and does not prove</h3>
+          <p>The current harness is precise about repeated local replays, but it intentionally stops short of broader claims.</p>
+          <ul>
+            <li>This report only checks repeated runs on the same machine, driver, GPU, and Warp/Newton build; it does not prove cross-GPU or cross-driver reproducibility.</li>
+<li>The verdict is based on final core state hashes. Videos and scenario extras are diagnostic evidence, not the primary pass/fail signal.</li>
+          </ul>
+        </div>
+        <div class="list-card">
+          <h3>Controls in this harness</h3>
+          <ul>
+            <li><code>wp.config.deterministic</code> is set before heavy Warp/Newton imports and propagated to subprocesses.</li>
+            <li>Each scenario owns a seeded NumPy RNG, so pose jitter and control trajectories are reproducible.</li>
+            <li>The comparison boundary is process-level: no Python or GPU state is reused between replays.</li>
+            <li>Only final core state decides the verdict; scenario extras are diagnostic and reported separately.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Generated 2026-05-12 00:29:11 Pacific Daylight Time. Raw machine-readable data: <code>determinism_report.json</code>.
+  </footer>
+</body>
+</html>
