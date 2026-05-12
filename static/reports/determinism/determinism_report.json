@@ -1,0 +1,1356 @@
+{
+  "generated_at": "2026-05-12 00:29:11 Pacific Daylight Time",
+  "config": {
+    "runs": 2,
+    "num_steps": 60,
+    "substeps": 4,
+    "fps": 60,
+    "world_count": 2,
+    "seed": 0,
+    "warp_deterministic": "run_to_run"
+  },
+  "scenario_order": [
+    "falling_cube",
+    "box_stack",
+    "domino_chain",
+    "arm_7dof",
+    "humanoid",
+    "diffsim_ball",
+    "diffsim_cloth_com",
+    "diffsim_spring_cage"
+  ],
+  "scenarios": {
+    "falling_cube": {
+      "title": "Falling Cube",
+      "doc": "",
+      "note": "Single free rigid body floor contact. Useful for detecting tiny contact drift after impact.",
+      "representative_solver": "xpbd"
+    },
+    "box_stack": {
+      "title": "Box Stack",
+      "doc": "",
+      "note": "Twenty jittered boxes with many contacts. A compact stress case for ordering and reductions.",
+      "representative_solver": "xpbd"
+    },
+    "domino_chain": {
+      "title": "Domino Chain",
+      "doc": "",
+      "note": "Sequential impacts amplify small timing changes into visible propagation differences.",
+      "representative_solver": "xpbd"
+    },
+    "arm_7dof": {
+      "title": "7-DOF Arm",
+      "doc": "",
+      "note": "Franka arm tracks deterministic sinusoidal PD targets from a fixed base.",
+      "representative_solver": "featherstone"
+    },
+    "humanoid": {
+      "title": "Humanoid Standing",
+      "doc": "",
+      "note": "Unitree H1 holds a standing pose; drift or falling exposes articulated-contact robustness issues.",
+      "representative_solver": "featherstone"
+    },
+    "diffsim_ball": {
+      "title": "Diffsim Ball",
+      "doc": "Diffsim ball target gradient inspired by ``example_diffsim_ball``.",
+      "note": "Differentiable particle target with wall and floor contacts; core includes loss and initial-velocity gradients.",
+      "representative_solver": "semi_implicit"
+    },
+    "diffsim_cloth_com": {
+      "title": "Diffsim Cloth COM",
+      "doc": "Small cloth gradient scenario inspired by ``example_diffsim_cloth``.",
+      "note": "Small differentiable cloth target; COM uses an atomic accumulation before backpropagating gradients.",
+      "representative_solver": "semi_implicit"
+    },
+    "diffsim_spring_cage": {
+      "title": "Diffsim Spring Cage",
+      "doc": "Spring rest-length gradient inspired by ``example_diffsim_spring_cage``.",
+      "note": "Differentiable spring-cage target; core includes loss and spring rest-length gradients.",
+      "representative_solver": "semi_implicit"
+    }
+  },
+  "solver_results": [
+    {
+      "scenario": "falling_cube",
+      "solver": "xpbd",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "a02cc8895c024b70",
+        "a02cc8895c024b70"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "final_pose": 0.0,
+        "final_velocity": 0.0,
+        "final_height": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "final_pose",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "falling_cube",
+        "solver": "xpbd",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final height mean",
+          "value": "0.15 m"
+        },
+        {
+          "label": "Final height range",
+          "value": "0.15-0.15 m"
+        },
+        {
+          "label": "Awake bodies",
+          "value": "0"
+        },
+        {
+          "label": "Mean speed",
+          "value": "2.801e-04 m/s"
+        }
+      ],
+      "duration_s": 15.01253859999997,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "falling_cube",
+      "solver": "featherstone",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "01bbd6f08b74e93a",
+        "01bbd6f08b74e93a"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "final_pose": 0.0,
+        "final_velocity": 0.0,
+        "final_height": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "final_pose",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "falling_cube",
+        "solver": "featherstone",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final height mean",
+          "value": "0.884 m"
+        },
+        {
+          "label": "Final height range",
+          "value": "0.884-0.884 m"
+        },
+        {
+          "label": "Awake bodies",
+          "value": "2"
+        },
+        {
+          "label": "Mean speed",
+          "value": "0.859 m/s"
+        }
+      ],
+      "duration_s": 32.16257900000346,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "falling_cube",
+      "solver": "semi_implicit",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "373f429491fcc0a5",
+        "373f429491fcc0a5"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "final_pose": 0.0,
+        "final_velocity": 0.0,
+        "final_height": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "final_pose",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "falling_cube",
+        "solver": "semi_implicit",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final height mean",
+          "value": "0.884 m"
+        },
+        {
+          "label": "Final height range",
+          "value": "0.884-0.884 m"
+        },
+        {
+          "label": "Awake bodies",
+          "value": "2"
+        },
+        {
+          "label": "Mean speed",
+          "value": "0.842 m/s"
+        }
+      ],
+      "duration_s": 18.84229050000431,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "falling_cube",
+      "solver": "mujoco",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "68935964b1c713c4",
+        "68935964b1c713c4"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "final_pose": 0.0,
+        "final_velocity": 0.0,
+        "final_height": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "final_pose",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "falling_cube",
+        "solver": "mujoco",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final height mean",
+          "value": "0.15 m"
+        },
+        {
+          "label": "Final height range",
+          "value": "0.15-0.15 m"
+        },
+        {
+          "label": "Awake bodies",
+          "value": "0"
+        },
+        {
+          "label": "Mean speed",
+          "value": "6.262e-06 m/s"
+        }
+      ],
+      "duration_s": 77.88564860000042,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "box_stack",
+      "solver": "xpbd",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "2dcf0af6b09042a2",
+        "2dcf0af6b09042a2"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "stack_order_world0": 0.0,
+        "contact_count_history": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "stack_order_world0",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "box_stack",
+        "solver": "xpbd",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "COM drift",
+          "value": "0.002 m"
+        },
+        {
+          "label": "Kinetic energy proxy",
+          "value": "1924.727"
+        },
+        {
+          "label": "Contact samples",
+          "value": "6"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "38"
+        }
+      ],
+      "duration_s": 16.561317599996983,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "box_stack",
+      "solver": "mujoco",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "cca7bd4780f3553c",
+        "cca7bd4780f3553c"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "stack_order_world0": 0.0,
+        "contact_count_history": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "stack_order_world0",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "box_stack",
+        "solver": "mujoco",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "COM drift",
+          "value": "0.002 m"
+        },
+        {
+          "label": "Kinetic energy proxy",
+          "value": "1924.727"
+        },
+        {
+          "label": "Contact samples",
+          "value": "6"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "38"
+        }
+      ],
+      "duration_s": 77.44210680000106,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "domino_chain",
+      "solver": "xpbd",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "bfe9e2bd2ae05b03",
+        "bfe9e2bd2ae05b03"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {},
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": null,
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "domino_chain",
+        "solver": "xpbd",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Fallen dominos",
+          "value": "0"
+        },
+        {
+          "label": "Last-domino time",
+          "value": "not reached"
+        },
+        {
+          "label": "First angle",
+          "value": "14.324 deg"
+        },
+        {
+          "label": "Tracked fall events",
+          "value": "0"
+        }
+      ],
+      "duration_s": 14.383987699999125,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "domino_chain",
+      "solver": "mujoco",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "bd7d9d2811d1d0fe",
+        "bd7d9d2811d1d0fe"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {},
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": null,
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "domino_chain",
+        "solver": "mujoco",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Fallen dominos",
+          "value": "0"
+        },
+        {
+          "label": "Last-domino time",
+          "value": "not reached"
+        },
+        {
+          "label": "First angle",
+          "value": "14.324 deg"
+        },
+        {
+          "label": "Tracked fall events",
+          "value": "0"
+        }
+      ],
+      "duration_s": 42.15220930000214,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "arm_7dof",
+      "solver": "xpbd",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "71cdea8201bfbf6f",
+        "71cdea8201bfbf6f"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "joint_q_history": 0.0,
+        "joint_qd_history": 0.0,
+        "joint_tau_history": 0.0,
+        "final_target_error": 0.0,
+        "contact_count_history": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "joint_q_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "arm_7dof",
+        "solver": "xpbd",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Max target error",
+          "value": "0.35 rad"
+        },
+        {
+          "label": "Mean target error",
+          "value": "0.35 rad"
+        },
+        {
+          "label": "Peak PD torque",
+          "value": "41.982 N*m"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "0"
+        }
+      ],
+      "duration_s": 38.68972309999663,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "arm_7dof",
+      "solver": "featherstone",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "4c7b6368535aea2c",
+        "4c7b6368535aea2c"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "joint_q_history": 0.0,
+        "joint_qd_history": 0.0,
+        "joint_tau_history": 0.0,
+        "final_target_error": 0.0,
+        "contact_count_history": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "joint_q_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": false,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "arm_7dof",
+        "solver": "featherstone",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": false,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": false,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Max target error",
+          "value": "0.14 rad"
+        },
+        {
+          "label": "Mean target error",
+          "value": "0.14 rad"
+        },
+        {
+          "label": "Peak PD torque",
+          "value": "4.751 N*m"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "0"
+        }
+      ],
+      "duration_s": 26.121146000004956,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "arm_7dof",
+      "solver": "mujoco",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "c31b35d9dd27bcad",
+        "c31b35d9dd27bcad"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "joint_q_history": 0.0,
+        "joint_qd_history": 0.0,
+        "joint_tau_history": 0.0,
+        "final_target_error": 0.0,
+        "contact_count_history": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "joint_q_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "arm_7dof",
+        "solver": "mujoco",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Max target error",
+          "value": "1.754 rad"
+        },
+        {
+          "label": "Mean target error",
+          "value": "1.754 rad"
+        },
+        {
+          "label": "Peak PD torque",
+          "value": "15 N*m"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "64"
+        }
+      ],
+      "duration_s": 73.3386268999966,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "humanoid",
+      "solver": "xpbd",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "71260f98b7adeace",
+        "71260f98b7adeace"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "com_history": 0.0,
+        "foot_contact_history": 0.0,
+        "fell_mask": 0.0,
+        "root_height_final": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "com_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "humanoid",
+        "solver": "xpbd",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final root height",
+          "value": "1.06 m"
+        },
+        {
+          "label": "Fell worlds",
+          "value": "0"
+        },
+        {
+          "label": "Max COM XY drift",
+          "value": "0 m"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "28"
+        }
+      ],
+      "duration_s": 27.061357400001725,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "humanoid",
+      "solver": "featherstone",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "bba549dbc9d30790",
+        "bba549dbc9d30790"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "com_history": 0.0,
+        "foot_contact_history": 0.0,
+        "fell_mask": 0.0,
+        "root_height_final": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "com_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "humanoid",
+        "solver": "featherstone",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final root height",
+          "value": "0.723 m"
+        },
+        {
+          "label": "Fell worlds",
+          "value": "0"
+        },
+        {
+          "label": "Max COM XY drift",
+          "value": "0.198 m"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "28"
+        }
+      ],
+      "duration_s": 27.468262800000957,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "humanoid",
+      "solver": "mujoco",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "eb9a74812bdf98ce",
+        "eb9a74812bdf98ce"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "body_q": 0.0,
+        "body_qd": 0.0,
+        "joint_q": 0.0,
+        "joint_qd": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "body_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "com_history": 0.0,
+        "foot_contact_history": 0.0,
+        "fell_mask": 0.0,
+        "root_height_final": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "com_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": true,
+      "meta": {
+        "scenario": "humanoid",
+        "solver": "mujoco",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": true
+      },
+      "metrics": [
+        {
+          "label": "Final root height",
+          "value": "0.444 m"
+        },
+        {
+          "label": "Fell worlds",
+          "value": "2"
+        },
+        {
+          "label": "Max COM XY drift",
+          "value": "0.622 m"
+        },
+        {
+          "label": "Peak contacts",
+          "value": "28"
+        }
+      ],
+      "duration_s": 67.63919880000321,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "diffsim_ball",
+      "solver": "semi_implicit",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "56b799bd12c7bc6c",
+        "56b799bd12c7bc6c"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "final_particle_q": 0.0,
+        "final_particle_qd": 0.0,
+        "initial_particle_qd_grad": 0.0,
+        "loss": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "final_particle_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "loss_history": 0.0,
+        "target": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "loss_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": true,
+      "collision_pipeline_wp_deterministic": "run_to_run",
+      "graph_capture_enabled": false,
+      "meta": {
+        "scenario": "diffsim_ball",
+        "solver": "semi_implicit",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "collision_pipeline_deterministic": true,
+        "collision_pipeline_wp_deterministic": "run_to_run",
+        "custom_collision_pipeline": true,
+        "graph_capture_enabled": false,
+        "diffsim": true
+      },
+      "metrics": [],
+      "duration_s": 13.663079399993876,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    },
+    {
+      "scenario": "diffsim_cloth_com",
+      "solver": "semi_implicit",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "non_deterministic",
+      "all_equal": false,
+      "hashes": [
+        "1ac3eb5e5ca6c617",
+        "ee66762bd10913e4"
+      ],
+      "unique_hashes": 2,
+      "max_core_diff": {
+        "final_particle_q": 0.0,
+        "final_particle_qd": 0.0,
+        "initial_particle_qd_grad": 2.2351741790771484e-08,
+        "com": 0.0,
+        "loss": 0.0
+      },
+      "max_core_diff_overall": 2.2351741790771484e-08,
+      "dominant_core_signal": "initial_particle_qd_grad",
+      "dominant_core_value": 2.2351741790771484e-08,
+      "extras_diff": {
+        "loss_history": 0.0,
+        "target": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "loss_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": false,
+      "collision_pipeline_wp_deterministic": null,
+      "graph_capture_enabled": false,
+      "meta": {
+        "scenario": "diffsim_cloth_com",
+        "solver": "semi_implicit",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "graph_capture_enabled": false,
+        "diffsim": true
+      },
+      "metrics": [],
+      "duration_s": 11.325184100001934,
+      "summary": "2 unique hashes across 2 subprocess runs; largest core drift in initial_particle_qd_grad (2.235e-08); CUDA graph."
+    },
+    {
+      "scenario": "diffsim_spring_cage",
+      "solver": "semi_implicit",
+      "variant_id": "default",
+      "variant_label": "Default",
+      "variant_order": 0,
+      "status": "bit_exact",
+      "all_equal": true,
+      "hashes": [
+        "60224c5c5a7d340d",
+        "60224c5c5a7d340d"
+      ],
+      "unique_hashes": 1,
+      "max_core_diff": {
+        "final_particle_q": 0.0,
+        "final_particle_qd": 0.0,
+        "spring_rest_length_grad": 0.0,
+        "loss": 0.0
+      },
+      "max_core_diff_overall": 0.0,
+      "dominant_core_signal": "final_particle_q",
+      "dominant_core_value": 0.0,
+      "extras_diff": {
+        "loss_history": 0.0,
+        "target": 0.0
+      },
+      "max_extras_diff_overall": 0.0,
+      "dominant_extra_signal": "loss_history",
+      "dominant_extra_value": 0.0,
+      "disable_graph": false,
+      "collision_pipeline_deterministic": false,
+      "collision_pipeline_wp_deterministic": null,
+      "graph_capture_enabled": false,
+      "meta": {
+        "scenario": "diffsim_spring_cage",
+        "solver": "semi_implicit",
+        "world_count": 2,
+        "num_steps": 60,
+        "seed": 0,
+        "fps": 60,
+        "substeps": 4,
+        "warp_version": "1.14.0.dev0",
+        "wp_deterministic": "run_to_run",
+        "graph_capture_enabled": false,
+        "diffsim": true
+      },
+      "metrics": [],
+      "duration_s": 10.163171899999725,
+      "summary": "2/2 subprocess replays matched byte-for-byte with CUDA graph enabled."
+    }
+  ],
+  "videos": [
+    {
+      "scenario": "falling_cube",
+      "solver": "xpbd",
+      "video": "falling_cube_xpbd.mp4",
+      "poster": "falling_cube_xpbd_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 40.450310570987654,
+      "last_mean": 40.31791345164609
+    },
+    {
+      "scenario": "box_stack",
+      "solver": "xpbd",
+      "video": "box_stack_xpbd.mp4",
+      "poster": "box_stack_xpbd_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 42.26835583847737,
+      "last_mean": 43.865737525720164
+    },
+    {
+      "scenario": "domino_chain",
+      "solver": "xpbd",
+      "video": "domino_chain_xpbd.mp4",
+      "poster": "domino_chain_xpbd_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 46.60653420781893,
+      "last_mean": 46.82295781893004
+    },
+    {
+      "scenario": "arm_7dof",
+      "solver": "featherstone",
+      "video": "arm_7dof_featherstone.mp4",
+      "poster": "arm_7dof_featherstone_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 49.05024819958848,
+      "last_mean": 49.961316229423865
+    },
+    {
+      "scenario": "humanoid",
+      "solver": "featherstone",
+      "video": "humanoid_featherstone.mp4",
+      "poster": "humanoid_featherstone_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 41.43904063786008,
+      "last_mean": 41.53527199074074
+    },
+    {
+      "scenario": "diffsim_ball",
+      "solver": "semi_implicit",
+      "video": "diffsim_ball_semi_implicit.mp4",
+      "poster": "diffsim_ball_semi_implicit_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 47.24265496399177,
+      "last_mean": 47.146033307613166
+    },
+    {
+      "scenario": "diffsim_cloth_com",
+      "solver": "semi_implicit",
+      "video": "diffsim_cloth_com_semi_implicit.mp4",
+      "poster": "diffsim_cloth_com_semi_implicit_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 48.33533307613169,
+      "last_mean": 48.08200360082304
+    },
+    {
+      "scenario": "diffsim_spring_cage",
+      "solver": "semi_implicit",
+      "video": "diffsim_spring_cage_semi_implicit.mp4",
+      "poster": "diffsim_spring_cage_semi_implicit_poster.png",
+      "frames": 240,
+      "sim_steps": 240,
+      "frame_stride": 1,
+      "fps": 24,
+      "warp_deterministic": "not_guaranteed",
+      "width": 960,
+      "height": 540,
+      "first_mean": 47.855102880658436,
+      "last_mean": 47.85450552983539
+    }
+  ],
+  "xpbd_only": false,
+  "analysis": {
+    "findings": [
+      {
+        "tone": "ok",
+        "title": "Replay health",
+        "body": "All 17 solver pairs completed 2 independent subprocess replays."
+      },
+      {
+        "tone": "warn",
+        "title": "Run-to-run verdict",
+        "body": "1 of 17 solver pair(s) still diverged under wp.config.deterministic='run_to_run'."
+      },
+      {
+        "tone": "warn",
+        "title": "Largest remaining gap",
+        "body": "Diffsim Cloth COM / semi_implicit drifts the most: initial_particle_qd_grad = 2.235e-08."
+      }
+    ],
+    "observed_gaps": [
+      "Diffsim Cloth COM / semi_implicit: 2 unique hashes across 2 runs; dominant core drift in initial_particle_qd_grad = 2.235e-08; execution = CUDA graph."
+    ],
+    "scope_limits": [
+      "This report only checks repeated runs on the same machine, driver, GPU, and Warp/Newton build; it does not prove cross-GPU or cross-driver reproducibility.",
+      "The verdict is based on final core state hashes. Videos and scenario extras are diagnostic evidence, not the primary pass/fail signal."
+    ]
+  }
+}
