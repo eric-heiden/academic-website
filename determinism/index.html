@@ -325,6 +325,12 @@
       border-radius: 8px;
       box-shadow: var(--shadow);
     }
+    .section-copy {
+      margin: 0 0 16px;
+      max-width: 860px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -400,18 +406,20 @@
         <p class="eyebrow">Newton determinism harness</p>
         <h1>Run to run physics determinism report</h1>
         <p class="lead">
-          10 Newton scenarios were replayed in independent subprocesses with
+          12 Newton physics scenarios and 5 Warp lowering probes were replayed in independent subprocesses with
           <code>wp.config.deterministic = "run_to_run"</code>.
           The videos are captured from headless <code>ViewerGL.get_frame()</code>; the verdicts
           come from byte hashes of final physics state arrays. The full report covers the physics scenarios registered for this report. Contact scenarios use <code>CollisionPipeline(deterministic=True)</code> for contact ordering. MJWarp modules use <code>deterministic_max_records = 256</code> for dynamic solver atomics.
         </p>
       </div>
       <div class="summary-grid">
-        <div class="summary-tile emphasis"><span>Scenarios</span><strong>10</strong></div>
-        <div class="summary-tile"><span>Solver pairs</span><strong>22</strong></div>
-        <div class="summary-tile"><span>Bit-exact</span><strong>22</strong></div>
+        <div class="summary-tile emphasis"><span>Scenarios</span><strong>12</strong></div>
+        <div class="summary-tile"><span>Solver pairs</span><strong>24</strong></div>
+        <div class="summary-tile"><span>Warp probes</span><strong>5</strong></div>
+        <div class="summary-tile"><span>Total checks</span><strong>29</strong></div>
+        <div class="summary-tile"><span>Bit-exact</span><strong>28</strong></div>
         <div class="summary-tile"><span>Drift</span><strong>0</strong></div>
-        <div class="summary-tile"><span>Failures</span><strong>0</strong></div>
+        <div class="summary-tile"><span>Failures</span><strong>1</strong></div>
       </div>
     </div>
   </header>
@@ -424,7 +432,7 @@
         <article class="finding ok">
           <p class="eyebrow">Key finding</p>
           <h3>Replay health</h3>
-          <p>All 22 solver pairs completed 2 independent subprocess replays.</p>
+          <p>All 24 solver pairs completed 2 independent subprocess replays.</p>
         </article>
 
         <article class="finding ok">
@@ -437,6 +445,12 @@
           <p class="eyebrow">Key finding</p>
           <h3>Largest remaining gap</h3>
           <p>No remaining run-to-run gap was observed in the tested harness slice on this GPU/software stack.</p>
+        </article>
+
+        <article class="finding warn">
+          <p class="eyebrow">Key finding</p>
+          <h3>Warp lowering probes</h3>
+          <p>4/5 focused Warp micro-probes were bit-exact; 0 drifted and 1 failed before replay comparison.</p>
         </article>
       </div>
     </section>
@@ -572,7 +586,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>13.751 s</strong></div>
+        <div><span>Duration</span><strong>13.008 s</strong></div>
       </div>
 
     </article>
@@ -591,7 +605,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>67.858 s</strong></div>
+        <div><span>Duration</span><strong>52.01 s</strong></div>
       </div>
 
     </article>
@@ -610,7 +624,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>13.574 s</strong></div>
+        <div><span>Duration</span><strong>11.786 s</strong></div>
       </div>
 
     </article>
@@ -629,7 +643,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>16.753 s</strong></div>
+        <div><span>Duration</span><strong>14.61 s</strong></div>
       </div>
 
     </article>
@@ -648,7 +662,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>14.148 s</strong></div>
+        <div><span>Duration</span><strong>12.195 s</strong></div>
       </div>
 
     </article>
@@ -736,7 +750,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>60.207 s</strong></div>
+        <div><span>Duration</span><strong>48.547 s</strong></div>
       </div>
 
     </article>
@@ -755,7 +769,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.328 s</strong></div>
+        <div><span>Duration</span><strong>14.696 s</strong></div>
       </div>
 
     </article>
@@ -774,7 +788,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>14.785 s</strong></div>
+        <div><span>Duration</span><strong>12.921 s</strong></div>
       </div>
 
     </article>
@@ -862,7 +876,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>60.251 s</strong></div>
+        <div><span>Duration</span><strong>49.368 s</strong></div>
       </div>
 
     </article>
@@ -881,7 +895,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.102 s</strong></div>
+        <div><span>Duration</span><strong>14.898 s</strong></div>
       </div>
 
     </article>
@@ -900,7 +914,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>14.351 s</strong></div>
+        <div><span>Duration</span><strong>12.674 s</strong></div>
       </div>
 
     </article>
@@ -988,7 +1002,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>29.416 s</strong></div>
+        <div><span>Duration</span><strong>24.392 s</strong></div>
       </div>
 
     </article>
@@ -1007,7 +1021,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>81.088 s</strong></div>
+        <div><span>Duration</span><strong>64.535 s</strong></div>
       </div>
 
     </article>
@@ -1026,7 +1040,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>28.457 s</strong></div>
+        <div><span>Duration</span><strong>23.592 s</strong></div>
       </div>
 
     </article>
@@ -1114,7 +1128,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>30.106 s</strong></div>
+        <div><span>Duration</span><strong>24.865 s</strong></div>
       </div>
 
     </article>
@@ -1133,7 +1147,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>77.873 s</strong></div>
+        <div><span>Duration</span><strong>60.131 s</strong></div>
       </div>
 
     </article>
@@ -1152,7 +1166,7 @@
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>24.459 s</strong></div>
+        <div><span>Duration</span><strong>20.402 s</strong></div>
       </div>
 
     </article>
@@ -1182,6 +1196,15 @@
                 <p>Differentiable particle target with wall and floor contacts; core includes loss and initial-velocity gradients. Diffsim ball target gradient inspired by ``example_diffsim_ball``.</p>
                 <div class="metrics">
 
+        <div class="metric">
+          <span>Loss</span>
+          <strong>2.649</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>13.705</strong>
+        </div>
                 </div>
                 <div class="solver-cards">
 
@@ -1199,7 +1222,78 @@
         <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>13.714 s</strong></div>
+        <div><span>Duration</span><strong>11.978 s</strong></div>
+      </div>
+
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+
+                    <div class="solver-video">
+                      <p class="video-label"><code>semi_implicit</code></p>
+                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_bear_semi_implicit_poster.png">
+                        <source src="assets/diffsim_bear_semi_implicit.mp4" type="video/mp4">
+                      </video>
+                      <p class="video-caption">
+                        240 frames encoded at 24 fps
+                        (960x540, stride 1).
+                      </p>
+                    </div>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_bear</p>
+                  <h2>Diffsim Bear</h2>
+                </div>
+                <p>Differentiable soft bear activation network; core includes the loss, COM velocity, and activation-weight gradients. Compact soft bear gradient inspired by ``example_diffsim_bear``.</p>
+                <div class="metrics">
+
+        <div class="metric">
+          <span>Loss</span>
+          <strong>3.397e+04</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>4.005e+24</strong>
+        </div>
+
+        <div class="metric">
+          <span>Particles</span>
+          <strong>3972</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tets</span>
+          <strong>10708</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tape frames</span>
+          <strong>12</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>16.217 s</strong></div>
       </div>
 
     </article>
@@ -1229,6 +1323,15 @@
                 <p>Small differentiable cloth target; COM uses an atomic accumulation before backpropagating gradients. Small cloth gradient scenario inspired by ``example_diffsim_cloth``.</p>
                 <div class="metrics">
 
+        <div class="metric">
+          <span>Loss</span>
+          <strong>5.795</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>0.086</strong>
+        </div>
                 </div>
                 <div class="solver-cards">
 
@@ -1246,7 +1349,73 @@
         <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>9.991 s</strong></div>
+        <div><span>Duration</span><strong>8.546 s</strong></div>
+      </div>
+
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+
+                    <div class="solver-video">
+                      <p class="video-label"><code>semi_implicit</code></p>
+                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_soft_body_semi_implicit_poster.png">
+                        <source src="assets/diffsim_soft_body_semi_implicit.mp4" type="video/mp4">
+                      </video>
+                      <p class="video-caption">
+                        240 frames encoded at 24 fps
+                        (960x540, stride 1).
+                      </p>
+                    </div>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_soft_body</p>
+                  <h2>Diffsim Soft Body</h2>
+                </div>
+                <p>Small differentiable soft-body material target with dynamic soft contacts and material-parameter gradients. Small soft-body material gradient inspired by ``example_diffsim_soft_body``.</p>
+                <div class="metrics">
+
+        <div class="metric">
+          <span>Loss</span>
+          <strong>1.118e+04</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>480.596</strong>
+        </div>
+
+        <div class="metric">
+          <span>Particles</span>
+          <strong>54</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tets</span>
+          <strong>80</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>15.604 s</strong></div>
       </div>
 
     </article>
@@ -1276,6 +1445,15 @@
                 <p>Differentiable spring-cage target; core includes loss and spring rest-length gradients. Spring rest-length gradient inspired by ``example_diffsim_spring_cage``.</p>
                 <div class="metrics">
 
+        <div class="metric">
+          <span>Loss</span>
+          <strong>0.239</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>0.283</strong>
+        </div>
                 </div>
                 <div class="solver-cards">
 
@@ -1293,7 +1471,7 @@
         <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>9.374 s</strong></div>
+        <div><span>Duration</span><strong>8.093 s</strong></div>
       </div>
 
     </article>
@@ -1354,7 +1532,7 @@
         <div><span>Dominant core drift</span><strong>particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.762 s</strong></div>
+        <div><span>Duration</span><strong>15.691 s</strong></div>
       </div>
 
     </article>
@@ -1420,7 +1598,7 @@
         <div><span>Dominant core drift</span><strong>particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>19.253 s</strong></div>
+        <div><span>Duration</span><strong>15.77 s</strong></div>
       </div>
 
     </article>
@@ -1455,7 +1633,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>29.416 s</td>
+              <td>24.392 s</td>
             </tr>
 
             <tr>
@@ -1466,7 +1644,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>81.088 s</td>
+              <td>64.535 s</td>
             </tr>
 
             <tr>
@@ -1477,7 +1655,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>28.457 s</td>
+              <td>23.592 s</td>
             </tr>
 
             <tr>
@@ -1488,7 +1666,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>60.207 s</td>
+              <td>48.547 s</td>
             </tr>
 
             <tr>
@@ -1499,7 +1677,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>17.328 s</td>
+              <td>14.696 s</td>
             </tr>
 
             <tr>
@@ -1510,7 +1688,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>14.785 s</td>
+              <td>12.921 s</td>
             </tr>
 
             <tr>
@@ -1521,7 +1699,18 @@
               <td>final_particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>13.714 s</td>
+              <td>11.978 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Bear</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>final_particle_q (0)</td>
+              <td>0</td>
+              <td>0</td>
+              <td>16.217 s</td>
             </tr>
 
             <tr>
@@ -1532,7 +1721,18 @@
               <td>final_particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>9.991 s</td>
+              <td>8.546 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Soft Body</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>final_particle_q (0)</td>
+              <td>0</td>
+              <td>0</td>
+              <td>15.604 s</td>
             </tr>
 
             <tr>
@@ -1543,7 +1743,7 @@
               <td>final_particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>9.374 s</td>
+              <td>8.093 s</td>
             </tr>
 
             <tr>
@@ -1554,7 +1754,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>60.251 s</td>
+              <td>49.368 s</td>
             </tr>
 
             <tr>
@@ -1565,7 +1765,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>17.102 s</td>
+              <td>14.898 s</td>
             </tr>
 
             <tr>
@@ -1576,7 +1776,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>14.351 s</td>
+              <td>12.674 s</td>
             </tr>
 
             <tr>
@@ -1587,7 +1787,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>13.751 s</td>
+              <td>13.008 s</td>
             </tr>
 
             <tr>
@@ -1598,7 +1798,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>67.858 s</td>
+              <td>52.01 s</td>
             </tr>
 
             <tr>
@@ -1609,7 +1809,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>13.574 s</td>
+              <td>11.786 s</td>
             </tr>
 
             <tr>
@@ -1620,7 +1820,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>16.753 s</td>
+              <td>14.61 s</td>
             </tr>
 
             <tr>
@@ -1631,7 +1831,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>14.148 s</td>
+              <td>12.195 s</td>
             </tr>
 
             <tr>
@@ -1642,7 +1842,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>30.106 s</td>
+              <td>24.865 s</td>
             </tr>
 
             <tr>
@@ -1653,7 +1853,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>77.873 s</td>
+              <td>60.131 s</td>
             </tr>
 
             <tr>
@@ -1664,7 +1864,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>24.459 s</td>
+              <td>20.402 s</td>
             </tr>
 
             <tr>
@@ -1675,7 +1875,7 @@
               <td>particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>17.762 s</td>
+              <td>15.691 s</td>
             </tr>
 
             <tr>
@@ -1686,7 +1886,82 @@
               <td>particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>19.253 s</td>
+              <td>15.77 s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="band">
+      <h2>Warp Lowering Micro-Probes</h2>
+      <p class="section-copy">
+        These headless workloads are not Newton solver scenarios, so they stay out of the solver matrix.
+        They capture the focused Warp atomic and adjoint patterns that motivated the determinism work.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Probe</th>
+              <th>ID</th>
+              <th>Verdict</th>
+              <th>Unique hashes</th>
+              <th>Dominant core signal</th>
+              <th>Max core diff</th>
+              <th>Targeted pattern</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr>
+              <td>Warp Argmax Exchange</td>
+              <td><code>warp_argmax_exchange</code></td>
+              <td><span class="pill bad">FAILED</span></td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>return-consuming atomic_max plus exchange winner</td>
+            </tr>
+
+            <tr>
+              <td>Warp Indexed Counter</td>
+              <td><code>warp_counter_indexed</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>counts (0)</td>
+              <td>0</td>
+              <td>dynamic consumed-return counter index</td>
+            </tr>
+
+            <tr>
+              <td>Warp Sliced Counter</td>
+              <td><code>warp_counter_sliced</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>counts (0)</td>
+              <td>0</td>
+              <td>sliced counter target with dynamic prefix/index</td>
+            </tr>
+
+            <tr>
+              <td>Warp Static Counter Index</td>
+              <td><code>warp_counter_static_index</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>counts (0)</td>
+              <td>0</td>
+              <td>nonzero static consumed-return counter index</td>
+            </tr>
+
+            <tr>
+              <td>Warp Custom Adjoint</td>
+              <td><code>warp_custom_adjoint</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>y (0)</td>
+              <td>0</td>
+              <td>deterministic target mapping for wp.adjoint[array]</td>
             </tr>
           </tbody>
         </table>
@@ -1700,7 +1975,7 @@
           <h3>Observed gaps in this run</h3>
           <p>These notes are generated from the actual solver results above rather than a static message.</p>
           <ul>
-            <li>No observed run-to-run determinism gaps remain in this tested report slice.</li>
+            <li>Warp Argmax Exchange: probe failed before replay comparison; targeted pattern: return-consuming atomic_max plus exchange winner. Last log line: Module scripts.determinism.scenarios.warp_argmax_exchange 21101ef load on device &#x27;cuda:0&#x27; took 0.60 ms  (error)</li>
           </ul>
         </div>
         <div class="list-card">
@@ -1709,6 +1984,7 @@
           <ul>
             <li>This report only checks repeated runs on the same machine, driver, GPU, and Warp/Newton build; it does not prove cross-GPU or cross-driver reproducibility.</li>
 <li>The verdict is based on final core state hashes. Videos and scenario extras are diagnostic evidence, not the primary pass/fail signal.</li>
+<li>Warp lowering micro-probes are headless compiler/runtime workloads, not Newton solver scenarios; they are reported separately from the solver matrix.</li>
           </ul>
         </div>
         <div class="list-card">
@@ -1726,7 +2002,7 @@
   </main>
 
   <footer>
-    Generated 2026-05-26 11:37:37 Pacific Daylight Time. Raw machine-readable data: <code>determinism_report.json</code>.
+    Generated 2026-05-28 09:59:02 Pacific Daylight Time. Raw machine-readable data: <code>determinism_report.json</code>.
   </footer>
 </body>
 </html>
