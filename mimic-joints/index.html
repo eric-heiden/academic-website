@@ -3,18 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Newton Mimic Joints Prototype</title>
+  <title>Newton Mimic Joints Clear-Cut Report</title>
   <style>
     :root {
       color-scheme: light;
-      --ink: #1b1f27;
-      --muted: #596579;
+      --ink: #18212f;
+      --muted: #5b6575;
       --line: #d9dee7;
       --paper: #f7f5f0;
       --panel: #ffffff;
       --accent: #2456a6;
       --teal: #0f766e;
-      --warn: #8a5a00;
     }
     * { box-sizing: border-box; }
     body {
@@ -24,7 +23,7 @@
       color: var(--ink);
     }
     header, main {
-      width: min(1120px, calc(100% - 36px));
+      width: min(1180px, calc(100% - 36px));
       margin: 0 auto;
     }
     header {
@@ -41,13 +40,13 @@
     }
     h1 {
       margin: 0;
-      max-width: 900px;
-      font-size: clamp(2.35rem, 7vw, 5rem);
-      line-height: 0.96;
+      max-width: 980px;
+      font-size: clamp(2.25rem, 6vw, 4.8rem);
+      line-height: 0.98;
       letter-spacing: 0;
     }
     .lead {
-      max-width: 800px;
+      max-width: 840px;
       margin: 20px 0 0;
       color: var(--muted);
       font-size: 1.08rem;
@@ -55,69 +54,65 @@
     }
     main { padding: 30px 0 58px; }
     section {
-      padding: 24px 0;
+      padding: 26px 0;
       border-bottom: 1px solid var(--line);
     }
     h2 {
       margin: 0 0 12px;
-      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      font-size: clamp(1.45rem, 3vw, 2rem);
       letter-spacing: 0;
     }
     p, li {
       color: var(--muted);
       line-height: 1.6;
     }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .metric {
-      padding: 16px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-    }
-    .metric span {
-      display: block;
-      color: var(--muted);
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .metric strong {
-      display: block;
-      margin-top: 8px;
-      font-size: 1.55rem;
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.95em;
     }
     .media-grid {
       display: grid;
       grid-template-columns: minmax(260px, 0.85fr) minmax(280px, 1.15fr);
-      gap: 22px;
+      gap: 24px;
       align-items: center;
+    }
+    .capture-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    figure {
+      margin: 0;
     }
     img {
       width: 100%;
-      max-width: 480px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
+    }
+    figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.4;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       background: var(--panel);
       border: 1px solid var(--line);
+      font-size: 0.95rem;
     }
     th, td {
-      padding: 12px;
+      padding: 10px;
       border-bottom: 1px solid var(--line);
       text-align: left;
       vertical-align: top;
     }
     th {
       color: var(--muted);
-      font-size: 0.8rem;
+      font-size: 0.76rem;
       text-transform: uppercase;
     }
     tr:last-child td { border-bottom: 0; }
@@ -125,118 +120,117 @@
       border-left: 5px solid var(--teal);
       padding: 14px 18px;
       background: var(--panel);
+      color: var(--ink);
     }
-    .note {
-      border-left: 5px solid var(--warn);
-      padding: 14px 18px;
-      background: var(--panel);
-    }
-    @media (max-width: 780px) {
-      .metric-grid, .media-grid { grid-template-columns: 1fr; }
-      th, td { display: block; width: 100%; }
-      th { padding-bottom: 0; }
+    @media (max-width: 900px) {
+      .media-grid, .capture-grid { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
     }
   </style>
 </head>
 <body>
   <header>
     <p class="eyebrow">Newton API Prototype</p>
-    <h1>Mimic Constraints As Joints</h1>
+    <h1>Mimics Are Joints</h1>
     <p class="lead">
-      A first implementation report for representing mimic relationships as zero-DOF follower joints,
-      with inline FK/IK kinematics, a Robotiq-style gripper example, and solver adaptation notes.
+      A clear-cut implementation report for moving URDF and USD mimic relationships into
+      zero-DOF <code>JointType.MIMIC</code> followers, with branch-vs-main measurements
+      on Robotiq and menagerie assets.
     </p>
   </header>
   <main>
     <section class="media-grid">
-      <img src="assets/mimic_joint_kinematics.gif" alt="Animated Robotiq-style mimic joint kinematics">
+      <figure>
+        <img src="assets/mimic_joint_kinematics.gif" alt="Animated Robotiq-style mimic joint kinematics">
+        <figcaption>Minimal Robotiq-style model: one independent driver and five zero-DOF mimic joints.</figcaption>
+      </figure>
       <div>
-        <h2>Prototype Scope</h2>
+        <h2>Implementation</h2>
         <p>
-          The branch adds <code>JointType.MIMIC</code>, stores leader/coefficient/follower-axis metadata on
-          joints, evaluates mimic followers inside the FK kernel, and exposes a URDF prototype switch that can
-          import representable <code>&lt;mimic&gt;</code> tags as zero-DOF joints.
+          URDF <code>&lt;mimic&gt;</code>, USD <code>NewtonMimicAPI</code>, and
+          USD <code>PhysxMimicJointAPI</code> now import as joint metadata. The old
+          <code>mimic_constraints_as_joints</code> flag remains only for source compatibility;
+          passing <code>false</code> does not restore separate mimic-constraint storage.
         </p>
         <p>
-          The animation is a minimal Robotiq-2F85-style two-finger kinematic tree: one driver joint and five
-          follower joints. It isolates the mimic relationship from the full menagerie asset's tendons, contacts,
-          and closed-loop equality constraints.
+          FK and IK consume the follower inline. MuJoCo lowers each Newton MIMIC joint
+          to the synthetic scalar coordinate and <code>mjEQ_JOINT</code> row that MuJoCo
+          needs internally; that lowering is not a second Newton model representation.
         </p>
       </div>
     </section>
 
     <section>
-      <h2>Measured Snapshot</h2>
-      <div class="metric-grid">
-        <div class="metric"><span>Mimic-as-joint DOFs</span><strong>1</strong></div>
-        <div class="metric"><span>Legacy DOFs</span><strong>6</strong></div>
-        <div class="metric"><span>Mimic joints</span><strong>5</strong></div>
-        <div class="metric"><span>Legacy mimic constraints</span><strong>5</strong></div>
-      </div>
+      <h2>Branch vs Main</h2>
+      <p>
+        Each checkout ran the same benchmark harness with 20 samples and 3 repeats on
+        <code>cuda:0</code>. Raw data:
+        <a href="asset_benchmark_branch.json">branch JSON</a>,
+        <a href="asset_benchmark_main.json">main JSON</a>, and
+        <a href="mimic_joint_report.json">minimal example JSON</a>.
+      </p>
       <table>
         <thead>
           <tr>
-            <th>Representation</th>
-            <th>FK timing</th>
-            <th>Extra propagation</th>
-            <th>Interpretation</th>
+            <th>Asset</th>
+            <th>Branch coords / DOFs</th>
+            <th>Main coords / DOFs</th>
+            <th>Branch mimic joints / constraints</th>
+            <th>Main mimic joints / constraints</th>
+            <th>Branch FK mean</th>
+            <th>Main FK mean</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Mimic as joints</td>
-            <td>64.35 us mean on CUDA</td>
-            <td>None</td>
-            <td>Single FK path with one independent driver coordinate.</td>
-          </tr>
-          <tr>
-            <td>Separate mimic constraints</td>
-            <td>56.90 us mean with already propagated follower q</td>
-            <td>207.51 us for host q propagation plus FK</td>
-            <td>Raw FK is comparable, but kinematics-only use needs an extra coordinate propagation step.</td>
-          </tr>
+          <tr><td>Synthetic Robotiq URDF</td><td>1 / 1</td><td>6 / 6</td><td>5 / 0</td><td>0 / 5</td><td>352.2 us</td><td>544.4 us</td></tr>
+          <tr><td>Robotiq 2F85 USD</td><td>6 / 6</td><td>14 / 12</td><td>0 / 0</td><td>0 / 1</td><td>343.9 us</td><td>698.6 us</td></tr>
+          <tr><td>Robotiq 2F85 MJCF</td><td>6 / 6</td><td>14 / 12</td><td>0 / 0</td><td>0 / 1</td><td>351.0 us</td><td>483.0 us</td></tr>
+          <tr><td>LEAP hand MJCF</td><td>16 / 16</td><td>16 / 16</td><td>0 / 0</td><td>0 / 0</td><td>408.5 us</td><td>320.2 us</td></tr>
+          <tr><td>Shadow hand MJCF</td><td>24 / 24</td><td>24 / 24</td><td>0 / 0</td><td>0 / 0</td><td>401.2 us</td><td>331.0 us</td></tr>
+          <tr><td>Unitree G1 with hands URDF</td><td>43 / 43</td><td>43 / 43</td><td>0 / 0</td><td>0 / 0</td><td>420.8 us</td><td>400.1 us</td></tr>
         </tbody>
       </table>
       <p>
-        The raw data is available as <a href="mimic_joint_report.json">mimic_joint_report.json</a>.
+        The mimic-heavy Robotiq cases are the meaningful delta: the branch removes
+        follower coordinates and separate mimic-constraint rows from importer output.
+        The other assets are controls and show no coordinate-count change.
       </p>
     </section>
 
     <section>
-      <h2>Solver Adaptation</h2>
-      <p>
-        FK and IK are the cleanest fit: the follower has no independent coordinate and its transform can be
-        derived inline from the leader coordinate. This matches the user-facing mental model in URDF and USD,
-        where mimic metadata is attached to joints.
-      </p>
-      <p>
-        Maximal-coordinate solvers such as XPBD and Kamino still need equality/connect constraints for closed-loop
-        dynamics and contact-consistent force transfer. A zero-DOF mimic joint is not enough unless follower
-        impulses are projected back to the leader coordinate.
-      </p>
-      <p>
-        Generalized-coordinate solvers such as Featherstone need articulated inertia and force accumulation from
-        follower bodies to flow through the leader coordinate. Without that dependent-coordinate mapping, FK can
-        be right while dynamics are incomplete.
-      </p>
-      <p>
-        MuJoCo already represents joint coupling naturally as equality constraints, so a mimic-joint front end
-        should lower back to <code>mjEQ_JOINT</code> for dynamic stepping unless the bridge adds native dependent
-        coordinates.
-      </p>
+      <h2>Real-Asset Captures</h2>
+      <div class="capture-grid">
+        <figure>
+          <img src="assets/videos/synthetic_robotiq_urdf.gif" alt="Synthetic Robotiq URDF capture">
+          <figcaption>Synthetic Robotiq URDF</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/videos/robotiq_2f85_v4_usd.gif" alt="Robotiq 2F85 USD capture">
+          <figcaption>Robotiq 2F85 USD</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/videos/leap_hand_right_mjcf.gif" alt="LEAP hand MJCF capture">
+          <figcaption>LEAP hand MJCF</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/videos/shadow_hand_right_mjcf.gif" alt="Shadow hand MJCF capture">
+          <figcaption>Shadow hand MJCF</figcaption>
+        </figure>
+      </div>
     </section>
 
     <section>
-      <h2>Verdict</h2>
+      <h2>Solver Direction</h2>
+      <p>
+        XPBD, Featherstone, Semi-Implicit, and VBD should add dependent-coordinate
+        force handling for <code>JointType.MIMIC</code> when they support dynamic mimics.
+        They should not preserve or reintroduce an importer-facing mimic-constraint
+        path for URDF/USD mimic metadata.
+      </p>
       <p class="verdict">
-        Use mimic-as-joint as the import and kinematics representation, but keep the separate mimic/equality
-        constraint path as the solver lowering target until the dynamic solvers explicitly handle dependent
-        coordinates and force transfer.
-      </p>
-      <p class="note">
-        Remaining work: run larger timings on the real menagerie Robotiq assets, add MP4/WebM exports, and decide
-        whether MJCF equality-joint couplings should gain a mimic-joint import prototype or remain solver equality
-        constraints.
+        Verdict: mimics are joints. Importers attach mimic metadata to joints, FK/IK
+        consume it directly, and solvers either consume <code>JointType.MIMIC</code>
+        natively or lower it privately.
       </p>
     </section>
   </main>
