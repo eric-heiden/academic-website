@@ -7,13 +7,14 @@
   <style>
     :root {
       color-scheme: light;
-      --ink: #18212f;
+      --ink: #192231;
       --muted: #5b6575;
       --line: #d9dee7;
-      --paper: #f7f5f0;
+      --paper: #f5f7fa;
       --panel: #ffffff;
       --accent: #2456a6;
       --teal: #0f766e;
+      --warn: #9f3a15;
     }
     * { box-sizing: border-box; }
     body {
@@ -46,7 +47,7 @@
       letter-spacing: 0;
     }
     .lead {
-      max-width: 840px;
+      max-width: 860px;
       margin: 20px 0 0;
       color: var(--muted);
       font-size: 1.08rem;
@@ -72,24 +73,24 @@
     }
     .media-grid {
       display: grid;
-      grid-template-columns: minmax(260px, 0.85fr) minmax(280px, 1.15fr);
-      gap: 24px;
-      align-items: center;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 16px;
     }
     .capture-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
       margin-top: 16px;
     }
-    figure {
-      margin: 0;
-    }
-    img {
+    figure { margin: 0; }
+    video {
+      display: block;
       width: 100%;
+      aspect-ratio: 16 / 9;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: var(--panel);
+      background: #232b37;
     }
     figcaption {
       margin-top: 8px;
@@ -115,7 +116,9 @@
       font-size: 0.76rem;
       text-transform: uppercase;
     }
+    td.numeric { text-align: right; white-space: nowrap; }
     tr:last-child td { border-bottom: 0; }
+    .status-error { color: var(--warn); font-weight: 700; }
     .verdict {
       border-left: 5px solid var(--teal);
       padding: 14px 18px;
@@ -133,41 +136,67 @@
     <p class="eyebrow">Newton API Prototype</p>
     <h1>Mimics Are Joints</h1>
     <p class="lead">
-      A clear-cut implementation report for moving URDF and USD mimic relationships into
-      zero-DOF <code>JointType.MIMIC</code> followers, with branch-vs-main measurements
-      on Robotiq and menagerie assets.
+      A clear-cut implementation report for moving URDF and USD mimic
+      relationships into zero-DOF <code>JointType.MIMIC</code> followers, with
+      real ViewerGL videos and solver timing instead of schematic captures.
     </p>
   </header>
   <main>
-    <section class="media-grid">
-      <figure>
-        <img src="assets/mimic_joint_kinematics.gif" alt="Animated Robotiq-style mimic joint kinematics">
-        <figcaption>Minimal Robotiq-style model: one independent driver and five zero-DOF mimic joints.</figcaption>
-      </figure>
-      <div>
-        <h2>Implementation</h2>
-        <p>
-          URDF <code>&lt;mimic&gt;</code>, USD <code>NewtonMimicAPI</code>, and
-          USD <code>PhysxMimicJointAPI</code> now import as joint metadata. The old
-          <code>mimic_constraints_as_joints</code> flag remains only for source compatibility;
-          passing <code>false</code> does not restore separate mimic-constraint storage.
-        </p>
-        <p>
-          FK and IK consume the follower inline. MuJoCo lowers each Newton MIMIC joint
-          to the synthetic scalar coordinate and <code>mjEQ_JOINT</code> row that MuJoCo
-          needs internally; that lowering is not a second Newton model representation.
-        </p>
+    <section>
+      <h2>Implementation</h2>
+      <p>
+        URDF <code>&lt;mimic&gt;</code>, USD <code>NewtonMimicAPI</code>, and
+        USD <code>PhysxMimicJointAPI</code> import as joint metadata. FK and IK
+        consume the follower inline. MuJoCo lowers each Newton MIMIC joint to the
+        synthetic scalar coordinate and <code>mjEQ_JOINT</code> row that MuJoCo
+        needs internally; that lowering is not a second Newton model
+        representation.
+      </p>
+      <p>
+        This branch also adds solver-side adoption work: Featherstone refreshes
+        MIMIC follower transforms and velocities, and XPBD explicitly skips
+        zero-DOF MIMIC followers in the joint-force kernel.
+      </p>
+    </section>
+
+    <section>
+      <h2>ViewerGL Captures</h2>
+      <p>
+        These are MP4 captures rendered from real imported assets using
+        <code>ViewerGL.get_frame()</code> in headless EGL mode. No schematic
+        captures are used in this report.
+      </p>
+      <div class="capture-grid">
+        <figure>
+          <video src="assets/videos/robotiq_2f85_v4_usd.mp4" controls muted loop playsinline></video>
+          <figcaption>Robotiq 2F85 USD</figcaption>
+        </figure>
+        <figure>
+          <video src="assets/videos/robotiq_2f85_v4_mjcf.mp4" controls muted loop playsinline></video>
+          <figcaption>Robotiq 2F85 MJCF</figcaption>
+        </figure>
+        <figure>
+          <video src="assets/videos/leap_hand_right_mjcf.mp4" controls muted loop playsinline></video>
+          <figcaption>LEAP hand MJCF</figcaption>
+        </figure>
+        <figure>
+          <video src="assets/videos/shadow_hand_right_mjcf.mp4" controls muted loop playsinline></video>
+          <figcaption>Shadow hand MJCF</figcaption>
+        </figure>
+        <figure>
+          <video src="assets/videos/unitree_g1_with_hands_urdf.mp4" controls muted loop playsinline></video>
+          <figcaption>Unitree G1 with hands URDF</figcaption>
+        </figure>
       </div>
     </section>
 
     <section>
-      <h2>Branch vs Main</h2>
+      <h2>Branch vs Main FK</h2>
       <p>
-        Each checkout ran the same benchmark harness with 20 samples and 3 repeats on
-        <code>cuda:0</code>. Raw data:
-        <a href="asset_benchmark_branch.json">branch JSON</a>,
-        <a href="asset_benchmark_main.json">main JSON</a>, and
-        <a href="mimic_joint_report.json">minimal example JSON</a>.
+        Each checkout ran the same benchmark harness with 20 samples and 3
+        repeats on <code>cuda:0</code>. Raw data:
+        <a href="asset_benchmark_branch.json">branch JSON</a> and
+        <a href="asset_benchmark_main.json">main JSON</a>.
       </p>
       <table>
         <thead>
@@ -182,55 +211,82 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Synthetic Robotiq URDF</td><td>1 / 1</td><td>6 / 6</td><td>5 / 0</td><td>0 / 5</td><td>352.2 us</td><td>544.4 us</td></tr>
-          <tr><td>Robotiq 2F85 USD</td><td>6 / 6</td><td>14 / 12</td><td>0 / 0</td><td>0 / 1</td><td>343.9 us</td><td>698.6 us</td></tr>
-          <tr><td>Robotiq 2F85 MJCF</td><td>6 / 6</td><td>14 / 12</td><td>0 / 0</td><td>0 / 1</td><td>351.0 us</td><td>483.0 us</td></tr>
-          <tr><td>LEAP hand MJCF</td><td>16 / 16</td><td>16 / 16</td><td>0 / 0</td><td>0 / 0</td><td>408.5 us</td><td>320.2 us</td></tr>
-          <tr><td>Shadow hand MJCF</td><td>24 / 24</td><td>24 / 24</td><td>0 / 0</td><td>0 / 0</td><td>401.2 us</td><td>331.0 us</td></tr>
-          <tr><td>Unitree G1 with hands URDF</td><td>43 / 43</td><td>43 / 43</td><td>0 / 0</td><td>0 / 0</td><td>420.8 us</td><td>400.1 us</td></tr>
+          <tr><td>Synthetic Robotiq URDF</td><td class="numeric">1 / 1</td><td class="numeric">6 / 6</td><td class="numeric">5 / 0</td><td class="numeric">0 / 5</td><td class="numeric">305.0 us</td><td class="numeric">509.9 us</td></tr>
+          <tr><td>Robotiq 2F85 USD</td><td class="numeric">6 / 6</td><td class="numeric">14 / 12</td><td class="numeric">0 / 0</td><td class="numeric">0 / 1</td><td class="numeric">316.4 us</td><td class="numeric">460.5 us</td></tr>
+          <tr><td>Robotiq 2F85 MJCF</td><td class="numeric">6 / 6</td><td class="numeric">14 / 12</td><td class="numeric">0 / 0</td><td class="numeric">0 / 1</td><td class="numeric">342.1 us</td><td class="numeric">490.1 us</td></tr>
+          <tr><td>LEAP hand MJCF</td><td class="numeric">16 / 16</td><td class="numeric">16 / 16</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">370.3 us</td><td class="numeric">324.6 us</td></tr>
+          <tr><td>Shadow hand MJCF</td><td class="numeric">24 / 24</td><td class="numeric">24 / 24</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">332.9 us</td><td class="numeric">339.7 us</td></tr>
+          <tr><td>Unitree G1 with hands URDF</td><td class="numeric">43 / 43</td><td class="numeric">43 / 43</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">384.4 us</td><td class="numeric">308.0 us</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Solver Step Timing</h2>
+      <p>
+        Branch means from <code>dt=1/240</code>, 5 steps x 3 repeats. Error cells
+        are intentionally retained.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Semi-Implicit</th>
+            <th>XPBD</th>
+            <th>Featherstone</th>
+            <th>VBD</th>
+            <th>MuJoCo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Synthetic Robotiq URDF</td><td class="numeric">169.1 us</td><td class="numeric">513.4 us</td><td class="numeric">530.0 us</td><td class="status-error">unsupported MIMIC</td><td class="status-error">inertia error</td></tr>
+          <tr><td>Robotiq 2F85 USD</td><td class="numeric">159.4 us</td><td class="numeric">503.6 us</td><td class="numeric">815.3 us</td><td class="numeric">4383.3 us</td><td class="numeric">15423.0 us</td></tr>
+          <tr><td>Robotiq 2F85 MJCF</td><td class="numeric">189.6 us</td><td class="numeric">702.3 us</td><td class="numeric">829.1 us</td><td class="numeric">3947.4 us</td><td class="status-error">inertia error</td></tr>
+          <tr><td>LEAP hand MJCF</td><td class="numeric">184.6 us</td><td class="numeric">609.3 us</td><td class="numeric">4365.0 us</td><td class="numeric">4437.0 us</td><td class="numeric">4325.4 us</td></tr>
+          <tr><td>Shadow hand MJCF</td><td class="numeric">176.6 us</td><td class="numeric">496.8 us</td><td class="numeric">13429.4 us</td><td class="numeric">4107.8 us</td><td class="status-error">inertia error</td></tr>
+          <tr><td>Unitree G1 with hands URDF</td><td class="numeric">174.9 us</td><td class="numeric">498.6 us</td><td class="numeric">107075.3 us</td><td class="numeric">3947.8 us</td><td class="status-error">inertia error</td></tr>
         </tbody>
       </table>
       <p>
-        The mimic-heavy Robotiq cases are the meaningful delta: the branch removes
-        follower coordinates and separate mimic-constraint rows from importer output.
-        The other assets are controls and show no coordinate-count change.
+        VBD still rejects a model containing real <code>JointType.MIMIC</code>
+        rigid followers. MuJoCo steps branch Robotiq USD after private lowering,
+        but several imported assets still fail XML construction because moving
+        bodies have mass/inertia below <code>mjMINVAL</code>.
       </p>
     </section>
 
     <section>
-      <h2>Real-Asset Captures</h2>
-      <div class="capture-grid">
-        <figure>
-          <img src="assets/videos/synthetic_robotiq_urdf.gif" alt="Synthetic Robotiq URDF capture">
-          <figcaption>Synthetic Robotiq URDF</figcaption>
-        </figure>
-        <figure>
-          <img src="assets/videos/robotiq_2f85_v4_usd.gif" alt="Robotiq 2F85 USD capture">
-          <figcaption>Robotiq 2F85 USD</figcaption>
-        </figure>
-        <figure>
-          <img src="assets/videos/leap_hand_right_mjcf.gif" alt="LEAP hand MJCF capture">
-          <figcaption>LEAP hand MJCF</figcaption>
-        </figure>
-        <figure>
-          <img src="assets/videos/shadow_hand_right_mjcf.gif" alt="Shadow hand MJCF capture">
-          <figcaption>Shadow hand MJCF</figcaption>
-        </figure>
-      </div>
+      <h2>Main Solver Baseline</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Semi-Implicit</th>
+            <th>XPBD</th>
+            <th>Featherstone</th>
+            <th>VBD</th>
+            <th>MuJoCo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Synthetic Robotiq URDF</td><td class="numeric">179.9 us</td><td class="numeric">508.2 us</td><td class="numeric">523.9 us</td><td class="numeric">3683.4 us</td><td class="status-error">inertia error</td></tr>
+          <tr><td>Robotiq 2F85 USD</td><td class="numeric">150.2 us</td><td class="numeric">461.0 us</td><td class="numeric">804.4 us</td><td class="numeric">4883.4 us</td><td class="numeric">29931.1 us</td></tr>
+          <tr><td>Robotiq 2F85 MJCF</td><td class="numeric">160.8 us</td><td class="numeric">502.8 us</td><td class="numeric">822.9 us</td><td class="numeric">5280.0 us</td><td class="status-error">inertia error</td></tr>
+          <tr><td>LEAP hand MJCF</td><td class="numeric">170.1 us</td><td class="numeric">520.1 us</td><td class="numeric">4333.4 us</td><td class="numeric">3954.8 us</td><td class="numeric">3953.0 us</td></tr>
+          <tr><td>Shadow hand MJCF</td><td class="numeric">167.2 us</td><td class="numeric">546.3 us</td><td class="numeric">13363.5 us</td><td class="numeric">4009.5 us</td><td class="status-error">inertia error</td></tr>
+          <tr><td>Unitree G1 with hands URDF</td><td class="numeric">121.9 us</td><td class="numeric">388.0 us</td><td class="numeric">106552.2 us</td><td class="numeric">3742.8 us</td><td class="status-error">inertia error</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section>
-      <h2>Solver Direction</h2>
-      <p>
-        XPBD, Featherstone, Semi-Implicit, and VBD should add dependent-coordinate
-        force handling for <code>JointType.MIMIC</code> when they support dynamic mimics.
-        They should not preserve or reintroduce an importer-facing mimic-constraint
-        path for URDF/USD mimic metadata.
-      </p>
+      <h2>Verdict</h2>
       <p class="verdict">
-        Verdict: mimics are joints. Importers attach mimic metadata to joints, FK/IK
+        Mimics are joints. Importers attach mimic metadata to joints, FK/IK
         consume it directly, and solvers either consume <code>JointType.MIMIC</code>
-        natively or lower it privately.
+        natively or lower it privately. The remaining branch gap is VBD rigid
+        MIMIC support, and it is visible as an unsupported benchmark row rather
+        than hidden by a skipped test or schematic capture.
       </p>
     </section>
   </main>
