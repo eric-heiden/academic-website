@@ -1,0 +1,37 @@
+{
+  "updated_utc": "2026-05-30 15:50:36 UTC",
+  "mujoco_mjcf": {
+    "equality_joint": {
+      "url": "https://mujoco.readthedocs.io/en/stable/XMLreference.html#equality-joint",
+      "semantics": "Constrains one scalar joint position/angle to a quartic polynomial of another scalar joint. Only slide and hinge joints can be used.",
+      "polynomial": "y - y0 = a0 + a1*(x-x0) + a2*(x-x0)^2 + a3*(x-x0)^3 + a4*(x-x0)^4",
+      "urdf_linear_mapping": "For y = multiplier*x + offset, use a1=multiplier and a0=offset + multiplier*x0 - y0; if initial pose already satisfies the mimic, a0=0."
+    },
+    "equality_tendon": {
+      "url": "https://mujoco.readthedocs.io/en/stable/XMLreference.html#equality-tendon",
+      "semantics": "Constrains one scalar tendon length to a quartic polynomial of another scalar tendon length. Fixed tendons can be linear combinations of scalar hinge/slide joint positions."
+    },
+    "multi_dof": "No native vector/matrix multi-DOF mimic. Decompose into scalar joint equalities or scalar fixed-tendon equalities where representable."
+  },
+  "usd_physics_core": {
+    "joint_url": "https://openusd.org/release/api/class_usd_physics_joint.html",
+    "drive_url": "https://openusd.org/release/api/class_usd_physics_drive_a_p_i.html",
+    "limit_url": "https://openusd.org/release/api/class_usd_physics_limit_a_p_i.html",
+    "semantics": "Core UsdPhysics has generic joints, per-axis limits, per-axis drives, and collision filtering, but no direct mimic/coupled-joint schema."
+  },
+  "physx_usd_extension": {
+    "mimic_url": "https://docs.omniverse.nvidia.com/kit/docs/omni_usd_schema_physics/latest/physxschema/class_physx_schema_physx_mimic_joint_a_p_i.html",
+    "semantics": "PhysxMimicJointAPI is a multiple-apply API on a PhysicsJoint in an articulation. Each instance connects targetJoint,targetJointAxis to referenceJoint,referenceJointAxis with gearing and offset.",
+    "multi_dof": "Scalar per-axis/per-DOF relation; multi-DOF mimic should be represented as multiple API instances, one per target axis, not as one vector-valued relation.",
+    "related_couplings": [
+      "PhysxPhysicsGearJoint: revolute-revolute coupling with gear ratio.",
+      "PhysxPhysicsRackAndPinionJoint: revolute-prismatic coupling with ratio."
+    ]
+  },
+  "newton_prototype": {
+    "branch": "eric/mimic-constraint",
+    "commit": "aa76da854810210c95593ad8ee57881eaae2ead2",
+    "current_handling": "Stores one scalar coef0/coef1 per mimic constraint between two joint indices. The docstring says multi-DOF joints are supported by applying the same scalar coefficients to all DOFs, but there is no solver/FK kernel consumption of constraint_mimic_* in the branch.",
+    "limitation": "No per-axis mapping, no vector offset, no matrix A, no DOF index selection, and no enforcement yet."
+  }
+}
