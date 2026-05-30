@@ -3,291 +3,122 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Newton Mimic Joints Clear-Cut Report</title>
+  <title>Newton Mimic Joints Parameterization Report</title>
   <style>
-    :root {
-      color-scheme: light;
-      --ink: #192231;
-      --muted: #5b6575;
-      --line: #d9dee7;
-      --paper: #f5f7fa;
-      --panel: #ffffff;
-      --accent: #2456a6;
-      --teal: #0f766e;
-      --warn: #9f3a15;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--paper);
-      color: var(--ink);
-    }
-    header, main {
-      width: min(1180px, calc(100% - 36px));
-      margin: 0 auto;
-    }
-    header {
-      padding: 42px 0 28px;
-      border-bottom: 1px solid var(--line);
-    }
-    a { color: var(--accent); }
-    .eyebrow {
-      margin: 0 0 10px;
-      color: var(--teal);
-      font-size: 0.78rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-    h1 {
-      margin: 0;
-      max-width: 980px;
-      font-size: clamp(2.25rem, 6vw, 4.8rem);
-      line-height: 0.98;
-      letter-spacing: 0;
-    }
-    .lead {
-      max-width: 860px;
-      margin: 20px 0 0;
-      color: var(--muted);
-      font-size: 1.08rem;
-      line-height: 1.6;
-    }
-    main { padding: 30px 0 58px; }
-    section {
-      padding: 26px 0;
-      border-bottom: 1px solid var(--line);
-    }
-    h2 {
-      margin: 0 0 12px;
-      font-size: clamp(1.45rem, 3vw, 2rem);
-      letter-spacing: 0;
-    }
-    p, li {
-      color: var(--muted);
-      line-height: 1.6;
-    }
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.95em;
-    }
-    .media-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-      margin-top: 16px;
-    }
-    .capture-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 16px;
-    }
-    figure { margin: 0; }
-    video {
-      display: block;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #232b37;
-    }
-    figcaption {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 0.88rem;
-      line-height: 1.4;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      font-size: 0.95rem;
-    }
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      vertical-align: top;
-    }
-    th {
-      color: var(--muted);
-      font-size: 0.76rem;
-      text-transform: uppercase;
-    }
-    td.numeric { text-align: right; white-space: nowrap; }
-    tr:last-child td { border-bottom: 0; }
-    .status-error { color: var(--warn); font-weight: 700; }
-    .verdict {
-      border-left: 5px solid var(--teal);
-      padding: 14px 18px;
-      background: var(--panel);
-      color: var(--ink);
-    }
-    @media (max-width: 900px) {
-      .media-grid, .capture-grid { grid-template-columns: 1fr; }
-      table { display: block; overflow-x: auto; }
-    }
+    :root { color-scheme: light; --ink:#182234; --muted:#596579; --line:#d8deea; --paper:#f5f7fb; --panel:#fff; --accent:#2456a6; --teal:#0f766e; --warn:#9f3a15; --good:#166534; }
+    * { box-sizing: border-box; } body { margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--paper); color:var(--ink); }
+    header, main { width:min(1180px, calc(100% - 36px)); margin:0 auto; } header { padding:42px 0 28px; border-bottom:1px solid var(--line); } main { padding:30px 0 58px; }
+    a { color:var(--accent); } .eyebrow { margin:0 0 10px; color:var(--teal); font-size:.78rem; font-weight:800; text-transform:uppercase; }
+    h1 { margin:0; max-width:980px; font-size:clamp(2.25rem,6vw,4.8rem); line-height:.98; } h2 { margin:0 0 12px; font-size:clamp(1.45rem,3vw,2rem); } h3 { margin:18px 0 8px; }
+    .lead { max-width:900px; margin:20px 0 0; color:var(--muted); font-size:1.08rem; line-height:1.6; } section { padding:26px 0; border-bottom:1px solid var(--line); } p, li { color:var(--muted); line-height:1.6; } code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.95em; }
+    .cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:16px 0; } .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; } .card strong { display:block; margin-bottom:6px; }
+    .capture-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:16px; } figure { margin:0; } video { display:block; width:100%; aspect-ratio:16/9; border:1px solid var(--line); border-radius:8px; background:#232b37; } figcaption { margin-top:8px; color:var(--muted); font-size:.88rem; line-height:1.4; }
+    table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); font-size:.93rem; margin-top:12px; } th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { color:var(--muted); font-size:.74rem; text-transform:uppercase; } td.numeric { text-align:right; white-space:nowrap; } tr:last-child td { border-bottom:0; } .status-error { color:var(--warn); font-weight:700; } .delta { color:var(--muted); font-size:.86em; }
+    .verdict { border-left:5px solid var(--teal); padding:14px 18px; background:var(--panel); color:var(--ink); } .warning { border-left-color:var(--warn); } .good { color:var(--good); font-weight:700; } .note { font-size:.92rem; color:var(--muted); }
+    @media (max-width:900px) { .cards,.capture-grid { grid-template-columns:1fr; } table { display:block; overflow-x:auto; } }
   </style>
 </head>
 <body>
   <header>
-    <p class="eyebrow">Newton API Prototype</p>
-    <h1>Mimics Are Joints</h1>
-    <p class="lead">
-      A clear-cut implementation report for moving URDF and USD mimic
-      relationships into zero-DOF <code>JointType.MIMIC</code> followers, with
-      real ViewerGL videos and solver timing instead of schematic captures.
-    </p>
+    <p class="eyebrow">Newton API Prototype · Mimic Joint Design</p>
+    <h1>Should Mimics Be Joints?</h1>
+    <p class="lead">Updated report on treating URDF/USD mimic relationships as zero-DOF Newton joints. This version focuses on Model parameterization, reuse of existing joint attributes, benchmark numbers, and the design trade-off between a joint-topology representation and separate mimic constraints.</p>
   </header>
   <main>
     <section>
-      <h2>Implementation</h2>
-      <p>
-        URDF <code>&lt;mimic&gt;</code>, USD <code>NewtonMimicAPI</code>, and
-        USD <code>PhysxMimicJointAPI</code> import as joint metadata. FK and IK
-        consume the follower inline. MuJoCo lowers each Newton MIMIC joint to the
-        synthetic scalar coordinate and <code>mjEQ_JOINT</code> row that MuJoCo
-        needs internally; that lowering is not a second Newton model
-        representation.
-      </p>
-      <p>
-        This branch also adds solver-side adoption work: Featherstone refreshes
-        MIMIC follower transforms and velocities, and XPBD explicitly skips
-        zero-DOF MIMIC followers in the joint-force kernel.
-      </p>
+      <h2>Executive summary</h2>
+      <div class="cards">
+        <div class="card"><strong>Best semantic model</strong><p>Mimic followers are kinematic joints in the body tree: they have parent/child bodies, fixed parent/child frames, labels, world membership, and enabled state. Reusing those existing joint attributes is a real win.</p></div>
+        <div class="card"><strong>Best storage model</strong><p>Do <em>not</em> add dense mimic-only arrays on every joint if this becomes production API. Use a compact, generic affine joint-relation table keyed by joint index, or keep the existing constraint table.</p></div>
+        <div class="card"><strong>Practical verdict</strong><p>Keep mimics as joints for FK/import/export, but lower to solver-specific constraints where needed. If Newton will not add a generic relation table, keeping mimics as a separate concept is cleaner than adding permanent mimic-only Model arrays.</p></div>
+      </div>
+      <p class="verdict">Numerically, joint-based import reduces Robotiq generalized coordinates from 6 to 1 in the synthetic URDF and 14/12 to 6/6 in imported Robotiq models, improving FK by 30–40% on those assets. Solver timing is mostly neutral/noisy, except MuJoCo Robotiq USD improves by 48% after private lowering. The blocker is API/storage design, not performance.</p>
     </section>
 
     <section>
-      <h2>ViewerGL Captures</h2>
-      <p>
-        These are MP4 captures rendered from real imported assets using
-        <code>ViewerGL.get_frame()</code> in headless EGL mode. No schematic
-        captures are used in this report.
-      </p>
+      <h2>How a mimic joint should be parameterized in <code>Model</code></h2>
+      <p>A mimic relation is the scalar affine equation <code>q_follower = offset + multiplier * q_leader</code>. To make it a Newton joint without inflating generalized state, the follower should be a zero-DOF joint that derives its effective coordinate during FK/IK/state transfer.</p>
+      <h3>Reuse existing joint attributes</h3>
+      <ul>
+        <li><code>joint_type[j] = JointType.MIMIC</code> marks the row as a derived joint.</li>
+        <li><code>joint_parent</code>, <code>joint_child</code>, <code>joint_X_p</code>, <code>joint_X_c</code>, <code>joint_label</code>, <code>joint_world</code>, and <code>joint_enabled</code> should be used exactly as for other joints. This is the strongest argument for treating mimics as joints.</li>
+        <li><code>joint_q_start[j] == joint_q_start[j+1]</code>, <code>joint_qd_start[j] == joint_qd_start[j+1]</code>, and <code>joint_dof_dim[j] = (0, 0)</code>. The follower adds no generalized coordinates, velocities, forces, limits, armature, target, or actuation rows.</li>
+        <li>The leader coordinate should be resolved through the leader joint's existing <code>joint_q_start</code>/<code>joint_qd_start</code>. For the current URDF/USD scalar mimic use case, only scalar revolute and prismatic leaders should be accepted.</li>
+      </ul>
+      <h3>Parameters still needed somewhere</h3>
+      <p>Existing per-DOF arrays cannot fully encode a zero-DOF mimic: <code>joint_axis</code>, limits, targets, armature, friction, and effort arrays are all indexed by generalized DOF, and the mimic intentionally has none. Therefore the branch's current <code>joint_mimic_leader</code>, <code>joint_mimic_coef</code>, <code>joint_mimic_type</code>, and <code>joint_mimic_axis</code> arrays are understandable, but they are mimic-specific and dense over <code>joint_count</code>.</p>
+      <p>The recommended production parameterization is a generic compact relation table rather than mimic-only dense arrays:</p>
+      <ul>
+        <li><code>joint_relation_start[j:j+2]</code>: range of relation rows owned by joint <code>j</code>, usually zero or one.</li>
+        <li><code>joint_relation_kind[r]</code>: initially <code>AFFINE_COORD</code>; future uses include gear joints, coupled coordinates, tendon-like derived joints, loop closures, or solver lowering metadata.</li>
+        <li><code>joint_relation_source_joint[r]</code> and optional <code>joint_relation_source_axis[r]</code>: the leader scalar coordinate.</li>
+        <li><code>joint_relation_coef[r, 0:2]</code>: <code>[offset, multiplier]</code>.</li>
+        <li><code>joint_relation_follower_kind[r]</code> and <code>joint_relation_follower_axis[r]</code>: revolute/prismatic interpretation and axis for the follower transform.</li>
+      </ul>
+      <p>This keeps the topology in the joint list while avoiding attributes that only make sense for <code>JointType.MIMIC</code>. The current branch can be viewed as a prototype of this, with the relation table expanded to one dense row per joint.</p>
+    </section>
+
+    <section>
+      <h2>Design alternatives compared</h2>
+      <table>
+        <thead><tr><th>Approach</th><th>Model shape</th><th>Pros</th><th>Cons</th><th>When to choose</th></tr></thead>
+        <tbody>
+          <tr><td>Separate mimic constraints</td><td>Keep <code>constraint_mimic_joint0/joint1/coef0/coef1</code>; follower is still a normal DOF joint.</td><td>Compact storage; matches constraint semantics; no new joint type; solver lowering already natural.</td><td>Duplicates kinematic topology; import/export/FK must special-case an out-of-tree relation; generalized state includes follower DOFs unless separately suppressed.</td><td>Choose if Newton wants zero Model API churn and solver constraint semantics are the priority.</td></tr>
+          <tr><td>Current branch: dense mimic joint attrs</td><td><code>JointType.MIMIC</code> plus <code>joint_mimic_*</code> arrays of length <code>joint_count</code>.</td><td>Simple kernels; no separate lookup table; passes mimic tests; clean FK topology.</td><td>Adds four permanent mimic-only arrays to every Model; sparse assets pay storage/cache cost; hard to justify if no other joint type uses these fields.</td><td>Good prototype; questionable production API.</td></tr>
+          <tr><td>Recommended: joint + generic relation table</td><td><code>JointType.MIMIC</code> owns one compact <code>AFFINE_COORD</code> relation row.</td><td>Reuses joint topology; compact; names are not mimic-specific; supports future coupled/derived joints.</td><td>Requires one new generic table and one indirection from joint to relation rows.</td><td>Choose if Newton wants mimics as joints but wants a durable Model API.</td></tr>
+          <tr><td>Virtual axis slot in existing arrays</td><td>Permit zero-DOF joints to have an axis metadata row outside <code>joint_dof_count</code>.</td><td>Reuses <code>joint_axis</code> conceptually for follower axis.</td><td>Breaks the current invariant that <code>joint_axis</code> is per DOF; touches many kernels; still needs leader and affine coefficients.</td><td>Not recommended unless Newton is already splitting axis metadata from generalized DOFs.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Real Newton asset benchmarks</h2>
+      <p>Existing branch and main benchmark data were preserved: <a href="asset_benchmark_branch.json">branch JSON</a> and <a href="asset_benchmark_main.json">main JSON</a>. Each checkout ran 20 FK samples and 3 repeats on <code>cuda:0</code>; solver timings are <code>dt=1/240</code>, 5 steps × 3 repeats.</p>
+      <h3>FK and state-size results</h3>
+      <table>
+        <thead><tr><th>Asset</th><th>Joints</th><th>Branch coords / DOFs</th><th>Main coords / DOFs</th><th>Branch mimic joints / constraints</th><th>Main mimic joints / constraints</th><th>Branch FK</th><th>Main FK</th><th>Branch vs main</th></tr></thead>
+        <tbody><tr><td>LEAP hand MJCF</td><td class="numeric">17</td><td class="numeric">16 / 16</td><td class="numeric">16 / 16</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">370.3 us</td><td class="numeric">324.6 us</td><td class="numeric">+14.1%</td></tr><tr><td>Robotiq 2F85 MJCF</td><td class="numeric">11</td><td class="numeric">6 / 6</td><td class="numeric">14 / 12</td><td class="numeric">0 / 0</td><td class="numeric">0 / 1</td><td class="numeric">342.1 us</td><td class="numeric">490.1 us</td><td class="numeric">-30.2%</td></tr><tr><td>Robotiq 2F85 USD</td><td class="numeric">11</td><td class="numeric">6 / 6</td><td class="numeric">14 / 12</td><td class="numeric">0 / 0</td><td class="numeric">0 / 1</td><td class="numeric">316.4 us</td><td class="numeric">460.5 us</td><td class="numeric">-31.3%</td></tr><tr><td>Shadow hand MJCF</td><td class="numeric">25</td><td class="numeric">24 / 24</td><td class="numeric">24 / 24</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">332.9 us</td><td class="numeric">339.7 us</td><td class="numeric">-2.0%</td></tr><tr><td>Synthetic Robotiq URDF</td><td class="numeric">7</td><td class="numeric">1 / 1</td><td class="numeric">6 / 6</td><td class="numeric">5 / 0</td><td class="numeric">0 / 5</td><td class="numeric">305.0 us</td><td class="numeric">509.9 us</td><td class="numeric">-40.2%</td></tr><tr><td>Unitree G1 with hands URDF</td><td class="numeric">53</td><td class="numeric">43 / 43</td><td class="numeric">43 / 43</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">384.4 us</td><td class="numeric">308.0 us</td><td class="numeric">+24.8%</td></tr></tbody>
+      </table>
+      <p class="note">Interpretation: the performance win appears exactly where mimic followers remove generalized coordinates. Robotiq assets improve 30–40% in FK. Assets without mimics are neutral or noisy; the branch does not provide a general speedup independent of mimic state reduction.</p>
+      <h3>Solver step results</h3>
+      <table>
+        <thead><tr><th>Asset</th><th>Semi-Implicit</th><th>XPBD</th><th>Featherstone</th><th>VBD</th><th>MuJoCo</th></tr></thead>
+        <tbody><tr><td>LEAP hand MJCF</td><td class="numeric">184.6 us <span class="delta">(+8.6%)</span></td><td class="numeric">609.3 us <span class="delta">(+17.1%)</span></td><td class="numeric">4365.0 us <span class="delta">(+0.7%)</span></td><td class="numeric">4437.0 us <span class="delta">(+12.2%)</span></td><td class="numeric">4325.4 us <span class="delta">(+9.4%)</span></td></tr><tr><td>Robotiq 2F85 MJCF</td><td class="numeric">189.6 us <span class="delta">(+17.9%)</span></td><td class="numeric">702.3 us <span class="delta">(+39.7%)</span></td><td class="numeric">829.1 us <span class="delta">(+0.8%)</span></td><td class="numeric">3947.4 us <span class="delta">(-25.2%)</span></td><td><span class="status-error">ValueError: Error: mass and inertia of mov</span></td></tr><tr><td>Robotiq 2F85 USD</td><td class="numeric">159.4 us <span class="delta">(+6.1%)</span></td><td class="numeric">503.6 us <span class="delta">(+9.2%)</span></td><td class="numeric">815.3 us <span class="delta">(+1.4%)</span></td><td class="numeric">4383.3 us <span class="delta">(-10.2%)</span></td><td class="numeric">15423.0 us <span class="delta">(-48.5%)</span></td></tr><tr><td>Shadow hand MJCF</td><td class="numeric">176.6 us <span class="delta">(+5.6%)</span></td><td class="numeric">496.8 us <span class="delta">(-9.1%)</span></td><td class="numeric">13429.4 us <span class="delta">(+0.5%)</span></td><td class="numeric">4107.8 us <span class="delta">(+2.5%)</span></td><td><span class="status-error">ValueError: Error: mass and inertia of mov</span></td></tr><tr><td>Synthetic Robotiq URDF</td><td class="numeric">169.1 us <span class="delta">(-6.0%)</span></td><td class="numeric">513.4 us <span class="delta">(+1.0%)</span></td><td class="numeric">530.0 us <span class="delta">(+1.2%)</span></td><td><span class="status-error">NotImplementedError: SolverVBD rigid joint</span></td><td><span class="status-error">ValueError: Error: mass and inertia of mov</span></td></tr><tr><td>Unitree G1 with hands URDF</td><td class="numeric">174.9 us <span class="delta">(+43.5%)</span></td><td class="numeric">498.6 us <span class="delta">(+28.5%)</span></td><td class="numeric">107075.3 us <span class="delta">(+0.5%)</span></td><td class="numeric">3947.8 us <span class="delta">(+5.5%)</span></td><td><span class="status-error">ValueError: Error: mass and inertia of mov</span></td></tr></tbody>
+      </table>
+      <p class="note">Solver interpretation: semi-implicit, XPBD, Featherstone, and VBD timings are mostly dominated by solver implementation and asset size rather than mimic representation. MuJoCo's Robotiq USD row improves from 29.9 ms to 15.4 ms after lowering the zero-DOF mimic representation to MuJoCo's equality format. VBD still rejects the synthetic rigid <code>JointType.MIMIC</code> case, so full solver parity is not yet achieved.</p>
+    </section>
+
+    <section>
+      <h2>Parameterization microbenchmark</h2>
+      <p>I added a small dependency-free traversal benchmark to compare Model storage options: <a href="parameterization_benchmark.py">script</a> and <a href="parameterization_benchmark.json">raw JSON</a>. It measures host-side metadata traversal for dense per-joint mimic arrays, a compact joint relation table, and a separate constraint pass. This is not a replacement for the real Newton solver benchmark above; it isolates storage/traversal overhead.</p>
+      <table>
+        <thead><tr><th>Case</th><th>Baseline FK loop</th><th>Dense mimic arrays</th><th>Compact relation table</th><th>Separate constraint pass</th><th>Metadata bytes dense / compact / separate</th></tr></thead>
+        <tbody><tr><td>synthetic robotiq like</td><td class="numeric">12406.0 us</td><td class="numeric">16562.1 us <span class="delta">(+33.5%)</span></td><td class="numeric">19960.1 us <span class="delta">(+60.9%)</span></td><td class="numeric">21261.6 us <span class="delta">(+71.4%)</span></td><td class="numeric">196 / 140 / 120</td></tr><tr><td>robotiq imported like</td><td class="numeric">11465.9 us</td><td class="numeric">15819.3 us <span class="delta">(+38.0%)</span></td><td class="numeric">19085.6 us <span class="delta">(+66.5%)</span></td><td class="numeric">19135.7 us <span class="delta">(+66.9%)</span></td><td class="numeric">420 / 224 / 192</td></tr><tr><td>hand 24dof sparse mimic</td><td class="numeric">18395.9 us</td><td class="numeric">22943.5 us <span class="delta">(+24.7%)</span></td><td class="numeric">21549.3 us <span class="delta">(+17.1%)</span></td><td class="numeric">22714.5 us <span class="delta">(+23.5%)</span></td><td class="numeric">896 / 112 / 96</td></tr><tr><td>humanoid 43dof sparse mimic</td><td class="numeric">26640.1 us</td><td class="numeric">33410.7 us <span class="delta">(+25.4%)</span></td><td class="numeric">29551.0 us <span class="delta">(+10.9%)</span></td><td class="numeric">30906.3 us <span class="delta">(+16.0%)</span></td><td class="numeric">1792 / 168 / 144</td></tr><tr><td>large batched 10pct mimic</td><td class="numeric">45413.5 us</td><td class="numeric">55125.5 us <span class="delta">(+21.4%)</span></td><td class="numeric">49401.2 us <span class="delta">(+8.8%)</span></td><td class="numeric">51594.5 us <span class="delta">(+13.6%)</span></td><td class="numeric">28672 / 2856 / 2448</td></tr></tbody>
+      </table>
+      <p class="note">Takeaway: dense arrays are simple and can be fast for very small mimic-heavy assets, but they scale with all joints. Compact relation or separate constraint storage scales with mimic count and saves 6–10× metadata bytes on sparse cases. The real solver timings show those metadata differences are not yet the runtime bottleneck, so API cleanliness should drive the choice.</p>
+    </section>
+
+    <section>
+      <h2>ViewerGL captures</h2>
+      <p>These MP4 captures are from real imported assets using <code>ViewerGL.get_frame()</code> in headless EGL mode.</p>
       <div class="capture-grid">
-        <figure>
-          <video src="assets/videos/robotiq_2f85_v4_usd.mp4" controls muted loop playsinline></video>
-          <figcaption>Robotiq 2F85 USD</figcaption>
-        </figure>
-        <figure>
-          <video src="assets/videos/robotiq_2f85_v4_mjcf.mp4" controls muted loop playsinline></video>
-          <figcaption>Robotiq 2F85 MJCF</figcaption>
-        </figure>
-        <figure>
-          <video src="assets/videos/leap_hand_right_mjcf.mp4" controls muted loop playsinline></video>
-          <figcaption>LEAP hand MJCF</figcaption>
-        </figure>
-        <figure>
-          <video src="assets/videos/shadow_hand_right_mjcf.mp4" controls muted loop playsinline></video>
-          <figcaption>Shadow hand MJCF</figcaption>
-        </figure>
-        <figure>
-          <video src="assets/videos/unitree_g1_with_hands_urdf.mp4" controls muted loop playsinline></video>
-          <figcaption>Unitree G1 with hands URDF</figcaption>
-        </figure>
+        <figure><video src="assets/videos/robotiq_2f85_v4_usd.mp4" controls muted loop playsinline></video><figcaption>Robotiq 2F85 USD</figcaption></figure>
+        <figure><video src="assets/videos/robotiq_2f85_v4_mjcf.mp4" controls muted loop playsinline></video><figcaption>Robotiq 2F85 MJCF</figcaption></figure>
+        <figure><video src="assets/videos/leap_hand_right_mjcf.mp4" controls muted loop playsinline></video><figcaption>LEAP hand MJCF</figcaption></figure>
+        <figure><video src="assets/videos/shadow_hand_right_mjcf.mp4" controls muted loop playsinline></video><figcaption>Shadow hand MJCF</figcaption></figure>
+        <figure><video src="assets/videos/unitree_g1_with_hands_urdf.mp4" controls muted loop playsinline></video><figcaption>Unitree G1 with hands URDF</figcaption></figure>
       </div>
     </section>
 
     <section>
-      <h2>Branch vs Main FK</h2>
-      <p>
-        Each checkout ran the same benchmark harness with 20 samples and 3
-        repeats on <code>cuda:0</code>. Raw data:
-        <a href="asset_benchmark_branch.json">branch JSON</a> and
-        <a href="asset_benchmark_main.json">main JSON</a>.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Asset</th>
-            <th>Branch coords / DOFs</th>
-            <th>Main coords / DOFs</th>
-            <th>Branch mimic joints / constraints</th>
-            <th>Main mimic joints / constraints</th>
-            <th>Branch FK mean</th>
-            <th>Main FK mean</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Synthetic Robotiq URDF</td><td class="numeric">1 / 1</td><td class="numeric">6 / 6</td><td class="numeric">5 / 0</td><td class="numeric">0 / 5</td><td class="numeric">305.0 us</td><td class="numeric">509.9 us</td></tr>
-          <tr><td>Robotiq 2F85 USD</td><td class="numeric">6 / 6</td><td class="numeric">14 / 12</td><td class="numeric">0 / 0</td><td class="numeric">0 / 1</td><td class="numeric">316.4 us</td><td class="numeric">460.5 us</td></tr>
-          <tr><td>Robotiq 2F85 MJCF</td><td class="numeric">6 / 6</td><td class="numeric">14 / 12</td><td class="numeric">0 / 0</td><td class="numeric">0 / 1</td><td class="numeric">342.1 us</td><td class="numeric">490.1 us</td></tr>
-          <tr><td>LEAP hand MJCF</td><td class="numeric">16 / 16</td><td class="numeric">16 / 16</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">370.3 us</td><td class="numeric">324.6 us</td></tr>
-          <tr><td>Shadow hand MJCF</td><td class="numeric">24 / 24</td><td class="numeric">24 / 24</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">332.9 us</td><td class="numeric">339.7 us</td></tr>
-          <tr><td>Unitree G1 with hands URDF</td><td class="numeric">43 / 43</td><td class="numeric">43 / 43</td><td class="numeric">0 / 0</td><td class="numeric">0 / 0</td><td class="numeric">384.4 us</td><td class="numeric">308.0 us</td></tr>
-        </tbody>
-      </table>
+      <h2>Validation run</h2>
+      <p><span class="good">Passed:</span> <code>uv run --extra dev -m newton.tests -k mimic --no-cache-clear</code> on the prototype branch ran 23 mimic-related tests in 17.395 s on Warp 1.14.0rc2 with CUDA device NVIDIA L40.</p>
     </section>
 
     <section>
-      <h2>Solver Step Timing</h2>
-      <p>
-        Branch means from <code>dt=1/240</code>, 5 steps x 3 repeats. Error cells
-        are intentionally retained.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Asset</th>
-            <th>Semi-Implicit</th>
-            <th>XPBD</th>
-            <th>Featherstone</th>
-            <th>VBD</th>
-            <th>MuJoCo</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Synthetic Robotiq URDF</td><td class="numeric">169.1 us</td><td class="numeric">513.4 us</td><td class="numeric">530.0 us</td><td class="status-error">unsupported MIMIC</td><td class="status-error">inertia error</td></tr>
-          <tr><td>Robotiq 2F85 USD</td><td class="numeric">159.4 us</td><td class="numeric">503.6 us</td><td class="numeric">815.3 us</td><td class="numeric">4383.3 us</td><td class="numeric">15423.0 us</td></tr>
-          <tr><td>Robotiq 2F85 MJCF</td><td class="numeric">189.6 us</td><td class="numeric">702.3 us</td><td class="numeric">829.1 us</td><td class="numeric">3947.4 us</td><td class="status-error">inertia error</td></tr>
-          <tr><td>LEAP hand MJCF</td><td class="numeric">184.6 us</td><td class="numeric">609.3 us</td><td class="numeric">4365.0 us</td><td class="numeric">4437.0 us</td><td class="numeric">4325.4 us</td></tr>
-          <tr><td>Shadow hand MJCF</td><td class="numeric">176.6 us</td><td class="numeric">496.8 us</td><td class="numeric">13429.4 us</td><td class="numeric">4107.8 us</td><td class="status-error">inertia error</td></tr>
-          <tr><td>Unitree G1 with hands URDF</td><td class="numeric">174.9 us</td><td class="numeric">498.6 us</td><td class="numeric">107075.3 us</td><td class="numeric">3947.8 us</td><td class="status-error">inertia error</td></tr>
-        </tbody>
-      </table>
-      <p>
-        VBD still rejects a model containing real <code>JointType.MIMIC</code>
-        rigid followers. MuJoCo steps branch Robotiq USD after private lowering,
-        but several imported assets still fail XML construction because moving
-        bodies have mass/inertia below <code>mjMINVAL</code>.
-      </p>
-    </section>
-
-    <section>
-      <h2>Main Solver Baseline</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Asset</th>
-            <th>Semi-Implicit</th>
-            <th>XPBD</th>
-            <th>Featherstone</th>
-            <th>VBD</th>
-            <th>MuJoCo</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Synthetic Robotiq URDF</td><td class="numeric">179.9 us</td><td class="numeric">508.2 us</td><td class="numeric">523.9 us</td><td class="numeric">3683.4 us</td><td class="status-error">inertia error</td></tr>
-          <tr><td>Robotiq 2F85 USD</td><td class="numeric">150.2 us</td><td class="numeric">461.0 us</td><td class="numeric">804.4 us</td><td class="numeric">4883.4 us</td><td class="numeric">29931.1 us</td></tr>
-          <tr><td>Robotiq 2F85 MJCF</td><td class="numeric">160.8 us</td><td class="numeric">502.8 us</td><td class="numeric">822.9 us</td><td class="numeric">5280.0 us</td><td class="status-error">inertia error</td></tr>
-          <tr><td>LEAP hand MJCF</td><td class="numeric">170.1 us</td><td class="numeric">520.1 us</td><td class="numeric">4333.4 us</td><td class="numeric">3954.8 us</td><td class="numeric">3953.0 us</td></tr>
-          <tr><td>Shadow hand MJCF</td><td class="numeric">167.2 us</td><td class="numeric">546.3 us</td><td class="numeric">13363.5 us</td><td class="numeric">4009.5 us</td><td class="status-error">inertia error</td></tr>
-          <tr><td>Unitree G1 with hands URDF</td><td class="numeric">121.9 us</td><td class="numeric">388.0 us</td><td class="numeric">106552.2 us</td><td class="numeric">3742.8 us</td><td class="status-error">inertia error</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section>
-      <h2>Verdict</h2>
-      <p class="verdict">
-        Mimics are joints. Importers attach mimic metadata to joints, FK/IK
-        consume it directly, and solvers either consume <code>JointType.MIMIC</code>
-        natively or lower it privately. The remaining branch gap is VBD rigid
-        MIMIC support, and it is visible as an unsupported benchmark row rather
-        than hidden by a skipped test or schematic capture.
-      </p>
+      <h2>Conclusion</h2>
+      <p class="verdict">Treat mimics as joints only if the production Model stores the dependency generically and compactly. The branch proves the semantic direction is sound: FK, IK, importers, and MuJoCo lowering can operate on zero-DOF follower joints, and Robotiq FK improves by eliminating follower coordinates. But the current dense <code>joint_mimic_*</code> arrays are not the right final API because they are mimic-only and mostly empty on sparse models. My recommendation is: keep <code>JointType.MIMIC</code>, reuse all normal joint topology attributes, replace the dense mimic-specific arrays with a compact generic affine relation table, and continue lowering to solver-specific constraints where native zero-DOF followers are unsupported. If Newton does not want that generic relation table, then keeping mimics as separate constraints is preferable to baking mimic-only arrays into <code>Model</code>.</p>
+      <p class="note">Last updated: 2026-05-30 05:41:41 UTC</p>
     </section>
   </main>
 </body>
