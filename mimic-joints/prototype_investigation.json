@@ -1,0 +1,13 @@
+{
+  "branch": "eric/mimic-constraint",
+  "commit": "aa76da854810210c95593ad8ee57881eaae2ead2",
+  "worktree": "/home/horde/repos/newton-worktrees/mimic-constraint",
+  "findings": [
+    "Prototype adds separate constraint_mimic_* arrays to Model and ModelBuilder, not JointType.MIMIC.",
+    "URDF import keeps the follower as a normal revolute/prismatic/fixed/free/planar joint, records the leader/follower relation after all joints are created, and stores coef0=offset and coef1=multiplier.",
+    "Prototype docstring says multi-DOF joints are supported by applying the same scalar coefficients to all DOFs, but the branch only stores metadata; no solver/FK kernels consume constraint_mimic_* yet.",
+    "Targeted tests passed: uv run python -m unittest newton.tests.test_model.TestModel.test_mimic_constraint_programmatic newton.tests.test_import_urdf.TestMimicConstraints -v. Full uv run --extra dev -m newton.tests -k mimic was blocked by a 404 for mujoco==3.4.1.dev856273160; uv run -m newton.tests -k mimic was blocked by missing GitPython during asset download."
+  ],
+  "targeted_test_result": "Ran 4 tests in 0.202s: OK",
+  "updated_utc": "2026-05-30 15:40:18 UTC"
+}

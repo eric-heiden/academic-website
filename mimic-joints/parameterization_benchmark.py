@@ -70,6 +70,15 @@ def bench_case(case: Case) -> dict:
     axis_coeff = [(dense_offset[j], dense_mult[j], 0.0) for j in range(joints)]
     # Legacy separate concept: same scalar math, plus enabled flag and follower lookup.
     constraints = [(j, n % dofs, 0.01 * (n % 7), -1.0 if n % 2 else 1.0, True) for n, j in enumerate(mimic_joint_indices)]
+    # Same-DOF mimic: the follower remains a normal scalar DOF joint and a
+    # relation pass constrains it to the leader. This mirrors the current
+    # mimic-constraint prototype: it preserves axis/target slots, but duplicates
+    # generalized state and needs constraint enforcement/stabilization.
+    same_dof_q = q + [0.003 * ((i % 31) - 15) for i in range(mimics)]
+    same_dof_qd = qd + [0.004 * ((i % 29) - 14) for i in range(mimics)]
+    same_dof_q_start = joint_q_start[:]
+    for n, j in enumerate(mimic_joint_indices):
+        same_dof_q_start[j] = dofs + n
 
     def fk_baseline() -> float:
         acc = 0.0
@@ -127,6 +136,20 @@ def bench_case(case: Case) -> dict:
                     acc += q[s] * 1.000001 + qd[s] * 0.5
         return acc
 
+    def same_dof_mimic_with_constraint() -> float:
+        acc = 0.0
+        for _ in range(case.loops):
+            for j in range(joints):
+                s = same_dof_q_start[j]
+                acc += same_dof_q[s] * 1.000001 + same_dof_qd[s] * 0.5
+            for follower, leader, offset, mult, enabled in constraints:
+                if enabled:
+                    fs = same_dof_q_start[follower]
+                    residual = same_dof_q[fs] - (offset + mult * q[leader])
+                    residual_d = same_dof_qd[fs] - mult * qd[leader]
+                    acc += residual * residual + 0.1 * residual_d * residual_d
+        return acc
+
     def legacy_constraint_pass() -> float:
         acc = 0.0
         for _ in range(case.loops):
@@ -143,6 +166,7 @@ def bench_case(case: Case) -> dict:
         "joint_dense_branch_arrays_us": dense_joint_arrays,
         "overloaded_existing_attributes_us": overloaded_existing_attributes,
         "joint_axis_coefficients_us": joint_axis_coefficients,
+        "same_dof_mimic_with_constraint_us": same_dof_mimic_with_constraint,
         "joint_compact_relation_table_us": compact_mimic_table,
         "separate_constraint_pass_us": legacy_constraint_pass,
     }
@@ -172,10 +196,14 @@ def bench_case(case: Case) -> dict:
     # joint_axis coefficients: zero incremental only if the existing joint_axis
     # storage can be reinterpreted at joint frequency. If mimic joints remain
     # zero-DOF under Newton's current per-DOF invariant, they have no valid slot.
+    # same-DOF mimic: approximate scalar follower state/control/model per-DOF
+    # storage (q, qd, f, act, axis, targets, limits, armature, effort/velocity,
+    # friction ~= 76 bytes) plus one compact relation row (~24 bytes).
     results["memory_bytes"] = {
         "joint_dense_branch_arrays": joints * 28,
         "overloaded_existing_attributes_incremental": 0,
         "joint_axis_coefficients_incremental": 0,
+        "same_dof_mimic_with_constraint": mimics * 100,
         "joint_compact_relation_table": mimics * 28,
         "separate_constraint_pass": mimics * 24,
         "dense_minus_compact_bytes": joints * 28 - mimics * 28,
