@@ -60,6 +60,14 @@ def bench_case(case: Case) -> dict:
     overloaded_parent = dense_leader
     overloaded_target_ke = dense_offset
     overloaded_target_kd = dense_mult
+    # Variant suggested during review: keep joint_parent as the leader joint and
+    # put offset/multiplier in joint_axis.x/y. This has the same traversal shape
+    # as the target_ke/kd overload, but it is even more semantically awkward in
+    # current Newton because joint_axis is per DOF and zero-DOF mimic joints have
+    # no axis slot. Treat this benchmark as the cost if Newton nevertheless
+    # introduced a documented type-dependent metadata slot.
+    axis_coeff_parent = dense_leader
+    axis_coeff = [(dense_offset[j], dense_mult[j], 0.0) for j in range(joints)]
     # Legacy separate concept: same scalar math, plus enabled flag and follower lookup.
     constraints = [(j, n % dofs, 0.01 * (n % 7), -1.0 if n % 2 else 1.0, True) for n, j in enumerate(mimic_joint_indices)]
 
@@ -106,6 +114,19 @@ def bench_case(case: Case) -> dict:
                     acc += q[s] * 1.000001 + qd[s] * 0.5
         return acc
 
+    def joint_axis_coefficients() -> float:
+        acc = 0.0
+        for _ in range(case.loops):
+            for j in range(joints):
+                if joint_type[j] == 99:
+                    leader = axis_coeff_parent[j]
+                    offset, mult, _unused = axis_coeff[j]
+                    acc += offset + mult * q[leader] + mult * qd[leader]
+                else:
+                    s = joint_q_start[j]
+                    acc += q[s] * 1.000001 + qd[s] * 0.5
+        return acc
+
     def legacy_constraint_pass() -> float:
         acc = 0.0
         for _ in range(case.loops):
@@ -121,6 +142,7 @@ def bench_case(case: Case) -> dict:
         "baseline_no_mimic_us": fk_baseline,
         "joint_dense_branch_arrays_us": dense_joint_arrays,
         "overloaded_existing_attributes_us": overloaded_existing_attributes,
+        "joint_axis_coefficients_us": joint_axis_coefficients,
         "joint_compact_relation_table_us": compact_mimic_table,
         "separate_constraint_pass_us": legacy_constraint_pass,
     }
@@ -147,9 +169,13 @@ def bench_case(case: Case) -> dict:
     # joint_target_ke/kd are redefined/overloaded. If current semantics must be
     # preserved, this hidden cost becomes a replacement parent-body array and
     # joint-frequency target metadata, so it is not actually free.
+    # joint_axis coefficients: zero incremental only if the existing joint_axis
+    # storage can be reinterpreted at joint frequency. If mimic joints remain
+    # zero-DOF under Newton's current per-DOF invariant, they have no valid slot.
     results["memory_bytes"] = {
         "joint_dense_branch_arrays": joints * 28,
         "overloaded_existing_attributes_incremental": 0,
+        "joint_axis_coefficients_incremental": 0,
         "joint_compact_relation_table": mimics * 28,
         "separate_constraint_pass": mimics * 24,
         "dense_minus_compact_bytes": joints * 28 - mimics * 28,
