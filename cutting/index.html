@@ -4,6 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Newton Cutting Simulation</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [["\\(", "\\)"]],
+        displayMath: [["\\[", "\\]"]],
+        processEscapes: true
+      },
+      svg: { fontCache: "global" }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -183,6 +194,14 @@
       font-size: 0.92rem;
       color: var(--muted);
     }
+    .math-display {
+      margin: 14px 0;
+      padding: 10px 14px;
+      overflow-x: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
     .compact-list {
       margin-top: 10px;
       padding-left: 20px;
@@ -267,6 +286,13 @@ def update_cut_damage(pos, stress, fracture_energy, damage, cut_side, knife_sdf,
         damage[p] = wp.min(1.0, damage[p] + d_inc)
         if damage[p] &gt; 0.95:
             cut_side[p] = sign_to_int(wp.dot(pos[p] - knife_sdf.tip, n))</code></pre>
+      <p>In continuum terms, the toy damage update is the discrete version of a work-to-toughness rule:</p>
+      <div class="math-display">\[
+        \Delta d =
+        \frac{\max(\sigma_n, 0)\, v_{\mathrm{edge}}\, \Delta t}{G_c},
+        \qquad
+        d_{t+\Delta t} = \min(1, d_t + \Delta d).
+      \]</div>
       <p class="verdict warning">The MPM issue is not damage detection. It is separation. A single velocity field can smear or heal the two sides of a cut. The first Newton baseline should test two separation choices: particle-side labels with contact filtering near the knife, and a multi-field or multi-material velocity solve in cut cells. CRESSim-MPM is a recent robotics/surgical reference for making MPM cutting and suturing real time.</p>
     </section>
 
@@ -288,21 +314,40 @@ lambda_eff = tet_materials[tet_id, 1] * scale
 f_tet, h_tet = evaluate_volumetric_neo_hookean_force_and_hessian(
     tet_id, vertex_order, pos_prev, pos, tet_indices, tet_poses[tet_id],
     mu_eff, lambda_eff, tet_materials[tet_id, 2], dt)</code></pre>
+      <div class="math-display">\[
+        \mu_{\mathrm{eff}} = (1-d)^2\mu,
+        \qquad
+        \lambda_{\mathrm{eff}} = (1-d)^2\lambda.
+      \]</div>
       <p>For DiSECt-style robot cutting, the important feature is continuous damage: the knife contact force gradually weakens cohesive links before they fail. This keeps gradients and force traces smoother than instant remesh/delete events, and it gives parameters that map to measured cutting forces.</p>
     </section>
 
     <section>
       <h2>X-FEM Solver Track</h2>
       <p>X-FEM is the mathematically cleanest mesh-based route for a knife that cuts through existing tetrahedra without forcing the simulation mesh to conform to the blade. Instead of splitting every intersected tet, it augments the displacement field with discontinuous basis functions. For a complete cut, the practical starting point is shifted-Heaviside enrichment:</p>
-      <pre><code>u(x) = sum_i N_i(x) u_i
-     + sum_{i in enriched nodes} N_i(x) (H(phi(x)) - H(phi_i)) a_i</code></pre>
-      <p>Here <code>u_i</code> are Newton's ordinary particle displacements, <code>a_i</code> are extra vector DOFs, <code>phi</code> is the signed cut-surface distance, and <code>H</code> is the side indicator. The shifted form makes enrichment vanish at the owning node, which keeps the standard nodal field interpretable and improves conditioning. Partial/progressive cuts need crack-tip enrichment or a process-zone substitute near the knife front; complete cuts can start with Heaviside only.</p>
+      <div class="math-display">\[
+        \mathbf{u}(\mathbf{x}) =
+        \sum_i N_i(\mathbf{x})\,\mathbf{u}_i
+        +
+        \sum_{i \in \mathcal{I}_{\mathrm{xfem}}}
+        N_i(\mathbf{x})
+        \left(H(\phi(\mathbf{x})) - H(\phi_i)\right)
+        \mathbf{a}_i .
+      \]</div>
+      <p>Here \(\mathbf{u}_i\) are Newton's ordinary particle displacements, \(\mathbf{a}_i\) are extra vector DOFs, \(\phi\) is the signed cut-surface distance, and \(H\) is the side indicator. The shifted form makes enrichment vanish at the owning node, which keeps the standard nodal field interpretable and improves conditioning. Partial/progressive cuts need crack-tip enrichment or a process-zone substitute near the knife front; complete cuts can start with Heaviside only.</p>
       <p>The literature has converged on three practical lessons. First, X-FEM avoids remeshing but does not avoid geometry: every cut tet still needs side-aware quadrature for mass, stiffness, elastic energy, and internal force. Second, real-time stability depends on suppressing non-contributing or tiny-volume enrichment DOFs; otherwise nearly singular matrices appear when a blade grazes a vertex or sliver of material. Third, X-FEM must still be coupled to a cohesive fracture law if we want cutting forces rather than just a geometric discontinuity.</p>
       <div class="cards">
         <div class="card"><strong>Newton fit</strong><p>Make a separate <code>SolverXFEMCut</code>. Reuse <code>Model.tet_indices</code>, <code>tet_poses</code>, <code>tet_materials</code>, and VBD's Neo-Hookean force math, but add solver-owned enrichment arrays and cut quadrature.</p></div>
         <div class="card"><strong>Why not just VBD?</strong><p>Current VBD tet kernels solve one 3D block per physical particle. X-FEM adds <code>a_i</code> vector unknowns that are not particles, have no contact geometry, and couple to physical particles through every cut-cell integral.</p></div>
-        <div class="card"><strong>Physics hook</strong><p>Use cohesive traction-separation on the cut surface: damage grows from knife/contact work and dissipates <code>G_c</code>. The enrichment only supplies the kinematics needed for the two sides to separate.</p></div>
+        <div class="card"><strong>Physics hook</strong><p>Use cohesive traction-separation on the cut surface: damage grows from knife/contact work and dissipates \(G_c\). The enrichment only supplies the kinematics needed for the two sides to separate.</p></div>
       </div>
+      <p>A simple cohesive normal-traction law for the first solver prototype can be written as:</p>
+      <div class="math-display">\[
+        t_n(\delta_n, d) =
+        (1-d)\,T_c\,\max\!\left(0, 1-\frac{\delta_n}{\delta_c}\right),
+        \qquad
+        G_c = \int_0^{\delta_c} t_n(\delta, 0)\,d\delta .
+      \]</div>
       <p>Concrete Newton data layout:</p>
       <pre><code>model.cut.fracture_energy[tet]      # J/m^2, per tet or material region
 model.cut.cohesive_strength[tet]    # Pa
@@ -329,6 +374,13 @@ for local in range(4):
 
 force, hessian = neo_hookean_cut_quad(F, quad_weight, mu, lambda)
 scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
+      <p>The same kernel is evaluating the quadrature-point deformation gradient:</p>
+      <div class="math-display">\[
+        \mathbf{F}_q =
+        \sum_{i=1}^{4}
+        \left(\mathbf{x}_i + (H_q - H_i)\mathbf{a}_i\right)
+        \otimes \nabla N_i .
+      \]</div>
       <p>The scatter step is the main reason this should be its own solver. A VBD-style block descent is still possible, but the coloring graph must include both physical nodes and enriched nodes. A matrix-free PCG/Newton-Krylov variant is also plausible because X-FEM naturally wants residual and Jacobian-vector products over mixed DOFs.</p>
       <p>I added a second report-local NumPy artifact, <a href="xfem_enrichment_exploration.py"><code>xfem_enrichment_exploration.py</code></a>, with a standard-library test, <a href="test_xfem_enrichment.py"><code>test_xfem_enrichment.py</code></a>. It clips tetrahedra by a knife plane, estimates positive/negative material fractions, counts shifted-Heaviside enriched nodes, estimates cut-cell quadrature subcells, and flags enrichment variables whose stiffness contribution is near-null. Results are saved as <a href="xfem_enrichment_results.json"><code>xfem_enrichment_results.json</code></a>.</p>
       <table>
@@ -373,12 +425,16 @@ scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
       <table>
         <thead><tr><th>Width</th><th>Fracture energy</th><th>Interfacial shear</th><th>Contact area</th><th>Force scale</th></tr></thead>
         <tbody>
-          <tr><td>0.03 m</td><td>25 J/m^2</td><td>1 kPa</td><td>1.0e-4 m^2</td><td class="numeric">0.85 N</td></tr>
-          <tr><td>0.05 m</td><td>100 J/m^2</td><td>4 kPa</td><td>2.5e-4 m^2</td><td class="numeric">6.00 N</td></tr>
-          <tr><td>0.08 m</td><td>250 J/m^2</td><td>10 kPa</td><td>5.0e-4 m^2</td><td class="numeric">25.00 N</td></tr>
+          <tr><td>0.03 m</td><td>25 \(\mathrm{J}/\mathrm{m}^2\)</td><td>1 kPa</td><td>\(1.0\times10^{-4}\,\mathrm{m}^2\)</td><td class="numeric">0.85 N</td></tr>
+          <tr><td>0.05 m</td><td>100 \(\mathrm{J}/\mathrm{m}^2\)</td><td>4 kPa</td><td>\(2.5\times10^{-4}\,\mathrm{m}^2\)</td><td class="numeric">6.00 N</td></tr>
+          <tr><td>0.08 m</td><td>250 \(\mathrm{J}/\mathrm{m}^2\)</td><td>10 kPa</td><td>\(5.0\times10^{-4}\,\mathrm{m}^2\)</td><td class="numeric">25.00 N</td></tr>
         </tbody>
       </table>
-      <p class="note">Force scale used here: <code>F ~= Gamma_c * width + tau_interface * A_contact</code>. It is intentionally simple, but it gives Newton parameter ranges that can be checked against real knife force data before a full solver exists.</p>
+      <p class="note">Force scale used here:</p>
+      <div class="math-display">\[
+        F_{\mathrm{cut}} \approx G_c\,w + \tau_{\mathrm{interface}}\,A_{\mathrm{contact}}.
+      \]</div>
+      <p class="note">It is intentionally simple, but it gives Newton parameter ranges that can be checked against real knife force data before a full solver exists.</p>
     </section>
 
     <section>
