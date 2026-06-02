@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newton Cutting Simulation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182234;
+      --muted: #5a6678;
+      --line: #d9dee7;
+      --paper: #f6f7f9;
+      --panel: #ffffff;
+      --accent: #0f766e;
+      --blue: #2456a6;
+      --warn: #9f3a15;
+      --good: #166534;
+      --bad: #991b1b;
+      --code: #111827;
+      --code-bg: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    a { color: var(--blue); }
+    header, main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+    header {
+      padding: 42px 0 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    main { padding: 30px 0 64px; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    h1 {
+      margin: 0;
+      max-width: 980px;
+      font-size: clamp(2.3rem, 6vw, 5rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: clamp(1.45rem, 3vw, 2rem);
+      letter-spacing: 0;
+    }
+    h3 { margin: 20px 0 8px; }
+    p, li {
+      color: var(--muted);
+      line-height: 1.62;
+    }
+    .lead {
+      max-width: 920px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.6;
+    }
+    section {
+      padding: 26px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px 16px;
+    }
+    .card strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ink);
+    }
+    .verdict {
+      border-left: 5px solid var(--accent);
+      padding: 14px 18px;
+      background: var(--panel);
+      color: var(--ink);
+    }
+    .verdict.warning { border-left-color: var(--warn); }
+    .tag {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tag.good { background: #dcfce7; color: var(--good); }
+    .tag.mixed { background: #fef3c7; color: #92400e; }
+    .tag.bad { background: #fee2e2; color: var(--bad); }
+    .tag.info { background: #dbeafe; color: #1d4ed8; }
+    table {
+      width: 100%;
+      margin-top: 14px;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      font-size: 0.93rem;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .numeric { text-align: right; white-space: nowrap; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.95em;
+      color: var(--code);
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 1px 4px;
+    }
+    pre {
+      margin: 14px 0;
+      padding: 14px;
+      overflow-x: auto;
+      color: var(--code);
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      line-height: 1.45;
+    }
+    pre code {
+      padding: 0;
+      background: transparent;
+    }
+    .process-map {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }
+    .step {
+      min-height: 118px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--panel);
+    }
+    .step span {
+      display: block;
+      color: var(--accent);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .step strong {
+      display: block;
+      margin: 5px 0;
+      color: var(--ink);
+    }
+    .step p { margin: 0; font-size: 0.92rem; }
+    .note {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+    .compact-list {
+      margin-top: 10px;
+      padding-left: 20px;
+    }
+    .source-list li { margin-bottom: 8px; }
+    @media (max-width: 980px) {
+      .cards, .process-map { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Newton research note · soft object cutting</p>
+    <h1>Cutting Simulation for Soft Objects in Newton</h1>
+    <p class="lead">A literature-grounded implementation report on real-time cutting forces, damage, fracture toughness, MPM baselines, and mesh-based Newton/Warp paths for robot knife interactions.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Executive Summary</h2>
+      <div class="cards">
+        <div class="card"><strong>Best immediate baseline</strong><p>Use Newton's existing <code>SolverImplicitMPM</code> with knife contact, per-particle damage, toughness, yield, and softening attributes. This avoids topology changes and is the fastest way to get force traces against experiments.</p></div>
+        <div class="card"><strong>Best mesh-based path</strong><p>Add a VBD/FEM cutting capability based on virtual nodes plus cohesive damage springs across the cut surface. It maps well to Newton's particle/tet arrays and keeps the solver local.</p></div>
+        <div class="card"><strong>Hardest path</strong><p>Full adaptive remeshing or X-FEM/CutFEM is accurate and elegant, but dynamic topology, extra degrees of freedom, quadrature changes, and graph capture make it a second-phase feature.</p></div>
+      </div>
+      <p class="verdict">Recommendation: build two tracks. Track A is an MPM cutting benchmark in Newton now. Track B is a VBD mesh cutting prototype using DiSECt-style virtual-node/cohesive interface mechanics. Do not start with full X-FEM. Do not start with arbitrary tetrahedral remeshing as the main physics path. Use remeshing first as a geometry/export helper and as a later high-fidelity option.</p>
+    </section>
+
+    <section>
+      <h2>What Newton Already Has</h2>
+      <p>Newton has the right raw pieces for this exploration. <code>ModelBuilder.add_soft_grid()</code> and <code>add_soft_mesh()</code> create particles, surface triangles, bending edges, <code>tet_indices</code>, <code>tet_poses</code>, and <code>tet_materials</code>. <code>SolverVBD</code> consumes those arrays through local vertex-block solves for triangles, edges, springs, contacts, and tetrahedral Neo-Hookean elasticity. It also requires <code>builder.color()</code>, which matters because changing topology invalidates particle coloring and adjacency.</p>
+      <p><code>SolverImplicitMPM.register_custom_attributes()</code> already registers per-particle material and state attributes including <code>mpm:young_modulus</code>, <code>mpm:poisson_ratio</code>, pressure and deviatoric yield parameters, hardening/softening, viscosity, <code>particle_Jp</code>, and <code>particle_stress</code>. That is unusually close to a cutting material model: we mainly need damage/toughness attributes, knife geometry/contact, and a separation rule that prevents cut material from numerically healing across the grid.</p>
+      <div class="process-map">
+        <div class="step"><span>Model data</span><strong>Particles and tets</strong><p>Mesh soft bodies are already particle based with tet connectivity and rest-pose matrices.</p></div>
+        <div class="step"><span>VBD solve</span><strong>Local elasticity</strong><p>Tet energy can be degraded by per-element damage without a global stiffness factorization.</p></div>
+        <div class="step"><span>MPM solve</span><strong>Plastic stress state</strong><p>MPM can carry per-particle yield, stress, plastic volume, and new cut damage.</p></div>
+        <div class="step"><span>Constraint</span><strong>Graph capture</strong><p>Fixed particle counts and fixed arrays are friendly. Dynamic remeshing is the capture-sensitive part.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Literature Map</h2>
+      <p>The cutting literature splits into a few implementation families. They are not interchangeable: each makes a different bet about topology, force realism, and real-time cost.</p>
+      <table>
+        <thead><tr><th>Method</th><th>Core idea</th><th>Force/material realism</th><th>Newton/Warp fit</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag good">Start</span> MPM with damage/fracture</td><td>Particles carry material state while a background grid solves motion. Cutting is contact plus damage/separation, not mesh surgery.</td><td>Excellent for large deformation, plasticity, chip-like flow, contact, and force calibration. Needs multi-material or multi-field separation to avoid healing.</td><td>Strong fit. Newton already has implicit MPM, stress, yield, softening, and sparse/fixed grid options.</td><td>Best baseline and fastest validation route.</td></tr>
+          <tr><td><span class="tag good">Start</span> Virtual nodes plus cohesive springs</td><td>Duplicate cut-side degrees of freedom and connect them with weakening cohesive elements or springs.</td><td>Good for robot cutting forces if damage depends on knife work, fracture energy, and interfacial friction.</td><td>Strong fit for VBD. Newton already has particles, springs, tets, contacts, and local solves.</td><td>Best mesh-based prototype.</td></tr>
+          <tr><td><span class="tag mixed">Later</span> Adaptive remeshing/subdivision</td><td>Split intersected tetrahedra so the mesh conforms to the cut surface.</td><td>Clear geometry and perception mesh output. Risk of slivers, mass transfer, recoloing, and frequent topology rebuilds.</td><td>Feasible in NumPy first, Warp fixed-capacity later. Dynamic allocation is the obstacle.</td><td>Use as event processing or export, not first solver core.</td></tr>
+          <tr><td><span class="tag mixed">Later</span> X-FEM/CutFEM</td><td>Represent discontinuities with enriched basis functions or unfitted integration rather than conforming remesh.</td><td>High numerical quality and mesh-independent cracks. Extra DOFs, quadrature, conditioning, and constraints are nontrivial.</td><td>Poor first fit for VBD because Newton's current mesh soft-body solver has vertex positions as the direct DOFs.</td><td>Future high-fidelity FEM solver path.</td></tr>
+          <tr><td><span class="tag mixed">Research</span> Phase-field fracture</td><td>Diffuse crack damage field regularized by a length scale.</td><td>Good physics for crack nucleation and branching; force calibration is principled through fracture energy.</td><td>Could fit MPM or a future FEM solve, but adds a PDE/state solve and length-scale tuning.</td><td>Useful reference, not first real-time knife implementation.</td></tr>
+          <tr><td><span class="tag bad">Avoid first</span> Element deletion only</td><td>Remove or deactivate material once a stress threshold is exceeded.</td><td>Fast but poor force realism, volume loss, mesh dependence, and weak crack-surface control.</td><td>Easy but not close to real-world cutting measurements.</td><td>Only as a debug baseline.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>MPM Baseline</h2>
+      <p>The MPM track should target force validation first. The knife should be an analytic SDF or mesh SDF collider with a sharp-edge model, a blade normal, and a blade tangent for slicing. Each particle carries fracture/damage variables. Each step accumulates normal indentation work, tangential sliding work, and local stress. Once the local work reaches a toughness threshold, damage grows and cohesive/tensile resistance is reduced.</p>
+      <p>Minimal new attributes can be registered through Newton's existing custom-attribute mechanism:</p>
+      <pre><code>SolverImplicitMPM.register_custom_attributes(builder)
+builder.add_custom_attribute(newton.ModelBuilder.CustomAttribute(
+    name="fracture_energy", namespace="cut", frequency=newton.Model.AttributeFrequency.PARTICLE,
+    assignment=newton.Model.AttributeAssignment.MODEL, dtype=wp.float32, default=100.0))
+builder.add_custom_attribute(newton.ModelBuilder.CustomAttribute(
+    name="damage", namespace="cut", frequency=newton.Model.AttributeFrequency.PARTICLE,
+    assignment=newton.Model.AttributeAssignment.STATE, dtype=wp.float32, default=0.0))
+builder.add_custom_attribute(newton.ModelBuilder.CustomAttribute(
+    name="cut_side", namespace="cut", frequency=newton.Model.AttributeFrequency.PARTICLE,
+    assignment=newton.Model.AttributeAssignment.STATE, dtype=wp.int32, default=0))</code></pre>
+      <p>Warp-shaped damage update:</p>
+      <pre><code>@wp.kernel
+def update_cut_damage(pos, stress, fracture_energy, damage, cut_side, knife_sdf, dt):
+    p = wp.tid()
+    phi, n, blade_tangent = eval_knife_sdf(knife_sdf, pos[p])
+    if phi &lt; knife_sdf.process_zone:
+        sigma_n = normal_stress(stress[p], n)
+        work = wp.max(sigma_n, 0.0) * knife_sdf.edge_speed * dt
+        d_inc = work / wp.max(fracture_energy[p], 1.0e-6)
+        damage[p] = wp.min(1.0, damage[p] + d_inc)
+        if damage[p] &gt; 0.95:
+            cut_side[p] = sign_to_int(wp.dot(pos[p] - knife_sdf.tip, n))</code></pre>
+      <p class="verdict warning">The MPM issue is not damage detection. It is separation. A single velocity field can smear or heal the two sides of a cut. The first Newton baseline should test two separation choices: particle-side labels with contact filtering near the knife, and a multi-field or multi-material velocity solve in cut cells. CRESSim-MPM is a recent robotics/surgical reference for making MPM cutting and suturing real time.</p>
+    </section>
+
+    <section>
+      <h2>Mesh-Based VBD Track</h2>
+      <p>For Newton's current mesh soft-body stack, the most natural cutting implementation is a VBD extension rather than a new global FEM solver. VBD already solves per-particle blocks from adjacent triangles, springs, and tets. A cut event can duplicate or virtually duplicate DOFs along the knife path, add cohesive links across the prospective cut, and weaken those links using a damage law.</p>
+      <p>Concrete first implementation:</p>
+      <ol class="compact-list">
+        <li>Add cut material metadata: per-tet or per-interface <code>fracture_energy</code>, <code>cohesive_strength</code>, <code>damage</code>, and optional anisotropic grain direction.</li>
+        <li>Build a CPU NumPy cut-event pass that classifies tets by knife plane/SDF, creates paired cut-surface vertices, and inserts cohesive springs between twins.</li>
+        <li>Use the existing VBD spring path for cohesive forces. A spring stiffness is scaled by <code>(1 - damage)^2</code> and goes to zero when the local work exceeds toughness.</li>
+        <li>After a topology event, rebuild the VBD adjacency, coloring, and self-contact filters. During ordinary frames, keep arrays fixed and graph-capturable.</li>
+      </ol>
+      <pre><code># VBD tet/damage sketch inside the force evaluation path.
+d = cut_damage[tet_id]
+scale = (1.0 - d) * (1.0 - d)
+mu_eff = tet_materials[tet_id, 0] * scale
+lambda_eff = tet_materials[tet_id, 1] * scale
+f_tet, h_tet = evaluate_volumetric_neo_hookean_force_and_hessian(
+    tet_id, vertex_order, pos_prev, pos, tet_indices, tet_poses[tet_id],
+    mu_eff, lambda_eff, tet_materials[tet_id, 2], dt)</code></pre>
+      <p>For DiSECt-style robot cutting, the important feature is continuous damage: the knife contact force gradually weakens cohesive links before they fail. This keeps gradients and force traces smoother than instant remesh/delete events, and it gives parameters that map to measured cutting forces.</p>
+    </section>
+
+    <section>
+      <h2>Adaptive Remeshing</h2>
+      <p>Adaptive tetrahedral remeshing is valuable, especially for visual cut surfaces and mesh-based perception. It is also the part most likely to fight real-time graph capture. A practical Newton implementation should separate the event pass from the per-step solve.</p>
+      <table>
+        <thead><tr><th>Phase</th><th>Implementation</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Prototype</td><td>NumPy event pass: classify intersected tets, compute edge intersections, emit surface triangles, duplicate vertices, update connectivity.</td><td>Fast to validate topology and mass conservation with minimal dependencies.</td></tr>
+          <tr><td>Newton beta</td><td>Rebuild <code>Model</code>/<code>SolverVBD</code> after cut events, recapture CUDA graph after topology changes.</td><td>Simple and honest. Cutting events are less frequent than solver iterations.</td></tr>
+          <tr><td>Warp/GPU</td><td>Fixed-capacity buffers, prefix sums, intersection kernels, compaction, and active masks.</td><td>Necessary if cuts happen every frame and must remain inside graph capture.</td></tr>
+          <tr><td>Production</td><td>Virtual-node embedded material or robust state-machine subdivision for degeneracies.</td><td>Needed for cuts through vertices, edges, faces, and repeated/branching cuts.</td></tr>
+        </tbody>
+      </table>
+      <p>The adaptive virtual node literature is particularly relevant because it avoids sliver tetrahedra by embedding cut geometry in larger well-shaped elements. That is likely better for Newton than naive tet subdivision once we need repeated cuts.</p>
+    </section>
+
+    <section>
+      <h2>Toy Exploration</h2>
+      <p>I added a report-local NumPy script, <a href="toy_cutting_exploration.py"><code>toy_cutting_exploration.py</code></a>, and saved its output as <a href="toy_cutting_results.json"><code>toy_cutting_results.json</code></a>. It builds Newton-like five-tet grids, crosses them with an oblique knife plane, and counts touched tets, cut edges, estimated cut-surface triangles, and force scales.</p>
+      <table>
+        <thead><tr><th>Cells</th><th>Vertices</th><th>Tets</th><th>Cut tets</th><th>Cut fraction</th><th>Unique cut edges</th><th>Estimated cut triangles</th></tr></thead>
+        <tbody>
+          <tr><td>4 x 4 x 2</td><td class="numeric">75</td><td class="numeric">160</td><td class="numeric">49</td><td class="numeric">30.63%</td><td class="numeric">45</td><td class="numeric">62</td></tr>
+          <tr><td>8 x 8 x 4</td><td class="numeric">405</td><td class="numeric">1,280</td><td class="numeric">209</td><td class="numeric">16.33%</td><td class="numeric">159</td><td class="numeric">262</td></tr>
+          <tr><td>16 x 16 x 8</td><td class="numeric">2,601</td><td class="numeric">10,240</td><td class="numeric">821</td><td class="numeric">8.02%</td><td class="numeric">573</td><td class="numeric">1,034</td></tr>
+        </tbody>
+      </table>
+      <p>Interpretation: the touched set scales like a surface through the volume. That is good news for localized cut events. The 16 x 16 x 8 case touches only 8% of tets, but it still creates enough new surface primitives that per-frame allocation would be risky inside CUDA graph capture.</p>
+      <table>
+        <thead><tr><th>Width</th><th>Fracture energy</th><th>Interfacial shear</th><th>Contact area</th><th>Force scale</th></tr></thead>
+        <tbody>
+          <tr><td>0.03 m</td><td>25 J/m^2</td><td>1 kPa</td><td>1.0e-4 m^2</td><td class="numeric">0.85 N</td></tr>
+          <tr><td>0.05 m</td><td>100 J/m^2</td><td>4 kPa</td><td>2.5e-4 m^2</td><td class="numeric">6.00 N</td></tr>
+          <tr><td>0.08 m</td><td>250 J/m^2</td><td>10 kPa</td><td>5.0e-4 m^2</td><td class="numeric">25.00 N</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Force scale used here: <code>F ~= Gamma_c * width + tau_interface * A_contact</code>. It is intentionally simple, but it gives Newton parameter ranges that can be checked against real knife force data before a full solver exists.</p>
+    </section>
+
+    <section>
+      <h2>Validation Plan</h2>
+      <p>Cutting should be validated against measured force traces, not only visual cuts. The minimum useful experiment is a robot or linear stage with a force-torque sensor, fixed blade geometry, known vertical and slicing velocities, and soft samples with measured bulk and fracture properties.</p>
+      <div class="cards">
+        <div class="card"><strong>Material tests</strong><p>Fit bulk elasticity from compression/tension. Measure fracture energy with a razorblade or notched soft-gel test. Use NIST's RIFT paper as a practical soft-gel protocol reference.</p></div>
+        <div class="card"><strong>Cutting tests</strong><p>Record vertical force, lateral force, blade pose, insertion depth, and slicing speed. Sweep down velocity, lateral velocity, blade angle, and material.</p></div>
+        <div class="card"><strong>Metrics</strong><p>Match peak initiation force, steady cutting force, force drop after rupture, lateral force, cut opening, and final geometry. Calibrate on one speed and test generalization to others.</p></div>
+      </div>
+      <p>A physically useful model needs at least four effects: bulk finite-strain deformation, fracture/cohesive resistance, pressure-dependent friction, and pressure-independent adhesion or wear. The 2026 soft-material cutting study is a good reminder that these terms interact; a force match from friction alone is not a reliable fracture model.</p>
+    </section>
+
+    <section>
+      <h2>Implementation Roadmap</h2>
+      <table>
+        <thead><tr><th>Milestone</th><th>Deliverable</th><th>Acceptance check</th></tr></thead>
+        <tbody>
+          <tr><td>1. MPM damage baseline</td><td>Example <code>example_mpm_cutting_block.py</code> with analytic knife SDF, damage attributes, force logging, and no topology changes.</td><td>Runs in real time for 10k to 100k particles and produces depth-force curves with tunable peak and steady force.</td></tr>
+          <tr><td>2. MPM separation</td><td>Cut-side labels or multi-field velocity handling near cut cells so separated particles do not heal across the grid.</td><td>After a full cut, the two sides remain separated under contact and gravity.</td></tr>
+          <tr><td>3. VBD cohesive cut prototype</td><td>NumPy cut event pass creates paired cut vertices and cohesive springs on a tet block.</td><td>VBD force trace reacts to toughness and blade motion; topology events recapture cleanly.</td></tr>
+          <tr><td>4. Robust VNA/remesh</td><td>Handle cuts through vertices/edges/faces and repeated cuts; update surface triangles and collision filters.</td><td>No inverted elements or self-contact artifacts on randomized cut paths.</td></tr>
+          <tr><td>5. Calibration package</td><td>Scripts for importing measured force profiles and optimizing toughness, cohesive strength, friction, and damping.</td><td>Fit one material/speed, predict held-out speeds or blade angles within a target force error.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Source Notes</h2>
+      <ul class="source-list">
+        <li>Molino, Bao, and Fedkiw, <a href="https://physbam.stanford.edu/~fedkiw/papers/stanford2004-01.pdf">A Virtual Node Algorithm for Changing Mesh Topology During Simulation</a>, 2004.</li>
+        <li>Wang, Jiang, Schroeder, and Teran, <a href="https://diglib.eg.org/items/3d5efbc1-3328-48d4-b267-71d9d2f4337d">An Adaptive Virtual Node Algorithm with Robust Mesh Cutting</a>, SCA 2014, DOI 10.2312/sca.20141125.</li>
+        <li>Bielser, Glardon, Teschner, and Gross, <a href="https://www.sciencedirect.com/science/article/abs/pii/S1524070304000529">A state machine for real-time cutting of tetrahedral meshes</a>, Graphical Models 2004.</li>
+        <li>Turkiyyah, Bou Karam, Ajami, and Nasri, <a href="https://www.sciencedirect.com/science/article/abs/pii/S0010448510001995">Mesh cutting during real-time physical simulation</a>, Computer-Aided Design 2011.</li>
+        <li>Moës, Dolbow, and Belytschko, <a href="https://doi.org/10.1002/(SICI)1097-0207(19990910)46:1%3C131::AID-NME726%3E3.0.CO;2-J">A finite element method for crack growth without remeshing</a>, IJNME 1999.</li>
+        <li>Bui, Tomar, and Bordas, <a href="https://arxiv.org/abs/1712.03052">Corotational Cut Finite Element Method for real-time surgical simulation</a>, CMAME 2018.</li>
+        <li>Ambati, Pan, Yuan, and Zhang, <a href="https://www.sciencedirect.com/science/article/abs/pii/S0927025611003570">Application of material point methods for cutting process simulations</a>, Computational Materials Science 2012.</li>
+        <li>Nairn, <a href="https://www.cof.orst.edu/cof/wse/faculty/Nairn/papers/MPMCutting.pdf">Numerical Simulation of Orthogonal Cutting using the Material Point Method</a>, Engineering Fracture Mechanics 2015.</li>
+        <li>Ou and Tavakoli, <a href="https://arxiv.org/abs/2502.18437">CRESSim-MPM: A Material Point Method Library for Surgical Soft Body Simulation with Cutting and Suturing</a>, IROS 2025.</li>
+        <li>Heiden, Macklin, Narang, Fox, Garg, and Ramos, <a href="https://arxiv.org/abs/2203.10263">DiSECt: A Differentiable Simulator for Parameter Inference and Control in Robotic Cutting</a>, 2022 extended version.</li>
+        <li>Moreno-Mateos and Steinmann, <a href="https://www.nature.com/articles/s41524-025-01869-y">Cutting soft materials: how material differences shape the response</a>, npj Computational Materials 2026.</li>
+        <li>Duncan, Sarapas, Defante, Beers, and Chan, <a href="https://www.nist.gov/publications/cutting-measure-elasticity-and-fracture-soft-gels">Cutting to Measure the Elasticity and Fracture of Soft Gels</a>, Soft Matter 2020.</li>
+        <li>Kakouris and Triantafyllou, <a href="https://arxiv.org/abs/1906.04740">Phase-field material point method for dynamic brittle fracture</a>, CMAME 2019.</li>
+        <li>Wang and Ma, <a href="https://pubmed.ncbi.nlm.nih.gov/29869383/">A review of virtual cutting methods and technology in deformable objects</a>, International Journal of Medical Robotics 2018.</li>
+        <li>Yu, Zhao, Wang, and Pan, <a href="https://pubmed.ncbi.nlm.nih.gov/38631128/">Real-time soft body dissection simulation with parallelized graph-based shape matching on GPU</a>, Computer Methods and Programs in Biomedicine 2024.</li>
+      </ul>
+      <p class="note">Last updated: 2026-06-02 UTC.</p>
+    </section>
+  </main>
+</body>
+</html>
