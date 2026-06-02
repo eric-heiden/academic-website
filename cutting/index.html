@@ -101,6 +101,54 @@
       margin-bottom: 7px;
       color: var(--ink);
     }
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin: 18px 0;
+    }
+    .media-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .media-card video,
+    .media-card img {
+      display: block;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0f172a;
+    }
+    .media-card h3 {
+      margin: 2px 0 10px;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 3px;
+      color: var(--ink);
+      font-size: 1.15rem;
+    }
     .verdict {
       border-left: 5px solid var(--accent);
       padding: 14px 18px;
@@ -208,7 +256,7 @@
     }
     .source-list li { margin-bottom: 8px; }
     @media (max-width: 980px) {
-      .cards, .process-map { grid-template-columns: 1fr; }
+      .cards, .process-map, .media-grid, .metric-grid { grid-template-columns: 1fr; }
       table { display: block; overflow-x: auto; }
     }
   </style>
@@ -258,6 +306,99 @@
           <tr><td><span class="tag bad">Avoid first</span> Element deletion only</td><td>Remove or deactivate material once a stress threshold is exceeded.</td><td>Fast but poor force realism, volume loss, mesh dependence, and weak crack-surface control.</td><td>Easy but not close to real-world cutting measurements.</td><td>Only as a debug baseline.</td></tr>
         </tbody>
       </table>
+    </section>
+
+    <section>
+      <h2>Implemented Newton Baselines</h2>
+      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, MP4 export path through <code>ViewerGL.get_frame()</code>, and minimal optional encoding dependency. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or remeshing implementations.</p>
+      <div class="media-grid">
+        <div class="media-card">
+          <h3>MPM process-zone baseline</h3>
+          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png">
+            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4" type="video/mp4">
+          </video>
+          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, and a knife-induced separation velocity. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the cut unless we add side labels or multi-field separation.</p>
+        </div>
+        <div class="media-card">
+          <h3>Mesh-based VBD damage track</h3>
+          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png">
+            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4" type="video/mp4">
+          </video>
+          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces and softens cut tetrahedra by scaling <code>tet_materials</code>. This is not topology-changing yet; it is the mesh-based force/damage baseline for the virtual-node and X-FEM follow-up.</p>
+        </div>
+      </div>
+      <div class="media-grid">
+        <div class="media-card">
+          <h3>MPM force profile</h3>
+          <img src="assets/newton_baselines/mpm/mpm_force_profile.png" alt="MPM knife force and mean damage profile">
+        </div>
+        <div class="media-card">
+          <h3>VBD force profile</h3>
+          <img src="assets/newton_baselines/vbd/vbd_force_profile.png" alt="VBD knife force and mean damage profile">
+        </div>
+      </div>
+      <p>The shared knife update uses a compact process-zone model. For particle \(i\), with knife front \(x_k(t)\), process width \(\ell\), and blade window indicator \(\chi_i\), the active weight is</p>
+      <div class="math-display">\[
+        w_i =
+        \chi_i\,
+        \max\left(0,\,
+        1 - \frac{|x_i - x_k(t)|}{\ell}
+        \right).
+      \]</div>
+      <p>Damage grows monotonically and the estimated knife force combines yield-like contact resistance with a fracture-energy term:</p>
+      <div class="math-display">\[
+        d_i^{n+1} =
+        \min\left(1,\,
+        d_i^n + r_d\,\Delta t\,w_i(1-d_i^n)
+        \right),
+        \qquad
+        F_{\mathrm{knife}} =
+        \sum_i
+        \left[
+          \sigma_y A_i w_i(1-d_i^n)
+          +
+          \frac{G_c A_i}{\ell}
+          \frac{d_i^{n+1}-d_i^n}{\Delta t}
+        \right].
+      \]</div>
+      <p>For VBD, cut tetrahedra are softened from the particle damage field as a first mesh-based coupling:</p>
+      <div class="math-display">\[
+        \bar d_T = \frac{1}{4}\sum_{i\in T} d_i,
+        \qquad
+        \mu_T^{\mathrm{eff}} =
+        \left(\eta + (1-\eta)(1-\bar d_T)\right)\mu_T,
+        \qquad
+        \lambda_T^{\mathrm{eff}} =
+        \left(\eta + (1-\eta)(1-\bar d_T)\right)\lambda_T .
+      \]</div>
+      <pre><code># Shared pattern used by the examples.
+launch_mpm_knife_cut(state_0, damage, colors, accum, knife, material, dt, particle_volume, time, device)
+solver_mpm.step(state_0, state_1, control=None, contacts=None, dt=dt)
+
+state_0.clear_forces()
+launch_vbd_knife_cut(state_0, damage, colors, accum, knife, material, dt, particle_volume, time, device)
+launch_cut_tet_degradation(model, damage, base_tet_materials)
+solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
+      <table>
+        <thead><tr><th>Track</th><th>Scene</th><th>Peak force</th><th>Mean force</th><th>Impulse</th><th>Final mean damage</th><th>Solver-only FPS</th><th>GL capture FPS</th></tr></thead>
+        <tbody>
+          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">16.9</td><td class="numeric">5.4</td></tr>
+          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">25.2</td><td class="numeric">6.8</td></tr>
+        </tbody>
+      </table>
+      <div class="metric-grid">
+        <div class="metric"><span>GPU</span><strong>NVIDIA L40</strong></div>
+        <div class="metric"><span>Memory</span><strong>47 GiB</strong></div>
+        <div class="metric"><span>Warp</span><strong>1.14.0rc2</strong></div>
+        <div class="metric"><span>Driver</span><strong>550.127.05</strong></div>
+      </div>
+      <p class="note">The solver-only FPS was measured with <code>--viewer null</code>. The MP4 runs used <code>xvfb-run</code>, <code>--viewer gl --headless</code>, <code>ViewerGL.get_frame()</code>, and optional <code>imageio/imageio-ffmpeg</code> only for encoding. On this host CUDA/OpenGL interop was unavailable under Xvfb, so frame capture used copy-based readback; that is why GL capture FPS is lower than the solver-only timing. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM capture stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM solver stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD capture stats</a>, and <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD solver stats</a>.</p>
+      <pre><code>xvfb-run -a -s '-screen 0 1280x720x24' \
+  uv run --extra examples --with imageio --with imageio-ffmpeg \
+  python -m newton.examples cutting_mpm \
+  --viewer gl --headless --record-video --record-fps 30 \
+  --num-frames 90 --device cuda:0 --artifact-dir cutting/assets/newton_baselines/mpm</code></pre>
+      <p class="verdict warning">Current limitation: these are damage and force baselines, not final cutting solvers. They do not yet duplicate DOFs, split tets, add cut-surface collision, or prevent all numerical healing. Their purpose is to make force calibration, video generation, material sweeps, and future solver comparisons concrete immediately.</p>
     </section>
 
     <section>
@@ -453,9 +594,9 @@ scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
       <table>
         <thead><tr><th>Milestone</th><th>Deliverable</th><th>Acceptance check</th></tr></thead>
         <tbody>
-          <tr><td>1. MPM damage baseline</td><td>Example <code>example_mpm_cutting_block.py</code> with analytic knife SDF, damage attributes, force logging, and no topology changes.</td><td>Runs in real time for 10k to 100k particles and produces depth-force curves with tunable peak and steady force.</td></tr>
+          <tr><td>1. MPM damage baseline</td><td>Implemented as <code>newton/examples/cutting/example_cutting_mpm.py</code> with analytic knife process zone, damage state, force logging, MP4 export, and no topology changes.</td><td>Produces a depth-force curve with tunable peak and steady force; next step is stronger side separation and material sweeps.</td></tr>
           <tr><td>2. MPM separation</td><td>Cut-side labels or multi-field velocity handling near cut cells so separated particles do not heal across the grid.</td><td>After a full cut, the two sides remain separated under contact and gravity.</td></tr>
-          <tr><td>3. VBD cohesive cut prototype</td><td>NumPy cut event pass creates paired cut vertices and cohesive springs on a tet block.</td><td>VBD force trace reacts to toughness and blade motion; topology events recapture cleanly.</td></tr>
+          <tr><td>3. VBD cohesive cut prototype</td><td>Implemented first as <code>newton/examples/cutting/example_cutting_vbd.py</code> with knife forces and tet-material softening; next add paired cut vertices and cohesive springs.</td><td>VBD force trace reacts to toughness and blade motion; topology events recapture cleanly.</td></tr>
           <tr><td>4. X-FEM static complete cut</td><td>Prototype <code>SolverXFEMCut</code> with shifted-Heaviside enrichment, fixed cut-cell quadrature, constrained weak enrichment DOFs, and cohesive traction on one cut surface.</td><td>Matches an equivalent cut-aligned/remeshed FEM block within a small force-displacement tolerance.</td></tr>
           <tr><td>5. Robust VNA/remesh</td><td>Handle cuts through vertices/edges/faces and repeated cuts; update surface triangles and collision filters.</td><td>No inverted elements or self-contact artifacts on randomized cut paths.</td></tr>
           <tr><td>6. X-FEM progressive/multiple cuts</td><td>Add crack-front process zones, tip enrichment or cohesive-zone regularization, and Boolean integration for multiple intersecting cuts.</td><td>Stable force traces when the knife advances incrementally through a mesh and when cuts intersect.</td></tr>
