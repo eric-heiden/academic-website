@@ -309,22 +309,66 @@
     </section>
 
     <section>
+      <h2>Application Tracks</h2>
+      <p>The broader capability should be framed by application, not by solver family. A robot knife cutting soft tissue or food is a tool-driven separation problem with measured blade forces. Tearing cloth or paper is a thin-shell crack propagation problem where bending, anisotropy, and adaptive refinement dominate. Fracturing a rigid object is often a stress- or impact-driven fragmentation problem where the main output is stable debris geometry, contact, and momentum transfer.</p>
+      <table>
+        <thead><tr><th>Capability</th><th>Typical objects</th><th>Driving event</th><th>Best first Newton track</th><th>Hard part</th></tr></thead>
+        <tbody>
+          <tr><td>Soft-body cutting</td><td>Tissue, gels, food, foam, rubber</td><td>Knife/tool contact, indentation work, slicing velocity</td><td>MPM baseline for large deformation; VBD/X-FEM for mesh-aware robotic perception and cut surfaces</td><td>Measured force matching, side separation, friction/adhesion, and cut-surface contact</td></tr>
+          <tr><td>Cloth/paper tearing</td><td>Fabric, paper, plastic sheet, foil, packaging</td><td>In-plane stress, imposed tear path, tool puncture, or crack-tip energy release</td><td>Cloth/triangle-mesh tearing with adaptive local refinement and duplicated seam vertices</td><td>Crack path resolution, anisotropy from weave/fiber direction, bending near crack tips, and avoiding sliver triangles</td></tr>
+          <tr><td>Rigid-object fracture</td><td>Glass, ceramic, stone, wood blocks, brittle props</td><td>Impact, tensile stress, impulse, pre-scored weakness, or user-authored break pattern</td><td>Hybrid rigid-body fragments plus FEM/XPBD stress trigger; prefracture fallback for real-time</td><td>Fragment generation, stable contact between many pieces, fracture energy realism, and collision-shape updates</td></tr>
+        </tbody>
+      </table>
+      <p>These tracks share a fracture-energy idea but differ in state representation. Soft cutting can use a cohesive process zone tied to blade work:</p>
+      <div class="math-display">\[
+        G_{\mathrm{tool}} =
+        \int_{\Gamma_{\mathrm{blade}}}
+        \left(\mathbf{t}_{n}\cdot \mathbf{v}_{n}
+        + \mathbf{t}_{\tau}\cdot \mathbf{v}_{\tau}\right)\,dt,
+        \qquad
+        \Delta d > 0 \;\;\text{when}\;\; G_{\mathrm{tool}} \ge G_c .
+      \]</div>
+      <p>Thin-sheet tearing should instead resolve crack-tip energy on a surface mesh, usually with anisotropic toughness for paper grain or woven cloth:</p>
+      <div class="math-display">\[
+        G_{\mathrm{sheet}}(\theta) \ge G_c(\theta),
+        \qquad
+        G_c(\theta) =
+        G_{\parallel}\cos^2\theta + G_{\perp}\sin^2\theta .
+      \]</div>
+      <p>Rigid fracture should expose both physical and authorable criteria. The physically meaningful test is stress-intensity or maximum principal stress, while real-time applications often combine this with precomputed fracture patterns:</p>
+      <div class="math-display">\[
+        K_I \ge K_{Ic}
+        \quad\text{or}\quad
+        \sigma_{\max} \ge \sigma_c,
+        \qquad
+        E_{\mathrm{impact}} \rightarrow
+        \{\text{fragment graph},\;\text{new collision shapes}\}.
+      \]</div>
+      <div class="cards">
+        <div class="card"><strong>Soft cutting approach</strong><p>Keep the current MPM and VBD baselines for force calibration. Add side labels, cut-surface collision, and either virtual-node or X-FEM DOFs once the measured force curve is credible.</p></div>
+        <div class="card"><strong>Cloth/paper approach</strong><p>Start with Newton's cloth triangle mesh. Duplicate vertices along a crack path, add seam collision, refine locally near crack tips, and drive fracture by edge strain or energy release.</p></div>
+        <div class="card"><strong>Rigid fracture approach</strong><p>Use prefractured or dynamically generated convex fragments for real-time debris. For higher fidelity, use a temporary FEM/XPBD stress solve to decide crack planes, then hand fragments to rigid-body simulation.</p></div>
+      </div>
+      <p class="verdict">Implementation recommendation: keep one shared fracture/cut material description, but expose three solver tracks. Track A remains soft cutting with MPM/VBD/X-FEM. Track B is thin-sheet tearing in the cloth solver with adaptive crack-local refinement. Track C is rigid fracture with stress-triggered fragment generation and rigid-body debris. Trying to force all three through one "cutting solver" would hide the real differences in geometry, forces, and validation.</p>
+    </section>
+
+    <section>
       <h2>Implemented Newton Baselines</h2>
-      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, MP4 export path through <code>ViewerGL.get_frame()</code>, and minimal optional encoding dependency. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or remeshing implementations.</p>
+      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, and render-side split surface mesh. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or remeshing implementations.</p>
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM process-zone baseline</h3>
           <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png">
             <source src="assets/newton_baselines/mpm/mpm_cutting.mp4" type="video/mp4">
           </video>
-          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, and a knife-induced separation velocity. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the cut unless we add side labels or multi-field separation.</p>
+          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and a render-only split surface/cut-wall mesh so the cut reads geometrically. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the simulated material unless we add side labels or multi-field separation.</p>
         </div>
         <div class="media-card">
           <h3>Mesh-based VBD damage track</h3>
           <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png">
             <source src="assets/newton_baselines/vbd/vbd_cutting.mp4" type="video/mp4">
           </video>
-          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces and softens cut tetrahedra by scaling <code>tet_materials</code>. This is not topology-changing yet; it is the mesh-based force/damage baseline for the virtual-node and X-FEM follow-up.</p>
+          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders a split surface/cut-wall mesh. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
         </div>
       </div>
       <div class="media-grid">
@@ -380,10 +424,10 @@ launch_vbd_knife_cut(state_0, damage, colors, accum, knife, material, dt, partic
 launch_cut_tet_degradation(model, damage, base_tet_materials)
 solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
       <table>
-        <thead><tr><th>Track</th><th>Scene</th><th>Peak force</th><th>Mean force</th><th>Impulse</th><th>Final mean damage</th><th>Solver-only FPS</th><th>GL capture FPS</th></tr></thead>
+        <thead><tr><th>Track</th><th>Scene</th><th>Peak force</th><th>Mean force</th><th>Impulse</th><th>Final mean damage</th><th>Simulation FPS</th><th>Rendered-video FPS</th></tr></thead>
         <tbody>
-          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">16.9</td><td class="numeric">5.4</td></tr>
-          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">25.2</td><td class="numeric">6.8</td></tr>
+          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">16.9</td><td class="numeric">5.2</td></tr>
+          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">25.2</td><td class="numeric">8.2</td></tr>
         </tbody>
       </table>
       <div class="metric-grid">
@@ -392,13 +436,8 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
         <div class="metric"><span>Warp</span><strong>1.14.0rc2</strong></div>
         <div class="metric"><span>Driver</span><strong>550.127.05</strong></div>
       </div>
-      <p class="note">The solver-only FPS was measured with <code>--viewer null</code>. The MP4 runs used <code>xvfb-run</code>, <code>--viewer gl --headless</code>, <code>ViewerGL.get_frame()</code>, and optional <code>imageio/imageio-ffmpeg</code> only for encoding. On this host CUDA/OpenGL interop was unavailable under Xvfb, so frame capture used copy-based readback; that is why GL capture FPS is lower than the solver-only timing. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM capture stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM solver stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD capture stats</a>, and <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD solver stats</a>.</p>
-      <pre><code>xvfb-run -a -s '-screen 0 1280x720x24' \
-  uv run --extra examples --with imageio --with imageio-ffmpeg \
-  python -m newton.examples cutting_mpm \
-  --viewer gl --headless --record-video --record-fps 30 \
-  --num-frames 90 --device cuda:0 --artifact-dir cutting/assets/newton_baselines/mpm</code></pre>
-      <p class="verdict warning">Current limitation: these are damage and force baselines, not final cutting solvers. They do not yet duplicate DOFs, split tets, add cut-surface collision, or prevent all numerical healing. Their purpose is to make force calibration, video generation, material sweeps, and future solver comparisons concrete immediately.</p>
+      <p class="note">Simulation FPS isolates the physics update. Rendered-video FPS includes the visualization layer, so it is the more conservative end-to-end number for this report. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM rendered-video stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM simulation stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD rendered-video stats</a>, and <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD simulation stats</a>.</p>
+      <p class="verdict warning">Current limitation: the videos now show render-side remeshing with duplicated seam geometry and cut walls, but the solvers still use process-zone damage rather than true topological separation. The next mesh milestone is to move from render-only duplicated vertices to solver-owned duplicated DOFs, cohesive links, cut-surface collision, and side-aware contact filtering.</p>
     </section>
 
     <section>
@@ -627,11 +666,19 @@ scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
         <li>Heiden, Macklin, Narang, Fox, Garg, and Ramos, <a href="https://arxiv.org/abs/2203.10263">DiSECt: A Differentiable Simulator for Parameter Inference and Control in Robotic Cutting</a>, 2022 extended version.</li>
         <li>Moreno-Mateos and Steinmann, <a href="https://www.nature.com/articles/s41524-025-01869-y">Cutting soft materials: how material differences shape the response</a>, npj Computational Materials 2026.</li>
         <li>Duncan, Sarapas, Defante, Beers, and Chan, <a href="https://www.nist.gov/publications/cutting-measure-elasticity-and-fracture-soft-gels">Cutting to Measure the Elasticity and Fracture of Soft Gels</a>, Soft Matter 2020.</li>
+        <li>Baraff and Witkin, <a href="https://dl.acm.org/doi/10.1145/280814.280821">Large Steps in Cloth Simulation</a>, SIGGRAPH 1998.</li>
+        <li>Pfaff, Narain, de Joya, and O'Brien, <a href="https://graphics.berkeley.edu/papers/Pfaff-ATC-2014-07/">Adaptive Tearing and Cracking of Thin Sheets</a>, SIGGRAPH 2014.</li>
+        <li>Vandenberghe and Villermaux, <a href="https://arxiv.org/abs/1108.3534">Forced tearing of ductile and brittle thin sheets</a>, Physical Review Letters 2013.</li>
+        <li>O'Brien and Hodgins, <a href="https://graphics.berkeley.edu/papers/Obrien-GMA-1999-08/index.html">Graphical Modeling and Animation of Brittle Fracture</a>, SIGGRAPH 1999.</li>
+        <li>O'Brien, Bargteil, and Hodgins, <a href="https://escholarship.org/uc/item/1pb4c21m">Graphical modeling and animation of ductile fracture</a>, SIGGRAPH 2002.</li>
+        <li>Muller, McMillan, Dorsey, and Jagnow, <a href="https://graphics.cs.yale.edu/publications/real-time-simulation-deformation-and-fracture-stiff-materials">Real-time simulation of deformation and fracture of stiff materials</a>, SCA 2001.</li>
+        <li>Parker and O'Brien, <a href="https://graphics.berkeley.edu/papers/Parker-RTD-2009-08/">Real-Time Deformation and Fracture in a Game Environment</a>, SCA 2009.</li>
+        <li>Muller, Chentanez, and Kim, <a href="https://dl.acm.org/doi/10.1145/2461912.2461934">Real Time Dynamic Fracture with Volumetric Approximate Convex Decompositions</a>, SIGGRAPH 2013.</li>
         <li>Kakouris and Triantafyllou, <a href="https://arxiv.org/abs/1906.04740">Phase-field material point method for dynamic brittle fracture</a>, CMAME 2019.</li>
         <li>Wang and Ma, <a href="https://pubmed.ncbi.nlm.nih.gov/29869383/">A review of virtual cutting methods and technology in deformable objects</a>, International Journal of Medical Robotics 2018.</li>
         <li>Yu, Zhao, Wang, and Pan, <a href="https://pubmed.ncbi.nlm.nih.gov/38631128/">Real-time soft body dissection simulation with parallelized graph-based shape matching on GPU</a>, Computer Methods and Programs in Biomedicine 2024.</li>
       </ul>
-      <p class="note">Last updated: 2026-06-02 UTC.</p>
+      <p class="note">Last updated: 2026-06-03 UTC.</p>
     </section>
   </main>
 </body>
