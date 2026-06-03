@@ -354,19 +354,19 @@
 
     <section>
       <h2>Implemented Newton Baselines</h2>
-      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with three concrete examples under <code>newton/examples/cutting/</code>: MPM, VBD, and the new Track C X-FEM solver. They share a rigid blade mesh with a sampled edge spline, cohesive process-zone damage law, force logger, and zero-kerf cut-surface rendering that follows the simulated particle motion without deleting cells or shrinking the object volume.</p>
+      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with three concrete examples under <code>newton/examples/cutting/</code>: MPM, VBD, and the new Track C X-FEM solver. They share a rigid blade mesh with a sampled edge spline, cohesive process-zone damage law, force logger, and zero-kerf cut-surface rendering that follows the simulated particle motion without deleting cells or shrinking the object volume. The videos below are rendered from Newton <code>ViewerGL.get_frame()</code> captures with transparent soft meshes drawn after opaque blade/cut-wall geometry.</p>
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM process-zone baseline</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png?v=rigid-edge-no-handle-20260603">
-            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4?v=rigid-edge-no-handle-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png?v=viewergl-opacity-20260603">
+            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4?v=viewergl-opacity-20260603" type="video/mp4">
           </video>
           <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and adaptive particle-following cut-wall rendering. The exterior volume remains intact; the visible red interface is the dissected material plane, not removed cells.</p>
         </div>
         <div class="media-card">
           <h3>Mesh-based VBD damage track</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png?v=rigid-edge-no-handle-20260603">
-            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4?v=rigid-edge-no-handle-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png?v=viewergl-opacity-20260603">
+            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4?v=viewergl-opacity-20260603" type="video/mp4">
           </video>
           <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders a zero-kerf cut wall that follows the VBD particles. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
         </div>
@@ -374,17 +374,17 @@
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM force profile</h3>
-          <img src="assets/newton_baselines/mpm/mpm_force_profile.png?v=rigid-edge-no-handle-20260603" alt="MPM knife force and mean damage profile">
+          <img src="assets/newton_baselines/mpm/mpm_force_profile.png?v=viewergl-opacity-20260603" alt="MPM knife force and mean damage profile">
         </div>
         <div class="media-card">
           <h3>VBD force profile</h3>
-          <img src="assets/newton_baselines/vbd/vbd_force_profile.png?v=rigid-edge-no-handle-20260603" alt="VBD knife force and mean damage profile">
+          <img src="assets/newton_baselines/vbd/vbd_force_profile.png?v=viewergl-opacity-20260603" alt="VBD knife force and mean damage profile">
         </div>
       </div>
       <div class="media-grid">
         <div class="media-card">
           <h3>Adaptive remesh complexity</h3>
-          <img src="assets/newton_baselines/adaptive_remesh_profile.png?v=rigid-edge-no-handle-20260603" alt="Adaptive remeshing active segment and triangle count profile">
+          <img src="assets/newton_baselines/adaptive_remesh_profile.png?v=viewergl-opacity-20260603" alt="Adaptive remeshing active segment and triangle count profile">
         </div>
       </div>
       <h3>Track C X-FEM solver scenarios</h3>
@@ -392,29 +392,29 @@
       <div class="media-grid">
         <div class="media-card">
           <h3>X-FEM cuboid slice</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_first_frame.png?v=rigid-edge-no-handle-20260603">
-            <source src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_cutting.mp4?v=rigid-edge-no-handle-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_first_frame.png?v=viewergl-opacity-20260603">
+            <source src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_cutting.mp4?v=viewergl-opacity-20260603" type="video/mp4">
           </video>
           <p class="note">Soft cuboid with progressive cut-cell enrichment, cohesive damage, tet softening, and zero-kerf adaptive cut-surface rendering.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM vegetable sawing</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_first_frame.png?v=rigid-edge-no-handle-20260603">
-            <source src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_cutting.mp4?v=rigid-edge-no-handle-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_first_frame.png?v=viewergl-opacity-20260603">
+            <source src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_cutting.mp4?v=viewergl-opacity-20260603" type="video/mp4">
           </video>
           <p class="note">Gmsh tetrahedral half-cylinder on a table with gravity, bottom glue, knife friction, and sinusoidal blade-axis sawing motion. The model has 1,323 particles and 5,772 tetrahedra.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM paper tearing</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_first_frame.png?v=rigid-edge-no-handle-20260603">
-            <source src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_cutting.mp4?v=rigid-edge-no-handle-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_first_frame.png?v=viewergl-opacity-20260603">
+            <source src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_cutting.mp4?v=viewergl-opacity-20260603" type="video/mp4">
           </video>
           <p class="note">Thin tear coupon with a fixed edge, low toughness, and a numerically thickened tet layer to avoid ill-conditioned sliver elements.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM bread tearing</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_first_frame.png?v=rigid-edge-no-handle-20260603">
-            <source src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_cutting.mp4?v=rigid-edge-no-handle-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_first_frame.png?v=viewergl-opacity-20260603">
+            <source src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_cutting.mp4?v=viewergl-opacity-20260603" type="video/mp4">
           </video>
           <p class="note">Gmsh tetrahedral bread half-cylinder with 882 particles, 3,720 tetrahedra, table glue over the flat bottom, and a lower-friction rough tearing response.</p>
         </div>
@@ -422,19 +422,19 @@
       <div class="media-grid">
         <div class="media-card">
           <h3>Cuboid force profile</h3>
-          <img src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_force_profile.png?v=rigid-edge-no-handle-20260603" alt="X-FEM cuboid cutting force profile">
+          <img src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_force_profile.png?v=viewergl-opacity-20260603" alt="X-FEM cuboid cutting force profile">
         </div>
         <div class="media-card">
           <h3>Vegetable force profile</h3>
-          <img src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_force_profile.png?v=rigid-edge-no-handle-20260603" alt="X-FEM vegetable sawing force profile">
+          <img src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_force_profile.png?v=viewergl-opacity-20260603" alt="X-FEM vegetable sawing force profile">
         </div>
         <div class="media-card">
           <h3>Paper force profile</h3>
-          <img src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_force_profile.png?v=rigid-edge-no-handle-20260603" alt="X-FEM paper tearing force profile">
+          <img src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_force_profile.png?v=viewergl-opacity-20260603" alt="X-FEM paper tearing force profile">
         </div>
         <div class="media-card">
           <h3>Bread force profile</h3>
-          <img src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_force_profile.png?v=rigid-edge-no-handle-20260603" alt="X-FEM bread tearing force profile">
+          <img src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_force_profile.png?v=viewergl-opacity-20260603" alt="X-FEM bread tearing force profile">
         </div>
       </div>
       <p>The shared knife update uses a compact process-zone model around a rigid blade-edge spline. Let \(\Gamma_k(t)\) be the world-space cutting edge of the knife mesh, sampled as a polyline, and let \(h_y\) be the half-thickness of the blade process zone. For particle or vertex \(i\), the edge distance and active weight are</p>
@@ -494,12 +494,12 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
       <table>
         <thead><tr><th>Track</th><th>Scene</th><th>Peak force</th><th>Mean force</th><th>Impulse</th><th>Final mean damage</th><th>Simulation FPS</th><th>Report-video FPS</th></tr></thead>
         <tbody>
-          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">2,203.4 N</td><td class="numeric">1,733.9 N</td><td class="numeric">2,600.9 N s</td><td class="numeric">0.215</td><td class="numeric">18.9</td><td class="numeric">2.3</td></tr>
-          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">626.5 N</td><td class="numeric">493.6 N</td><td class="numeric">740.4 N s</td><td class="numeric">0.225</td><td class="numeric">35.3</td><td class="numeric">2.5</td></tr>
-          <tr><td>X-FEM</td><td>Cuboid slice, 630 particles, 2,100 tets</td><td class="numeric">719.8 N</td><td class="numeric">516.2 N</td><td class="numeric">774.3 N s</td><td class="numeric">0.270</td><td class="numeric">16.6</td><td class="numeric">2.1</td></tr>
-          <tr><td>X-FEM</td><td>Vegetable half-cylinder, 1,323 particles, 5,772 tets</td><td class="numeric">647.8 N</td><td class="numeric">495.6 N</td><td class="numeric">738.5 N s</td><td class="numeric">0.486</td><td class="numeric">13.8</td><td class="numeric">2.3</td></tr>
-          <tr><td>X-FEM</td><td>Paper tearing, 210 particles, fixed edge</td><td class="numeric">23.2 N</td><td class="numeric">14.7 N</td><td class="numeric">21.9 N s</td><td class="numeric">0.427</td><td class="numeric">16.4</td><td class="numeric">2.1</td></tr>
-          <tr><td>X-FEM</td><td>Bread half-cylinder, 882 particles, 3,720 tets</td><td class="numeric">179.5 N</td><td class="numeric">150.2 N</td><td class="numeric">223.2 N s</td><td class="numeric">0.606</td><td class="numeric">16.1</td><td class="numeric">2.5</td></tr>
+          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">2,203.4 N</td><td class="numeric">1,733.9 N</td><td class="numeric">2,600.9 N s</td><td class="numeric">0.215</td><td class="numeric">19.0</td><td class="numeric">14.4</td></tr>
+          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">626.5 N</td><td class="numeric">493.6 N</td><td class="numeric">740.4 N s</td><td class="numeric">0.225</td><td class="numeric">33.0</td><td class="numeric">23.2</td></tr>
+          <tr><td>X-FEM</td><td>Cuboid slice, 630 particles, 2,100 tets</td><td class="numeric">719.8 N</td><td class="numeric">516.2 N</td><td class="numeric">774.3 N s</td><td class="numeric">0.270</td><td class="numeric">15.6</td><td class="numeric">13.5</td></tr>
+          <tr><td>X-FEM</td><td>Vegetable half-cylinder, 1,323 particles, 5,772 tets</td><td class="numeric">645.9 N</td><td class="numeric">494.5 N</td><td class="numeric">737.0 N s</td><td class="numeric">0.485</td><td class="numeric">14.2</td><td class="numeric">5.6</td></tr>
+          <tr><td>X-FEM</td><td>Paper tearing, 210 particles, fixed edge</td><td class="numeric">23.2 N</td><td class="numeric">14.7 N</td><td class="numeric">21.9 N s</td><td class="numeric">0.427</td><td class="numeric">15.3</td><td class="numeric">13.5</td></tr>
+          <tr><td>X-FEM</td><td>Bread half-cylinder, 882 particles, 3,720 tets</td><td class="numeric">179.5 N</td><td class="numeric">150.2 N</td><td class="numeric">223.2 N s</td><td class="numeric">0.606</td><td class="numeric">15.2</td><td class="numeric">6.9</td></tr>
         </tbody>
       </table>
       <div class="metric-grid">
@@ -508,7 +508,7 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
         <div class="metric"><span>Warp</span><strong>1.14.0rc2</strong></div>
         <div class="metric"><span>Driver</span><strong>550.127.05</strong></div>
       </div>
-      <p class="note">Simulation FPS isolates the physics update. Report-video FPS includes zero-kerf cut geometry extraction and the side-by-side force-profile rendering used for this page, so it is a conservative asset-generation number rather than a raw viewer frame rate. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD stats</a>, <a href="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_runtime_stats.json">X-FEM cuboid stats</a>, <a href="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_runtime_stats.json">X-FEM vegetable stats</a>, <a href="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_runtime_stats.json">X-FEM paper stats</a>, and <a href="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_runtime_stats.json">X-FEM bread stats</a>.</p>
+      <p class="note">Simulation FPS isolates the physics update. Report-video FPS is the full ViewerGL asset-generation throughput, including rendering, capture, and encoding preparation, so it is lower for the higher-tet half-cylinder scenes. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD stats</a>, <a href="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_runtime_stats.json">X-FEM cuboid stats</a>, <a href="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_runtime_stats.json">X-FEM vegetable stats</a>, <a href="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_runtime_stats.json">X-FEM paper stats</a>, and <a href="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_runtime_stats.json">X-FEM bread stats</a>.</p>
       <p class="verdict warning">Current limitation: Track C now has solver-owned enrichment and cut-state arrays, but the elastic backbone is still XPBD over physical particles plus material softening, not the final full mixed physical/enriched cut-cell quadrature solve. The updated videos keep volume intact and show particle-following cut faces; the next physics milestone is cohesive cut-surface collision and a solve over physical plus enriched DOFs.</p>
     </section>
 
@@ -725,10 +725,10 @@ stats = remesher.log(
       <table>
         <thead><tr><th>Track</th><th>Mean active x segments</th><th>Max active x segments</th><th>Min dx</th><th>Mean surface triangles</th><th>Mean cut-wall triangles</th><th>Report-video FPS</th></tr></thead>
         <tbody>
-          <tr><td>MPM cuboid adaptive render</td><td class="numeric">40.0</td><td class="numeric">45</td><td class="numeric">0.0094 m</td><td class="numeric">1,327</td><td class="numeric">501</td><td class="numeric">2.9</td></tr>
-          <tr><td>VBD cuboid adaptive render</td><td class="numeric">40.5</td><td class="numeric">45</td><td class="numeric">0.0093 m</td><td class="numeric">1,344</td><td class="numeric">503</td><td class="numeric">2.9</td></tr>
-          <tr><td>X-FEM cuboid adaptive render</td><td class="numeric">46.5</td><td class="numeric">52</td><td class="numeric">0.0080 m</td><td class="numeric">1,731</td><td class="numeric">686</td><td class="numeric">2.1</td></tr>
-          <tr><td>X-FEM vegetable tet-wall render</td><td class="numeric">216 cut tets</td><td class="numeric">456 cut tets</td><td class="numeric">0.0330 m</td><td class="numeric">1,292</td><td class="numeric">270</td><td class="numeric">2.3</td></tr>
+          <tr><td>MPM cuboid adaptive render</td><td class="numeric">40.0</td><td class="numeric">45</td><td class="numeric">0.0094 m</td><td class="numeric">1,327</td><td class="numeric">501</td><td class="numeric">14.4</td></tr>
+          <tr><td>VBD cuboid adaptive render</td><td class="numeric">40.5</td><td class="numeric">45</td><td class="numeric">0.0093 m</td><td class="numeric">1,344</td><td class="numeric">503</td><td class="numeric">23.2</td></tr>
+          <tr><td>X-FEM cuboid adaptive render</td><td class="numeric">46.5</td><td class="numeric">52</td><td class="numeric">0.0080 m</td><td class="numeric">1,731</td><td class="numeric">686</td><td class="numeric">13.5</td></tr>
+          <tr><td>X-FEM vegetable tet-wall render</td><td class="numeric">216 cut tets</td><td class="numeric">456 cut tets</td><td class="numeric">0.0330 m</td><td class="numeric">1,292</td><td class="numeric">270</td><td class="numeric">5.6</td></tr>
         </tbody>
       </table>
       <p>With 24 coarse x-cells and a 4x local refinement factor, the cuboid remesher reduces local spacing from about 3.7 cm to 9.3 mm near the knife front, while keeping the rest of the block coarse. The MPM/VBD cuboid topology peaks at 1,488 surface triangles plus 840-864 zero-kerf cut-wall triangles. The X-FEM cuboid uses a finer setting and peaks at 1,928 surface triangles plus 1,120 wall triangles. For curved meshes, the half-cylinder path reports cut tetrahedra rather than x segments; the vegetable scene averages 216 cut tets and 270 cut-wall triangles.</p>
