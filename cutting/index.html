@@ -354,21 +354,21 @@
 
     <section>
       <h2>Implemented Newton Baselines</h2>
-      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, and render-side split surface mesh. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or remeshing implementations.</p>
+      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, and a render-side split surface mesh that follows the simulated particle motion. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or remeshing implementations.</p>
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM process-zone baseline</h3>
           <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png">
             <source src="assets/newton_baselines/mpm/mpm_cutting.mp4" type="video/mp4">
           </video>
-          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and a render-only split surface/cut-wall mesh so the cut reads geometrically. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the simulated material unless we add side labels or multi-field separation.</p>
+          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and a particle-following split surface/cut-wall mesh so the cut reads geometrically. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the simulated material unless we add side labels or multi-field separation.</p>
         </div>
         <div class="media-card">
           <h3>Mesh-based VBD damage track</h3>
           <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png">
             <source src="assets/newton_baselines/vbd/vbd_cutting.mp4" type="video/mp4">
           </video>
-          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders a split surface/cut-wall mesh. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
+          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders a particle-following split surface/cut-wall mesh. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
         </div>
       </div>
       <div class="media-grid">
@@ -426,8 +426,8 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
       <table>
         <thead><tr><th>Track</th><th>Scene</th><th>Peak force</th><th>Mean force</th><th>Impulse</th><th>Final mean damage</th><th>Simulation FPS</th><th>Rendered-video FPS</th></tr></thead>
         <tbody>
-          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">16.9</td><td class="numeric">5.2</td></tr>
-          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">25.2</td><td class="numeric">8.2</td></tr>
+          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">16.7</td><td class="numeric">2.4</td></tr>
+          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">24.8</td><td class="numeric">4.4</td></tr>
         </tbody>
       </table>
       <div class="metric-grid">
@@ -436,8 +436,8 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
         <div class="metric"><span>Warp</span><strong>1.14.0rc2</strong></div>
         <div class="metric"><span>Driver</span><strong>550.127.05</strong></div>
       </div>
-      <p class="note">Simulation FPS isolates the physics update. Rendered-video FPS includes the visualization layer, so it is the more conservative end-to-end number for this report. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM rendered-video stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM simulation stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD rendered-video stats</a>, and <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD simulation stats</a>.</p>
-      <p class="verdict warning">Current limitation: the videos now show render-side remeshing with duplicated seam geometry and cut walls, but the solvers still use process-zone damage rather than true topological separation. The next mesh milestone is to move from render-only duplicated vertices to solver-owned duplicated DOFs, cohesive links, cut-surface collision, and side-aware contact filtering.</p>
+      <p class="note">Simulation FPS isolates the physics update. Rendered-video FPS includes the particle-following visualization layer, so it is the more conservative end-to-end number for this report. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM rendered-video stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM simulation stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD rendered-video stats</a>, and <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD simulation stats</a>.</p>
+      <p class="verdict warning">Current limitation: the videos now show particle-following render-side remeshing with duplicated seam geometry and cut walls, but the solvers still use process-zone damage rather than true topological separation. The next mesh milestone is to move from render-only duplicated vertices to solver-owned duplicated DOFs, cohesive links, cut-surface collision, and side-aware contact filtering.</p>
     </section>
 
     <section>
