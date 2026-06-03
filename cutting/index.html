@@ -354,31 +354,37 @@
 
     <section>
       <h2>Implemented Newton Baselines</h2>
-      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, and a render-side split surface mesh that follows the simulated particle motion. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or remeshing implementations.</p>
+      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with two concrete examples under <code>newton/examples/cutting/</code>. Both use the same analytic knife, cohesive process-zone damage law, force logger, and a Warp-backed adaptive cut-surface remesher that follows the simulated particle motion. The branch keeps solver internals intact for now, which makes it easy to compare against later X-FEM, virtual-node, or solver-owned remeshing implementations.</p>
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM process-zone baseline</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png?v=particle-following-20260603">
-            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4?v=particle-following-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png?v=adaptive-remesh-20260603">
+            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4?v=adaptive-remesh-20260603" type="video/mp4">
           </video>
-          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and a particle-following split surface/cut-wall mesh so the cut reads geometrically. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the simulated material unless we add side labels or multi-field separation.</p>
+          <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and adaptive particle-following surface/cut-wall remeshing so the cut reads geometrically. This is the fastest path to force calibration, but the single MPM velocity field can still smear or heal the simulated material unless we add side labels or multi-field separation.</p>
         </div>
         <div class="media-card">
           <h3>Mesh-based VBD damage track</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png?v=particle-following-20260603">
-            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4?v=particle-following-20260603" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png?v=adaptive-remesh-20260603">
+            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4?v=adaptive-remesh-20260603" type="video/mp4">
           </video>
-          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders a particle-following split surface/cut-wall mesh. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
+          <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders adaptive particle-following surface/cut-wall remeshing. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
         </div>
       </div>
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM force profile</h3>
-          <img src="assets/newton_baselines/mpm/mpm_force_profile.png?v=particle-following-20260603" alt="MPM knife force and mean damage profile">
+          <img src="assets/newton_baselines/mpm/mpm_force_profile.png?v=adaptive-remesh-20260603" alt="MPM knife force and mean damage profile">
         </div>
         <div class="media-card">
           <h3>VBD force profile</h3>
-          <img src="assets/newton_baselines/vbd/vbd_force_profile.png?v=particle-following-20260603" alt="VBD knife force and mean damage profile">
+          <img src="assets/newton_baselines/vbd/vbd_force_profile.png?v=adaptive-remesh-20260603" alt="VBD knife force and mean damage profile">
+        </div>
+      </div>
+      <div class="media-grid">
+        <div class="media-card">
+          <h3>Adaptive remesh complexity</h3>
+          <img src="assets/newton_baselines/adaptive_remesh_profile.png?v=adaptive-remesh-20260603" alt="Adaptive remeshing active segment and triangle count profile">
         </div>
       </div>
       <p>The shared knife update uses a compact process-zone model. For particle \(i\), with knife front \(x_k(t)\), process width \(\ell\), and blade window indicator \(\chi_i\), the active weight is</p>
@@ -426,8 +432,8 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
       <table>
         <thead><tr><th>Track</th><th>Scene</th><th>Peak force</th><th>Mean force</th><th>Impulse</th><th>Final mean damage</th><th>Simulation FPS</th><th>Rendered-video FPS</th></tr></thead>
         <tbody>
-          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">16.7</td><td class="numeric">2.4</td></tr>
-          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">24.8</td><td class="numeric">4.4</td></tr>
+          <tr><td>MPM</td><td>2,880 particles, 90 frames, 1.5 s</td><td class="numeric">1,071.0 N</td><td class="numeric">837.5 N</td><td class="numeric">1,256.2 N s</td><td class="numeric">0.104</td><td class="numeric">15.4</td><td class="numeric">4.3</td></tr>
+          <tr><td>VBD</td><td>840 particles, 2,940 tets, 90 frames, 1.5 s</td><td class="numeric">439.9 N</td><td class="numeric">342.6 N</td><td class="numeric">513.9 N s</td><td class="numeric">0.156</td><td class="numeric">24.8</td><td class="numeric">5.8</td></tr>
         </tbody>
       </table>
       <div class="metric-grid">
@@ -436,8 +442,8 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
         <div class="metric"><span>Warp</span><strong>1.14.0rc2</strong></div>
         <div class="metric"><span>Driver</span><strong>550.127.05</strong></div>
       </div>
-      <p class="note">Simulation FPS isolates the physics update. Rendered-video FPS includes the particle-following visualization layer, so it is the more conservative end-to-end number for this report. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM rendered-video stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM simulation stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD rendered-video stats</a>, and <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD simulation stats</a>.</p>
-      <p class="verdict warning">Current limitation: the videos now show particle-following render-side remeshing with duplicated seam geometry and cut walls, but the solvers still use process-zone damage rather than true topological separation. The next mesh milestone is to move from render-only duplicated vertices to solver-owned duplicated DOFs, cohesive links, cut-surface collision, and side-aware contact filtering.</p>
+      <p class="note">Simulation FPS isolates the physics update. Rendered-video FPS includes the adaptive remeshing visualization layer, so it is the more conservative end-to-end number for this report. Raw logs are available as <a href="assets/newton_baselines/mpm/mpm_runtime_stats.json">MPM rendered-video stats</a>, <a href="assets/newton_baselines/mpm/mpm_solver_runtime_stats.json">MPM simulation stats</a>, <a href="assets/newton_baselines/mpm/mpm_adaptive_remesh_stats.json">MPM adaptive remesh stats</a>, <a href="assets/newton_baselines/vbd/vbd_runtime_stats.json">VBD rendered-video stats</a>, <a href="assets/newton_baselines/vbd/vbd_solver_runtime_stats.json">VBD simulation stats</a>, and <a href="assets/newton_baselines/vbd/vbd_adaptive_remesh_stats.json">VBD adaptive remesh stats</a>.</p>
+      <p class="verdict warning">Current limitation: the videos now show Warp-generated adaptive surface remeshing with duplicated seam geometry and cut walls, but the solvers still use process-zone damage rather than true topological separation. The next mesh milestone is to move from render-owned duplicated vertices to solver-owned duplicated DOFs, cohesive links, cut-surface collision, and side-aware contact filtering.</p>
     </section>
 
     <section>
@@ -577,17 +583,54 @@ scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
 
     <section>
       <h2>Adaptive Remeshing</h2>
-      <p>Adaptive tetrahedral remeshing is valuable, especially for visual cut surfaces and mesh-based perception. It is also the part most likely to fight real-time graph capture. A practical Newton implementation should separate the event pass from the per-step solve.</p>
+      <p>I added a first Warp-based adaptive remeshing implementation to the Newton cutting branch. It is currently a render-side surface remesher, not a solver-owned tet topology update: the MPM/VBD solvers keep their particle/tet arrays fixed, while a fixed-capacity GPU remesher generates duplicated seam geometry, cut-wall triangles, and local x refinement around the knife front each frame. This is the right intermediate step because it exercises the geometry path, particle-motion coupling, and fixed-buffer design before we make topology changes part of the physics solve.</p>
+      <p>The implementation lives in <code>AdaptiveCutSurfaceRemesher</code>. A small per-frame schedule marks coarse x-cells near the knife front for subdivision; Warp kernels then emit surface and wall triangles into preallocated buffers. Generated rest-space vertices are deformed from the current solver particles using inverse-distance displacement sampling, so the remeshed cut surface follows the simulated block.</p>
+      <div class="math-display">\[
+        n_i =
+        \begin{cases}
+        r, & |x_i - x_k(t)| \le b_{\mathrm{refine}},\\
+        1, & \text{otherwise},
+        \end{cases}
+        \qquad
+        \Delta x_{\min} = \frac{\Delta x_{\mathrm{coarse}}}{r}.
+      \]</div>
+      <p>Particle-following deformation is computed as a GPU-side weighted displacement blend:</p>
+      <div class="math-display">\[
+        \mathbf{x}_{\mathrm{render}}(\mathbf{X}) =
+        \mathbf{X} +
+        \frac{\sum_j w_j(\mathbf{X})(\mathbf{x}_j-\mathbf{X}_j)}
+             {\sum_j w_j(\mathbf{X})},
+        \qquad
+        w_j(\mathbf{X}) = \frac{1}{\|\mathbf{X}-\mathbf{X}_j\|^2 + \epsilon}.
+      \]</div>
+      <pre><code># New render path in the examples.
+remesher = AdaptiveCutSurfaceRemesher(
+    block_lo, block_hi, knife,
+    base_segments=24, refine_factor=4,
+    refine_band=0.13, height_segments=6)
+
+stats = remesher.log(
+    viewer, model.device, sim_time,
+    rest_particle_points=rest_particle_q,
+    particle_points=state_0.particle_q)</code></pre>
+      <table>
+        <thead><tr><th>Track</th><th>Mean active x segments</th><th>Max active x segments</th><th>Min dx</th><th>Mean surface triangles</th><th>Mean cut-wall triangles</th><th>Rendered-video FPS</th></tr></thead>
+        <tbody>
+          <tr><td>MPM adaptive render</td><td class="numeric">40.0</td><td class="numeric">45</td><td class="numeric">0.0094 m</td><td class="numeric">1,327</td><td class="numeric">959</td><td class="numeric">4.3</td></tr>
+          <tr><td>VBD adaptive render</td><td class="numeric">40.5</td><td class="numeric">45</td><td class="numeric">0.0093 m</td><td class="numeric">1,344</td><td class="numeric">972</td><td class="numeric">5.8</td></tr>
+        </tbody>
+      </table>
+      <p>With 24 coarse x-cells and a 4x local refinement factor, the remesher reduces local spacing from about 3.7 cm to 9.3 mm near the knife front, while keeping the rest of the block coarse. The generated topology peaks at 1,488 surface triangles plus 1,080 cut-wall triangles. The adaptive path is also faster than the previous CPU-deformed split mesh in the rendered-video runs because the vertex deformation is now performed by Warp kernels on the device.</p>
       <table>
         <thead><tr><th>Phase</th><th>Implementation</th><th>Why</th></tr></thead>
         <tbody>
-          <tr><td>Prototype</td><td>NumPy event pass: classify intersected tets, compute edge intersections, emit surface triangles, duplicate vertices, update connectivity.</td><td>Fast to validate topology and mass conservation with minimal dependencies.</td></tr>
-          <tr><td>Newton beta</td><td>Rebuild <code>Model</code>/<code>SolverVBD</code> after cut events, recapture CUDA graph after topology changes.</td><td>Simple and honest. Cutting events are less frequent than solver iterations.</td></tr>
-          <tr><td>Warp/GPU</td><td>Fixed-capacity buffers, prefix sums, intersection kernels, compaction, and active masks.</td><td>Necessary if cuts happen every frame and must remain inside graph capture.</td></tr>
+          <tr><td>Current branch</td><td>Fixed-capacity Warp surface/cut-wall remeshing, adaptive x refinement, duplicated seam vertices, particle-following deformation, and remesh stats export.</td><td>Gives visible cut geometry, GPU timing data, and a graph-capture-friendly buffer layout without destabilizing the solver.</td></tr>
+          <tr><td>Next beta</td><td>Move from parametric cuboid faces to cut-tet surface extraction: classify intersected tets, compute edge intersections, emit cut surface triangles, duplicate vertices, and update surface collision.</td><td>Produces perception-ready geometry for arbitrary tet meshes, while solver topology can still remain fixed initially.</td></tr>
+          <tr><td>Solver-owned remesh</td><td>Rebuild or incrementally update <code>Model</code>/<code>SolverVBD</code> after cut events, then recapture graphs after topology changes.</td><td>Needed when the cut surface must affect elasticity, mass, contact, and self-collision directly.</td></tr>
           <tr><td>Production</td><td>Virtual-node embedded material or robust state-machine subdivision for degeneracies.</td><td>Needed for cuts through vertices, edges, faces, and repeated/branching cuts.</td></tr>
         </tbody>
       </table>
-      <p>The adaptive virtual node literature is particularly relevant because it avoids sliver tetrahedra by embedding cut geometry in larger well-shaped elements. That is likely better for Newton than naive tet subdivision once we need repeated cuts.</p>
+      <p>The adaptive virtual node literature is particularly relevant because it avoids sliver tetrahedra by embedding cut geometry in larger well-shaped elements. That is likely better for Newton than naive tet subdivision once we need repeated cuts. The concrete next experiment is a Warp cut-tet extraction kernel using prefix sums and fixed-capacity triangle buffers; this branch now has the remeshing stats/export plumbing needed to compare that against the current parametric cuboid remesher.</p>
     </section>
 
     <section>
