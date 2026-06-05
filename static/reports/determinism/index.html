@@ -325,6 +325,12 @@
       border-radius: 8px;
       box-shadow: var(--shadow);
     }
+    .section-copy {
+      margin: 0 0 16px;
+      max-width: 860px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -398,18 +404,20 @@
     <div class="hero">
       <div>
         <p class="eyebrow">Newton determinism harness</p>
-        <h1>Run to run physics determinism report</h1>
+        <h1>Solver run to run physics determinism report</h1>
         <p class="lead">
-          10 Newton scenarios were replayed in independent subprocesses with
-          <code>wp.config.deterministic = "run_to_run"</code>.
+          12 Newton physics scenarios and 4 Warp lowering probes were replayed in independent subprocesses with
+          <code>solver_deterministic = "run_to_run"</code>. No process-global Warp deterministic mode is set for physics rows.
           The videos are captured from headless <code>ViewerGL.get_frame()</code>; the verdicts
           come from byte hashes of final physics state arrays. The full report covers the physics scenarios registered for this report. Contact scenarios use <code>CollisionPipeline(deterministic=True)</code> for contact ordering.
         </p>
       </div>
       <div class="summary-grid">
-        <div class="summary-tile emphasis"><span>Scenarios</span><strong>10</strong></div>
-        <div class="summary-tile"><span>Solver pairs</span><strong>22</strong></div>
-        <div class="summary-tile"><span>Bit-exact</span><strong>22</strong></div>
+        <div class="summary-tile emphasis"><span>Scenarios</span><strong>12</strong></div>
+        <div class="summary-tile"><span>Solver pairs</span><strong>23</strong></div>
+        <div class="summary-tile"><span>Warp probes</span><strong>4</strong></div>
+        <div class="summary-tile"><span>Total checks</span><strong>27</strong></div>
+        <div class="summary-tile"><span>Bit-exact</span><strong>27</strong></div>
         <div class="summary-tile"><span>Drift</span><strong>0</strong></div>
         <div class="summary-tile"><span>Failures</span><strong>0</strong></div>
       </div>
@@ -424,19 +432,25 @@
         <article class="finding ok">
           <p class="eyebrow">Key finding</p>
           <h3>Replay health</h3>
-          <p>All 22 solver pairs completed 2 independent subprocess replays.</p>
+          <p>All 23 solver pairs completed 3 independent subprocess replays.</p>
         </article>
 
         <article class="finding ok">
           <p class="eyebrow">Key finding</p>
           <h3>Run-to-run verdict</h3>
-          <p>Every tested solver pair was bit-exact under wp.config.deterministic=&#x27;run_to_run&#x27;.</p>
+          <p>Every tested solver pair was bit-exact with solver_deterministic=&#x27;run_to_run&#x27;.</p>
         </article>
 
         <article class="finding ok">
           <p class="eyebrow">Key finding</p>
           <h3>Largest remaining gap</h3>
           <p>No remaining run-to-run gap was observed in the tested harness slice on this GPU/software stack.</p>
+        </article>
+
+        <article class="finding ok">
+          <p class="eyebrow">Key finding</p>
+          <h3>Warp lowering probes</h3>
+          <p>4/4 focused Warp micro-probes were bit-exact.</p>
         </article>
       </div>
     </section>
@@ -446,7 +460,7 @@
       <div class="method-grid">
         <div class="method">
           <strong>Independent replays</strong>
-          <p>2 subprocess runs per supported scenario/solver pair.</p>
+          <p>3 subprocess runs per supported scenario/solver pair.</p>
         </div>
         <div class="method">
           <strong>Canonical hash</strong>
@@ -454,7 +468,7 @@
         </div>
         <div class="method">
           <strong>Fixed workload</strong>
-          <p>60 frames, 4 substeps, 60 Hz, seed 0, world count 2.</p>
+          <p>180 frames, 10 substeps, 60 Hz, seed 0, world count 1.</p>
         </div>
         <div class="method">
           <strong>Deterministic contacts</strong>
@@ -479,8 +493,8 @@
                         <source src="assets/falling_cube_featherstone.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -490,8 +504,8 @@
                         <source src="assets/falling_cube_mujoco.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -501,19 +515,8 @@
                         <source src="assets/falling_cube_semi_implicit.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>vbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_vbd_poster.png">
-                        <source src="assets/falling_cube_vbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -523,8 +526,8 @@
                         <source src="assets/falling_cube_xpbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -553,7 +556,12 @@
 
         <div class="metric">
           <span>Mean speed</span>
-          <strong>2.801e-04 m/s</strong>
+          <strong>0 m/s</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>4</strong>
         </div>
                 </div>
                 <div class="solver-cards">
@@ -565,14 +573,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>14.081 s</strong></div>
+        <div><span>Duration</span><strong>48.799 s</strong></div>
       </div>
 
     </article>
@@ -584,14 +592,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>41.97 s</strong></div>
+        <div><span>Duration</span><strong>263.698 s</strong></div>
       </div>
 
     </article>
@@ -603,33 +611,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>13.255 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>vbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>16.426 s</strong></div>
+        <div><span>Duration</span><strong>22.221 s</strong></div>
       </div>
 
     </article>
@@ -641,14 +630,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>13.808 s</strong></div>
+        <div><span>Duration</span><strong>18.566 s</strong></div>
       </div>
 
     </article>
@@ -665,8 +654,8 @@
                         <source src="assets/box_stack_mujoco.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -676,8 +665,8 @@
                         <source src="assets/box_stack_vbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -687,8 +676,8 @@
                         <source src="assets/box_stack_xpbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -702,22 +691,22 @@
 
         <div class="metric">
           <span>COM drift</span>
-          <strong>0.002 m</strong>
+          <strong>0.055 m</strong>
         </div>
 
         <div class="metric">
           <span>Kinetic energy proxy</span>
-          <strong>1924.727</strong>
+          <strong>133.092</strong>
         </div>
 
         <div class="metric">
           <span>Contact samples</span>
-          <strong>6</strong>
+          <strong>18</strong>
         </div>
 
         <div class="metric">
           <span>Peak contacts</span>
-          <strong>38</strong>
+          <strong>184</strong>
         </div>
                 </div>
                 <div class="solver-cards">
@@ -729,14 +718,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>48.201 s</strong></div>
+        <div><span>Duration</span><strong>349.492 s</strong></div>
       </div>
 
     </article>
@@ -748,14 +737,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>16.806 s</strong></div>
+        <div><span>Duration</span><strong>31.86 s</strong></div>
       </div>
 
     </article>
@@ -767,14 +756,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>13.961 s</strong></div>
+        <div><span>Duration</span><strong>17.547 s</strong></div>
       </div>
 
     </article>
@@ -791,8 +780,8 @@
                         <source src="assets/domino_chain_mujoco.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -802,8 +791,8 @@
                         <source src="assets/domino_chain_vbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -813,8 +802,8 @@
                         <source src="assets/domino_chain_xpbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -828,22 +817,22 @@
 
         <div class="metric">
           <span>Fallen dominos</span>
-          <strong>0</strong>
+          <strong>12</strong>
         </div>
 
         <div class="metric">
           <span>Last-domino time</span>
-          <strong>not reached</strong>
+          <strong>75 steps</strong>
         </div>
 
         <div class="metric">
           <span>First angle</span>
-          <strong>14.324 deg</strong>
+          <strong>73.473 deg</strong>
         </div>
 
         <div class="metric">
           <span>Tracked fall events</span>
-          <strong>0</strong>
+          <strong>12</strong>
         </div>
                 </div>
                 <div class="solver-cards">
@@ -855,14 +844,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>50.447 s</strong></div>
+        <div><span>Duration</span><strong>359.002 s</strong></div>
       </div>
 
     </article>
@@ -874,14 +863,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>20.5 s</strong></div>
+        <div><span>Duration</span><strong>32.436 s</strong></div>
       </div>
 
     </article>
@@ -893,14 +882,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.277 s</strong></div>
+        <div><span>Duration</span><strong>17.906 s</strong></div>
       </div>
 
     </article>
@@ -917,8 +906,8 @@
                         <source src="assets/arm_7dof_featherstone.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -928,8 +917,8 @@
                         <source src="assets/arm_7dof_mujoco.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -939,8 +928,8 @@
                         <source src="assets/arm_7dof_xpbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -954,17 +943,17 @@
 
         <div class="metric">
           <span>Max target error</span>
-          <strong>0.14 rad</strong>
+          <strong>0.095 rad</strong>
         </div>
 
         <div class="metric">
           <span>Mean target error</span>
-          <strong>0.14 rad</strong>
+          <strong>0.095 rad</strong>
         </div>
 
         <div class="metric">
           <span>Peak PD torque</span>
-          <strong>4.751 N*m</strong>
+          <strong>4.768 N*m</strong>
         </div>
 
         <div class="metric">
@@ -981,14 +970,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>30.527 s</strong></div>
+        <div><span>Duration</span><strong>69.207 s</strong></div>
       </div>
 
     </article>
@@ -1000,14 +989,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>58.379 s</strong></div>
+        <div><span>Duration</span><strong>287.208 s</strong></div>
       </div>
 
     </article>
@@ -1019,14 +1008,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>36.849 s</strong></div>
+        <div><span>Duration</span><strong>57.34 s</strong></div>
       </div>
 
     </article>
@@ -1043,8 +1032,8 @@
                         <source src="assets/humanoid_featherstone.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -1054,8 +1043,8 @@
                         <source src="assets/humanoid_mujoco.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
 
@@ -1065,8 +1054,8 @@
                         <source src="assets/humanoid_xpbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -1080,22 +1069,22 @@
 
         <div class="metric">
           <span>Final root height</span>
-          <strong>0.723 m</strong>
+          <strong>0.544 m</strong>
         </div>
 
         <div class="metric">
           <span>Fell worlds</span>
-          <strong>0</strong>
+          <strong>1</strong>
         </div>
 
         <div class="metric">
           <span>Max COM XY drift</span>
-          <strong>0.198 m</strong>
+          <strong>0.86 m</strong>
         </div>
 
         <div class="metric">
           <span>Peak contacts</span>
-          <strong>28</strong>
+          <strong>24</strong>
         </div>
                 </div>
                 <div class="solver-cards">
@@ -1107,14 +1096,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>24.991 s</strong></div>
+        <div><span>Duration</span><strong>68.207 s</strong></div>
       </div>
 
     </article>
@@ -1126,14 +1115,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>50.329 s</strong></div>
+        <div><span>Duration</span><strong>275.179 s</strong></div>
       </div>
 
     </article>
@@ -1145,14 +1134,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>20.746 s</strong></div>
+        <div><span>Duration</span><strong>31.04 s</strong></div>
       </div>
 
     </article>
@@ -1169,8 +1158,8 @@
                         <source src="assets/diffsim_ball_semi_implicit.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -1182,6 +1171,45 @@
                 <p>Differentiable particle target with wall and floor contacts; core includes loss and initial-velocity gradients. Diffsim ball target gradient inspired by ``example_diffsim_ball``.</p>
                 <div class="metrics">
 
+        <div class="metric">
+          <span>Loss</span>
+          <strong>1.409</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>0.232</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max state abs</span>
+          <strong>1.746</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max velocity abs</span>
+          <strong>4.668</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>98</strong>
+        </div>
+
+        <div class="metric">
+          <span>Contact samples</span>
+          <strong>600</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tape frames</span>
+          <strong>60</strong>
+        </div>
+
+        <div class="metric">
+          <span>Effective substeps</span>
+          <strong>10</strong>
+        </div>
                 </div>
                 <div class="solver-cards">
 
@@ -1192,14 +1220,110 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>14.044 s</strong></div>
+        <div><span>Duration</span><strong>25.629 s</strong></div>
+      </div>
+
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+
+                    <div class="solver-video">
+                      <p class="video-label"><code>semi_implicit</code></p>
+                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_bear_semi_implicit_poster.png">
+                        <source src="assets/diffsim_bear_semi_implicit.mp4" type="video/mp4">
+                      </video>
+                      <p class="video-caption">
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
+                      </p>
+                    </div>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_bear</p>
+                  <h2>Diffsim Bear</h2>
+                </div>
+                <p>Differentiable soft bear activation network; core includes the loss, COM velocity, and activation-weight gradients. Compact soft bear gradient inspired by ``example_diffsim_bear``.</p>
+                <div class="metrics">
+
+        <div class="metric">
+          <span>Loss</span>
+          <strong>13.222</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>0.104</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max state abs</span>
+          <strong>5.872</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max velocity abs</span>
+          <strong>3.214</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>1986</strong>
+        </div>
+
+        <div class="metric">
+          <span>Contact samples</span>
+          <strong>1</strong>
+        </div>
+
+        <div class="metric">
+          <span>Particles</span>
+          <strong>1986</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tets</span>
+          <strong>5354</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tape frames</span>
+          <strong>12</strong>
+        </div>
+
+        <div class="metric">
+          <span>Effective substeps</span>
+          <strong>80</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>59.097 s</strong></div>
       </div>
 
     </article>
@@ -1216,8 +1340,8 @@
                         <source src="assets/diffsim_cloth_com_semi_implicit.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -1229,6 +1353,35 @@
                 <p>Small differentiable cloth target; COM uses an atomic accumulation before backpropagating gradients. Small cloth gradient scenario inspired by ``example_diffsim_cloth``.</p>
                 <div class="metrics">
 
+        <div class="metric">
+          <span>Loss</span>
+          <strong>2.122</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>0.106</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max state abs</span>
+          <strong>1.2</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max velocity abs</span>
+          <strong>0.1</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tape frames</span>
+          <strong>120</strong>
+        </div>
+
+        <div class="metric">
+          <span>Effective substeps</span>
+          <strong>16</strong>
+        </div>
                 </div>
                 <div class="solver-cards">
 
@@ -1239,14 +1392,110 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>10.41 s</strong></div>
+        <div><span>Duration</span><strong>39.599 s</strong></div>
+      </div>
+
+    </article>
+                </div>
+              </div>
+            </article>
+
+            <article class="scenario">
+              <div class="media">
+
+                    <div class="solver-video">
+                      <p class="video-label"><code>semi_implicit</code></p>
+                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_soft_body_semi_implicit_poster.png">
+                        <source src="assets/diffsim_soft_body_semi_implicit.mp4" type="video/mp4">
+                      </video>
+                      <p class="video-caption">
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
+                      </p>
+                    </div>
+              </div>
+              <div class="scenario-body">
+                <div class="scenario-heading">
+                  <p class="eyebrow">diffsim_soft_body</p>
+                  <h2>Diffsim Soft Body</h2>
+                </div>
+                <p>Small differentiable soft-body material target with dynamic soft contacts and material-parameter gradients. Small soft-body material gradient inspired by ``example_diffsim_soft_body``.</p>
+                <div class="metrics">
+
+        <div class="metric">
+          <span>Loss</span>
+          <strong>0.733</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>5.253e-04</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max state abs</span>
+          <strong>0.84</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max velocity abs</span>
+          <strong>9.887</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>9</strong>
+        </div>
+
+        <div class="metric">
+          <span>Contact samples</span>
+          <strong>960</strong>
+        </div>
+
+        <div class="metric">
+          <span>Particles</span>
+          <strong>27</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tets</span>
+          <strong>40</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tape frames</span>
+          <strong>60</strong>
+        </div>
+
+        <div class="metric">
+          <span>Effective substeps</span>
+          <strong>16</strong>
+        </div>
+                </div>
+                <div class="solver-cards">
+
+    <article class="solver-card ok">
+      <div class="solver-card-head">
+        <div>
+          <h3><code>semi_implicit</code></h3>
+        </div>
+        <span class="pill ok">BIT-EXACT</span>
+      </div>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <div class="solver-stats">
+        <div><span>Execution</span><strong>CUDA graph</strong></div>
+        <div><span>Unique hashes</span><strong>1</strong></div>
+        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
+        <div><span>Dominant extra drift</span><strong>none</strong></div>
+        <div><span>Max core diff</span><strong>0</strong></div>
+        <div><span>Duration</span><strong>57.981 s</strong></div>
       </div>
 
     </article>
@@ -1263,8 +1512,8 @@
                         <source src="assets/diffsim_spring_cage_semi_implicit.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -1276,6 +1525,45 @@
                 <p>Differentiable spring-cage target; core includes loss and spring rest-length gradients. Spring rest-length gradient inspired by ``example_diffsim_spring_cage``.</p>
                 <div class="metrics">
 
+        <div class="metric">
+          <span>Loss</span>
+          <strong>2.313</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max grad abs</span>
+          <strong>0.03</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max state abs</span>
+          <strong>1.8</strong>
+        </div>
+
+        <div class="metric">
+          <span>Max velocity abs</span>
+          <strong>1.307</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>114</strong>
+        </div>
+
+        <div class="metric">
+          <span>Contact samples</span>
+          <strong>600</strong>
+        </div>
+
+        <div class="metric">
+          <span>Tape frames</span>
+          <strong>60</strong>
+        </div>
+
+        <div class="metric">
+          <span>Effective substeps</span>
+          <strong>10</strong>
+        </div>
                 </div>
                 <div class="solver-cards">
 
@@ -1286,14 +1574,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>9.834 s</strong></div>
+        <div><span>Duration</span><strong>29.339 s</strong></div>
       </div>
 
     </article>
@@ -1310,8 +1598,8 @@
                         <source src="assets/vbd_cloth_patch_vbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -1325,17 +1613,22 @@
 
         <div class="metric">
           <span>Particles</span>
-          <strong>154</strong>
+          <strong>77</strong>
         </div>
 
         <div class="metric">
           <span>Pinned particles</span>
-          <strong>22</strong>
+          <strong>11</strong>
         </div>
 
         <div class="metric">
           <span>Height range</span>
-          <strong>0.664-1.286 m</strong>
+          <strong>0.01-0.306 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>24</strong>
         </div>
                 </div>
                 <div class="solver-cards">
@@ -1347,14 +1640,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.605 s</strong></div>
+        <div><span>Duration</span><strong>38.582 s</strong></div>
       </div>
 
     </article>
@@ -1371,8 +1664,8 @@
                         <source src="assets/vbd_soft_body_vbd.mp4" type="video/mp4">
                       </video>
                       <p class="video-caption">
-                        240 frames encoded at 24 fps
-                        (960x540, stride 1).
+                        61 frames encoded at 24 fps
+                        (960x540, stride 3).
                       </p>
                     </div>
               </div>
@@ -1386,22 +1679,27 @@
 
         <div class="metric">
           <span>Particles</span>
-          <strong>160</strong>
+          <strong>80</strong>
         </div>
 
         <div class="metric">
           <span>Pinned particles</span>
-          <strong>32</strong>
+          <strong>16</strong>
         </div>
 
         <div class="metric">
           <span>Height range</span>
-          <strong>0.945-1.24 m</strong>
+          <strong>0-0.24 m</strong>
+        </div>
+
+        <div class="metric">
+          <span>Peak contacts</span>
+          <strong>20</strong>
         </div>
 
         <div class="metric">
           <span>Tets</span>
-          <strong>360</strong>
+          <strong>180</strong>
         </div>
                 </div>
                 <div class="solver-cards">
@@ -1413,14 +1711,14 @@
         </div>
         <span class="pill ok">BIT-EXACT</span>
       </div>
-      <p class="solver-summary">2/2 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
+      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
       <div class="solver-stats">
         <div><span>Execution</span><strong>CUDA graph</strong></div>
         <div><span>Unique hashes</span><strong>1</strong></div>
         <div><span>Dominant core drift</span><strong>particle_q (0)</strong></div>
         <div><span>Dominant extra drift</span><strong>none</strong></div>
         <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>18.015 s</strong></div>
+        <div><span>Duration</span><strong>41.72 s</strong></div>
       </div>
 
     </article>
@@ -1455,7 +1753,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>30.527 s</td>
+              <td>69.207 s</td>
             </tr>
 
             <tr>
@@ -1466,7 +1764,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>58.379 s</td>
+              <td>287.208 s</td>
             </tr>
 
             <tr>
@@ -1477,7 +1775,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>36.849 s</td>
+              <td>57.34 s</td>
             </tr>
 
             <tr>
@@ -1488,7 +1786,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>48.201 s</td>
+              <td>349.492 s</td>
             </tr>
 
             <tr>
@@ -1499,7 +1797,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>16.806 s</td>
+              <td>31.86 s</td>
             </tr>
 
             <tr>
@@ -1510,7 +1808,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>13.961 s</td>
+              <td>17.547 s</td>
             </tr>
 
             <tr>
@@ -1521,7 +1819,18 @@
               <td>final_particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>14.044 s</td>
+              <td>25.629 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Bear</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>final_particle_q (0)</td>
+              <td>0</td>
+              <td>0</td>
+              <td>59.097 s</td>
             </tr>
 
             <tr>
@@ -1532,7 +1841,18 @@
               <td>final_particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>10.41 s</td>
+              <td>39.599 s</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Soft Body</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>final_particle_q (0)</td>
+              <td>0</td>
+              <td>0</td>
+              <td>57.981 s</td>
             </tr>
 
             <tr>
@@ -1543,7 +1863,7 @@
               <td>final_particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>9.834 s</td>
+              <td>29.339 s</td>
             </tr>
 
             <tr>
@@ -1554,7 +1874,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>50.447 s</td>
+              <td>359.002 s</td>
             </tr>
 
             <tr>
@@ -1565,7 +1885,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>20.5 s</td>
+              <td>32.436 s</td>
             </tr>
 
             <tr>
@@ -1576,7 +1896,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>17.277 s</td>
+              <td>17.906 s</td>
             </tr>
 
             <tr>
@@ -1587,7 +1907,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>14.081 s</td>
+              <td>48.799 s</td>
             </tr>
 
             <tr>
@@ -1598,7 +1918,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>41.97 s</td>
+              <td>263.698 s</td>
             </tr>
 
             <tr>
@@ -1609,18 +1929,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>13.255 s</td>
-            </tr>
-
-            <tr>
-              <td>Falling Cube</td>
-              <td><code>vbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>16.426 s</td>
+              <td>22.221 s</td>
             </tr>
 
             <tr>
@@ -1631,7 +1940,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>13.808 s</td>
+              <td>18.566 s</td>
             </tr>
 
             <tr>
@@ -1642,7 +1951,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>24.991 s</td>
+              <td>68.207 s</td>
             </tr>
 
             <tr>
@@ -1653,7 +1962,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>50.329 s</td>
+              <td>275.179 s</td>
             </tr>
 
             <tr>
@@ -1664,7 +1973,7 @@
               <td>body_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>20.746 s</td>
+              <td>31.04 s</td>
             </tr>
 
             <tr>
@@ -1675,7 +1984,7 @@
               <td>particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>17.605 s</td>
+              <td>38.582 s</td>
             </tr>
 
             <tr>
@@ -1686,7 +1995,72 @@
               <td>particle_q (0)</td>
               <td>0</td>
               <td>0</td>
-              <td>18.015 s</td>
+              <td>41.72 s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="band">
+      <h2>Warp Lowering Micro-Probes</h2>
+      <p class="section-copy">
+        These headless workloads are not Newton solver scenarios, so they stay out of the solver matrix.
+        They capture the focused Warp atomic and adjoint patterns that motivated the determinism work.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Probe</th>
+              <th>ID</th>
+              <th>Verdict</th>
+              <th>Unique hashes</th>
+              <th>Dominant core signal</th>
+              <th>Max core diff</th>
+              <th>Targeted pattern</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr>
+              <td>Warp Indexed Counter</td>
+              <td><code>warp_counter_indexed</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>counts (0)</td>
+              <td>0</td>
+              <td>dynamic consumed-return counter index</td>
+            </tr>
+
+            <tr>
+              <td>Warp Sliced Counter</td>
+              <td><code>warp_counter_sliced</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>counts (0)</td>
+              <td>0</td>
+              <td>sliced counter target with dynamic prefix/index</td>
+            </tr>
+
+            <tr>
+              <td>Warp Static Counter Index</td>
+              <td><code>warp_counter_static_index</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>counts (0)</td>
+              <td>0</td>
+              <td>nonzero static consumed-return counter index</td>
+            </tr>
+
+            <tr>
+              <td>Warp Custom Adjoint</td>
+              <td><code>warp_custom_adjoint</code></td>
+              <td><span class="pill ok">BIT-EXACT</span></td>
+              <td>1</td>
+              <td>y (0)</td>
+              <td>0</td>
+              <td>deterministic target mapping for wp.adjoint[array]</td>
             </tr>
           </tbody>
         </table>
@@ -1709,12 +2083,15 @@
           <ul>
             <li>This report only checks repeated runs on the same machine, driver, GPU, and Warp/Newton build; it does not prove cross-GPU or cross-driver reproducibility.</li>
 <li>The verdict is based on final core state hashes. Videos and scenario extras are diagnostic evidence, not the primary pass/fail signal.</li>
+<li>Warp lowering micro-probes are headless compiler/runtime workloads, not Newton solver scenarios; they are reported separately from the solver matrix.</li>
           </ul>
         </div>
         <div class="list-card">
           <h3>Controls in this harness</h3>
           <ul>
-            <li><code>wp.config.deterministic</code> is set before heavy Warp/Newton imports and propagated to subprocesses.</li>
+            <li>Newton solver kernels receive deterministic module options through solver constructors.</li>
+            <li><code>wp.config.deterministic</code> is only set when an explicit global Warp mode is requested, mostly for standalone Warp probes.</li>
+            <li>MJWarp dynamic solver-atomic capacity is passed as a solver deterministic module option when <code>--mujoco-deterministic-max-records</code> is set.</li>
             <li>Each scenario owns a seeded NumPy RNG, so pose jitter and control trajectories are reproducible.</li>
             <li>The comparison boundary is process-level: no Python or GPU state is reused between replays.</li>
             <li>Only final core state decides the verdict; scenario extras are diagnostic and reported separately.</li>
@@ -1725,7 +2102,7 @@
   </main>
 
   <footer>
-    Generated 2026-05-12 10:57:47 Pacific Daylight Time. Raw machine-readable data: <code>determinism_report.json</code>.
+    Generated 2026-06-05 14:03:35 Pacific Daylight Time. Raw machine-readable data: <code>determinism_report.json</code>.
   </footer>
 </body>
 </html>
