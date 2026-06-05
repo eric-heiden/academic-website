@@ -354,19 +354,19 @@
 
     <section>
       <h2>Implemented Newton Baselines</h2>
-      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with three concrete examples under <code>newton/examples/cutting/</code>: MPM, VBD, and the new Track C X-FEM solver. They share a rigid blade mesh with a sampled edge spline, cohesive process-zone damage law, force logger, and cut-surface rendering that follows the simulated particle motion without deleting cells or shrinking the object volume. For cloth X-FEM, the solver now owns the online cut topology state: Warp kernels mark cut bending edges and triangles, zero the cut bending/membrane response, and feed the persistent triangle cut state to the shell renderer. The latest render path updates the OpenGL index buffer whenever topology changes, duplicates seam vertices with side-owned motion instead of interpolation across separated material, clips X-FEM exterior triangles by the knife-front half-plane before the cut side, locally refines active shell triangles, caps the visual opening gap, filters degenerate slivers, and renders enriched X-FEM displacements on the visible surface. The videos below are rendered from Newton <code>ViewerGL.get_frame()</code> captures with the rigid blade visible and the soft split surface drawn from the current simulated particles.</p>
+      <p>I added an experimental Newton branch, <code>eric-heiden/cutting-soft-objects</code>, with three concrete examples under <code>newton/examples/cutting/</code>: MPM, VBD, and the new Track C X-FEM solver. They share a rigid blade mesh with a sampled edge spline, cohesive process-zone damage law, force logger, and cut-surface rendering that follows the simulated particle motion without deleting cells or shrinking the object volume. For cloth X-FEM, the branch now uses virtual-node sheet topology for the report cloth cases: the rest sheet is split along the scenario cut path, seam particles are duplicated into side-owned material DOFs, zero-rest cohesive springs hold the two sides until the knife front reaches them, and the VBD triangle membrane/bending material is preserved instead of being zeroed on cut triangles. The solver also caps per-step knife impulse for shell cloth, so the cutter releases the seam rather than blasting low-mass triangles apart. The latest render path updates the OpenGL index buffer whenever topology changes, uses side-owned seam vertices instead of interpolation across separated material, locally refines active shell triangles, filters degenerate slivers, and renders the physical split surface from the current simulated particles.</p>
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM process-zone baseline</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/mpm/mpm_frame_44.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/mpm/mpm_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
           <p class="note">Uses <code>SolverImplicitMPM</code> with 2,880 particles, per-particle damage/color state, a knife-induced separation velocity, and adaptive particle-following cut-wall rendering. The exterior volume remains intact; the visible red interface is the dissected material plane, not removed cells.</p>
         </div>
         <div class="media-card">
           <h3>Mesh-based VBD damage track</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/vbd/vbd_frame_44.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/vbd/vbd_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
           <p class="note">Uses <code>SolverVBD</code> on an 840-particle, 2,940-tet soft grid. The knife adds cohesive forces, softens cut tetrahedra by scaling <code>tet_materials</code>, and renders a finite-gap cut wall that follows the VBD particles. The physical tet mesh is not topology-changing yet; it is the mesh-based force/damage baseline for virtual-node and X-FEM follow-up.</p>
         </div>
@@ -374,89 +374,89 @@
       <div class="media-grid">
         <div class="media-card">
           <h3>MPM force profile</h3>
-          <img src="assets/newton_baselines/mpm/mpm_force_profile.png?v=vbd-xfem-cloth-20260605" alt="MPM knife force and mean damage profile">
+          <img src="assets/newton_baselines/mpm/mpm_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="MPM knife force and mean damage profile">
         </div>
         <div class="media-card">
           <h3>VBD force profile</h3>
-          <img src="assets/newton_baselines/vbd/vbd_force_profile.png?v=vbd-xfem-cloth-20260605" alt="VBD knife force and mean damage profile">
+          <img src="assets/newton_baselines/vbd/vbd_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="VBD knife force and mean damage profile">
         </div>
       </div>
       <div class="media-grid">
         <div class="media-card">
           <h3>Adaptive remesh complexity</h3>
-          <img src="assets/newton_baselines/adaptive_remesh_profile.png?v=vbd-xfem-cloth-20260605" alt="Adaptive remeshing active segment and triangle count profile">
+          <img src="assets/newton_baselines/adaptive_remesh_profile.png?v=virtual-node-xfem-cloth-20260605" alt="Adaptive remeshing active segment and triangle count profile">
         </div>
       </div>
       <h3>Track C X-FEM solver scenarios</h3>
-      <p>The new <code>SolverXFEMCut</code> is implemented as a proper Newton solver in <code>newton/_src/solvers/xfem_cut</code>. It owns cut-side state, per-particle shifted-Heaviside enrichment displacement/velocity arrays, per-tet cut state/damage/weight arrays, material softening, knife normal/friction force accumulation, table/glue projection, and direct tangent-velocity drag for the sawing and cloth-slicing cases. For spline cuts, the visible rigid blade yaws with the local path tangent while the solver classifies bending edges, triangles, and particles against the fixed rest-space spline, so the rendered topology and force model no longer drift apart. The current prototype uses Newton's XPBD tetrahedral elasticity for solids and VBD shell cloth elasticity for triangle sheets while the X-FEM kernels provide the discontinuity, damage, and tool interaction layer; the next step is full cut-cell quadrature over physical plus enriched DOFs.</p>
+      <p>The new <code>SolverXFEMCut</code> is implemented as a proper Newton solver in <code>newton/_src/solvers/xfem_cut</code>. It owns cut-side state, per-particle shifted-Heaviside enrichment displacement/velocity arrays for solid cases, per-tet cut state/damage/weight arrays, material softening, knife normal/friction force accumulation, table/glue projection, and direct tangent-velocity drag for sawing cases. For cloth, the current report path uses virtual-node side-owned topology plus online cohesive seam release; the X-FEM kernels still classify the rest-space cut, release cohesive seam springs, mark render cut state, and bound the knife impulse while Newton VBD integrates the triangle membrane/bending material. For spline cuts, the visible rigid blade yaws with the local path tangent while the solver classifies the cut against the fixed rest-space spline, so the rendered topology and force model no longer drift apart. The next step is full cut-cell quadrature over physical plus enriched DOFs for volumetric X-FEM.</p>
       <div class="media-grid">
         <div class="media-card">
           <h3>X-FEM cuboid slice</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_first_frame.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_first_frame.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
           <p class="note">Soft cuboid with progressive cut-cell enrichment, cohesive damage, tet softening, and finite-gap adaptive cut-surface rendering. The first frame now shows the full cuboid from the start, and subsequent topology updates keep both sides visible instead of retracting to the knife front.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM vegetable sawing</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_first_frame.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_first_frame.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
           <p class="note">Gmsh tetrahedral half-cylinder on a table with gravity, bottom glue, knife friction, and sinusoidal blade-axis sawing motion. The model has 1,323 particles and 5,772 tetrahedra. Exterior triangles crossing the already-cut wake are clipped into separate side polygons, so the rendered skin no longer bridges the two halves after the knife passes.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM paper tearing</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_first_frame.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_first_frame.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
-          <p class="note">Wide Newton cloth-grid sheet with 693 particles, 1,280 triangles, 1,972 bending edges, and no structural spring lattice. The shell path now uses Newton VBD with triangle membrane terms and bending edges; the X-FEM topology kernels disable cut membrane/bending response online. The shell renderer splits only triangles marked cut by the solver, so the paper stays present as a 2D surface without hidden deleted cells.</p>
+          <p class="note">Wide Newton cloth sheet with 823 particles, 1,408 triangles, 2,229 bending edges, and 65 zero-rest cohesive seam springs. The shell path uses Newton VBD with triangle membrane terms and bending edges; the X-FEM topology kernels release the cohesive seam online while preserving membrane material on every side-owned triangle. The renderer follows the physical split sheet, so the paper stays present as a 2D surface without hidden deleted cells.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM hanging cloth cut-off</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/hanging_cloth_cutoff/xfem_hanging_cloth_cutoff_frame_89.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/xfem/hanging_cloth_cutoff/xfem_hanging_cloth_cutoff_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/hanging_cloth_cutoff/xfem_hanging_cloth_cutoff_frame_89.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/xfem/hanging_cloth_cutoff/xfem_hanging_cloth_cutoff_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
-          <p class="note">Y-up cloth curtain with the top row fixed, gravity and explicitly sideways wind, 1,073 particles, 2,016 triangles, 3,088 bending edges, and no structural spring lattice. The detached lower panel is integrated by the VBD shell cloth solver with membrane and bending response, while cut triangles and bending edges lose their across-cut stiffness online. The shell renderer front-clips and locally refines the solver-cut triangles, so the lower panel detaches and falls as its own mesh piece instead of looking like elements were simply removed.</p>
+          <p class="note">Y-up cloth curtain with the top row fixed, gravity and explicitly sideways wind, 1,219 particles, 2,160 triangles, 3,377 bending edges, and 73 cohesive seam springs. The detached lower panel is integrated by the VBD shell cloth solver with membrane and bending response; as the knife front reaches each seam pair, the cohesive spring releases and the lower panel falls as its own physical mesh piece. The blade is tuned as a sharp release tool rather than a high-friction pusher, removing the earlier ballooning distortion.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM bread tearing</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_first_frame.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_first_frame.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
           <p class="note">Gmsh tetrahedral bread half-cylinder with 882 particles, 3,720 tetrahedra, table glue over the flat bottom, and a lower-friction rough tearing response. The tet cut-wall renderer now assigns every plane-intersection vertex to its own material side, removing the long triangle spikes caused by interpolating across already-separated halves.</p>
         </div>
         <div class="media-card">
           <h3>X-FEM curved cloth spline cut</h3>
-          <video controls preload="metadata" poster="assets/newton_baselines/xfem/curved_cloth_spline_cut/xfem_curved_cloth_spline_cut_frame_89.png?v=vbd-xfem-cloth-20260605">
-            <source src="assets/newton_baselines/xfem/curved_cloth_spline_cut/xfem_curved_cloth_spline_cut_cutting.mp4?v=vbd-xfem-cloth-20260605" type="video/mp4">
+          <video controls preload="metadata" poster="assets/newton_baselines/xfem/curved_cloth_spline_cut/xfem_curved_cloth_spline_cut_frame_89.png?v=virtual-node-xfem-cloth-20260605">
+            <source src="assets/newton_baselines/xfem/curved_cloth_spline_cut/xfem_curved_cloth_spline_cut_cutting.mp4?v=virtual-node-xfem-cloth-20260605" type="video/mp4">
           </video>
-          <p class="note">Large clamped cloth sheet with 1,925 particles, 3,672 triangles, and 5,596 bending edges. The knife follows a sinusoidal rest-space cut path, yaws to the local spline tangent, and uses a compact planar blade footprint so turns sweep less cloth while retaining nonzero normal/friction coupling. The Warp topology kernels mark bending edges and triangles online; cut triangles lose membrane stiffness, and the shell renderer front-clips and 3x-refines only solver-cut triangles so the non-straight split surface appears without deleting sheet area.</p>
+          <p class="note">Large clamped cloth sheet with 2,229 particles, 3,893 triangles, 6,069 bending edges, and 159 cohesive seam springs. The knife follows a sinusoidal rest-space cut path, yaws to the local spline tangent, and uses a compact planar blade footprint with very low normal/friction coupling so turns cut the sheet without sweeping material sideways. Rest-space snapping near grid vertices prevents tiny sliver triangles; the 3x shell renderer refines the visible curved seam without deleting sheet area.</p>
         </div>
       </div>
       <div class="media-grid">
         <div class="media-card">
           <h3>Cuboid force profile</h3>
-          <img src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_force_profile.png?v=vbd-xfem-cloth-20260605" alt="X-FEM cuboid cutting force profile">
+          <img src="assets/newton_baselines/xfem/cuboid_slice/xfem_cuboid_slice_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="X-FEM cuboid cutting force profile">
         </div>
         <div class="media-card">
           <h3>Vegetable force profile</h3>
-          <img src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_force_profile.png?v=vbd-xfem-cloth-20260605" alt="X-FEM vegetable sawing force profile">
+          <img src="assets/newton_baselines/xfem/vegetable_sawing/xfem_vegetable_sawing_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="X-FEM vegetable sawing force profile">
         </div>
         <div class="media-card">
           <h3>Paper force profile</h3>
-          <img src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_force_profile.png?v=vbd-xfem-cloth-20260605" alt="X-FEM paper tearing force profile">
+          <img src="assets/newton_baselines/xfem/paper_tearing/xfem_paper_tearing_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="X-FEM paper tearing force profile">
         </div>
         <div class="media-card">
           <h3>Hanging cloth force profile</h3>
-          <img src="assets/newton_baselines/xfem/hanging_cloth_cutoff/xfem_hanging_cloth_cutoff_force_profile.png?v=vbd-xfem-cloth-20260605" alt="X-FEM hanging cloth cutting force profile">
+          <img src="assets/newton_baselines/xfem/hanging_cloth_cutoff/xfem_hanging_cloth_cutoff_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="X-FEM hanging cloth cutting force profile">
         </div>
         <div class="media-card">
           <h3>Curved cloth force profile</h3>
-          <img src="assets/newton_baselines/xfem/curved_cloth_spline_cut/xfem_curved_cloth_spline_cut_force_profile.png?v=vbd-xfem-cloth-20260605" alt="X-FEM curved cloth spline cutting force profile">
+          <img src="assets/newton_baselines/xfem/curved_cloth_spline_cut/xfem_curved_cloth_spline_cut_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="X-FEM curved cloth spline cutting force profile">
         </div>
         <div class="media-card">
           <h3>Bread force profile</h3>
-          <img src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_force_profile.png?v=vbd-xfem-cloth-20260605" alt="X-FEM bread tearing force profile">
+          <img src="assets/newton_baselines/xfem/bread_tearing/xfem_bread_tearing_force_profile.png?v=virtual-node-xfem-cloth-20260605" alt="X-FEM bread tearing force profile">
         </div>
       </div>
       <p>The shared knife update uses a compact process-zone model around a rigid blade-edge spline. Let \(\Gamma_k(t)\) be the world-space cutting edge of the knife mesh, sampled as a polyline, and let \(h_y\) be the half-thickness of the blade process zone. For particle or vertex \(i\), the edge distance and active weight are</p>
@@ -520,9 +520,9 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
           <tr><td>VBD</td><td>840 particles, 2,940 tets, 360 frames, 6.0 s</td><td class="numeric">626.5 N</td><td class="numeric">123.4 N</td><td class="numeric">740.4 N s</td><td class="numeric">0.225</td><td class="numeric">38.9</td><td class="numeric">28.4</td></tr>
           <tr><td>X-FEM</td><td>Cuboid slice, 630 particles, 2,100 tets, 6.0 s</td><td class="numeric">917.9 N</td><td class="numeric">161.0 N</td><td class="numeric">966.3 N s</td><td class="numeric">0.272</td><td class="numeric">16.8</td><td class="numeric">13.9</td></tr>
           <tr><td>X-FEM</td><td>Vegetable half-cylinder, 1,323 particles, 5,772 tets, 6.0 s</td><td class="numeric">1,788.5 N</td><td class="numeric">866.3 N</td><td class="numeric">5,190.3 N s</td><td class="numeric">0.605</td><td class="numeric">16.1</td><td class="numeric">1.2</td></tr>
-          <tr><td>X-FEM</td><td>Wide paper shell, 693 particles, 1,280 triangles, 6.0 s</td><td class="numeric">74.5 N</td><td class="numeric">32.2 N</td><td class="numeric">193.1 N s</td><td class="numeric">0.110</td><td class="numeric">8.6</td><td class="numeric">2.9</td></tr>
-          <tr><td>X-FEM</td><td>Hanging cloth cut-off, 1,073 particles, 2,016 triangles, 6.0 s</td><td class="numeric">43.5 N</td><td class="numeric">25.8 N</td><td class="numeric">155.1 N s</td><td class="numeric">0.069</td><td class="numeric">12.5</td><td class="numeric">2.6</td></tr>
-          <tr><td>X-FEM</td><td>Curved cloth spline cut, 1,925 particles, 3,672 triangles, 6.0 s</td><td class="numeric">18.4 N</td><td class="numeric">9.6 N</td><td class="numeric">57.8 N s</td><td class="numeric">0.076</td><td class="numeric">8.4</td><td class="numeric">0.9</td></tr>
+          <tr><td>X-FEM</td><td>Wide paper shell, 823 particles, 1,408 triangles, 6.0 s</td><td class="numeric">90.5 N</td><td class="numeric">54.5 N</td><td class="numeric">326.5 N s</td><td class="numeric">0.217</td><td class="numeric">4.2</td><td class="numeric">2.8</td></tr>
+          <tr><td>X-FEM</td><td>Hanging cloth cut-off, 1,219 particles, 2,160 triangles, 6.0 s</td><td class="numeric">14.6 N</td><td class="numeric">10.0 N</td><td class="numeric">59.6 N s</td><td class="numeric">0.196</td><td class="numeric">10.0</td><td class="numeric">4.1</td></tr>
+          <tr><td>X-FEM</td><td>Curved cloth spline cut, 2,229 particles, 3,893 triangles, 6.0 s</td><td class="numeric">7.5 N</td><td class="numeric">3.7 N</td><td class="numeric">22.0 N s</td><td class="numeric">0.185</td><td class="numeric">5.6</td><td class="numeric">0.6</td></tr>
           <tr><td>X-FEM</td><td>Bread half-cylinder, 882 particles, 3,720 tets, 6.0 s</td><td class="numeric">678.0 N</td><td class="numeric">332.9 N</td><td class="numeric">1,994.7 N s</td><td class="numeric">0.757</td><td class="numeric">15.9</td><td class="numeric">1.5</td></tr>
         </tbody>
       </table>
@@ -538,24 +538,24 @@ solver_vbd.step(state_0, state_1, control, contacts, dt)</code></pre>
       <div class="media-grid">
         <div class="media-card">
           <h3>Complexity sweep</h3>
-          <img src="assets/newton_baselines/benchmark_results.png?v=vbd-xfem-cloth-20260605" alt="Null-viewer physics benchmark sweep">
+          <img src="assets/newton_baselines/benchmark_results.png?v=virtual-node-xfem-cloth-20260605" alt="Null-viewer physics benchmark sweep">
         </div>
       </div>
       <table>
         <thead><tr><th>Method</th><th>Case</th><th>Particles</th><th>Tets</th><th>Triangles</th><th>Edges/springs</th><th>Mean step</th><th>Sim FPS</th></tr></thead>
         <tbody>
-          <tr><td>MPM</td><td>Coarse cuboid</td><td class="numeric">200</td><td class="numeric">0</td><td class="numeric">0</td><td class="numeric">0 / 0</td><td class="numeric">47.2 ms</td><td class="numeric">21.2</td></tr>
-          <tr><td>MPM</td><td>Default cuboid</td><td class="numeric">2,880</td><td class="numeric">0</td><td class="numeric">0</td><td class="numeric">0 / 0</td><td class="numeric">43.2 ms</td><td class="numeric">23.1</td></tr>
-          <tr><td>MPM</td><td>Fine cuboid</td><td class="numeric">11,856</td><td class="numeric">0</td><td class="numeric">0</td><td class="numeric">0 / 0</td><td class="numeric">41.2 ms</td><td class="numeric">24.3</td></tr>
-          <tr><td>VBD</td><td>Coarse cuboid</td><td class="numeric">330</td><td class="numeric">1,000</td><td class="numeric">440</td><td class="numeric">660 / 0</td><td class="numeric">24.2 ms</td><td class="numeric">41.2</td></tr>
-          <tr><td>VBD</td><td>Default cuboid</td><td class="numeric">840</td><td class="numeric">2,940</td><td class="numeric">896</td><td class="numeric">1,344 / 0</td><td class="numeric">25.8 ms</td><td class="numeric">38.8</td></tr>
-          <tr><td>VBD</td><td>Fine cuboid</td><td class="numeric">1,520</td><td class="numeric">5,670</td><td class="numeric">1,404</td><td class="numeric">2,106 / 0</td><td class="numeric">24.6 ms</td><td class="numeric">40.6</td></tr>
-          <tr><td>X-FEM</td><td>Cuboid grid</td><td class="numeric">630</td><td class="numeric">2,100</td><td class="numeric">736</td><td class="numeric">1,104 / 0</td><td class="numeric">54.4 ms</td><td class="numeric">18.4</td></tr>
-          <tr><td>X-FEM</td><td>Paper shell</td><td class="numeric">693</td><td class="numeric">0</td><td class="numeric">1,280</td><td class="numeric">1,972 / 3,840</td><td class="numeric">60.5 ms</td><td class="numeric">16.5</td></tr>
-          <tr><td>X-FEM</td><td>Hanging cloth</td><td class="numeric">1,073</td><td class="numeric">0</td><td class="numeric">2,016</td><td class="numeric">3,088 / 6,048</td><td class="numeric">50.9 ms</td><td class="numeric">19.7</td></tr>
-          <tr><td>X-FEM</td><td>Curved cloth</td><td class="numeric">1,925</td><td class="numeric">0</td><td class="numeric">3,672</td><td class="numeric">5,596 / 11,016</td><td class="numeric">61.4 ms</td><td class="numeric">16.3</td></tr>
-          <tr><td>X-FEM</td><td>Bread half-cylinder</td><td class="numeric">882</td><td class="numeric">3,720</td><td class="numeric">924</td><td class="numeric">1,386 / 0</td><td class="numeric">57.6 ms</td><td class="numeric">17.4</td></tr>
-          <tr><td>X-FEM</td><td>Vegetable half-cylinder</td><td class="numeric">1,323</td><td class="numeric">5,772</td><td class="numeric">1,292</td><td class="numeric">1,938 / 0</td><td class="numeric">55.4 ms</td><td class="numeric">18.0</td></tr>
+          <tr><td>MPM</td><td>Coarse cuboid</td><td class="numeric">200</td><td class="numeric">0</td><td class="numeric">0</td><td class="numeric">0 / 0</td><td class="numeric">298.2 ms</td><td class="numeric">3.4</td></tr>
+          <tr><td>MPM</td><td>Default cuboid</td><td class="numeric">2,880</td><td class="numeric">0</td><td class="numeric">0</td><td class="numeric">0 / 0</td><td class="numeric">42.7 ms</td><td class="numeric">23.4</td></tr>
+          <tr><td>MPM</td><td>Fine cuboid</td><td class="numeric">11,856</td><td class="numeric">0</td><td class="numeric">0</td><td class="numeric">0 / 0</td><td class="numeric">62.4 ms</td><td class="numeric">16.0</td></tr>
+          <tr><td>VBD</td><td>Coarse cuboid</td><td class="numeric">330</td><td class="numeric">1,000</td><td class="numeric">440</td><td class="numeric">660 / 0</td><td class="numeric">22.6 ms</td><td class="numeric">44.3</td></tr>
+          <tr><td>VBD</td><td>Default cuboid</td><td class="numeric">840</td><td class="numeric">2,940</td><td class="numeric">896</td><td class="numeric">1,344 / 0</td><td class="numeric">28.1 ms</td><td class="numeric">35.6</td></tr>
+          <tr><td>VBD</td><td>Fine cuboid</td><td class="numeric">1,520</td><td class="numeric">5,670</td><td class="numeric">1,404</td><td class="numeric">2,106 / 0</td><td class="numeric">27.5 ms</td><td class="numeric">36.4</td></tr>
+          <tr><td>X-FEM</td><td>Cuboid grid</td><td class="numeric">630</td><td class="numeric">2,100</td><td class="numeric">736</td><td class="numeric">1,104 / 0</td><td class="numeric">273.2 ms</td><td class="numeric">3.7</td></tr>
+          <tr><td>X-FEM</td><td>Paper shell</td><td class="numeric">823</td><td class="numeric">0</td><td class="numeric">1,408</td><td class="numeric">2,229 / 65</td><td class="numeric">143.8 ms</td><td class="numeric">7.0</td></tr>
+          <tr><td>X-FEM</td><td>Hanging cloth</td><td class="numeric">1,219</td><td class="numeric">0</td><td class="numeric">2,160</td><td class="numeric">3,377 / 73</td><td class="numeric">110.9 ms</td><td class="numeric">9.0</td></tr>
+          <tr><td>X-FEM</td><td>Curved cloth</td><td class="numeric">2,229</td><td class="numeric">0</td><td class="numeric">3,893</td><td class="numeric">6,069 / 159</td><td class="numeric">150.7 ms</td><td class="numeric">6.6</td></tr>
+          <tr><td>X-FEM</td><td>Bread half-cylinder</td><td class="numeric">882</td><td class="numeric">3,720</td><td class="numeric">924</td><td class="numeric">1,386 / 0</td><td class="numeric">40.2 ms</td><td class="numeric">24.9</td></tr>
+          <tr><td>X-FEM</td><td>Vegetable half-cylinder</td><td class="numeric">1,323</td><td class="numeric">5,772</td><td class="numeric">1,292</td><td class="numeric">1,938 / 0</td><td class="numeric">40.1 ms</td><td class="numeric">25.0</td></tr>
         </tbody>
       </table>
       <p class="note">Raw benchmark data: <a href="assets/newton_baselines/benchmark_results.json">JSON</a> and <a href="assets/newton_baselines/benchmark_results.csv">CSV</a>.</p>
@@ -738,7 +738,7 @@ scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
 
     <section>
       <h2>Shell/Triangle X-FEM for Paper and Cloth</h2>
-      <p>Paper, cloth, film, foil, and packaging should be a 2D manifold embedded in 3D, not a one-element-thick tet block. The paper example uses Newton's cloth grid with 32 x 20 cells, 693 particles, 1,280 triangles, and a much wider aspect ratio so the tear has room to propagate without the whole sheet disappearing sideways. The hanging-cloth example uses a Y-up Newton cloth grid with the top row fixed, gravity, sideways wind, 1,073 particles, and 2,016 triangles; when the sideways knife finishes the cut, the lower panel fully detaches and falls. The curved-spline example uses a clamped 54 x 34 cloth grid where the knife follows a sinusoidal rest-space path, yaws with the local path tangent, and applies nonzero normal/friction coupling to cloth particles near the blade. The solver path still uses <code>SolverXFEMCut</code> for knife damage, side labels, enrichment displacement, and frictional blade drag, but the base cloth integration is now Newton VBD over triangle membrane materials and bending edges rather than a spring lattice.</p>
+      <p>Paper, cloth, film, foil, and packaging should be a 2D manifold embedded in 3D, not a one-element-thick tet block. The report cloth cases now start from regular source grids but build virtual-node triangle sheets around the intended cut path: paper has 823 particles and 1,408 triangles, hanging cloth has 1,219 particles and 2,160 triangles, and the curved clamped sheet has 2,229 particles and 3,893 triangles. Each duplicate seam is held by zero-rest cohesive springs until the knife reaches it, then Newton VBD continues integrating the separated sheet pieces with triangle membrane and bending materials. The solver path still uses <code>SolverXFEMCut</code> for knife damage, side labels, cohesive seam release, and frictional blade drag, but it no longer simulates cloth cuts by zeroing the membrane material of shared triangles.</p>
       <p>On a triangle \(T\), the shell analogue of the shifted-Heaviside field is</p>
       <div class="math-display">\[
         \mathbf{u}_h(\boldsymbol{\xi}) =
@@ -763,22 +763,22 @@ scatter_to_physical_and_enriched_blocks(force, hessian)</code></pre>
         G_{\mathrm{tip}} \ge G_c(\alpha) \Rightarrow \text{advance crack}.
       \]</div>
       <p>Here \(G_c(\alpha)\) can encode paper grain or woven-cloth anisotropy. That matters for validation: a torn sheet should expose crack-tip direction changes, bending near the tear mouth, and a force plateau governed by fracture energy, not only a visual seam.</p>
-      <p>The current branch now performs an online topology update for cloth in the solver step, not just at render time. <code>cut_xfem_cloth_edges_kernel</code> marks bending edges whose rest segment crosses the cut path and whose midpoint is behind the knife front, then sets their bending properties to zero. <code>cut_xfem_cloth_triangles_kernel</code> marks the visible triangles that must be split by the renderer and zeros the cut triangle membrane response used by VBD. These arrays are persistent, fixed-size Warp buffers, so the cut remains graph-capture friendly even though the cloth connectivity is effectively separated.</p>
+      <p>The current branch now performs the cloth separation in the physics mesh, not just at render time. The builder clips the source grid into side-owned virtual-node triangles, snaps near-grid cut intersections to avoid sliver triangles, and adds zero-rest cohesive springs between duplicate seam particles. <code>cut_xfem_cloth_springs_kernel</code> releases those springs online as the knife front reaches each seam pair. <code>cut_xfem_cloth_triangles_kernel</code> still records visible cut state for the renderer, but it preserves the base triangle membrane material because the material sides are already separated topologically. These arrays remain persistent, fixed-size Warp buffers, so the cut remains graph-capture friendly.</p>
       <table>
         <thead><tr><th>Layer</th><th>Current branch</th><th>Production direction</th></tr></thead>
         <tbody>
-          <tr><td>Physics mesh</td><td>Newton <code>add_cloth_grid</code> triangle sheet, VBD triangle membrane/bending materials, X-FEM particle damage/friction, persistent cut states, and online disabling of cut membrane/bending response.</td><td>Cloth solver owns crack-local topology updates: duplicate seam vertices/edges, update stretch/bending adjacency, add seam collision, and preserve total area.</td></tr>
+          <tr><td>Physics mesh</td><td>Virtual-node triangle sheet built from the source grid, VBD triangle membrane/bending materials, zero-rest cohesive seam springs, X-FEM particle damage/friction, persistent cut states, and bounded shell knife impulses.</td><td>Add seam collision and crack-tip refinement, then generalize from pre-specified cut paths to stress/energy-driven propagation.</td></tr>
           <tr><td>Cut criterion</td><td>Knife process-zone work updates particle damage using area-per-particle from summed triangle areas.</td><td>Use edge or crack-tip energy release with anisotropic \(G_c\), plus tool puncture and sliding work for blade-driven tearing.</td></tr>
-          <tr><td>Rendering</td><td><code>ShellCutSurfaceRenderer</code> consumes solver <code>tri_cut_state</code>, clips only online-cut triangles into positive/negative side polygons, and duplicates seam vertices so each copy follows its own cut side.</td><td>Move triangle classification, prefix sums, polygon emission, and cut-edge generation to Warp fixed-capacity buffers for graph-captured runs.</td></tr>
-          <tr><td>Performance</td><td>Regenerated video logs show 115.7 ms/physics frame for the 693-particle paper sheet, 80.0 ms/frame for the 1,073-particle hanging cloth, and 119.7 ms/frame for the 1,925-particle curved dynamic spline cut. Full report rendering is slower because the shell split is currently CPU/NumPy.</td><td>Keep active lists around the blade and crack tip, fuse classification/damage/friction kernels, and emit render topology directly on GPU.</td></tr>
+          <tr><td>Rendering</td><td><code>ShellCutSurfaceRenderer</code> follows the side-owned physical particles. Paper and hanging render the virtual-node mesh directly; the curved spline case still locally refines active cut triangles for a smoother visible path.</td><td>Move triangle classification, prefix sums, polygon emission, and cut-edge generation to Warp fixed-capacity buffers for graph-captured runs.</td></tr>
+          <tr><td>Performance</td><td>Regenerated video logs show 239.4 ms/physics frame for the 823-particle paper sheet, 99.6 ms/frame for the 1,219-particle hanging cloth, and 179.5 ms/frame for the 2,229-particle curved dynamic spline cut. Full report rendering is slower because the shell split/refinement path is currently CPU/NumPy.</td><td>Keep active lists around the blade and crack tip, fuse classification/damage/friction kernels, and emit render topology directly on GPU.</td></tr>
         </tbody>
       </table>
-      <p>The visual bug in the earlier paper tearing video came from treating a thin object like a volume and then trying to reveal a cut with tet-style rendering. A second bug interpolated new seam vertices between already-separated sides, producing a fan of long triangles after the hanging lower panel fell. A third bug split an entire triangle as soon as any corner entered the knife wake; partially traversed elements now get an intact front cap plus separate positive/negative cut-side patches. The revised shell renderer never deletes sheet area: with the visual opening disabled, a regression test checks that the split-triangle surface area equals the original sheet area. The videos add only a small capped display gap, hide dense shell seam overlays, and locally subdivide active cut triangles, so the visible cloth is split surface geometry rather than cut-wall-strip decoration. The curved-spline example now uses the same online remesh path with VBD cloth dynamics, tangent-aligned blade yaw, and nonzero knife friction/normal force. Remaining limitations are physical rather than visual: the current cloth solver now has a real triangle membrane/bending material path, but still lacks calibrated orthotropic cloth, crack-tip refinement, and cohesive seam collision, so it is a first shell X-FEM baseline rather than the final paper/cloth model.</p>
+      <p>The visual bug in the earlier paper tearing video came from treating a thin object like a volume and then trying to reveal a cut with tet-style rendering. A second bug interpolated new seam vertices between already-separated sides, producing a fan of long triangles after the hanging lower panel fell. A third bug let the knife impulse move too much low-mass cloth during a curved turn. The revised cloth path never deletes sheet area or disables membrane material to fake a cut: the physical sheet is already split into side-owned virtual-node triangles, cohesive springs release online, and the shell renderer follows those particles. The curved-spline example now uses tangent-aligned blade yaw, a compact planar footprint, low normal/friction coupling, and bounded shell impulses, so the final seam stays narrow instead of opening into a broad dark gap. Remaining limitations are physical rather than visual: the current cloth solver still lacks calibrated orthotropic cloth, crack-tip refinement, and cohesive seam collision, so it is a first shell X-FEM baseline rather than the final paper/cloth model.</p>
     </section>
 
     <section>
       <h2>Adaptive Remeshing</h2>
-      <p>I added a first Warp-based adaptive remeshing implementation to the Newton cutting branch. It is currently a render-side surface remesher, not a solver-owned tet topology update: the MPM/VBD solvers keep their particle/tet arrays fixed, while a fixed-capacity GPU remesher generates duplicated seam geometry, finite-gap cut-wall triangles, and local x refinement around the knife front each frame. The shell X-FEM path adds a CPU/NumPy split-triangle renderer for now, with front-aware clipping and local active-triangle subdivision that should move to Warp next. This is the right intermediate step because it exercises the geometry path, particle-motion coupling, and fixed-buffer design before we make topology changes part of the physics solve.</p>
+      <p>I added a first Warp-based adaptive remeshing implementation to the Newton cutting branch. It is currently a render-side surface remesher, not a solver-owned tet topology update: the MPM/VBD solvers keep their particle/tet arrays fixed, while a fixed-capacity GPU remesher generates duplicated seam geometry, finite-gap cut-wall triangles, and local x refinement around the knife front each frame. The shell X-FEM path now uses solver-side virtual-node cloth topology for the report paper and hanging cases, plus a CPU/NumPy split-triangle renderer for the curved active spline refinement that should move to Warp next. This is the right intermediate step because it exercises the geometry path, particle-motion coupling, and fixed-buffer design before we make topology changes part of the volumetric physics solve.</p>
       <p>The cuboid implementation lives in <code>AdaptiveCutSurfaceRemesher</code>. A small per-frame schedule marks coarse x-cells near the knife front for subdivision; Warp kernels then emit surface and wall triangles into preallocated buffers. Generated rest-space vertices are deformed from the current solver particles using side-aware inverse-distance displacement sampling, so the rendered dissection follows particles on the corresponding side of the cut rather than averaging across the discontinuity.</p>
       <p>For the half-cylinder X-FEM scenes, the branch also includes <code>TetMeshCutSurfaceRenderer</code>. It uses the actual Newton surface triangles for uncut regions, clips triangles that cross or touch the cut plane inside the knife wake into separate positive/negative side polygons, and computes internal cut faces by intersecting each rest tetrahedron with the cut plane behind the knife. The generated exterior and cut-wall vertices are then interpolated from current physical plus enriched particle positions. This keeps curved tetrahedral objects volume-preserving in the videos while removing exterior triangles that used to bridge both sides of the cut.</p>
       <h3>Adaptive cutting remeshing deep dive</h3>
@@ -845,18 +845,18 @@ stats = remesher.log(
           <tr><td>MPM cuboid adaptive render</td><td class="numeric">28.0 x segments</td><td class="numeric">45 x segments</td><td class="numeric">0.0094 m</td><td class="numeric">944</td><td class="numeric">557</td><td class="numeric">16.2</td></tr>
           <tr><td>VBD cuboid adaptive render</td><td class="numeric">28.1 x segments</td><td class="numeric">45 x segments</td><td class="numeric">0.0093 m</td><td class="numeric">948</td><td class="numeric">558</td><td class="numeric">26.9</td></tr>
           <tr><td>X-FEM cuboid adaptive render</td><td class="numeric">32.6 x segments</td><td class="numeric">52 x segments</td><td class="numeric">0.0080 m</td><td class="numeric">1,231</td><td class="numeric">759</td><td class="numeric">13.2</td></tr>
-          <tr><td>X-FEM paper shell split render</td><td class="numeric">51.0 cut triangles</td><td class="numeric">64 cut triangles</td><td class="numeric">0.0175 m eff.</td><td class="numeric">1,432</td><td class="numeric">0</td><td class="numeric">3.6</td></tr>
-          <tr><td>X-FEM hanging cloth split render</td><td class="numeric">55.4 cut triangles</td><td class="numeric">72 cut triangles</td><td class="numeric">0.0150 m eff.</td><td class="numeric">2,185</td><td class="numeric">0</td><td class="numeric">3.0</td></tr>
-          <tr><td>X-FEM curved cloth spline render</td><td class="numeric">85.2 cut triangles</td><td class="numeric">144 cut triangles</td><td class="numeric">0.0093 m eff.</td><td class="numeric">4,735</td><td class="numeric">0</td><td class="numeric">1.0</td></tr>
+          <tr><td>X-FEM paper virtual-node shell</td><td class="numeric">0.0 active refinements</td><td class="numeric">0 active refinements</td><td class="numeric">0.0350 m</td><td class="numeric">1,408</td><td class="numeric">0</td><td class="numeric">2.8</td></tr>
+          <tr><td>X-FEM hanging virtual-node cloth</td><td class="numeric">0.0 active refinements</td><td class="numeric">0 active refinements</td><td class="numeric">0.0300 m</td><td class="numeric">2,160</td><td class="numeric">0</td><td class="numeric">4.1</td></tr>
+          <tr><td>X-FEM curved cloth spline render</td><td class="numeric">149.6 cut triangles</td><td class="numeric">250 cut triangles</td><td class="numeric">0.0280 m</td><td class="numeric">5,433</td><td class="numeric">0</td><td class="numeric">0.6</td></tr>
           <tr><td>X-FEM vegetable split-tet render</td><td class="numeric">516 cut tets</td><td class="numeric">624 cut tets</td><td class="numeric">0.0330 m</td><td class="numeric">1,324</td><td class="numeric">1,289</td><td class="numeric">1.2</td></tr>
           <tr><td>X-FEM bread split-tet render</td><td class="numeric">500 cut tets</td><td class="numeric">600 cut tets</td><td class="numeric">0.0380 m</td><td class="numeric">1,092</td><td class="numeric">1,333</td><td class="numeric">1.5</td></tr>
         </tbody>
       </table>
-      <p>With 24 coarse x-cells and a 4x local refinement factor, the cuboid remesher reduces local spacing from about 3.7 cm to 9.3 mm near the knife front, while keeping the rest of the block coarse. The MPM/VBD cuboid topology peaks at 1,488 surface triangles plus 840-864 finite-gap cut-wall triangles. The X-FEM cuboid uses a finer setting and peaks at 1,928 surface triangles plus 1,120 wall triangles. The shell paper, hanging-cloth, and curved-spline paths report cut triangles rather than x segments; they keep every base sheet triangle represented, add front-cap split polygons only in the solver-marked cut wake, and hide dense seam overlays in the videos. The effective display spacing above includes the active shell subdivision factor: 2x for paper/hanging and 3x for the curved spline cut. For curved tetrahedral meshes, the half-cylinder path reports cut tets and emits both opened wall sides; the 6-second vegetable scene averages 516 cut tets and 1,289 cut-wall triangles, while the bread scene averages 500 cut tets and 1,333 cut-wall triangles.</p>
+      <p>With 24 coarse x-cells and a 4x local refinement factor, the cuboid remesher reduces local spacing from about 3.7 cm to 9.3 mm near the knife front, while keeping the rest of the block coarse. The MPM/VBD cuboid topology peaks at 1,488 surface triangles plus 840-864 finite-gap cut-wall triangles. The X-FEM cuboid uses a finer setting and peaks at 1,928 surface triangles plus 1,120 wall triangles. The paper and hanging-cloth reports now render their virtual-node physics mesh directly, so their surface triangle counts match the side-owned physical cloth topology. The curved-spline path still reports solver-marked cut triangles and uses 3x local visible refinement to smooth the non-straight seam. For curved tetrahedral meshes, the half-cylinder path reports cut tets and emits both opened wall sides; the 6-second vegetable scene averages 516 cut tets and 1,289 cut-wall triangles, while the bread scene averages 500 cut tets and 1,333 cut-wall triangles.</p>
       <table>
         <thead><tr><th>Phase</th><th>Implementation</th><th>Why</th></tr></thead>
         <tbody>
-          <tr><td>Current branch</td><td>Fixed-capacity Warp cuboid surface/cut-wall remeshing, adaptive x refinement, duplicated seam vertices with finite visual opening, side-owned particle-following deformation, VBD-backed cloth edge/triangle cut states, gmsh half-cylinder tetrahedral scenes, clipped split exterior surfaces, rest-tet cut-wall extraction, and dynamic spline-following cloth cuts with tangent-aligned knife yaw.</td><td>Gives visible cut geometry, timing data, graph-capture-friendly cuboid buffers, and online cloth topology cuts without rebuilding the full Newton <code>Model</code>.</td></tr>
+          <tr><td>Current branch</td><td>Fixed-capacity Warp cuboid surface/cut-wall remeshing, adaptive x refinement, duplicated seam vertices with finite visual opening, side-owned particle-following deformation, virtual-node VBD cloth topology with online cohesive seam release, gmsh half-cylinder tetrahedral scenes, clipped split exterior surfaces, rest-tet cut-wall extraction, and dynamic spline-following cloth cuts with tangent-aligned knife yaw.</td><td>Gives visible cut geometry, timing data, graph-capture-friendly cuboid buffers, and online cloth topology cuts without rebuilding the full Newton <code>Model</code>.</td></tr>
           <tr><td>Next beta</td><td>Move the curved cut-tet extraction fully into Warp: classify intersected tets, compute edge intersections, prefix-sum triangle counts, emit cut surface triangles, duplicate vertices, and update surface collision.</td><td>Produces perception-ready geometry for arbitrary tet meshes, while solver topology can still remain fixed initially.</td></tr>
           <tr><td>Solver-owned remesh</td><td>Rebuild or incrementally update <code>Model</code>/<code>SolverVBD</code> after cut events, then recapture graphs after topology changes.</td><td>Needed when the cut surface must affect elasticity, mass, contact, and self-collision directly.</td></tr>
           <tr><td>Production</td><td>Virtual-node embedded material or robust state-machine subdivision for degeneracies.</td><td>Needed for cuts through vertices, edges, faces, and repeated/branching cuts.</td></tr>
@@ -956,7 +956,7 @@ stats = remesher.log(
         <li>Wang and Ma, <a href="https://pubmed.ncbi.nlm.nih.gov/29869383/">A review of virtual cutting methods and technology in deformable objects</a>, International Journal of Medical Robotics 2018.</li>
         <li>Yu, Zhao, Wang, and Pan, <a href="https://pubmed.ncbi.nlm.nih.gov/38631128/">Real-time soft body dissection simulation with parallelized graph-based shape matching on GPU</a>, Computer Methods and Programs in Biomedicine 2024.</li>
       </ul>
-      <p class="note">Last updated: 2026-06-04 UTC.</p>
+      <p class="note">Last updated: 2026-06-05 UTC.</p>
     </section>
   </main>
 </body>
