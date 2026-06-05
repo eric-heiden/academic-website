@@ -199,7 +199,7 @@
 <main>
   <h1>Newton ModelBuilder Performance</h1>
   <p class="lede">Benchmarks for stale PR 1718 optimization ideas on a fresh current-main clone. The workloads load MuJoCo-menagerie-style USD assets, register the MuJoCo custom attributes, replicate them to RL-scale world counts, and measure <code>ModelBuilder.finalize()</code>. This version also measures repeated <code>ModelBuilder.add_builder()</code> calls, which is the relevant construction path for IsaacLab-style workflows.</p>
-  <div class="timestamp">Generated at <strong>2026-06-05T21:50:06+00:00</strong></div>
+  <div class="timestamp">Generated at <strong>2026-06-05T21:52:31+00:00</strong></div>
 
   <section class="grid">
     <div class="panel">
@@ -217,10 +217,10 @@
   </section>
 
   <h2>Run Metadata</h2>
-  <ul><li><strong>Report title:</strong> Newton ModelBuilder Performance</li><li><strong>Generated at UTC:</strong> 2026-06-05T21:50:06+00:00</li><li><strong>Newton repo:</strong> /home/horde/repos/newton-pr1718-bench</li><li><strong>Current main:</strong> 7c83974edb07</li><li><strong>PR 1718 head:</strong> da7eaef29c16</li><li><strong>PR merge base:</strong> 79e886ac4d7f</li><li><strong>origin/main...pr-1718 count:</strong> 644 left/right 24</li><li><strong>Device:</strong> cuda:0</li><li><strong>Finalize raw rows:</strong> 444</li><li><strong>add_builder raw rows:</strong> 768</li><li><strong>Finalize diagnostic rows:</strong> 6</li></ul>
+  <ul><li><strong>Report title:</strong> Newton ModelBuilder Performance</li><li><strong>Generated at UTC:</strong> 2026-06-05T21:52:31+00:00</li><li><strong>Newton repo:</strong> /home/horde/repos/newton-pr1718-bench</li><li><strong>Current main:</strong> 7c83974edb07</li><li><strong>PR 1718 head:</strong> da7eaef29c16</li><li><strong>PR merge base:</strong> 79e886ac4d7f</li><li><strong>origin/main...pr-1718 count:</strong> 644 left/right 24</li><li><strong>Device:</strong> cuda:0</li><li><strong>Finalize raw rows:</strong> 444</li><li><strong>add_builder raw rows:</strong> 768</li><li><strong>Finalize diagnostic rows:</strong> 6</li></ul>
 
   <h2>Matrix Completeness</h2>
-  <p>Each benchmark reports completeness against the assets, world counts, and variants included in that benchmark input set. The finalize follow-up focuses on high world counts and contact-pair templating; the add_builder follow-up covers the full 10-to-16k world ladder for all combinations of the retained add_builder-specific methods.</p>
+  <p>Each benchmark reports completeness against the assets, world counts, and variants included in that benchmark input set. The compact-filter follow-up covers the full 10-to-16k world ladder for all combinations of the retained finalize and add_builder methods.</p>
   <table class=""><thead><tr><th>Benchmark</th><th>Assets</th><th>Env counts</th><th>Variants</th><th>Expected</th><th>Successful</th><th>Missing</th></tr></thead><tbody><tr><td>finalize compact-filter</td><td>3</td><td>8</td><td>16</td><td>384</td><td>384</td><td class="ok-cell">0</td></tr><tr><td>add_builder compact-filter</td><td>3</td><td>8</td><td>16</td><td>384</td><td>384</td><td class="ok-cell">0</td></tr></tbody></table>
 
   <h2>Variant Overview</h2>
