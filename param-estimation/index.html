@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Real2Sim Parameter Estimation</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script>
+    window.MathJax = { tex: { inlineMath: [["\\(", "\\)"], ["$", "$"]] }, svg: { fontCache: "global" } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6b7d;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8deea;
+      --blue: #2456a6;
+      --teal: #0f766e;
+      --rust: #9a3412;
+      --green: #166534;
+      --violet: #6d3fb3;
+      --shadow: 0 18px 42px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { overflow-x: hidden; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+    header, main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+    header {
+      padding: 44px 0 26px;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--teal);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-size: clamp(2.4rem, 6vw, 5rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+    .lead {
+      max-width: 920px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.58;
+    }
+    main { padding: 26px 0 70px; }
+    section {
+      padding: 28px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    h2 {
+      margin: 0 0 13px;
+      font-size: clamp(1.45rem, 3vw, 2.05rem);
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 20px 0 9px;
+      font-size: 1.08rem;
+      letter-spacing: 0;
+    }
+    p, li {
+      color: var(--muted);
+      line-height: 1.62;
+      font-size: 1rem;
+    }
+    a { color: var(--blue); }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    code { font-size: 0.93em; }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 22px;
+      align-items: stretch;
+      margin-top: 24px;
+    }
+    .metric-grid, .cards, .method-grid, .tool-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .method-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card, .metric, .panel, .method {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .card, .method { padding: 16px; }
+    .metric { padding: 14px 16px; }
+    .metric span, .tag {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 1.65rem;
+      line-height: 1.05;
+    }
+    .metric small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .card strong, .method strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ink);
+      font-size: 1.02rem;
+    }
+    .card p, .method p { margin: 0; }
+    .verdict {
+      border-left: 5px solid var(--teal);
+      border-radius: 0 8px 8px 0;
+      background: var(--panel);
+      padding: 16px 18px;
+      color: var(--ink);
+      box-shadow: var(--shadow);
+    }
+    .diagram {
+      min-height: 360px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    svg text {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.92rem;
+    }
+    th {
+      color: var(--ink);
+      background: #e9edf5;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+    }
+    td { color: #303847; }
+    tr:last-child td { border-bottom: 0; }
+    td.numeric { text-align: right; white-space: nowrap; }
+    .plot {
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      min-height: 390px;
+      margin: 14px 0;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .code-panel {
+      max-width: 100%;
+      overflow: auto;
+      border: 1px solid #283449;
+      border-radius: 8px;
+      background: #111827;
+      color: #dce7f7;
+      box-shadow: var(--shadow);
+    }
+    pre {
+      margin: 0;
+      padding: 18px;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+    .kw { color: #93c5fd; }
+    .fn { color: #86efac; }
+    .str { color: #fbbf24; }
+    .cm { color: #94a3b8; }
+    .num { color: #fca5a5; }
+    .source-list {
+      columns: 2;
+      column-gap: 28px;
+      padding-left: 18px;
+    }
+    .source-list li { break-inside: avoid; margin-bottom: 8px; }
+    .note { font-size: 0.92rem; color: var(--muted); }
+    .pill {
+      display: inline-block;
+      margin: 0 6px 7px 0;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #e7f5f2;
+      color: #0f5f58;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+    @media (max-width: 980px) {
+      .hero-grid, .cards, .method-grid, .tool-grid, .metric-grid { grid-template-columns: 1fr; }
+      .source-list { columns: 1; }
+      table { display: block; overflow-x: auto; }
+    }
+    @media (max-width: 520px) {
+      header, main { width: min(100% - 32px, 1180px); }
+      header { padding-top: 40px; }
+      .diagram { min-height: 260px; }
+      pre { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Newton Research Report · Real2Sim Toolbox Design</p>
+    <h1>Real2Sim Parameter Estimation</h1>
+    <p class="lead">A focused literature review and Newton integration plan for estimating robot and object physical properties from real data: inertial parameters, joint friction, actuator effects, contact materials, payloads, and manipulated object properties.</p>
+    <div class="hero-grid">
+      <div class="panel diagram">
+        <svg viewBox="0 0 720 360" width="100%" height="100%" role="img" aria-label="Real2Sim parameter estimation pipeline">
+          <defs>
+            <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+              <path d="M0,0 L9,4.5 L0,9 z" fill="#2456a6"></path>
+            </marker>
+          </defs>
+          <rect x="28" y="36" width="150" height="72" rx="8" fill="#ffffff" stroke="#d8deea"></rect>
+          <text x="103" y="66" text-anchor="middle" font-size="15" font-weight="800" fill="#172033">Real robot</text>
+          <text x="103" y="88" text-anchor="middle" font-size="12" fill="#5f6b7d">q, qd, tau, poses</text>
+          <rect x="250" y="28" width="170" height="88" rx="8" fill="#eef6ff" stroke="#b6c8e6"></rect>
+          <text x="335" y="58" text-anchor="middle" font-size="15" font-weight="800" fill="#172033">Experiment</text>
+          <text x="335" y="81" text-anchor="middle" font-size="12" fill="#5f6b7d">excitation + loss</text>
+          <rect x="500" y="36" width="164" height="72" rx="8" fill="#ffffff" stroke="#d8deea"></rect>
+          <text x="582" y="66" text-anchor="middle" font-size="15" font-weight="800" fill="#172033">Newton model</text>
+          <text x="582" y="88" text-anchor="middle" font-size="12" fill="#5f6b7d">parameters + solvers</text>
+          <path d="M178 72 H250" stroke="#2456a6" stroke-width="3" marker-end="url(#arrow)"></path>
+          <path d="M420 72 H500" stroke="#2456a6" stroke-width="3" marker-end="url(#arrow)"></path>
+          <rect x="70" y="198" width="170" height="82" rx="8" fill="#f7fbf8" stroke="#b8d8c2"></rect>
+          <text x="155" y="229" text-anchor="middle" font-size="15" font-weight="800" fill="#172033">Parameter map</text>
+          <text x="155" y="251" text-anchor="middle" font-size="12" fill="#5f6b7d">bounds, transforms, notify</text>
+          <rect x="312" y="190" width="170" height="98" rx="8" fill="#fff7ed" stroke="#e4c3a6"></rect>
+          <text x="397" y="225" text-anchor="middle" font-size="15" font-weight="800" fill="#172033">Optimizer</text>
+          <text x="397" y="247" text-anchor="middle" font-size="12" fill="#5f6b7d">FD, AD, CEM, SVGD</text>
+          <rect x="552" y="198" width="150" height="82" rx="8" fill="#f5f0ff" stroke="#c7b8e8"></rect>
+          <text x="627" y="229" text-anchor="middle" font-size="15" font-weight="800" fill="#172033">Posterior</text>
+          <text x="627" y="251" text-anchor="middle" font-size="12" fill="#5f6b7d">uncertainty + policy</text>
+          <path d="M552 108 C520 150 472 162 430 190" fill="none" stroke="#2456a6" stroke-width="3" marker-end="url(#arrow)"></path>
+          <path d="M250 116 C210 150 178 168 164 198" fill="none" stroke="#2456a6" stroke-width="3" marker-end="url(#arrow)"></path>
+          <path d="M240 239 H312" stroke="#2456a6" stroke-width="3" marker-end="url(#arrow)"></path>
+          <path d="M482 239 H552" stroke="#2456a6" stroke-width="3" marker-end="url(#arrow)"></path>
+          <path d="M397 190 C390 148 410 122 500 91" fill="none" stroke="#9a3412" stroke-width="3" marker-end="url(#arrow)"></path>
+          <text x="397" y="334" text-anchor="middle" font-size="13" fill="#5f6b7d">Treat real2sim as estimation under uncertainty, not one magic differentiable loss.</text>
+        </svg>
+      </div>
+      <div class="metric-grid">
+        <div class="metric"><span>Prototype robot</span><strong>Franka</strong><small>FR3/Panda arm metadata loaded through Newton</small></div>
+        <div class="metric"><span>Estimated params</span><strong>3</strong><small>payload mass, friction scale, armature scale</small></div>
+        <div class="metric"><span>Noisy final loss</span><strong id="metric-loss">0.00014</strong><small>mean squared joint error over rollout</small></div>
+        <div class="metric"><span>Best error</span><strong id="metric-error">0.6%</strong><small>friction scale in noisy synthetic-real run</small></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Executive Summary</h2>
+      <p class="verdict">Newton should expose real2sim as a toolbox around parameter maps, experiment losses, solver notifications, batched rollout evaluators, and uncertainty-aware optimizers. Differentiable simulation is one important backend, but practical robot calibration also needs finite differences, simulation-based inference, Bayesian optimization, and classical inverse-dynamics identification because contacts, solver caches, actuator firmware, and parameter identifiability all break the clean gradient story.</p>
+      <div class="cards">
+        <div class="card"><strong>Use classical ID when torques are reliable</strong><p>For fixed-base arms with joint positions, velocities, accelerations, and torque measurements, inverse-dynamics regressors and physical-consistency constraints remain the most sample-efficient way to estimate inertial and friction parameters.</p></div>
+        <div class="card"><strong>Use simulation matching when observations are richer</strong><p>For object manipulation, contact, vision, tactile sensing, and controller-in-the-loop data, match rollouts in Newton directly. This is slower but it optimizes the same simulator used downstream.</p></div>
+        <div class="card"><strong>Return uncertainty, not only one vector</strong><p>Real data often leaves payload, armature, center of mass, and contact parameters partially coupled. Posterior particles or calibrated parameter distributions are more useful than a single brittle optimum.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Problem Shape</h2>
+      <p>Parameter estimation asks for physical settings \( \theta \) that make simulated observations \( \hat{x}_{1:T}(\theta) \) agree with real measurements \( x^r_{1:T} \). A practical Newton objective should look like:</p>
+      <p>\[
+        \theta^* = \arg\min_{\theta \in \Theta}
+        \sum_{e \in \mathcal{E}} \sum_{t=1}^{T_e}
+        \left\| W_e\left(h_e(s_t(\theta)) - y^r_{e,t}\right)\right\|^2
+        + R(\theta)
+      \]</p>
+      <p>Here \(h_e\) can be a joint encoder readout, object pose, force/torque signal, tactile depth map, image feature, or task return. The parameter set \(\Theta\) should enforce physical bounds: positive mass and inertia, dissipative friction, valid contact coefficients, stable solver settings, and explicit update flags for solver caches.</p>
+      <p>For Bayesian methods, the same pieces become a posterior:</p>
+      <p>\[
+        p(\theta \mid D) \propto p(D \mid \theta) p(\theta),
+        \quad
+        p(D \mid \theta) \approx \exp\left(-\frac{1}{2} \sum_t \|r_t(\theta)\|_{\Sigma^{-1}}^2\right).
+      \]</p>
+    </section>
+
+    <section>
+      <h2>Literature Groups</h2>
+      <div class="method-grid">
+        <div class="method"><strong>1. Inverse dynamics and physical consistency</strong><p>Use regressors, base parameters, excitation trajectories, and constraints. Best when torques are trustworthy and contacts are limited.</p></div>
+        <div class="method"><strong>2. Bayesian simulator-parameter inference</strong><p>Infer a distribution over simulator parameters from real rollouts. Best when many parameter settings explain the data.</p></div>
+        <div class="method"><strong>3. Differentiable simulation</strong><p>Backpropagate through rollouts or implicit solver layers. Best when gradient contracts are validated for the target solver/contact regime.</p></div>
+        <div class="method"><strong>4. Object property real2sim</strong><p>Estimate manipulated object mass, inertia, center of mass, friction, and geometry from robot interaction, vision, proprioception, and tactile signals.</p></div>
+        <div class="method"><strong>5. Online and task-aware adaptation</strong><p>Update parameters during policy execution or optimize distributions for transfer performance, not just trajectory fit.</p></div>
+      </div>
+
+      <h3>1. Robot inertial and friction identification</h3>
+      <p>The classic arm-calibration pipeline is still important. The BIRDy survey compares inverse-dynamics, maximum-likelihood, output-error, Kalman, neural, and physically consistent methods across serial robots and emphasizes excitation, preprocessing, and benchmark repeatability. Wensing, Kim, and Slotine's LMI formulation constrains inertial parameters to physically realizable mass distributions, while later geometric work characterizes which inertial transfers are actually observable in an articulated chain.</p>
+      <p><span class="pill">Newton fit</span> Use this as a fast offline initializer for \(m\), center of mass, inertia, armature, and joint friction before expensive contact-rich rollout matching. It should feed Newton parameter priors and bounds rather than replace simulator calibration.</p>
+
+      <h3>2. Bayesian and simulation-based inference</h3>
+      <p>SimOpt adapts a simulator-parameter distribution from real rollouts to improve policy transfer. BayesSim learns a posterior over black-box simulator parameters using likelihood-free inference, and BayRn searches domain-randomization distributions with Bayesian optimization. Probabilistic Differentiable Simulation extends this into a particle-based Bayesian method with differentiable likelihood gradients and constrained Stein variational updates.</p>
+      <p><span class="pill">Newton fit</span> This is a natural outer loop for Newton because solvers can be evaluated in batches. It also matches the reality of robot arms with payloads: a distribution over payload mass, center of mass, friction, and actuator lag is usually more honest than one number.</p>
+
+      <h3>3. Differentiable simulation and contact gradients</h3>
+      <p>Belbute-Peres et al. showed how analytical differentiation through an LCP physics layer can learn physical parameters and support control. Nimble and Dojo focus on articulated rigid-body dynamics with hard contact and implicit or analytical gradients. DiffMJX is a recent reminder that stiff realistic contacts can give poor gradients unless the backward path is designed and audited.</p>
+      <p><span class="pill">Newton fit</span> Newton already has Warp-based differentiable examples and model arrays that can carry gradients. The toolbox should still require gradient checks against finite differences for each solver and parameter family. Differentiability is a backend with a contract, not a blanket assumption.</p>
+
+      <h3>4. Objects manipulated by robot arms</h3>
+      <p>Object inertial-parameter surveys distinguish visual, exploratory, and fixed-object estimation. Fazeli, Kolbert, Tedrake, and Rodriguez formulate inertial and contact-force estimation for rigid bodies undergoing frictional contact. More recent work learns object properties from robot proprioception through differentiable robot-object interaction, while Scalable Real2Sim uses pick-and-place setups, torque sensors, and cameras to produce simulation-ready assets with geometry and physical properties. Phys2Real combines visual-language priors with online interaction estimates for task-conditioned manipulation.</p>
+      <p><span class="pill">Newton fit</span> This is where Newton can be unusually useful: it can expose robot, object, contact, and solver parameters in one batchable simulator. The parameter map should include both robot fields and object asset fields.</p>
+
+      <h3>5. Tactile and residual model calibration</h3>
+      <p>DiffTactile, DOT-Sim, and few-shot neural differentiable simulators point toward multimodal losses: tactile deformation, optical response, contact geometry, and learned residual dynamics. These methods are less direct for today's rigid arm parameter toolbox, but they show why a real2sim system must be modular about observations and losses.</p>
+      <p><span class="pill">Newton fit</span> Start with joint, torque, object pose, and contact losses. Keep the loss API open enough for tactile depth maps, signed-distance residuals, and learned observation models.</p>
+    </section>
+
+    <section>
+      <h2>Newton Toolbox Design</h2>
+      <div class="tool-grid">
+        <div class="card"><strong>Parameter registry</strong><p>Every estimated quantity is a `ParameterSpec`: array name, indices, transform, bounds, prior, units, and the `SolverNotifyFlags` required after mutation.</p></div>
+        <div class="card"><strong>Experiment adapter</strong><p>Maps real logs into controls, initial states, observations, masks, and losses. It also records excitation quality and missing sensors.</p></div>
+        <div class="card"><strong>Evaluator</strong><p>Sets parameters, notifies the solver, runs Newton, and returns residuals. It should support single-world, tiled-world, and multi-trajectory batches.</p></div>
+        <div class="card"><strong>Optimizer layer</strong><p>Pluggable optimizers: least squares, finite-difference Adam, CEM/CMA-ES, Bayesian optimization, SVGD/SMC, and autodiff when validated.</p></div>
+      </div>
+
+      <h3>Parameter families</h3>
+      <table>
+        <thead><tr><th>Family</th><th>Newton fields</th><th>Likely data</th><th>Recommended first optimizer</th><th>Risk</th></tr></thead>
+        <tbody>
+          <tr><td>Link inertials</td><td><code>body_mass</code>, <code>body_inertia</code>, <code>body_com</code></td><td>joint q/qd/qdd + torque, external wrench</td><td>classical ID + physical projection, then rollout fit</td><td>base-parameter ambiguity, bad inertia tensors</td></tr>
+          <tr><td>Joint losses</td><td><code>joint_friction</code>, <code>joint_armature</code>, drive gains</td><td>encoder motion, commanded target/torque, current logs</td><td>finite-difference or autodiff rollout matching</td><td>absorbs actuator firmware and controller delay</td></tr>
+          <tr><td>Contact materials</td><td><code>shape_material_mu</code>, restitution, stiffness/damping</td><td>object pose, contact events, tactile, FT</td><td>CEM/BO/SVGD with robust losses</td><td>nonsmooth contacts and solver-specific semantics</td></tr>
+          <tr><td>Object assets</td><td>body inertials, collision geometry, material fields</td><td>pick, shake, push, vision, torque sensors</td><td>Bayesian rollout matching with task priors</td><td>partial observability and grasp/contact uncertainty</td></tr>
+          <tr><td>Solver settings</td><td>iterations, tolerances, margins, stabilization constants</td><td>same task logs plus stability metrics</td><td>black-box search under constraints</td><td>overfitting numerical artifacts</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Minimal API sketch</h3>
+      <div class="code-panel"><pre><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass
+
+<span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="fn">ParameterSpec</span>:
+    name: str                 <span class="cm"># "joint_friction"</span>
+    indices: list[int]
+    transform: str            <span class="cm"># "exp", "softplus", "identity"</span>
+    lower: float
+    upper: float
+    notify: SolverNotifyFlags
+    prior_mean: float | None = None
+    prior_std: float | None = None
+
+<span class="kw">def</span> <span class="fn">evaluate</span>(theta_raw, experiment, model, solver):
+    theta = parameter_map.decode(theta_raw)
+    parameter_map.assign(model, theta)
+    solver.notify_model_changed(parameter_map.notify_flags)
+    simulated = rollout(model, solver, experiment.controls)
+    return experiment.loss(simulated, experiment.real_observations)</pre></div>
+    </section>
+
+    <section>
+      <h2>Prototype: Franka Parameter Fit</h2>
+      <p>The Newton worktree branch <code>eric-heiden/param-estimation</code> contains a runnable prototype at <code>newton/examples/robot/example_robot_param_estimation.py</code>. It loads the Franka FR3/Panda arm through Newton, reads armature/friction metadata, generates a noisy synthetic-real joint trajectory, and estimates three positive real2sim parameters using finite-difference Adam over Warp rollout kernels.</p>
+      <div class="code-panel"><pre><span class="cm"># in /home/horde/repos/newton-worktrees/param-estimation</span>
+uv run python -m newton.examples robot_param_estimation \
+  --iterations <span class="num">500</span> --steps <span class="num">260</span> --noise-std <span class="num">0.0015</span> \
+  --learning-rate <span class="num">0.03</span> \
+  --output param_estimation_result_noisy.json</pre></div>
+
+      <table id="result-table">
+        <thead><tr><th>Parameter</th><th>Truth</th><th>Initial</th><th>Estimate</th><th>Relative error</th></tr></thead>
+        <tbody>
+          <tr><td>payload mass [kg]</td><td class="numeric">1.350</td><td class="numeric">0.450</td><td class="numeric">1.265</td><td class="numeric">6.3%</td></tr>
+          <tr><td>joint friction scale</td><td class="numeric">1.650</td><td class="numeric">0.650</td><td class="numeric">1.641</td><td class="numeric">0.6%</td></tr>
+          <tr><td>armature scale</td><td class="numeric">0.720</td><td class="numeric">1.800</td><td class="numeric">0.791</td><td class="numeric">9.8%</td></tr>
+        </tbody>
+      </table>
+      <div id="plot-loss" class="plot"></div>
+      <div id="plot-params" class="plot"></div>
+      <p class="note">Raw data: <a href="data/franka_param_estimation_result.json"><code>data/franka_param_estimation_result.json</code></a>. The finite-difference path is deliberate: it matches the toolbox recommendation that Newton first provide robust solver-agnostic calibration, then enable autodiff per solver only after gradient checks pass.</p>
+    </section>
+
+    <section>
+      <h2>Practical Recommendations</h2>
+      <ol>
+        <li><strong>Start with a parameter registry.</strong> Without typed parameter specs, every method becomes a one-off script that mutates model arrays differently.</li>
+        <li><strong>Make solver notifications first-class.</strong> MuJoCo-backed fields, contact fields, joint DOF properties, and inertial properties need explicit cache updates after parameter changes.</li>
+        <li><strong>Batch black-box rollouts now.</strong> Finite differences, CEM, Bayesian optimization, and posterior particles are immediately useful and work across solvers.</li>
+        <li><strong>Add differentiable backends behind gradient tests.</strong> Every differentiable parameter family needs a finite-difference audit on representative trajectories, especially through contacts and recurrent integration loops.</li>
+        <li><strong>Report identifiability.</strong> Provide Fisher spectra, posterior covariance, or particle spread. When payload mass and armature can trade off, the user needs to see that uncertainty.</li>
+        <li><strong>Separate physical parameters from residuals.</strong> Estimate interpretable mass/friction/contact fields first. Use residual dynamics only when they explain repeatable model error and transfer across tasks.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Source Trail</h2>
+      <ul class="source-list">
+        <li><a href="https://www.mdpi.com/2076-3417/11/9/4303">BIRDy and inertial parameter identification survey</a></li>
+        <li><a href="https://arxiv.org/abs/1701.04395">Physically consistent inertial parameter identification with LMIs</a></li>
+        <li><a href="https://journals.sagepub.com/doi/10.1177/02783649241258215">Geometric observability for inertial parameter identification</a></li>
+        <li><a href="https://arxiv.org/abs/1810.05687">SimOpt: adapting simulation randomization from real rollouts</a></li>
+        <li><a href="https://arxiv.org/abs/1906.01728">BayesSim: likelihood-free Bayesian simulator parameter inference</a></li>
+        <li><a href="https://arxiv.org/abs/2003.02471">BayRn: Bayesian optimization for domain randomization</a></li>
+        <li><a href="https://arxiv.org/abs/2109.08815">Probabilistic Differentiable Simulation and CSVGD</a></li>
+        <li><a href="https://papers.nips.cc/paper/7948-end-to-end-differentiable-physics-for-learning-and-control">End-to-end differentiable physics for learning and control</a></li>
+        <li><a href="https://arxiv.org/abs/2103.16021">Nimble differentiable articulated rigid bodies with contact</a></li>
+        <li><a href="https://arxiv.org/abs/2203.00806">Dojo differentiable physics engine for robotics</a></li>
+        <li><a href="https://arxiv.org/abs/2506.14186">DiffMJX hard contacts with soft gradients</a></li>
+        <li><a href="https://arxiv.org/abs/1911.04397">Object inertial parameters in grasping and manipulation survey</a></li>
+        <li><a href="https://journals.sagepub.com/doi/10.1177/0278364917698749">Parameter and contact force estimation under frictional contact</a></li>
+        <li><a href="https://arxiv.org/abs/2410.03920">Learning object properties from robot proprioception</a></li>
+        <li><a href="https://arxiv.org/abs/2503.00370">Scalable Real2Sim physics-aware asset generation</a></li>
+        <li><a href="https://arxiv.org/abs/2510.11689">Phys2Real with VLM priors and online adaptation</a></li>
+        <li><a href="https://arxiv.org/abs/2403.08716">DiffTactile differentiable tactile simulator</a></li>
+        <li><a href="https://arxiv.org/abs/2604.27367">DOT-Sim tactile real-to-sim calibration</a></li>
+        <li><a href="https://arxiv.org/abs/2603.06218">Few-shot neural differentiable simulator for rigid contact</a></li>
+      </ul>
+      <p class="note">Last updated: 2026-06-05 UTC.</p>
+    </section>
+  </main>
+
+  <script>
+    const palette = {
+      payload_mass: "#2456a6",
+      friction_scale: "#0f766e",
+      armature_scale: "#9a3412",
+      truth: "#172033"
+    };
+
+    function fmt(value, digits = 3) {
+      return Number(value).toFixed(digits);
+    }
+
+    function pct(value) {
+      return `${(100 * Number(value)).toFixed(1)}%`;
+    }
+
+    async function loadResult() {
+      const response = await fetch("data/franka_param_estimation_result.json");
+      return await response.json();
+    }
+
+    function updateMetrics(data) {
+      document.getElementById("metric-loss").textContent = fmt(data.final_loss, 5);
+      const best = Math.min(...Object.values(data.relative_errors));
+      document.getElementById("metric-error").textContent = pct(best);
+    }
+
+    function updateTable(data) {
+      const labels = {
+        payload_mass: "payload mass [kg]",
+        friction_scale: "joint friction scale",
+        armature_scale: "armature scale"
+      };
+      const rows = Object.keys(labels).map((key) => `
+        <tr>
+          <td>${labels[key]}</td>
+          <td class="numeric">${fmt(data.truth[key])}</td>
+          <td class="numeric">${fmt(data.initial[key])}</td>
+          <td class="numeric">${fmt(data.estimate[key])}</td>
+          <td class="numeric">${pct(data.relative_errors[key])}</td>
+        </tr>
+      `).join("");
+      document.querySelector("#result-table tbody").innerHTML = rows;
+    }
+
+    function plotLoss(data) {
+      const x = data.loss_history.map((_, i) => i);
+      Plotly.newPlot("plot-loss", [{
+        x,
+        y: data.loss_history,
+        mode: "lines",
+        line: { color: "#2456a6", width: 3 },
+        hovertemplate: "iter %{x}<br>loss %{y:.6f}<extra></extra>"
+      }], {
+        title: "Prototype Loss Over Iterations",
+        xaxis: { title: "Adam iteration" },
+        yaxis: { title: "mean squared joint error", type: "log" },
+        margin: { l: 72, r: 24, t: 52, b: 62 },
+        paper_bgcolor: "#ffffff",
+        plot_bgcolor: "#ffffff"
+      }, { responsive: true, displaylogo: false });
+    }
+
+    function plotParams(data) {
+      const params = ["payload_mass", "friction_scale", "armature_scale"];
+      const traces = params.map((key) => ({
+        x: data.parameter_history.map((row) => row.iteration),
+        y: data.parameter_history.map((row) => row[key]),
+        name: key.replace("_", " "),
+        mode: "lines+markers",
+        line: { color: palette[key], width: 3 },
+        marker: { size: 6 },
+        hovertemplate: "%{fullData.name}<br>iter %{x}<br>%{y:.3f}<extra></extra>"
+      }));
+      for (const key of params) {
+        traces.push({
+          x: [0, data.iterations],
+          y: [data.truth[key], data.truth[key]],
+          name: `${key.replace("_", " ")} truth`,
+          mode: "lines",
+          line: { color: palette[key], width: 1.5, dash: "dot" },
+          hoverinfo: "skip",
+          showlegend: false
+        });
+      }
+      Plotly.newPlot("plot-params", traces, {
+        title: "Estimated Parameters Move Toward Synthetic Reality",
+        xaxis: { title: "Adam iteration" },
+        yaxis: { title: "physical parameter value" },
+        legend: { orientation: "h", y: -0.25 },
+        margin: { l: 72, r: 24, t: 52, b: 92 },
+        paper_bgcolor: "#ffffff",
+        plot_bgcolor: "#ffffff"
+      }, { responsive: true, displaylogo: false });
+    }
+
+    loadResult()
+      .then((data) => {
+        updateMetrics(data);
+        updateTable(data);
+        plotLoss(data);
+        plotParams(data);
+      })
+      .catch(() => {
+        document.getElementById("plot-loss").textContent = "Could not load report data.";
+        document.getElementById("plot-params").textContent = "Could not load report data.";
+      });
+  </script>
+</body>
+</html>
