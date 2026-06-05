@@ -181,6 +181,19 @@
     td { color: #303847; }
     tr:last-child td { border-bottom: 0; }
     td.numeric { text-align: right; white-space: nowrap; }
+    .wide-table {
+      max-width: 100%;
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+    .wide-table table {
+      min-width: 920px;
+      margin-top: 0;
+    }
+    .wide-table th:first-child,
+    .wide-table td:first-child {
+      width: 15%;
+    }
     .plot {
       width: 100%;
       max-width: 100%;
@@ -234,6 +247,7 @@
       .hero-grid, .cards, .method-grid, .tool-grid, .metric-grid { grid-template-columns: 1fr; }
       .source-list { columns: 1; }
       table { display: block; overflow-x: auto; }
+      .wide-table table { display: table; }
     }
     @media (max-width: 520px) {
       header, main { width: min(100% - 32px, 1180px); }
@@ -325,38 +339,74 @@
     <section>
       <h2>Literature Groups</h2>
       <div class="method-grid">
-        <div class="method"><strong>1. Inverse dynamics and physical consistency</strong><p>Use regressors, base parameters, excitation trajectories, and constraints. Best when torques are trustworthy and contacts are limited.</p></div>
-        <div class="method"><strong>2. Bayesian simulator-parameter inference</strong><p>Infer a distribution over simulator parameters from real rollouts. Best when many parameter settings explain the data.</p></div>
-        <div class="method"><strong>3. Differentiable simulation</strong><p>Backpropagate through rollouts or implicit solver layers. Best when gradient contracts are validated for the target solver/contact regime.</p></div>
-        <div class="method"><strong>4. Object property real2sim</strong><p>Estimate manipulated object mass, inertia, center of mass, friction, and geometry from robot interaction, vision, proprioception, and tactile signals.</p></div>
-        <div class="method"><strong>5. Online and task-aware adaptation</strong><p>Update parameters during policy execution or optimize distributions for transfer performance, not just trajectory fit.</p></div>
+        <div class="method"><strong>1. Robot dynamics identification</strong><p>Regress inertial, friction, motor, and armature parameters from joint motion and torque/current logs. Most mature, but sensor quality and identifiability dominate.</p></div>
+        <div class="method"><strong>2. Bayesian and simulation-based inference</strong><p>Infer a parameter distribution from real rollouts or task returns. Useful when contact, firmware, and payload uncertainty make one optimum misleading.</p></div>
+        <div class="method"><strong>3. Differentiable simulation</strong><p>Use gradients through rollouts, implicit contact solvers, or smoothed contact models. Powerful, but only after finite-difference audits pass.</p></div>
+        <div class="method"><strong>4. Object and asset real2sim</strong><p>Estimate manipulated object inertials, contact fields, geometry, and material parameters from robot interaction, vision, force/torque, and proprioception.</p></div>
+        <div class="method"><strong>5. Multimodal and online adaptation</strong><p>Fuse tactile, vision-language priors, residual dynamics, and interaction history. Best treated as modular priors and observation losses around Newton.</p></div>
       </div>
 
       <h3>1. Robot inertial and friction identification</h3>
-      <p>The classic arm-calibration pipeline is still important. The BIRDy survey compares inverse-dynamics, maximum-likelihood, output-error, Kalman, neural, and physically consistent methods across serial robots and emphasizes excitation, preprocessing, and benchmark repeatability. Wensing, Kim, and Slotine's LMI formulation constrains inertial parameters to physically realizable mass distributions, while later geometric work characterizes which inertial transfers are actually observable in an articulated chain.</p>
-      <p><span class="pill">Newton fit</span> Use this as a fast offline initializer for \(m\), center of mass, inertia, armature, and joint friction before expensive contact-rich rollout matching. It should feed Newton parameter priors and bounds rather than replace simulator calibration.</p>
+      <p>The classical arm literature is the right starting point for Franka, UR10, KUKA iiwa, Kinova, and similar fixed-base arms because it makes the best use of high-rate encoders and torque/current logs. The BIRDy survey is the broad map: it compares inverse-dynamics least-squares variants, instrumental variables, maximum likelihood, closed-loop input/output-error methods, Kalman approaches, neural estimators, and physically consistent semidefinite programs on serial manipulators. Its practical lesson is not that one estimator wins everywhere; it is that excitation design, filtering of velocity/acceleration, torque quality, and cross-validation dominate the result.</p>
+      <p>Wensing, Kim, and Slotine add the missing physical constraint layer: identified masses, centers of mass, and inertia tensors must correspond to a realizable mass distribution. Their LMI formulation is important for a simulator because a numerically good least-squares fit can still create impossible inertias and unstable rollouts. The later geometric observability work explains another simulator failure mode: many link inertial parameters are only identifiable up to transfers along the articulated chain. For Newton, this means the toolbox should report identifiable combinations and posterior spread, not quietly pretend that every URDF field was independently observed.</p>
+      <p>Robot-specific studies make this concrete. The KUKA LBR iiwa identification work estimates base and feasible physical parameters including friction from optimized excitation trajectories, using constraints to keep the model usable in simulation. Franka Panda identification with penalty-based feasible optimization is directly relevant to this report's prototype: it shows that a collaborative arm with rich internal sensing still needs careful friction modeling and feasibility projection. Work on inertial identification including friction and motor dynamics is also relevant because real arms often expose motor currents and joint torques through a controller stack; the difference between link friction, motor inertia, actuator lag, and hidden compensation can be larger than the residuals we are trying to fit.</p>
+      <p><span class="pill">Newton fit</span> Implement a robot-arm initializer that estimates feasible link inertials, payload mass/CoM, joint friction, and armature from logs before running expensive rollout matching. The output should be priors and bounds for Newton, not final truth. Newton should preserve the distinction between base parameters that are observable from inverse dynamics and simulator fields that are merely one feasible realization.</p>
 
       <h3>2. Bayesian and simulation-based inference</h3>
-      <p>SimOpt adapts a simulator-parameter distribution from real rollouts to improve policy transfer. BayesSim learns a posterior over black-box simulator parameters using likelihood-free inference, and BayRn searches domain-randomization distributions with Bayesian optimization. Probabilistic Differentiable Simulation extends this into a particle-based Bayesian method with differentiable likelihood gradients and constrained Stein variational updates.</p>
-      <p><span class="pill">Newton fit</span> This is a natural outer loop for Newton because solvers can be evaluated in batches. It also matches the reality of robot arms with payloads: a distribution over payload mass, center of mass, friction, and actuator lag is usually more honest than one number.</p>
+      <p>Simulation-based inference starts from a different premise: treat the simulator as the model being calibrated, and search over parameters using real rollouts. SimOpt adapts a distribution over simulator parameters from a small number of real executions interleaved with policy training; its core value is closing the loop with real behavior instead of hand-tuning randomization ranges. BayesSim makes the same idea explicitly Bayesian and black-box: it learns a posterior over simulator parameters from simulated rollouts and real observations using likelihood-free inference, which is attractive for Newton solvers where an analytic likelihood is rarely available.</p>
+      <p>BayRn shifts the target from trajectory agreement to task performance: Bayesian optimization searches the parameters of the randomization distribution so policies trained in simulation improve on the target system. Probabilistic Differentiable Simulation and CSVGD combine the Bayesian view with gradients and GPU-parallel particles; the paper is especially relevant because it includes a 7-DOF arm exciting an object with unknown mass configuration and shows why multimodal posteriors matter. Online BayesSim, DROPO, AdaptSim, and related task-driven variants push the same theme: sometimes the best simulator parameters are those that make the downstream policy robust, not those that minimize a narrow state residual.</p>
+      <p><span class="pill">Newton fit</span> Newton should have a batched particle evaluator as a first-class API. A particle is just a candidate parameter map over <code>body_mass</code>, <code>body_inertia</code>, <code>joint_friction</code>, <code>shape_material_mu</code>, solver settings, and object asset fields. Once Newton can tile hundreds of worlds with different parameter maps, finite differences, CEM, CMA-ES, Bayesian optimization, SMC, and SVGD all become library-level choices rather than one-off scripts.</p>
 
       <h3>3. Differentiable simulation and contact gradients</h3>
-      <p>Belbute-Peres et al. showed how analytical differentiation through an LCP physics layer can learn physical parameters and support control. Nimble and Dojo focus on articulated rigid-body dynamics with hard contact and implicit or analytical gradients. DiffMJX is a recent reminder that stiff realistic contacts can give poor gradients unless the backward path is designed and audited.</p>
-      <p><span class="pill">Newton fit</span> Newton already has Warp-based differentiable examples and model arrays that can carry gradients. The toolbox should still require gradient checks against finite differences for each solver and parameter family. Differentiability is a backend with a contract, not a blanket assumption.</p>
+      <p>Differentiable physics promises the shortest path from data to parameters, but contact makes the promise conditional. Belbute-Peres et al. showed that differentiating through an LCP physics layer can learn physical parameters and support control. Nimble brings differentiability to feature-complete articulated rigid bodies with hard contact. Dojo uses a variational integrator and implicit differentiation through a relaxed contact problem, targeting stable robotics gradients rather than only fast rollouts. DiffMJX is a useful recent case study because it tries to keep hard-contact realism while supplying soft gradients that remain useful for learning and control.</p>
+      <p>The cautionary thread is equally important. Papers on gradient correctness in differentiable contact show that simulators can be differentiable and still supply gradients that are wrong for position, velocity, control, or parameter updates under the chosen contact model. This surfaced in the Newton prototype too: a gradient audit found a mismatch for the recurrent rollout kernel, so the report prototype uses finite-difference Adam over Warp kernels. That is not a retreat from differentiability; it is the contract Newton should enforce before exposing a gradient backend to users.</p>
+      <p><span class="pill">Newton fit</span> Treat autodiff as an optional accelerator behind a <code>GradientProvider</code> interface. Each provider must pass a finite-difference audit on representative regimes: free-space arm motion, payload excitation, intermittent contact, sliding contact, resting contact, and solver-parameter changes. Newton should store these audits next to examples so a new solver cannot accidentally advertise gradients that only work in trivial cases.</p>
 
       <h3>4. Objects manipulated by robot arms</h3>
-      <p>Object inertial-parameter surveys distinguish visual, exploratory, and fixed-object estimation. Fazeli, Kolbert, Tedrake, and Rodriguez formulate inertial and contact-force estimation for rigid bodies undergoing frictional contact. More recent work learns object properties from robot proprioception through differentiable robot-object interaction, while Scalable Real2Sim uses pick-and-place setups, torque sensors, and cameras to produce simulation-ready assets with geometry and physical properties. Phys2Real combines visual-language priors with online interaction estimates for task-conditioned manipulation.</p>
-      <p><span class="pill">Newton fit</span> This is where Newton can be unusually useful: it can expose robot, object, contact, and solver parameters in one batchable simulator. The parameter map should include both robot fields and object asset fields.</p>
+      <p>Object real2sim is the most valuable extension beyond robot-arm calibration. The object inertial-parameter survey separates methods by sensing mode and use case: some identify mass and inertia from force/torque while the object is held, others exploit grasping and manipulation, and others use vision or exploratory actions. Fazeli, Kolbert, Tedrake, and Rodriguez analyze rigid bodies undergoing frictional contact and estimate both inertial parameters and contact forces, which is exactly where a clean inverse-dynamics formulation breaks down.</p>
+      <p>Recent systems move toward deployable asset pipelines. Learning Object Properties from Robot Proprioception uses differentiable robot-object interaction and only joint encoder signals to infer object inertia and softness; the important idea is that the robot itself is the sensor. Scalable Real2Sim goes further by using a pick-and-place setup with torque sensors and camera input to build simulation-ready assets: visual geometry, collision geometry, and physical properties. Splatting-style real2sim work points in the same direction for imperfect robot data: jointly refine scene geometry, robot pose, and physical parameters rather than treating perception as a fixed input.</p>
+      <p>Phys2Real adds a useful prior mechanism. It uses visual-language estimates and geometric reconstruction to propose uncertain physical parameters, then refines them online with interaction data. For Newton, the actionable part is not “trust the VLM”; it is “accept cheap priors with explicit uncertainty, then let robot interaction overwrite them.”</p>
+      <p><span class="pill">Newton fit</span> Create an object asset calibration path parallel to robot-arm ID. It should estimate <code>body_mass</code>, <code>body_inertia</code>, <code>body_com</code>, collision geometry scale/offset, contact friction, restitution, and possibly deformable material fields. It should accept logs from pick, lift, shake, push, slide, drop, and place experiments, with camera/object-pose observations as optional losses.</p>
 
       <h3>5. Tactile and residual model calibration</h3>
-      <p>DiffTactile, DOT-Sim, and few-shot neural differentiable simulators point toward multimodal losses: tactile deformation, optical response, contact geometry, and learned residual dynamics. These methods are less direct for today's rigid arm parameter toolbox, but they show why a real2sim system must be modular about observations and losses.</p>
-      <p><span class="pill">Newton fit</span> Start with joint, torque, object pose, and contact losses. Keep the loss API open enough for tactile depth maps, signed-distance residuals, and learned observation models.</p>
+      <p>Tactile and residual methods are less central for the first rigid-arm toolbox, but they shape the right API. DiffTactile couples a FEM elastomer model, contact dynamics, and optical response so tactile data can supervise physical-property refinement. DOT-Sim uses MPM and a residual optical renderer to calibrate optical tactile sensors from a small number of demonstrations and then transfer tactile policies. Few-shot neural differentiable simulators show another path: keep a physics core but add a learned contact residual that is grounded by a small amount of real contact data.</p>
+      <p>Dynamics-as-prompts and in-context system-identification work points to a different interface: instead of optimizing every parameter online, use history-conditioned models to propose updates quickly. This is useful when a factory robot changes tools, a payload changes, or a contact surface wears down. The danger is interpretability drift: a learned residual can improve a rollout while hiding that the physical friction or actuator model is wrong.</p>
+      <p><span class="pill">Newton fit</span> Keep the first toolbox physics-first, but make observations modular. A Newton real2sim experiment should be able to attach joint residuals, force/torque residuals, object-pose residuals, tactile-image residuals, and learned feature residuals without changing the parameter optimizer. Learned residuals should be reported separately from physical parameters.</p>
+
+      <h3>Method contrast</h3>
+      <div class="wide-table">
+        <table>
+          <thead><tr><th>Group</th><th>Representative papers</th><th>Real data used</th><th>Estimates returned</th><th>Where it works</th><th>Newton implication</th></tr></thead>
+          <tbody>
+            <tr><td>Robot dynamics ID</td><td>BIRDy survey; Wensing LMI; geometric observability; KUKA iiwa feasibility; Franka Panda feasible optimization</td><td>q, qd, qdd, torque, current, excitation trajectories</td><td>Base inertial parameters, feasible link inertials, friction, motor terms</td><td>Fixed-base arms, limited contact, trustworthy torque/current sensing</td><td>Use as initializer and prior builder; report observability and feasible projections</td></tr>
+            <tr><td>Bayesian real2sim</td><td>SimOpt; BayesSim; BayRn; Online BayesSim; Probabilistic Differentiable Simulation; DROPO/AdaptSim</td><td>Rollouts, policy returns, state/object trajectories, sparse real executions</td><td>Posterior particles or randomization distributions</td><td>Payload, contact, and controller uncertainty; low real-data regimes</td><td>Expose batched parameter particles and posterior diagnostics across Newton solvers</td></tr>
+            <tr><td>Differentiable simulation</td><td>End-to-end differentiable physics; Nimble; Dojo; DiffMJX; gradient-correctness studies</td><td>Trajectory residuals, contact events, controls, sometimes task losses</td><td>Gradient-optimized physical parameters and controls</td><td>Smooth-enough dynamics or contact models with audited gradients</td><td>Add <code>GradientProvider</code> backends guarded by finite-difference tests</td></tr>
+            <tr><td>Object asset real2sim</td><td>Object inertial survey; Fazeli contact-force estimation; proprioceptive object-property learning; Scalable Real2Sim; Phys2Real</td><td>Force/torque, object pose, camera reconstruction, joint encoders, pick/push/shake interactions</td><td>Object mass, CoM, inertia, friction, geometry, material priors</td><td>Manipulated objects where direct measurement is slow or impossible</td><td>Unify robot and object parameter specs so asset generation can call Newton directly</td></tr>
+            <tr><td>Multimodal/online adaptation</td><td>DiffTactile; DOT-Sim; few-shot neural differentiable simulator; Dynamics as Prompts</td><td>Tactile images, contact deformation, interaction histories, learned features</td><td>Sensor calibration, material/contact residuals, fast online updates</td><td>Contact-rich manipulation with sensors beyond encoders and cameras</td><td>Make losses pluggable and keep residual dynamics separate from physical fields</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Synergies for Newton</h3>
+      <div class="wide-table">
+        <table>
+          <thead><tr><th>Combine</th><th>Why it matters</th><th>Concrete Newton toolbox behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Classical ID + Bayesian inference</td><td>Classical ID gives a feasible center; Bayesian inference exposes what remains uncertain.</td><td>Initialize posterior particles from LMI-projected inertials and friction fits, then widen uncertain directions using observability diagnostics.</td></tr>
+            <tr><td>Finite differences + differentiable simulation</td><td>Finite differences are slow but reliable; autodiff is fast when the gradient contract is valid.</td><td>Default to solver-agnostic finite differences/CEM, then switch individual parameter families to autodiff only after per-solver gradient audits.</td></tr>
+            <tr><td>Robot ID + object asset calibration</td><td>Object estimates are biased if the arm model is wrong; arm estimates are biased if payload/contact is ignored.</td><td>Run staged experiments: free-space arm calibration, held-payload excitation, object contact calibration, then joint posterior refinement.</td></tr>
+            <tr><td>Task-driven methods + trajectory matching</td><td>Low residual does not always mean good transfer, and good transfer can tolerate several plausible parameter vectors.</td><td>Let experiments define both residual losses and task metrics; report Pareto fronts between fit quality, task success, and physical plausibility.</td></tr>
+            <tr><td>VLM/geometric priors + interaction data</td><td>Cheap priors accelerate calibration, but interaction data should dominate the final estimate.</td><td>Represent priors as distributions with provenance and confidence; update them through pick/push/lift logs rather than hard-coding guessed masses.</td></tr>
+            <tr><td>Tactile/contact sensors + rigid-body losses</td><td>Contact parameters are weakly observed from joint motion alone.</td><td>Add observation adapters for tactile/depth/contact patches that can supervise friction, compliance, contact offsets, and residual contact models.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section>
       <h2>Newton Toolbox Design</h2>
       <div class="tool-grid">
-        <div class="card"><strong>Parameter registry</strong><p>Every estimated quantity is a `ParameterSpec`: array name, indices, transform, bounds, prior, units, and the `SolverNotifyFlags` required after mutation.</p></div>
+        <div class="card"><strong>Parameter registry</strong><p>Every estimated quantity is a <code>ParameterSpec</code>: array name, indices, transform, bounds, prior, units, and the <code>SolverNotifyFlags</code> required after mutation.</p></div>
         <div class="card"><strong>Experiment adapter</strong><p>Maps real logs into controls, initial states, observations, masks, and losses. It also records excitation quality and missing sensors.</p></div>
         <div class="card"><strong>Evaluator</strong><p>Sets parameters, notifies the solver, runs Newton, and returns residuals. It should support single-world, tiled-world, and multi-trajectory batches.</p></div>
         <div class="card"><strong>Optimizer layer</strong><p>Pluggable optimizers: least squares, finite-difference Adam, CEM/CMA-ES, Bayesian optimization, SVGD/SMC, and autodiff when validated.</p></div>
@@ -373,6 +423,23 @@
           <tr><td>Solver settings</td><td>iterations, tolerances, margins, stabilization constants</td><td>same task logs plus stability metrics</td><td>black-box search under constraints</td><td>overfitting numerical artifacts</td></tr>
         </tbody>
       </table>
+
+      <h3>Updated proposal: build the toolbox in layers</h3>
+      <div class="wide-table">
+        <table>
+          <thead><tr><th>Layer</th><th>What to implement</th><th>Borrowed ideas</th><th>Success test</th></tr></thead>
+          <tbody>
+            <tr><td>0. Parameter registry</td><td><code>ParameterSpec</code> objects for Newton model arrays, transforms, bounds, priors, units, solver notification flags, and serialization.</td><td>Physical feasibility from robot ID; distribution semantics from BayesSim/PDS.</td><td>A saved experiment can reconstruct the exact parameter vector, bounds, priors, and fields mutated in Newton.</td></tr>
+            <tr><td>1. Experiment adapters</td><td>Load real logs into controls, initial states, observations, masks, and losses for free-space arm, payload, push/slide, pick/lift, and contact tasks.</td><td>BIRDy excitation and preprocessing; Scalable Real2Sim task structure; tactile observation modularity.</td><td>The same optimizer can run on joint-only Franka logs, object-pose push logs, and force/torque payload logs.</td></tr>
+            <tr><td>2. Batched evaluator</td><td>Run many parameter particles through Newton worlds with shared controls and separate model fields.</td><td>SimOpt distribution updates; BayesSim likelihood-free inference; CSVGD parallel particles.</td><td>One API evaluates point estimates, finite-difference stencils, CEM populations, and posterior particles.</td></tr>
+            <tr><td>3. Conservative optimizers</td><td>Finite-difference Adam, nonlinear least squares, CEM/CMA-ES, Bayesian optimization, and robust residual weighting.</td><td>Practical black-box real2sim and task-driven domain randomization.</td><td>Works with any solver and returns diagnostics before any autodiff dependency is introduced.</td></tr>
+            <tr><td>4. Classical arm initializer</td><td>Estimate base parameters, feasible inertials, friction, armature, and payload priors from q/qd/qdd/tau/current logs.</td><td>BIRDy, LMI feasibility, Franka/KUKA identification, motor/friction identification.</td><td>Produces stable Newton parameters and an observability report for Franka or UR10 calibration trajectories.</td></tr>
+            <tr><td>5. Posterior and identifiability reports</td><td>Return particles/covariances, parameter correlations, Fisher or finite-difference spectra, and task-vs-fit Pareto plots.</td><td>Bayesian posteriors, CSVGD multimodality, geometric observability.</td><td>Shows when payload mass, armature, friction, or contact parameters are coupled instead of hiding uncertainty.</td></tr>
+            <tr><td>6. Audited differentiable backends</td><td><code>GradientProvider</code> implementations for selected solvers and losses, gated by finite-difference tests.</td><td>Nimble/Dojo implicit gradients; DiffMJX soft gradients; gradient-correctness studies.</td><td>Each differentiable parameter family has a passing gradient audit in free-space, payload, sliding, and resting-contact cases.</td></tr>
+            <tr><td>7. Object asset calibration</td><td>Estimate object inertials, collision geometry corrections, contact/material fields, and priors from camera, FT, and robot proprioception.</td><td>Fazeli contact estimation; proprioceptive object-property learning; Scalable Real2Sim; Phys2Real priors.</td><td>A pick/push/lift dataset produces a reusable Newton object asset with uncertainty metadata.</td></tr>
+          </tbody>
+        </table>
+      </div>
 
       <h3>Minimal API sketch</h3>
       <div class="code-panel"><pre><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass
@@ -421,12 +488,13 @@ uv run python -m newton.examples robot_param_estimation \
     <section>
       <h2>Practical Recommendations</h2>
       <ol>
-        <li><strong>Start with a parameter registry.</strong> Without typed parameter specs, every method becomes a one-off script that mutates model arrays differently.</li>
-        <li><strong>Make solver notifications first-class.</strong> MuJoCo-backed fields, contact fields, joint DOF properties, and inertial properties need explicit cache updates after parameter changes.</li>
-        <li><strong>Batch black-box rollouts now.</strong> Finite differences, CEM, Bayesian optimization, and posterior particles are immediately useful and work across solvers.</li>
-        <li><strong>Add differentiable backends behind gradient tests.</strong> Every differentiable parameter family needs a finite-difference audit on representative trajectories, especially through contacts and recurrent integration loops.</li>
-        <li><strong>Report identifiability.</strong> Provide Fisher spectra, posterior covariance, or particle spread. When payload mass and armature can trade off, the user needs to see that uncertainty.</li>
-        <li><strong>Separate physical parameters from residuals.</strong> Estimate interpretable mass/friction/contact fields first. Use residual dynamics only when they explain repeatable model error and transfer across tasks.</li>
+        <li><strong>Build the parameter registry before adding more optimizers.</strong> The literature only transfers cleanly if Newton has typed specs for fields, bounds, transforms, priors, units, and solver notifications.</li>
+        <li><strong>Use classical arm ID as the first initializer.</strong> For Franka, UR10, KUKA, and Kinova arms, feasible inverse-dynamics estimates should seed payload, friction, armature, and inertial priors before rollout matching.</li>
+        <li><strong>Make batched black-box rollouts the default path.</strong> Finite differences, CEM, Bayesian optimization, SMC, and posterior particles are immediately useful and work across Newton solvers.</li>
+        <li><strong>Expose uncertainty as a product feature.</strong> Posterior particles, spectra, and parameter-correlation plots should be shown whenever payload mass, armature, friction, CoM, and contact parameters trade off.</li>
+        <li><strong>Add differentiable backends only behind gradient contracts.</strong> Every differentiable parameter family needs a finite-difference audit on representative trajectories, especially through contacts and recurrent integration loops.</li>
+        <li><strong>Treat object assets as first-class calibration targets.</strong> Robot-arm ID, object-property estimation, contact calibration, and geometry correction should share one experiment/parameter API.</li>
+        <li><strong>Keep learned residuals and priors separate from physical fields.</strong> VLM priors, in-context updates, tactile features, and neural residuals are useful, but the report should show when they changed a prior versus when Newton changed a physical parameter.</li>
       </ol>
     </section>
 
@@ -436,22 +504,33 @@ uv run python -m newton.examples robot_param_estimation \
         <li><a href="https://www.mdpi.com/2076-3417/11/9/4303">BIRDy and inertial parameter identification survey</a></li>
         <li><a href="https://arxiv.org/abs/1701.04395">Physically consistent inertial parameter identification with LMIs</a></li>
         <li><a href="https://journals.sagepub.com/doi/10.1177/02783649241258215">Geometric observability for inertial parameter identification</a></li>
+        <li><a href="https://www.sciencedirect.com/science/article/pii/S2405896317317147">KUKA LBR iiwa identification with physical feasibility constraints</a></li>
+        <li><a href="https://diag.uniroma1.it/~labrob/pub/papers/RAL_2019_PandaDynamicModel_PreprintXplore.pdf">Franka Panda feasible dynamic parameter identification</a></li>
+        <li><a href="https://arxiv.org/abs/1410.4410">Inertial parameter identification including friction and motor dynamics</a></li>
         <li><a href="https://arxiv.org/abs/1810.05687">SimOpt: adapting simulation randomization from real rollouts</a></li>
         <li><a href="https://arxiv.org/abs/1906.01728">BayesSim: likelihood-free Bayesian simulator parameter inference</a></li>
         <li><a href="https://arxiv.org/abs/2003.02471">BayRn: Bayesian optimization for domain randomization</a></li>
         <li><a href="https://arxiv.org/abs/2109.08815">Probabilistic Differentiable Simulation and CSVGD</a></li>
+        <li><a href="https://arxiv.org/abs/1710.06537">Dynamics randomization for robotic arm sim-to-real transfer</a></li>
+        <li><a href="https://sim2real.github.io/assets/papers/2020/possas.pdf">Online BayesSim for parameter inference and policy improvement</a></li>
+        <li><a href="https://arxiv.org/abs/2201.08434">DROPO: offline domain randomization for sim-to-real transfer</a></li>
+        <li><a href="https://arxiv.org/abs/2302.04903">AdaptSim: task-driven simulation adaptation</a></li>
         <li><a href="https://papers.nips.cc/paper/7948-end-to-end-differentiable-physics-for-learning-and-control">End-to-end differentiable physics for learning and control</a></li>
         <li><a href="https://arxiv.org/abs/2103.16021">Nimble differentiable articulated rigid bodies with contact</a></li>
         <li><a href="https://arxiv.org/abs/2203.00806">Dojo differentiable physics engine for robotics</a></li>
         <li><a href="https://arxiv.org/abs/2506.14186">DiffMJX hard contacts with soft gradients</a></li>
+        <li><a href="https://arxiv.org/abs/2207.05060">Gradient correctness in differentiable physics with contacts</a></li>
         <li><a href="https://arxiv.org/abs/1911.04397">Object inertial parameters in grasping and manipulation survey</a></li>
         <li><a href="https://journals.sagepub.com/doi/10.1177/0278364917698749">Parameter and contact force estimation under frictional contact</a></li>
         <li><a href="https://arxiv.org/abs/2410.03920">Learning object properties from robot proprioception</a></li>
+        <li><a href="https://arxiv.org/abs/2203.00830">Fast object inertial parameter identification for collaborative robots</a></li>
         <li><a href="https://arxiv.org/abs/2503.00370">Scalable Real2Sim physics-aware asset generation</a></li>
+        <li><a href="https://arxiv.org/abs/2506.04120">Splatting physical scenes for end-to-end real-to-sim</a></li>
         <li><a href="https://arxiv.org/abs/2510.11689">Phys2Real with VLM priors and online adaptation</a></li>
         <li><a href="https://arxiv.org/abs/2403.08716">DiffTactile differentiable tactile simulator</a></li>
         <li><a href="https://arxiv.org/abs/2604.27367">DOT-Sim tactile real-to-sim calibration</a></li>
         <li><a href="https://arxiv.org/abs/2603.06218">Few-shot neural differentiable simulator for rigid contact</a></li>
+        <li><a href="https://arxiv.org/abs/2410.20357">Dynamics as Prompts for in-context system identification</a></li>
       </ul>
       <p class="note">Last updated: 2026-06-05 UTC.</p>
     </section>
