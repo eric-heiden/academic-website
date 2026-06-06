@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newton Fluid Support</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17212b;
+      --muted: #5f6f7d;
+      --line: #d7e0e7;
+      --panel: #f5f8fb;
+      --accent: #0f766e;
+      --blue: #1f6f9f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: #fff;
+      line-height: 1.55;
+    }
+    main { max-width: 1080px; margin: 0 auto; padding: 42px 32px 76px; }
+    h1 { margin: 0 0 10px; font-size: 36px; line-height: 1.12; letter-spacing: 0; }
+    h2 { margin: 36px 0 12px; font-size: 23px; }
+    h3 { margin: 24px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    code { background: #edf3f6; padding: 1px 5px; border-radius: 4px; }
+    .lede { color: var(--muted); font-size: 17px; max-width: 860px; }
+    .stamp { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+    .video {
+      display: block;
+      width: 100%;
+      max-width: 960px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0d1420;
+      margin: 12px 0 8px;
+    }
+    .wide { max-width: 100%; }
+    .caption { color: var(--muted); font-size: 14px; margin-top: 0; }
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      background: var(--panel);
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 18px 0 28px;
+    }
+    .metric { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fff; }
+    .metric strong { display: block; font-size: 24px; margin-top: 4px; }
+    .metric span { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f8; font-weight: 650; }
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    a { color: var(--blue); }
+    @media (max-width: 760px) {
+      main { padding: 28px 18px 52px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Newton Fluid Support</h1>
+  <p class="lede">Prototype implementation of particle-fluid simulation and ViewerGL water rendering for Newton, focused on giving solver developers a reusable fluid visualization path.</p>
+  <p class="stamp">Generated 2026-06-06 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
+
+  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/sph_dam_break_fluid_poster.jpg" src="assets/sph_dam_break_fluid.mp4"></video>
+  <p class="caption">Basic SPH dam-break prototype rendered as a translucent, smoothed screen-space water surface.</p>
+
+  <div class="grid">
+    <div class="metric"><span>Solver</span><strong>SolverSPH</strong></div>
+    <div class="metric"><span>Rendering path</span><strong>ViewerGL fluid</strong></div>
+    <div class="metric"><span>Capture check</span><strong>CUDA graph</strong></div>
+  </div>
+
+  <div class="callout">
+    <strong>Current recommendation:</strong> keep the solver intentionally small, but make the ViewerGL fluid renderer the reusable feature. Other Newton solvers can call <code>viewer.log_fluid()</code> with particle centers and radii, then get screen-space depth smoothing, translucent composition, approximate refraction, and screen-color reflection without reimplementing GL water shaders.
+  </div>
+
+  <h2>Architecture</h2>
+  <ul>
+    <li><code>newton.solvers.SolverSPH</code> is an experimental weakly-compressible SPH solver using Warp kernels and a <code>wp.HashGrid</code> neighbor search.</li>
+    <li><code>ViewerBase.log_fluid()</code> adds a backend-neutral fluid logging API. Backends without fluid support fall back to point rendering.</li>
+    <li><code>ViewerGL.log_fluid()</code> stores particle centers/radii in a GL buffer and renders them through a screen-space fluid pass.</li>
+    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using translucent color, refraction offsets, Fresnel-like reflection, and a specular highlight.</li>
+    <li>Particle billboards are expanded in a geometry shader instead of relying on <code>gl_PointCoord</code>, which was unreliable in the target headless GL context.</li>
+  </ul>
+
+  <h2>Rendering Prototype</h2>
+  <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/raw_particles_vs_fluid_poster.jpg" src="assets/raw_particles_vs_fluid.mp4"></video>
+  <p class="caption">The same SPH state rendered as raw particle spheres and as the new ViewerGL fluid surface. The fluid path is rendering-only; it does not change solver state.</p>
+
+  <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/smoothing_comparison_poster.jpg" src="assets/smoothing_comparison.mp4"></video>
+  <p class="caption">Prototype smoothing comparison. The selected path combines a rendering radius multiplier with bilateral screen-space depth smoothing. Low smoothing preserves every particle; the smoothed path reads more like a continuous liquid surface while remaining cheap.</p>
+
+  <h2>Solver Prototype</h2>
+  <p><code>SolverSPH</code> supports active-particle filtering, density/pressure evaluation, pressure forces, viscosity, gravity, external particle forces, axis-aligned world bounds, velocity damping, and velocity clamping. It preallocates density and pressure buffers and reserves the particle hash grid at construction time.</p>
+  <p>The solver is deliberately not a full production fluid method. It is intended as a first Newton-native fluid solver and as a compact example for solver authors who want to produce particles that can be rendered as liquid through the shared ViewerGL path.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Current status</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Neighbor search</td>
+        <td>Warp <code>HashGrid</code></td>
+        <td>Used for density, pressure, and viscosity loops; CUDA graph capture was verified after warm-up allocation/compilation.</td>
+      </tr>
+      <tr>
+        <td>Fluid rendering</td>
+        <td>Screen-space GL pass</td>
+        <td>Depth, thickness, bilateral smoothing, translucent composition, approximate reflection/refraction.</td>
+      </tr>
+      <tr>
+        <td>Surface smoothing</td>
+        <td>Chosen: inflated billboards + bilateral depth blur</td>
+        <td>Cheaper and simpler than meshing; gives other solvers a low-friction visualization path.</td>
+      </tr>
+      <tr>
+        <td>Splash/foam</td>
+        <td>Deferred</td>
+        <td>Can be added later as a velocity/curvature driven overlay or secondary point set without changing the core fluid API.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Examples</h2>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-thickness-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>Example invocation:</p>
+  <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
+
+  <h2>Verification</h2>
+  <ul>
+    <li><code>uv run --extra dev -m newton.tests -k test_solver_sph</code>: passed on CPU and CUDA, including CUDA graph capture on <code>cuda:0</code>.</li>
+    <li><code>uv run --extra dev -m newton.tests -k test_viewer_fluid</code>: passed.</li>
+    <li><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer null --test --num-frames 5</code>: passed.</li>
+    <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles and fluid rendering.</li>
+  </ul>
+
+  <h2>Next Work</h2>
+  <ul>
+    <li>Add fluid collision against arbitrary shapes instead of only axis-aligned bounds.</li>
+    <li>Add optional foam/splash particles for high-velocity free-surface regions.</li>
+    <li>Expose per-fluid material presets for water, viscous liquid, and sand-like particle rendering.</li>
+    <li>Consider a mesh or neural/splat surface backend later, while keeping <code>log_fluid()</code> as the stable frontend API.</li>
+  </ul>
+</main>
+</body>
+</html>
