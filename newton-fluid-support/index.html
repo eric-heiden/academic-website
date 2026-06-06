@@ -125,8 +125,8 @@
   <p class="lede">Prototype implementation of particle-fluid simulation and ViewerGL water rendering for Newton, focused on giving solver developers a reusable fluid visualization path.</p>
   <p class="stamp">Generated 2026-06-06 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
 
-  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_c_caustic_glass_poster.jpg" src="assets/variant_c_caustic_glass.mp4"></video>
-  <p class="caption">Candidate C: translucent caustic-glass material with wider depth smoothing and stronger refraction/reflection.</p>
+  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_k_beach_fresnel_default_poster.jpg" src="assets/variant_k_beach_fresnel_default.mp4"></video>
+  <p class="caption">Candidate K: brighter turquoise beach-water material with caustics and Fresnel-weighted environment-map reflection.</p>
 
   <div class="grid">
     <div class="metric"><span>Solver</span><strong>SolverSPH</strong></div>
@@ -135,7 +135,7 @@
   </div>
 
   <div class="callout">
-    <strong>Current recommendation:</strong> keep the solver intentionally small, but make the ViewerGL fluid renderer the reusable feature. Other Newton solvers can call <code>viewer.log_fluid()</code> with particle centers and radii, then get screen-space depth smoothing, translucent composition, approximate refraction, and screen-color reflection without reimplementing GL water shaders.
+    <strong>Current recommendation:</strong> keep the solver intentionally small, but make the ViewerGL fluid renderer the reusable feature. Other Newton solvers can call <code>viewer.log_fluid()</code> with particle centers and radii, then get screen-space depth smoothing, translucent composition, approximate refraction, screen-color reflection, Fresnel-weighted environment reflection, and caustics without reimplementing GL water shaders.
   </div>
 
   <h2>Architecture</h2>
@@ -143,8 +143,8 @@
     <li><code>newton.solvers.SolverSPH</code> is an experimental weakly-compressible SPH solver using Warp kernels and a <code>wp.HashGrid</code> neighbor search.</li>
     <li><code>ViewerBase.log_fluid()</code> adds a backend-neutral fluid logging API. Backends without fluid support fall back to point rendering.</li>
     <li><code>ViewerGL.log_fluid()</code> stores particle centers/radii in a GL buffer and renders them through a screen-space fluid pass.</li>
-    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using translucent color, refraction offsets, Fresnel-like reflection, procedural caustic strokes, and a specular highlight.</li>
-    <li>Additional material controls now include blur radius, refraction/reflection strength, and caustic strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
+    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using translucent color, refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, procedural caustic strokes, and a specular highlight.</li>
+    <li>Additional material controls now include blur radius, refraction/reflection strength, environment-map reflection strength, and caustic strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
     <li>Particle billboards are expanded in a geometry shader instead of relying on <code>gl_PointCoord</code>, which was unreliable in the target headless GL context.</li>
   </ul>
 
@@ -311,6 +311,141 @@
     </tbody>
   </table>
 
+  <h2>Beach Water Env-Map Sweep</h2>
+  <p>Variants K-R use the updated shader path. The fluid composite samples the same ViewerGL environment map used by metallic surfaces, then weights it with a water-style Fresnel term. These videos are longer than A-J and include warmup frames so the dam-break surface has moved before recording starts.</p>
+  <img class="contact-sheet" src="assets/variant_env_contact_sheet.jpg" alt="Contact sheet showing eight Newton beach-water environment-map variants">
+  <p class="caption">Contact sheet for the new environment-map/Fresnel sweep. K is the current recommendation; M, N, O, and R intentionally push one parameter family harder to expose tradeoffs.</p>
+
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_k_beach_fresnel_default_poster.jpg" src="assets/variant_k_beach_fresnel_default.mp4"></video>
+      <strong>K. Beach Fresnel: turquoise water + env reflection</strong>
+      <p class="caption">Current recommended beach-water look: brighter turquoise base color, visible caustics, and moderate Fresnel env reflection.</p>
+      <code class="settings">particles=1,008; radius_scale=1.85; blur=9 x 2.35; opacity=0.66; thickness=1.60; env=0.28; caustic=0.72 @ 120; refract=0.045</code>
+      <a class="video-link" href="assets/variant_k_beach_fresnel_default.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_l_subtle_env_clear_poster.jpg" src="assets/variant_l_subtle_env_clear.mp4"></video>
+      <strong>L. Subtle env: clear turquoise, restrained Fresnel</strong>
+      <p class="caption">Lower opacity and environment strength. Useful if the default reads too glossy or too stylized.</p>
+      <code class="settings">particles=1,008; radius_scale=1.75; blur=8 x 2.15; opacity=0.58; thickness=1.25; env=0.12; caustic=0.42 @ 105; refract=0.035</code>
+      <a class="video-link" href="assets/variant_l_subtle_env_clear.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_m_strong_env_gloss_poster.jpg" src="assets/variant_m_strong_env_gloss.mp4"></video>
+      <strong>M. Strong env: glossy Fresnel reflection</strong>
+      <p class="caption">Pushes environment reflection to show the upper end of the control. Good for reading sky reflections, but it may be too dark/glassy for a default.</p>
+      <code class="settings">particles=1,008; radius_scale=1.80; blur=8 x 2.25; opacity=0.62; thickness=1.45; env=0.55; caustic=0.58 @ 120; reflect=0.14</code>
+      <a class="video-link" href="assets/variant_m_strong_env_gloss.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_n_high_caustic_frequency_poster.jpg" src="assets/variant_n_high_caustic_frequency.mp4"></video>
+      <strong>N. High caustics: bright beach-water streaks</strong>
+      <p class="caption">Raises caustic strength and frequency. This is the clearest stress test for whether caustic strokes look useful or too busy.</p>
+      <code class="settings">particles=1,008; radius_scale=1.85; blur=8 x 2.25; opacity=0.64; thickness=1.35; env=0.25; caustic=1.25 @ 190; refract=0.055</code>
+      <a class="video-link" href="assets/variant_n_high_caustic_frequency.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_o_shallow_aqua_thin_poster.jpg" src="assets/variant_o_shallow_aqua_thin.mp4"></video>
+      <strong>O. Shallow aqua: thin, bright, sandy-water tint</strong>
+      <p class="caption">Lower optical thickness and a greener aqua tint. This variant explores a shallow beach-water preset rather than deep blue water.</p>
+      <code class="settings">particles=1,008; radius_scale=1.70; blur=7 x 2.10; opacity=0.52; thickness=0.95; env=0.32; caustic=0.88 @ 150; refract=0.050</code>
+      <a class="video-link" href="assets/variant_o_shallow_aqua_thin.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_p_dense_beach_water_poster.jpg" src="assets/variant_p_dense_beach_water.mp4"></video>
+      <strong>P. Dense beach water: 10,080 particles + env</strong>
+      <p class="caption">Higher particle count with the new material. This tests whether density reduces visible cells before the screen-space pass has to smooth them.</p>
+      <code class="settings">particles=10,080; radius_scale=1.50; blur=9 x 2.0; opacity=0.64; thickness=1.75; env=0.30; caustic=0.62 @ 130; refract=0.042</code>
+      <a class="video-link" href="assets/variant_p_dense_beach_water.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_q_dense_soft_blob_poster.jpg" src="assets/variant_q_dense_soft_blob.mp4"></video>
+      <strong>Q. Dense soft blob: 5,376 particles + wide blur</strong>
+      <p class="caption">Combines denser particles with aggressive bilateral smoothing. It reads as the most continuous surface, but small waves are softened.</p>
+      <code class="settings">particles=5,376; radius_scale=1.60; blur=12 x 2.75; opacity=0.68; thickness=1.85; env=0.26; caustic=0.50 @ 120; refract=0.040</code>
+      <a class="video-link" href="assets/variant_q_dense_soft_blob.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_r_low_smoothing_cells_poster.jpg" src="assets/variant_r_low_smoothing_cells.mp4"></video>
+      <strong>R. Low smoothing: visible cells, same env material</strong>
+      <p class="caption">Same bright material family with low smoothing. This shows how much the blob extraction step matters even when the water material is improved.</p>
+      <code class="settings">particles=1,008; radius_scale=1.30; blur=2 x 1.0; opacity=0.64; thickness=1.45; env=0.28; caustic=0.72 @ 120; refract=0.040</code>
+      <a class="video-link" href="assets/variant_r_low_smoothing_cells.mp4">Open MP4 render</a>
+    </div>
+  </div>
+
+  <h3>Env-Map Settings Matrix</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Question</th>
+        <th>Particles</th>
+        <th>Surface settings</th>
+        <th>Water material settings</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>K</td>
+        <td>Recommended beach-water default</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.85</code>, <code>blur=9 x 2.35</code></td>
+        <td><code>env=0.28</code>, <code>caustic=0.72 @ 120</code>, <code>color=(0.22, 0.95, 1.0)</code></td>
+      </tr>
+      <tr>
+        <td>L</td>
+        <td>How subtle should env reflection be?</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.75</code>, <code>blur=8 x 2.15</code></td>
+        <td><code>env=0.12</code>, <code>opacity=0.58</code>, <code>caustic=0.42 @ 105</code></td>
+      </tr>
+      <tr>
+        <td>M</td>
+        <td>How glossy can Fresnel reflection get?</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.80</code>, <code>blur=8 x 2.25</code></td>
+        <td><code>env=0.55</code>, <code>reflect=0.14</code>, <code>caustic=0.58 @ 120</code></td>
+      </tr>
+      <tr>
+        <td>N</td>
+        <td>How visible should caustics be?</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.85</code>, <code>blur=8 x 2.25</code></td>
+        <td><code>env=0.25</code>, <code>caustic=1.25 @ 190</code>, <code>refract=0.055</code></td>
+      </tr>
+      <tr>
+        <td>O</td>
+        <td>Can we get a shallow aqua tint?</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.70</code>, <code>blur=7 x 2.10</code></td>
+        <td><code>env=0.32</code>, <code>opacity=0.52</code>, <code>thickness=0.95</code></td>
+      </tr>
+      <tr>
+        <td>P</td>
+        <td>Does very high particle count help?</td>
+        <td>10,080</td>
+        <td><code>radius_scale=1.50</code>, <code>blur=9 x 2.0</code></td>
+        <td><code>env=0.30</code>, <code>caustic=0.62 @ 130</code>, <code>refract=0.042</code></td>
+      </tr>
+      <tr>
+        <td>Q</td>
+        <td>Does dense + wide blur make the best blob?</td>
+        <td>5,376</td>
+        <td><code>radius_scale=1.60</code>, <code>blur=12 x 2.75</code></td>
+        <td><code>env=0.26</code>, <code>opacity=0.68</code>, <code>caustic=0.50 @ 120</code></td>
+      </tr>
+      <tr>
+        <td>R</td>
+        <td>What if material improves but smoothing stays low?</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.30</code>, <code>blur=2 x 1.0</code></td>
+        <td><code>env=0.28</code>, <code>caustic=0.72 @ 120</code>, <code>refract=0.040</code></td>
+      </tr>
+    </tbody>
+  </table>
+
   <h2>Rendering Prototype</h2>
   <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/raw_particles_vs_fluid_poster.jpg" src="assets/raw_particles_vs_fluid.mp4"></video>
   <p class="caption">The same SPH state rendered as raw particle spheres and as the new ViewerGL fluid surface. The fluid path is rendering-only; it does not change solver state.</p>
@@ -339,7 +474,7 @@
       <tr>
         <td>Fluid rendering</td>
         <td>Screen-space GL pass</td>
-        <td>Depth, thickness, bilateral smoothing, translucent composition, approximate reflection/refraction, and procedural caustic highlights.</td>
+        <td>Depth, thickness, bilateral smoothing, translucent composition, approximate reflection/refraction, Fresnel-weighted environment-map reflection, and procedural caustic highlights.</td>
       </tr>
       <tr>
         <td>Surface smoothing</td>
@@ -355,7 +490,7 @@
   </table>
 
   <h2>Examples</h2>
-  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, and <code>--capture-graph</code>.</p>
   <p>Example invocation:</p>
   <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
 
@@ -364,7 +499,8 @@
     <li><code>uv run --extra dev -m newton.tests -k test_solver_sph</code>: passed on CPU and CUDA, including CUDA graph capture on <code>cuda:0</code>.</li>
     <li><code>uv run --extra dev -m newton.tests -k test_viewer_fluid</code>: passed.</li>
     <li><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer null --test --num-frames 5</code>: passed.</li>
-    <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles and fluid rendering.</li>
+    <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles, fluid rendering, and the env-map Fresnel water shader.</li>
+    <li>Report media check decoded 18 variant MP4 renders at 960x540: A-J have 54 frames each, and K-R have 72 frames each.</li>
   </ul>
 
   <h2>Next Work</h2>
