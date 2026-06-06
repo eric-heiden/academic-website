@@ -78,6 +78,25 @@
       margin-bottom: 8px;
     }
     .variant strong { display: block; margin-bottom: 4px; }
+    .settings {
+      display: block;
+      margin-top: 8px;
+      padding: 8px 9px;
+      border-radius: 6px;
+      background: #f3f7fa;
+      color: #435466;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: normal;
+    }
+    .video-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 650;
+      text-decoration: none;
+    }
     .contact-sheet {
       width: 100%;
       max-width: 840px;
@@ -130,42 +149,167 @@
   </ul>
 
   <h2>Visual Variants</h2>
-  <p>The gallery below explores six render directions. The labels A-F are intended for feedback; the implementation can keep several presets or converge on one default material.</p>
-  <img class="contact-sheet" src="assets/variant_contact_sheet.jpg" alt="Contact sheet showing six Newton fluid rendering variants">
-  <p class="caption">Contact sheet of the six generated variants. D uses a higher particle count; the others use the same 1,008-particle SPH setup with different ViewerGL material controls.</p>
+  <p>The gallery below explores ten rendered directions. Each card is a separate <code>ViewerGL.get_frame()</code> MP4 render with the exact settings shown under the video, so the visual tradeoffs can be compared directly.</p>
+  <img class="contact-sheet" src="assets/variant_contact_sheet.jpg" alt="Contact sheet showing ten Newton fluid rendering variants">
+  <p class="caption">Contact sheet of the generated variants. D and I use higher particle counts; the others use the same 1,008-particle SPH setup with different ViewerGL material controls.</p>
 
   <div class="variant-grid">
     <div class="variant">
       <video controls muted loop playsinline preload="metadata" poster="assets/variant_a_control_radius_blur_poster.jpg" src="assets/variant_a_control_radius_blur.mp4"></video>
       <strong>A. Control: radius expansion + light smoothing</strong>
       <p class="caption">Closest to the first implementation. Useful baseline, but individual particle silhouettes remain visible.</p>
+      <code class="settings">particles=1,008; radius_scale=1.35; blur=4 x 1.0; opacity=0.75; thickness=1.8; caustic=0.00; refract=0.022; reflect=0.07</code>
+      <a class="video-link" href="assets/variant_a_control_radius_blur.mp4">Open MP4 render</a>
     </div>
     <div class="variant">
       <video controls muted loop playsinline preload="metadata" poster="assets/variant_b_soft_blob_poster.jpg" src="assets/variant_b_soft_blob.mp4"></video>
       <strong>B. Soft blob: wider bilateral depth smoothing</strong>
       <p class="caption">More continuous surface extraction from the same particles. The blob reads smoother but loses some small-scale detail.</p>
+      <code class="settings">particles=1,008; radius_scale=1.95; blur=9 x 2.6; opacity=0.78; thickness=2.0; caustic=0.18 @ 80; refract=0.022; reflect=0.07</code>
+      <a class="video-link" href="assets/variant_b_soft_blob.mp4">Open MP4 render</a>
     </div>
     <div class="variant">
       <video controls muted loop playsinline preload="metadata" poster="assets/variant_c_caustic_glass_poster.jpg" src="assets/variant_c_caustic_glass.mp4"></video>
       <strong>C. Caustic glass: translucent highlights</strong>
       <p class="caption">Adds caustic-like procedural strokes, stronger refraction, and a glassier surface. Current best candidate for a nice water default.</p>
+      <code class="settings">particles=1,008; radius_scale=1.85; blur=8 x 2.3; opacity=0.74; thickness=2.0; caustic=0.62 @ 105; refract=0.034; reflect=0.11</code>
+      <a class="video-link" href="assets/variant_c_caustic_glass.mp4">Open MP4 render</a>
     </div>
     <div class="variant">
       <video controls muted loop playsinline preload="metadata" poster="assets/variant_d_high_particle_count_poster.jpg" src="assets/variant_d_high_particle_count.mp4"></video>
       <strong>D. High particle count: 5,376 particles</strong>
       <p class="caption">Tests the solver/render path with more particles and smaller radii. The surface has fewer visible particle cells before smoothing.</p>
+      <code class="settings">particles=5,376; radius_scale=1.35; blur=8 x 1.8; opacity=0.78; thickness=2.1; caustic=0.35 @ 85; refract=0.022; reflect=0.07</code>
+      <a class="video-link" href="assets/variant_d_high_particle_count.mp4">Open MP4 render</a>
     </div>
     <div class="variant">
       <video controls muted loop playsinline preload="metadata" poster="assets/variant_e_turquoise_milky_poster.jpg" src="assets/variant_e_turquoise_milky.mp4"></video>
       <strong>E. Turquoise milky: denser volume</strong>
       <p class="caption">More opaque and volumetric. This may suit viscous fluid presets better than clear water.</p>
+      <code class="settings">particles=1,008; radius_scale=1.65; blur=8 x 2.1; opacity=0.90; thickness=3.3; caustic=0.22 @ 75; refract=0.020; reflect=0.07</code>
+      <a class="video-link" href="assets/variant_e_turquoise_milky.mp4">Open MP4 render</a>
     </div>
     <div class="variant">
       <video controls muted loop playsinline preload="metadata" poster="assets/variant_f_thin_clear_caustics_poster.jpg" src="assets/variant_f_thin_clear_caustics.mp4"></video>
       <strong>F. Thin clear: strong caustics/refraction</strong>
       <p class="caption">Highest caustic/refraction settings. It is visually lively but may be too sparkly for a default water material.</p>
+      <code class="settings">particles=1,008; radius_scale=1.70; blur=7 x 2.0; opacity=0.64; thickness=1.35; caustic=0.95 @ 145; refract=0.046; reflect=0.14</code>
+      <a class="video-link" href="assets/variant_f_thin_clear_caustics.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_g_raw_particle_spheres_poster.jpg" src="assets/variant_g_raw_particle_spheres.mp4"></video>
+      <strong>G. Raw particle spheres: no fluid surface extraction</strong>
+      <p class="caption">Baseline render mode for comparison. The individual SPH samples are fully visible and do not read as a continuous liquid surface.</p>
+      <code class="settings">particles=1,008; render_mode=particles; fluid pass disabled; same SPH state and camera as A-C</code>
+      <a class="video-link" href="assets/variant_g_raw_particle_spheres.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_h_blob_extraction_only_poster.jpg" src="assets/variant_h_blob_extraction_only.mp4"></video>
+      <strong>H. Blob extraction only: wide splats, no caustics</strong>
+      <p class="caption">Isolates the screen-space surface extraction idea: large overlapping billboards plus aggressive bilateral depth smoothing.</p>
+      <code class="settings">particles=1,008; radius_scale=2.25; blur=11 x 3.0; opacity=0.80; thickness=2.2; caustic=0.00; refract=0.018; reflect=0.055</code>
+      <a class="video-link" href="assets/variant_h_blob_extraction_only.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_i_dense_clear_water_poster.jpg" src="assets/variant_i_dense_clear_water.mp4"></video>
+      <strong>I. Dense clear water: 10,080 smaller particles</strong>
+      <p class="caption">Pushes particle count and smaller radii. This reduces the particle-cell look before the render pass has to smooth the surface.</p>
+      <code class="settings">particles=10,080; radius_scale=1.45; blur=9 x 2.0; opacity=0.72; thickness=2.4; caustic=0.28 @ 92; refract=0.030; reflect=0.095</code>
+      <a class="video-link" href="assets/variant_i_dense_clear_water.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_j_clear_caustic_pool_poster.jpg" src="assets/variant_j_clear_caustic_pool.mp4"></video>
+      <strong>J. Clear caustic pool: strong refraction, thin water</strong>
+      <p class="caption">A deliberately exaggerated clear-water material. It shows the upper range of caustic and refraction controls.</p>
+      <code class="settings">particles=1,008; radius_scale=1.85; blur=8 x 2.4; opacity=0.60; thickness=1.25; caustic=1.10 @ 170; refract=0.055; reflect=0.16</code>
+      <a class="video-link" href="assets/variant_j_clear_caustic_pool.mp4">Open MP4 render</a>
     </div>
   </div>
+
+  <h3>Variant Settings Matrix</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Approach</th>
+        <th>Particles</th>
+        <th>Surface settings</th>
+        <th>Material settings</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>A</td>
+        <td>Control fluid render</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.35</code>, <code>blur=4 x 1.0</code></td>
+        <td><code>opacity=0.75</code>, <code>thickness=1.8</code>, <code>caustic=0.00</code></td>
+      </tr>
+      <tr>
+        <td>B</td>
+        <td>Soft blob extraction</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.95</code>, <code>blur=9 x 2.6</code></td>
+        <td><code>opacity=0.78</code>, <code>thickness=2.0</code>, <code>caustic=0.18 @ 80</code></td>
+      </tr>
+      <tr>
+        <td>C</td>
+        <td>Caustic glass candidate</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.85</code>, <code>blur=8 x 2.3</code></td>
+        <td><code>opacity=0.74</code>, <code>caustic=0.62 @ 105</code>, <code>refract=0.034</code>, <code>reflect=0.11</code></td>
+      </tr>
+      <tr>
+        <td>D</td>
+        <td>Higher particle count</td>
+        <td>5,376</td>
+        <td><code>radius_scale=1.35</code>, <code>blur=8 x 1.8</code></td>
+        <td><code>opacity=0.78</code>, <code>thickness=2.1</code>, <code>caustic=0.35 @ 85</code></td>
+      </tr>
+      <tr>
+        <td>E</td>
+        <td>Milky volumetric water</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.65</code>, <code>blur=8 x 2.1</code></td>
+        <td><code>opacity=0.90</code>, <code>thickness=3.3</code>, <code>caustic=0.22 @ 75</code></td>
+      </tr>
+      <tr>
+        <td>F</td>
+        <td>Thin clear caustics</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.70</code>, <code>blur=7 x 2.0</code></td>
+        <td><code>opacity=0.64</code>, <code>thickness=1.35</code>, <code>caustic=0.95 @ 145</code></td>
+      </tr>
+      <tr>
+        <td>G</td>
+        <td>Raw particle baseline</td>
+        <td>1,008</td>
+        <td><code>render_mode=particles</code></td>
+        <td>Fluid surface pass disabled.</td>
+      </tr>
+      <tr>
+        <td>H</td>
+        <td>Blob extraction only</td>
+        <td>1,008</td>
+        <td><code>radius_scale=2.25</code>, <code>blur=11 x 3.0</code></td>
+        <td><code>opacity=0.80</code>, <code>thickness=2.2</code>, <code>caustic=0.00</code></td>
+      </tr>
+      <tr>
+        <td>I</td>
+        <td>Dense clear water</td>
+        <td>10,080</td>
+        <td><code>radius_scale=1.45</code>, <code>blur=9 x 2.0</code></td>
+        <td><code>opacity=0.72</code>, <code>thickness=2.4</code>, <code>caustic=0.28 @ 92</code></td>
+      </tr>
+      <tr>
+        <td>J</td>
+        <td>Clear caustic pool</td>
+        <td>1,008</td>
+        <td><code>radius_scale=1.85</code>, <code>blur=8 x 2.4</code></td>
+        <td><code>opacity=0.60</code>, <code>caustic=1.10 @ 170</code>, <code>refract=0.055</code>, <code>reflect=0.16</code></td>
+      </tr>
+    </tbody>
+  </table>
 
   <h2>Rendering Prototype</h2>
   <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/raw_particles_vs_fluid_poster.jpg" src="assets/raw_particles_vs_fluid.mp4"></video>
