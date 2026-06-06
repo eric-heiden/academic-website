@@ -58,6 +58,35 @@
     .metric { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fff; }
     .metric strong { display: block; font-size: 24px; margin-top: 4px; }
     .metric span { color: var(--muted); font-size: 13px; }
+    .variant-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin: 18px 0 28px;
+    }
+    .variant {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+    .variant video {
+      width: 100%;
+      display: block;
+      border-radius: 6px;
+      background: #0d1420;
+      margin-bottom: 8px;
+    }
+    .variant strong { display: block; margin-bottom: 4px; }
+    .contact-sheet {
+      width: 100%;
+      max-width: 840px;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0d1420;
+      margin: 14px 0 8px;
+    }
     table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
     th { background: #f1f5f8; font-weight: 650; }
@@ -67,6 +96,7 @@
     @media (max-width: 760px) {
       main { padding: 28px 18px 52px; }
       .grid { grid-template-columns: 1fr; }
+      .variant-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -76,8 +106,8 @@
   <p class="lede">Prototype implementation of particle-fluid simulation and ViewerGL water rendering for Newton, focused on giving solver developers a reusable fluid visualization path.</p>
   <p class="stamp">Generated 2026-06-06 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
 
-  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/sph_dam_break_fluid_poster.jpg" src="assets/sph_dam_break_fluid.mp4"></video>
-  <p class="caption">Basic SPH dam-break prototype rendered as a translucent, smoothed screen-space water surface.</p>
+  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_c_caustic_glass_poster.jpg" src="assets/variant_c_caustic_glass.mp4"></video>
+  <p class="caption">Candidate C: translucent caustic-glass material with wider depth smoothing and stronger refraction/reflection.</p>
 
   <div class="grid">
     <div class="metric"><span>Solver</span><strong>SolverSPH</strong></div>
@@ -94,9 +124,48 @@
     <li><code>newton.solvers.SolverSPH</code> is an experimental weakly-compressible SPH solver using Warp kernels and a <code>wp.HashGrid</code> neighbor search.</li>
     <li><code>ViewerBase.log_fluid()</code> adds a backend-neutral fluid logging API. Backends without fluid support fall back to point rendering.</li>
     <li><code>ViewerGL.log_fluid()</code> stores particle centers/radii in a GL buffer and renders them through a screen-space fluid pass.</li>
-    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using translucent color, refraction offsets, Fresnel-like reflection, and a specular highlight.</li>
+    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using translucent color, refraction offsets, Fresnel-like reflection, procedural caustic strokes, and a specular highlight.</li>
+    <li>Additional material controls now include blur radius, refraction/reflection strength, and caustic strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
     <li>Particle billboards are expanded in a geometry shader instead of relying on <code>gl_PointCoord</code>, which was unreliable in the target headless GL context.</li>
   </ul>
+
+  <h2>Visual Variants</h2>
+  <p>The gallery below explores six render directions. The labels A-F are intended for feedback; the implementation can keep several presets or converge on one default material.</p>
+  <img class="contact-sheet" src="assets/variant_contact_sheet.jpg" alt="Contact sheet showing six Newton fluid rendering variants">
+  <p class="caption">Contact sheet of the six generated variants. D uses a higher particle count; the others use the same 1,008-particle SPH setup with different ViewerGL material controls.</p>
+
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_a_control_radius_blur_poster.jpg" src="assets/variant_a_control_radius_blur.mp4"></video>
+      <strong>A. Control: radius expansion + light smoothing</strong>
+      <p class="caption">Closest to the first implementation. Useful baseline, but individual particle silhouettes remain visible.</p>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_b_soft_blob_poster.jpg" src="assets/variant_b_soft_blob.mp4"></video>
+      <strong>B. Soft blob: wider bilateral depth smoothing</strong>
+      <p class="caption">More continuous surface extraction from the same particles. The blob reads smoother but loses some small-scale detail.</p>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_c_caustic_glass_poster.jpg" src="assets/variant_c_caustic_glass.mp4"></video>
+      <strong>C. Caustic glass: translucent highlights</strong>
+      <p class="caption">Adds caustic-like procedural strokes, stronger refraction, and a glassier surface. Current best candidate for a nice water default.</p>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_d_high_particle_count_poster.jpg" src="assets/variant_d_high_particle_count.mp4"></video>
+      <strong>D. High particle count: 5,376 particles</strong>
+      <p class="caption">Tests the solver/render path with more particles and smaller radii. The surface has fewer visible particle cells before smoothing.</p>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_e_turquoise_milky_poster.jpg" src="assets/variant_e_turquoise_milky.mp4"></video>
+      <strong>E. Turquoise milky: denser volume</strong>
+      <p class="caption">More opaque and volumetric. This may suit viscous fluid presets better than clear water.</p>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_f_thin_clear_caustics_poster.jpg" src="assets/variant_f_thin_clear_caustics.mp4"></video>
+      <strong>F. Thin clear: strong caustics/refraction</strong>
+      <p class="caption">Highest caustic/refraction settings. It is visually lively but may be too sparkly for a default water material.</p>
+    </div>
+  </div>
 
   <h2>Rendering Prototype</h2>
   <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/raw_particles_vs_fluid_poster.jpg" src="assets/raw_particles_vs_fluid.mp4"></video>
@@ -126,12 +195,12 @@
       <tr>
         <td>Fluid rendering</td>
         <td>Screen-space GL pass</td>
-        <td>Depth, thickness, bilateral smoothing, translucent composition, approximate reflection/refraction.</td>
+        <td>Depth, thickness, bilateral smoothing, translucent composition, approximate reflection/refraction, and procedural caustic highlights.</td>
       </tr>
       <tr>
         <td>Surface smoothing</td>
-        <td>Chosen: inflated billboards + bilateral depth blur</td>
-        <td>Cheaper and simpler than meshing; gives other solvers a low-friction visualization path.</td>
+        <td>Explored: inflated billboards, wider bilateral blur, more particles</td>
+        <td>The best-looking variants combine more overlap, a larger blur radius, and subtle caustics. True meshing remains a possible later backend.</td>
       </tr>
       <tr>
         <td>Splash/foam</td>
@@ -142,7 +211,7 @@
   </table>
 
   <h2>Examples</h2>
-  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-thickness-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, and <code>--capture-graph</code>.</p>
   <p>Example invocation:</p>
   <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
 
