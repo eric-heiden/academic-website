@@ -553,6 +553,141 @@
     </tbody>
   </table>
 
+  <h2>Translucency, Reflection, and Foam Sweep</h2>
+  <p>Variants Y-AF investigate three material dimensions requested for follow-up: water translucency, shallow/deep color-gradient strength, and reflectiveness. They also prototype foam generation. The current foam pass is intentionally rendering-side and solver-agnostic: it uses screen-space thickness, free-surface edges, normal variation, and a procedural breakup pattern to create edge/crest foam. A physically better next step would be a solver-side foam emitter based on velocity, vorticity, air exposure, and particle lifetime, but this screen-space version is cheap and works for any solver that calls <code>viewer.log_fluid()</code>.</p>
+  <img class="contact-sheet" src="assets/variant_foam_sweep_contact_sheet.jpg" alt="Contact sheet showing translucency, reflection, gradient, and foam Newton fluid variants">
+  <p class="caption">Contact sheet for the Y-AF sweep. Y/AB/AA isolate translucency and reflection; AC/AD/AE explore screen-space foam strength and scale; AF is a low-gradient, low-reflection control.</p>
+
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_y_transparent_low_reflect_hq_poster.jpg" src="assets/variant_y_transparent_low_reflect_hq.mp4"></video>
+      <strong>Y. Transparent: low opacity, subtle reflection</strong>
+      <p class="caption">A clearer, more glassy option with lower optical thickness and restrained environment reflection.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.42; thickness=0.95; gradient=0.78; env=0.16; reflect=0.065; foam=0.00</code>
+      <a class="video-link" href="assets/variant_y_transparent_low_reflect_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_z_balanced_reflect_foam_hq_poster.jpg" src="assets/variant_z_balanced_reflect_foam_hq.mp4"></video>
+      <strong>Z. Balanced: medium opacity, gradient, light foam</strong>
+      <p class="caption">A moderate blend of translucency, tropical gradient, env reflection, caustics, and light edge foam.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.60; thickness=1.35; gradient=0.84; env=0.32; reflect=0.10; foam=0.32 @ 120</code>
+      <a class="video-link" href="assets/variant_z_balanced_reflect_foam_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_aa_glossy_reflective_hq_poster.jpg" src="assets/variant_aa_glossy_reflective_hq.mp4"></video>
+      <strong>AA. Glossy: high env reflection, low foam</strong>
+      <p class="caption">Pushes Fresnel/environment reflection to see how much sky reflection the material can carry before becoming too glassy.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.64; gradient=0.90; env=0.62; reflect=0.16; refract=0.043; foam=0.20 @ 105</code>
+      <a class="video-link" href="assets/variant_aa_glossy_reflective_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ab_opaque_deep_gradient_hq_poster.jpg" src="assets/variant_ab_opaque_deep_gradient_hq.mp4"></video>
+      <strong>AB. Opaque: strong thickness color gradient</strong>
+      <p class="caption">Higher opacity and stronger deep-blue thickness gradient. Useful for testing whether the water should read denser.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.82; thickness=2.20; gradient=1.00; env=0.22; caustic=0.48 @ 120; foam=0.18 @ 100</code>
+      <a class="video-link" href="assets/variant_ab_opaque_deep_gradient_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ac_edge_foam_hq_poster.jpg" src="assets/variant_ac_edge_foam_hq.mp4"></video>
+      <strong>AC. Edge foam: moderate edge and crest foam</strong>
+      <p class="caption">Main foam candidate. Foam appears as subtle mint-white edge/crest breakup while preserving the underlying water material.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.62; gradient=0.82; env=0.30; caustic=0.82 @ 150; foam=0.78 @ 125</code>
+      <a class="video-link" href="assets/variant_ac_edge_foam_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ad_fine_foam_caustics_hq_poster.jpg" src="assets/variant_ad_fine_foam_caustics_hq.mp4"></video>
+      <strong>AD. Fine foam: high-frequency foam and caustics</strong>
+      <p class="caption">Stress test with stronger high-frequency foam and caustics. It exposes where the screen-space foam can start to look noisy.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.60; gradient=0.92; env=0.32; caustic=1.35 @ 220; foam=1.15 @ 230</code>
+      <a class="video-link" href="assets/variant_ad_fine_foam_caustics_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ae_dense_foam_hq_poster.jpg" src="assets/variant_ae_dense_foam_hq.mp4"></video>
+      <strong>AE. Dense foam: 10,080 particles with foam</strong>
+      <p class="caption">Combines the dense-particle run with moderate foam. This checks whether better particle density changes how much foam is needed.</p>
+      <code class="settings">1280x720; frames=96; particles=10,080; opacity=0.64; gradient=0.82; env=0.34; caustic=0.82 @ 150; foam=0.55 @ 135</code>
+      <a class="video-link" href="assets/variant_ae_dense_foam_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_af_low_gradient_control_hq_poster.jpg" src="assets/variant_af_low_gradient_control_hq.mp4"></video>
+      <strong>AF. Control: low gradient, low reflection, no foam</strong>
+      <p class="caption">Control case for the new sweep. This keeps the material close to a single tint with low reflectiveness and no foam.</p>
+      <code class="settings">1280x720; frames=96; opacity=0.62; gradient=0.18; env=0.10; reflect=0.065; caustic=0.45 @ 120; foam=0.00</code>
+      <a class="video-link" href="assets/variant_af_low_gradient_control_hq.mp4">Open MP4 render</a>
+    </div>
+  </div>
+
+  <h3>Foam Investigation Matrix</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Main question</th>
+        <th>Translucency</th>
+        <th>Gradient/reflectiveness</th>
+        <th>Foam settings</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Y</td>
+        <td>How transparent can the water be?</td>
+        <td><code>opacity=0.42</code>, <code>thickness=0.95</code></td>
+        <td><code>gradient=0.78</code>, <code>env=0.16</code></td>
+        <td><code>foam=0.00</code></td>
+      </tr>
+      <tr>
+        <td>Z</td>
+        <td>Balanced default candidate with light foam</td>
+        <td><code>opacity=0.60</code>, <code>thickness=1.35</code></td>
+        <td><code>gradient=0.84</code>, <code>env=0.32</code></td>
+        <td><code>foam=0.32 @ 120</code></td>
+      </tr>
+      <tr>
+        <td>AA</td>
+        <td>How reflective should beach water be?</td>
+        <td><code>opacity=0.64</code>, <code>thickness=1.45</code></td>
+        <td><code>gradient=0.90</code>, <code>env=0.62</code>, <code>reflect=0.16</code></td>
+        <td><code>foam=0.20 @ 105</code></td>
+      </tr>
+      <tr>
+        <td>AB</td>
+        <td>Does stronger opacity/depth color help?</td>
+        <td><code>opacity=0.82</code>, <code>thickness=2.20</code></td>
+        <td><code>gradient=1.00</code>, <code>env=0.22</code></td>
+        <td><code>foam=0.18 @ 100</code></td>
+      </tr>
+      <tr>
+        <td>AC</td>
+        <td>Does screen-space edge foam read well?</td>
+        <td><code>opacity=0.62</code>, <code>thickness=1.35</code></td>
+        <td><code>gradient=0.82</code>, <code>env=0.30</code></td>
+        <td><code>foam=0.78 @ 125</code></td>
+      </tr>
+      <tr>
+        <td>AD</td>
+        <td>Where does foam become too noisy?</td>
+        <td><code>opacity=0.60</code>, <code>thickness=1.20</code></td>
+        <td><code>gradient=0.92</code>, <code>caustic=1.35 @ 220</code></td>
+        <td><code>foam=1.15 @ 230</code></td>
+      </tr>
+      <tr>
+        <td>AE</td>
+        <td>Does dense particle sampling reduce foam need?</td>
+        <td><code>opacity=0.64</code>, <code>thickness=1.65</code></td>
+        <td><code>particles=10,080</code>, <code>gradient=0.82</code>, <code>env=0.34</code></td>
+        <td><code>foam=0.55 @ 135</code></td>
+      </tr>
+      <tr>
+        <td>AF</td>
+        <td>Control: low gradient/reflection/no foam</td>
+        <td><code>opacity=0.62</code>, <code>thickness=1.35</code></td>
+        <td><code>gradient=0.18</code>, <code>env=0.10</code></td>
+        <td><code>foam=0.00</code></td>
+      </tr>
+    </tbody>
+  </table>
+
   <h2>Rendering Prototype</h2>
   <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/raw_particles_vs_fluid_poster.jpg" src="assets/raw_particles_vs_fluid.mp4"></video>
   <p class="caption">The same SPH state rendered as raw particle spheres and as the new ViewerGL fluid surface. The fluid path is rendering-only; it does not change solver state.</p>
@@ -590,14 +725,14 @@
       </tr>
       <tr>
         <td>Splash/foam</td>
-        <td>Deferred</td>
-        <td>Can be added later as a velocity/curvature driven overlay or secondary point set without changing the core fluid API.</td>
+        <td>Prototype screen-space foam</td>
+        <td>Current pass estimates edge/crest foam from thickness, normal variation, and procedural breakup. Solver-side foam particles remain deferred.</td>
       </tr>
     </tbody>
   </table>
 
   <h2>Examples</h2>
-  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, <code>--fluid-foam-strength</code>, <code>--fluid-foam-scale</code>, and <code>--capture-graph</code>.</p>
   <p>Example invocation:</p>
   <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
 
@@ -607,13 +742,13 @@
     <li><code>uv run --extra dev -m newton.tests -k test_viewer_fluid</code>: passed.</li>
     <li><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer null --test --num-frames 5</code>: passed.</li>
     <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles, fluid rendering, and the env-map Fresnel water shader.</li>
-    <li>Report media check decoded 24 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, and S-X are high-quality 1280x720 with 96 frames each.</li>
+    <li>Report media check decoded 32 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, and S-AF are high-quality 1280x720 with 96 frames each.</li>
   </ul>
 
   <h2>Next Work</h2>
   <ul>
     <li>Add fluid collision against arbitrary shapes instead of only axis-aligned bounds.</li>
-    <li>Add optional foam/splash particles for high-velocity free-surface regions.</li>
+    <li>Replace or augment screen-space foam with optional solver-side foam/splash particles for high-velocity, high-vorticity free-surface regions.</li>
     <li>Expose per-fluid material presets for water, viscous liquid, and sand-like particle rendering.</li>
     <li>Consider a mesh or neural/splat surface backend later, while keeping <code>log_fluid()</code> as the stable frontend API.</li>
   </ul>
