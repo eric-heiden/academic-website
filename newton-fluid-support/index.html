@@ -125,8 +125,8 @@
   <p class="lede">Prototype implementation of particle-fluid simulation and ViewerGL water rendering for Newton, focused on giving solver developers a reusable fluid visualization path.</p>
   <p class="stamp">Updated 2026-06-07 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
 
-  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_ag_tropical_balanced_26k_1080p_poster.jpg" src="assets/variant_ag_tropical_balanced_26k_1080p.mp4"></video>
-  <p class="caption">Candidate AG: 1920x1080, 26,880 particles, tropical shallow/deep absorption, env-map Fresnel reflection, stronger refraction, and screen-space ripple/caustic detail.</p>
+  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_as_floor_caustics_high_bitrate_26k_poster.jpg" src="assets/variant_as_floor_caustics_high_bitrate_26k.mp4"></video>
+  <p class="caption">Candidate AS: 1280x720 at 30 Mbps CBR, 26,880 particles, scene-depth floor caustics, tropical shallow/deep absorption, sharper env-map Fresnel reflection, refraction, and screen-space ripple detail.</p>
 
   <div class="grid">
     <div class="metric"><span>Solver</span><strong>SolverSPH</strong></div>
@@ -136,6 +136,56 @@
 
   <div class="callout">
     <strong>Current recommendation:</strong> keep the solver intentionally small, but make the ViewerGL fluid renderer the reusable feature. Other Newton solvers can call <code>viewer.log_fluid()</code> with particle centers and radii, then get screen-space depth smoothing, translucent composition, tropical optical absorption, approximate refraction, screen-color reflection, Fresnel-weighted environment-map reflection, caustic/ripple distortion, and foam approximation without reimplementing GL water shaders.
+  </div>
+
+  <h2>High-Bitrate Water Fidelity Pass</h2>
+  <p>Variants AS-AX respond to the compression and water-depth feedback directly. These are rendered at 1280x720 with 30 Mbps CBR H.264, trading resolution for far fewer codec artifacts. AS-AV focus on water optics: stronger environment-map reflection/refraction, clearer tropical shallow-to-deep color separation, scene-depth floor caustics, and more visible three-dimensional surface cues. AW-AX use the new interactive tank example with scripted picking forces so the videos are reproducible; the actual demo supports right-click picking and live GUI sliders.</p>
+  <img class="contact-sheet" src="assets/variant_high_bitrate_contact_sheet.jpg" alt="Contact sheet showing high-bitrate Newton water fidelity and interactive tank variants">
+  <p class="caption">AS-AV are high-particle water-optics renders. AW-AX are interactive-tank renders with pickable rigid cubes suspended against the transparent water body.</p>
+
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_as_floor_caustics_high_bitrate_26k_poster.jpg" src="assets/variant_as_floor_caustics_high_bitrate_26k.mp4"></video>
+      <strong>AS. Floor caustics: 26,880 particles, 30 Mbps CBR</strong>
+      <p class="caption">Best current water-fidelity candidate. The shader uses the opaque scene depth behind the refracted water sample to add floor caustic streaks under the water volume.</p>
+      <code class="settings">1280x720; frames=120; bitrate=30M CBR; particles=26,880; opacity=0.54; env=1.05; reflect=0.25; refract=0.090; depth_cues=1.20; surface_caustic=2.30; floor_caustic=3.60</code>
+      <a class="video-link" href="assets/variant_as_floor_caustics_high_bitrate_26k.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_at_env_reflection_high_bitrate_26k_poster.jpg" src="assets/variant_at_env_reflection_high_bitrate_26k.mp4"></video>
+      <strong>AT. Strong environment reflection: 26,880 particles</strong>
+      <p class="caption">Pushes the ViewerGL environment map more aggressively with low reflection LOD and high env intensity, so the water surface picks up the same bright structure as metallic materials.</p>
+      <code class="settings">1280x720; frames=120; bitrate=30M CBR; particles=26,880; env_intensity=3.15; opacity=0.50; env=1.75; reflect=0.36; refract=0.058; floor_caustic=2.20</code>
+      <a class="video-link" href="assets/variant_at_env_reflection_high_bitrate_26k.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_au_depth_cues_high_bitrate_42k_poster.jpg" src="assets/variant_au_depth_cues_high_bitrate_42k.mp4"></video>
+      <strong>AU. Depth cues: 42,240 particles</strong>
+      <p class="caption">Higher density plus stronger optical-depth contrast. Shallow water stays pale turquoise while thicker regions shift toward dark tropical blue.</p>
+      <code class="settings">1280x720; frames=120; bitrate=30M CBR; particles=42,240; opacity=0.66; thickness=3.45; absorption=4.10; depth_cues=1.85; env=1.10; floor_caustic=2.80</code>
+      <a class="video-link" href="assets/variant_au_depth_cues_high_bitrate_42k.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_av_clear_refraction_caustics_high_bitrate_42k_poster.jpg" src="assets/variant_av_clear_refraction_caustics_high_bitrate_42k.mp4"></video>
+      <strong>AV. Clear refraction + caustics: 42,240 particles</strong>
+      <p class="caption">Clearer water with the strongest refraction and floor caustics in this pass. This clip is the stress test for transparent, refractive beach-water behavior.</p>
+      <code class="settings">1280x720; frames=120; bitrate=30M CBR; particles=42,240; opacity=0.46; env=1.35; reflect=0.28; refract=0.125; surface_caustic=2.55; floor_caustic=4.00</code>
+      <a class="video-link" href="assets/variant_av_clear_refraction_caustics_high_bitrate_42k.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_aw_interactive_cubes_splash_high_bitrate_poster.jpg" src="assets/variant_aw_interactive_cubes_splash_high_bitrate.mp4"></video>
+      <strong>AW. Interactive tank: scripted picking splash</strong>
+      <p class="caption">Scripted version of the new interactive demo. The visible cube is driven by a picking-style force while the SPH water and rigid body coupling are stepped together.</p>
+      <code class="settings">1280x720; frames=105; bitrate=30M CBR; particles=16,416; boxes=5; opacity=0.08; env=0.55; refract=0.060; floor_caustic=1.65; pick-style force=9</code>
+      <a class="video-link" href="assets/variant_aw_interactive_cubes_splash_high_bitrate.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ax_interactive_env_caustic_tank_high_bitrate_poster.jpg" src="assets/variant_ax_interactive_env_caustic_tank_high_bitrate.mp4"></video>
+      <strong>AX. Interactive tank: env reflection + floor caustics</strong>
+      <p class="caption">Same interactive tank with stronger env reflection and floor caustics. The production example exposes these settings through GUI sliders for live tuning.</p>
+      <code class="settings">1280x720; frames=105; bitrate=30M CBR; particles=16,416; boxes=5; opacity=0.12; env=1.15; reflect=0.20; refract=0.075; floor_caustic=2.60</code>
+      <a class="video-link" href="assets/variant_ax_interactive_env_caustic_tank_high_bitrate.mp4">Open MP4 render</a>
+    </div>
   </div>
 
   <h2>High-Particle 1080p Realism Sweep</h2>
@@ -241,9 +291,10 @@
     <li><code>newton.solvers.SolverSPH</code> is an experimental weakly-compressible SPH solver using Warp kernels and a <code>wp.HashGrid</code> neighbor search.</li>
     <li><code>ViewerBase.log_fluid()</code> adds a backend-neutral fluid logging API. Backends without fluid support fall back to point rendering.</li>
     <li><code>ViewerGL.log_fluid()</code> stores particle centers/radii in a GL buffer and renders them through a screen-space fluid pass.</li>
-    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using shallow/deep optical absorption, chromatic refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, env-map transmission, procedural ripple/caustic strokes, screen-space foam, and a specular highlight.</li>
-    <li>Additional material controls now include blur radius, shallow/deep colors, gradient strength, absorption strength, refraction/reflection strength, environment-map reflection strength, caustic strength/scale, and foam strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
+    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using shallow/deep optical absorption, chromatic refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, env-map transmission, scene-depth floor caustics, procedural ripple/caustic strokes, screen-space foam, and a specular highlight.</li>
+    <li>Additional material controls now include blur radius, shallow/deep colors, gradient strength, absorption strength, depth-cue strength, refraction/reflection strength, environment-map reflection strength/LOD/color preservation, surface caustics, floor caustics, and foam strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
     <li>Particle billboards are expanded in a geometry shader instead of relying on <code>gl_PointCoord</code>, which was unreliable in the target headless GL context.</li>
+    <li><code>example_fluid_sph_interactive_tank.py</code> couples SPH particles to suspended rigid boxes, enables ViewerGL right-click picking, and exposes water shader controls through the live GUI so solver and rendering parameters can be tuned in one demo.</li>
   </ul>
 
   <h2>Visual Variants</h2>
@@ -830,17 +881,20 @@
   </table>
 
   <h2>Examples</h2>
-  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--beach-lighting</code>, <code>--ground-color</code>, <code>--environment-intensity</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-absorption-strength</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, <code>--fluid-foam-strength</code>, <code>--fluid-foam-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--beach-lighting</code>, <code>--ground-color</code>, <code>--environment-intensity</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-absorption-strength</code>, <code>--fluid-depth-visualization-strength</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-env-reflection-lod</code>, <code>--fluid-env-color-preserve</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, <code>--fluid-floor-caustic-strength</code>, <code>--fluid-foam-strength</code>, <code>--fluid-foam-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch also adds <code>newton/examples/fluid/example_fluid_sph_interactive_tank.py</code>. It creates a transparent water body with suspended rigid boxes, applies SPH-to-box coupling forces, enables ViewerGL picking forces, and provides GUI sliders for the water shader, environment intensity/exposure/specular scale, picking stiffness/damping, suspension, and water-box coupling parameters.</p>
   <p>Example invocation:</p>
   <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
+  <pre><code>uv run --extra dev -m newton.examples fluid_sph_interactive_tank --viewer gl --no-show-bounds</code></pre>
 
   <h2>Verification</h2>
   <ul>
     <li><code>uv run --extra dev -m newton.tests -k test_solver_sph</code>: passed on CPU and CUDA, including CUDA graph capture on <code>cuda:0</code>.</li>
     <li><code>uv run --extra dev -m newton.tests -k test_viewer_fluid</code>: passed.</li>
     <li><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer null --test --num-frames 5</code>: passed.</li>
-    <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles, fluid rendering, and the env-map Fresnel water shader.</li>
-    <li>Report media check decoded 44 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, S-AF are 1280x720 with 96 frames each, AG-AN are 1920x1080 with 120 frames each, and AO-AR are 1920x1080 with 90 frames each.</li>
+    <li><code>uv run --extra dev -m newton.examples fluid_sph_interactive_tank --viewer null --test --num-frames 5 --dim-x 10 --dim-y 8 --dim-z 6 --box-count 3</code>: passed.</li>
+    <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles, fluid rendering, env-map Fresnel water, scene-depth floor caustics, and the interactive tank renderer.</li>
+    <li>Report media check decoded 50 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, S-AF are 1280x720 with 96 frames each, AG-AN are 1920x1080 with 120 frames each, AO-AR are 1920x1080 with 90 frames each, AS-AV are 1280x720 with 120 frames each at 30 Mbps CBR, and AW-AX are 1280x720 with 105 frames each at 30 Mbps CBR.</li>
   </ul>
 
   <h2>Next Work</h2>
