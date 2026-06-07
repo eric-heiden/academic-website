@@ -123,10 +123,10 @@
 <main>
   <h1>Newton Fluid Support</h1>
   <p class="lede">Prototype implementation of particle-fluid simulation and ViewerGL water rendering for Newton, focused on giving solver developers a reusable fluid visualization path.</p>
-  <p class="stamp">Generated 2026-06-06 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
+  <p class="stamp">Updated 2026-06-07 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
 
-  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_s_tropical_gradient_hq_poster.jpg" src="assets/variant_s_tropical_gradient_hq.mp4"></video>
-  <p class="caption">Candidate S: high-quality 1280x720 tropical gradient water, blending mint shallows into deeper blue with caustics and Fresnel environment reflection.</p>
+  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_ag_tropical_balanced_26k_1080p_poster.jpg" src="assets/variant_ag_tropical_balanced_26k_1080p.mp4"></video>
+  <p class="caption">Candidate AG: 1920x1080, 26,880 particles, tropical shallow/deep absorption, env-map Fresnel reflection, stronger refraction, and screen-space ripple/caustic detail.</p>
 
   <div class="grid">
     <div class="metric"><span>Solver</span><strong>SolverSPH</strong></div>
@@ -135,7 +135,105 @@
   </div>
 
   <div class="callout">
-    <strong>Current recommendation:</strong> keep the solver intentionally small, but make the ViewerGL fluid renderer the reusable feature. Other Newton solvers can call <code>viewer.log_fluid()</code> with particle centers and radii, then get screen-space depth smoothing, translucent composition, approximate refraction, screen-color reflection, Fresnel-weighted environment reflection, and caustics without reimplementing GL water shaders.
+    <strong>Current recommendation:</strong> keep the solver intentionally small, but make the ViewerGL fluid renderer the reusable feature. Other Newton solvers can call <code>viewer.log_fluid()</code> with particle centers and radii, then get screen-space depth smoothing, translucent composition, tropical optical absorption, approximate refraction, screen-color reflection, Fresnel-weighted environment-map reflection, caustic/ripple distortion, and foam approximation without reimplementing GL water shaders.
+  </div>
+
+  <h2>High-Particle 1080p Realism Sweep</h2>
+  <p>Variants AG-AN are the latest pass. They rerender the dam-break with 26,880 to 42,240 particles at 1920x1080 and use the revised water shader: the repo's ViewerGL environment map is sampled for both Fresnel reflection and refracted transmission, then filtered through a water tint so the indoor panorama contributes highlight structure without turning tropical water brown. The shader also adds optical-depth absorption, procedural ripple distortion, brighter caustic strokes, and softer screen-space foam.</p>
+  <img class="contact-sheet" src="assets/variant_realism_sweep_contact_sheet.jpg" alt="Contact sheet showing high-particle 1080p Newton fluid realism variants">
+  <p class="caption">AG-AN broad-view sweep. AG is the balanced candidate, AH pushes environment reflection, AI pushes refraction, AJ pushes deep-blue absorption, AK pushes caustics, AL pushes foam, and AM/AN use 42,240 particles for smoother surfaces.</p>
+
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ag_tropical_balanced_26k_1080p_poster.jpg" src="assets/variant_ag_tropical_balanced_26k_1080p.mp4"></video>
+      <strong>AG. Tropical balanced: 26,880 particles</strong>
+      <p class="caption">Balanced candidate for the current shader: shallow turquoise, darker depth absorption, moderate env reflection, and restrained foam.</p>
+      <code class="settings">1920x1080; frames=120; particles=26,880; opacity=0.62; thickness=2.15; absorption=2.2; env=0.72; reflect=0.17; refract=0.045; caustic=1.15 @ 185; foam=0.07 @ 45</code>
+      <a class="video-link" href="assets/variant_ag_tropical_balanced_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ah_strong_env_reflection_26k_1080p_poster.jpg" src="assets/variant_ah_strong_env_reflection_26k_1080p.mp4"></video>
+      <strong>AH. Strong env reflection: 26,880 particles</strong>
+      <p class="caption">Pushes the same environment map used for metallic materials so Fresnel reflection is more visible on glancing water angles.</p>
+      <code class="settings">1920x1080; frames=120; particles=26,880; env_intensity=1.75; opacity=0.58; absorption=1.9; env=1.15; reflect=0.24; refract=0.040; caustic=0.95 @ 175</code>
+      <a class="video-link" href="assets/variant_ah_strong_env_reflection_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ai_strong_refraction_26k_1080p_poster.jpg" src="assets/variant_ai_strong_refraction_26k_1080p.mp4"></video>
+      <strong>AI. Strong refraction: 26,880 particles</strong>
+      <p class="caption">More transparent water with stronger normal and ripple-driven refraction. Useful for judging distortion before it becomes too noisy.</p>
+      <code class="settings">1920x1080; frames=120; particles=26,880; opacity=0.52; thickness=1.70; absorption=1.55; env=0.58; reflect=0.13; refract=0.095; caustic=1.35 @ 205</code>
+      <a class="video-link" href="assets/variant_ai_strong_refraction_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_aj_deep_blue_absorption_26k_1080p_poster.jpg" src="assets/variant_aj_deep_blue_absorption_26k_1080p.mp4"></video>
+      <strong>AJ. Deep blue absorption: 26,880 particles</strong>
+      <p class="caption">Pushes tropical depth grading harder: shallow water stays turquoise while thicker regions move toward darker lagoon blue.</p>
+      <code class="settings">1920x1080; frames=120; particles=26,880; opacity=0.78; thickness=3.20; absorption=3.2; deep=(0.0, 0.02, 0.30); env=0.62; refract=0.040</code>
+      <a class="video-link" href="assets/variant_aj_deep_blue_absorption_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ak_caustic_focus_26k_1080p_poster.jpg" src="assets/variant_ak_caustic_focus_26k_1080p.mp4"></video>
+      <strong>AK. Caustic focus: 26,880 particles</strong>
+      <p class="caption">Stress test for visible caustic/ripple strokes. This remains a screen-space approximation, not floor-projected photon caustics.</p>
+      <code class="settings">1920x1080; frames=120; particles=26,880; opacity=0.62; thickness=1.95; absorption=1.7; env=0.68; refract=0.060; caustic=2.60 @ 260</code>
+      <a class="video-link" href="assets/variant_ak_caustic_focus_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_al_soft_edge_foam_26k_1080p_poster.jpg" src="assets/variant_al_soft_edge_foam_26k_1080p.mp4"></video>
+      <strong>AL. Soft edge foam: 26,880 particles</strong>
+      <p class="caption">Foam is now a softer thickness/curvature edge band with procedural breakup. Solver-side foam particles are still a future step.</p>
+      <code class="settings">1920x1080; frames=120; particles=26,880; opacity=0.65; thickness=2.05; absorption=2.0; env=0.70; refract=0.050; foam=0.38 @ 35</code>
+      <a class="video-link" href="assets/variant_al_soft_edge_foam_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_am_ultra_dense_smooth_42k_1080p_poster.jpg" src="assets/variant_am_ultra_dense_smooth_42k_1080p.mp4"></video>
+      <strong>AM. Ultra dense smooth: 42,240 particles</strong>
+      <p class="caption">Higher particle density and wider smoothing. This is the best broad-view check for hiding individual particle samples.</p>
+      <code class="settings">1920x1080; frames=120; particles=42,240; radius_scale=2.65; blur=22 x 4.1; opacity=0.62; thickness=2.20; absorption=2.2; env=0.72</code>
+      <a class="video-link" href="assets/variant_am_ultra_dense_smooth_42k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_an_ultra_dense_reflective_deep_42k_1080p_poster.jpg" src="assets/variant_an_ultra_dense_reflective_deep_42k_1080p.mp4"></video>
+      <strong>AN. Ultra dense reflective deep: 42,240 particles</strong>
+      <p class="caption">Dense-particle version with more reflection, refraction, and deep-water absorption.</p>
+      <code class="settings">1920x1080; frames=120; particles=42,240; opacity=0.72; thickness=2.85; absorption=2.6; env=0.95; reflect=0.22; refract=0.065; caustic=1.45 @ 220</code>
+      <a class="video-link" href="assets/variant_an_ultra_dense_reflective_deep_42k_1080p.mp4">Open MP4 render</a>
+    </div>
+  </div>
+
+  <h3>Close-Up Optical Stress Tests</h3>
+  <p>Variants AO-AR use the same 26,880-particle setup but record an earlier, taller fluid state from a closer camera. These are less useful as final beauty shots, but they make reflection/refraction/caustic/foam artifacts easier to evaluate than a flat puddle.</p>
+  <img class="contact-sheet" src="assets/variant_closeup_realism_contact_sheet.jpg" alt="Contact sheet showing close-up Newton fluid optical stress-test variants">
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ao_closeup_env_refraction_26k_1080p_poster.jpg" src="assets/variant_ao_closeup_env_refraction_26k_1080p.mp4"></video>
+      <strong>AO. Close-up env + refraction</strong>
+      <p class="caption">Close view with strong env-map reflection and refracted transmission through thicker water.</p>
+      <code class="settings">1920x1080; frames=90; particles=26,880; opacity=0.62; thickness=2.35; absorption=2.4; env=1.05; reflect=0.24; refract=0.075; caustic=1.55 @ 210</code>
+      <a class="video-link" href="assets/variant_ao_closeup_env_refraction_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ap_closeup_deep_lagoon_26k_1080p_poster.jpg" src="assets/variant_ap_closeup_deep_lagoon_26k_1080p.mp4"></video>
+      <strong>AP. Close-up deep lagoon</strong>
+      <p class="caption">Darkest absorption trial for evaluating whether deep regions read as blue water rather than uniform aqua.</p>
+      <code class="settings">1920x1080; frames=90; particles=26,880; opacity=0.82; thickness=3.70; absorption=4.2; deep=(0.0, 0.015, 0.24); env=0.78; refract=0.050</code>
+      <a class="video-link" href="assets/variant_ap_closeup_deep_lagoon_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_aq_closeup_caustic_foam_26k_1080p_poster.jpg" src="assets/variant_aq_closeup_caustic_foam_26k_1080p.mp4"></video>
+      <strong>AQ. Close-up caustic foam</strong>
+      <p class="caption">Pushes screen-space caustics and foam together to expose where the approximation becomes too busy.</p>
+      <code class="settings">1920x1080; frames=90; particles=26,880; opacity=0.66; thickness=2.50; absorption=2.5; caustic=3.20 @ 245; foam=0.55 @ 30</code>
+      <a class="video-link" href="assets/variant_aq_closeup_caustic_foam_26k_1080p.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_ar_closeup_clear_high_refraction_26k_1080p_poster.jpg" src="assets/variant_ar_closeup_clear_high_refraction_26k_1080p.mp4"></video>
+      <strong>AR. Close-up clear high refraction</strong>
+      <p class="caption">Most transparent/high-refraction trial. Useful for judging whether the refracted checker and env-map transmission are too strong.</p>
+      <code class="settings">1920x1080; frames=90; particles=26,880; opacity=0.48; thickness=1.65; absorption=1.55; env=0.70; reflect=0.16; refract=0.120; caustic=1.85 @ 220</code>
+      <a class="video-link" href="assets/variant_ar_closeup_clear_high_refraction_26k_1080p.mp4">Open MP4 render</a>
+    </div>
   </div>
 
   <h2>Architecture</h2>
@@ -143,8 +241,8 @@
     <li><code>newton.solvers.SolverSPH</code> is an experimental weakly-compressible SPH solver using Warp kernels and a <code>wp.HashGrid</code> neighbor search.</li>
     <li><code>ViewerBase.log_fluid()</code> adds a backend-neutral fluid logging API. Backends without fluid support fall back to point rendering.</li>
     <li><code>ViewerGL.log_fluid()</code> stores particle centers/radii in a GL buffer and renders them through a screen-space fluid pass.</li>
-    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using shallow/deep color gradients, refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, procedural caustic strokes, and a specular highlight.</li>
-    <li>Additional material controls now include blur radius, shallow/deep colors, gradient strength, refraction/reflection strength, environment-map reflection strength, and caustic strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
+    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using shallow/deep optical absorption, chromatic refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, env-map transmission, procedural ripple/caustic strokes, screen-space foam, and a specular highlight.</li>
+    <li>Additional material controls now include blur radius, shallow/deep colors, gradient strength, absorption strength, refraction/reflection strength, environment-map reflection strength, caustic strength/scale, and foam strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
     <li>Particle billboards are expanded in a geometry shader instead of relying on <code>gl_PointCoord</code>, which was unreliable in the target headless GL context.</li>
   </ul>
 
@@ -716,7 +814,7 @@
       <tr>
         <td>Fluid rendering</td>
         <td>Screen-space GL pass</td>
-        <td>Depth, thickness, bilateral smoothing, translucent composition, approximate reflection/refraction, Fresnel-weighted environment-map reflection, and procedural caustic highlights.</td>
+        <td>Depth, thickness, bilateral smoothing, translucent composition, tropical absorption, approximate reflection/refraction, Fresnel-weighted environment-map reflection, env-map transmission, ripple distortion, and procedural caustic highlights.</td>
       </tr>
       <tr>
         <td>Surface smoothing</td>
@@ -732,7 +830,7 @@
   </table>
 
   <h2>Examples</h2>
-  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, <code>--fluid-foam-strength</code>, <code>--fluid-foam-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--beach-lighting</code>, <code>--ground-color</code>, <code>--environment-intensity</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-absorption-strength</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, <code>--fluid-foam-strength</code>, <code>--fluid-foam-scale</code>, and <code>--capture-graph</code>.</p>
   <p>Example invocation:</p>
   <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
 
@@ -742,7 +840,7 @@
     <li><code>uv run --extra dev -m newton.tests -k test_viewer_fluid</code>: passed.</li>
     <li><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer null --test --num-frames 5</code>: passed.</li>
     <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles, fluid rendering, and the env-map Fresnel water shader.</li>
-    <li>Report media check decoded 32 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, and S-AF are high-quality 1280x720 with 96 frames each.</li>
+    <li>Report media check decoded 44 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, S-AF are 1280x720 with 96 frames each, AG-AN are 1920x1080 with 120 frames each, and AO-AR are 1920x1080 with 90 frames each.</li>
   </ul>
 
   <h2>Next Work</h2>
