@@ -125,8 +125,8 @@
   <p class="lede">Prototype implementation of particle-fluid simulation and ViewerGL water rendering for Newton, focused on giving solver developers a reusable fluid visualization path.</p>
   <p class="stamp">Generated 2026-06-06 from branch <code>eric-heiden/fluid-support</code>, based on <code>origin/main a046d613</code>. Media was rendered with <code>ViewerGL.get_frame()</code>.</p>
 
-  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_k_beach_fresnel_default_poster.jpg" src="assets/variant_k_beach_fresnel_default.mp4"></video>
-  <p class="caption">Candidate K: brighter turquoise beach-water material with caustics and Fresnel-weighted environment-map reflection.</p>
+  <video class="video" controls muted loop playsinline preload="metadata" poster="assets/variant_s_tropical_gradient_hq_poster.jpg" src="assets/variant_s_tropical_gradient_hq.mp4"></video>
+  <p class="caption">Candidate S: high-quality 1280x720 tropical gradient water, blending mint shallows into deeper blue with caustics and Fresnel environment reflection.</p>
 
   <div class="grid">
     <div class="metric"><span>Solver</span><strong>SolverSPH</strong></div>
@@ -143,8 +143,8 @@
     <li><code>newton.solvers.SolverSPH</code> is an experimental weakly-compressible SPH solver using Warp kernels and a <code>wp.HashGrid</code> neighbor search.</li>
     <li><code>ViewerBase.log_fluid()</code> adds a backend-neutral fluid logging API. Backends without fluid support fall back to point rendering.</li>
     <li><code>ViewerGL.log_fluid()</code> stores particle centers/radii in a GL buffer and renders them through a screen-space fluid pass.</li>
-    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using translucent color, refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, procedural caustic strokes, and a specular highlight.</li>
-    <li>Additional material controls now include blur radius, refraction/reflection strength, environment-map reflection strength, and caustic strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
+    <li>The ViewerGL pass writes nearest fluid depth and optical thickness, applies separable bilateral depth smoothing, then composites water over the opaque scene using shallow/deep color gradients, refraction offsets, screen-color reflection, Fresnel-weighted environment-map reflection, procedural caustic strokes, and a specular highlight.</li>
+    <li>Additional material controls now include blur radius, shallow/deep colors, gradient strength, refraction/reflection strength, environment-map reflection strength, and caustic strength/scale, so fluid solver authors can iterate visually without rewriting shaders.</li>
     <li>Particle billboards are expanded in a geometry shader instead of relying on <code>gl_PointCoord</code>, which was unreliable in the target headless GL context.</li>
   </ul>
 
@@ -446,6 +446,113 @@
     </tbody>
   </table>
 
+  <h2>High-Quality Tropical Gradient Sweep</h2>
+  <p>Variants S-X use the new shallow/deep color-gradient controls and were rendered at 1280x720 with 96 frames per clip. The palette options are based on typical tropical beach water: pale mint or emerald shallows, cyan mid-water, deeper blue/teal thickness, white-blue caustic highlights, and subtle Fresnel environment reflection.</p>
+  <img class="contact-sheet" src="assets/variant_gradient_hq_contact_sheet.jpg" alt="Contact sheet showing six high-quality tropical gradient Newton fluid renders">
+  <p class="caption">Contact sheet for the high-quality tropical gradient videos. These are the preferred clips for visual feedback because they preserve more resolution than the earlier A-R exploration renders.</p>
+
+  <div class="variant-grid">
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_s_tropical_gradient_hq_poster.jpg" src="assets/variant_s_tropical_gradient_hq.mp4"></video>
+      <strong>S. HQ tropical gradient: mint shallows to blue depth</strong>
+      <p class="caption">Recommended high-quality direction. Mint/aqua shallow color blends into deeper tropical blue, with moderate env reflection and caustics.</p>
+      <code class="settings">1280x720; frames=96; particles=1,008; shallow=(0.16, 1.00, 0.90); deep=(0.00, 0.42, 0.84); gradient=0.78; env=0.30; caustic=0.86 @ 145</code>
+      <a class="video-link" href="assets/variant_s_tropical_gradient_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_t_lagoon_emerald_hq_poster.jpg" src="assets/variant_t_lagoon_emerald_hq.mp4"></video>
+      <strong>T. HQ lagoon emerald: green shallows, teal depth</strong>
+      <p class="caption">Greener lagoon palette. This keeps the water bright without pushing as far into cobalt blue.</p>
+      <code class="settings">1280x720; frames=96; particles=1,008; shallow=(0.05, 0.96, 0.74); deep=(0.02, 0.48, 0.78); gradient=0.88; env=0.24; caustic=0.95 @ 160</code>
+      <a class="video-link" href="assets/variant_t_lagoon_emerald_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_u_reef_cobalt_hq_poster.jpg" src="assets/variant_u_reef_cobalt_hq.mp4"></video>
+      <strong>U. HQ reef cobalt: cyan surface, cobalt depth</strong>
+      <p class="caption">More saturated deep-water option. The surface stays cyan while thicker regions shift toward reef-blue/cobalt.</p>
+      <code class="settings">1280x720; frames=96; particles=1,008; shallow=(0.20, 0.95, 1.00); deep=(0.00, 0.22, 0.78); gradient=0.95; env=0.42; caustic=0.74 @ 135</code>
+      <a class="video-link" href="assets/variant_u_reef_cobalt_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_v_sandbar_mint_hq_poster.jpg" src="assets/variant_v_sandbar_mint_hq.mp4"></video>
+      <strong>V. HQ sandbar mint: pale shallows, soft depth</strong>
+      <p class="caption">Lighter and shallower, closer to water over sand. The lower opacity and lighter shallow color make it less glassy.</p>
+      <code class="settings">1280x720; frames=96; particles=1,008; shallow=(0.56, 1.00, 0.82); deep=(0.06, 0.68, 0.90); gradient=0.64; env=0.28; caustic=1.05 @ 170</code>
+      <a class="video-link" href="assets/variant_v_sandbar_mint_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_w_vivid_caustic_gradient_hq_poster.jpg" src="assets/variant_w_vivid_caustic_gradient_hq.mp4"></video>
+      <strong>W. HQ vivid caustics: strong color gradient + caustics</strong>
+      <p class="caption">Stress test for bright caustic strokes and stronger blue-green variation. Useful if the default still feels too flat.</p>
+      <code class="settings">1280x720; frames=96; particles=1,008; shallow=(0.12, 0.96, 0.95); deep=(0.02, 0.30, 0.95); gradient=0.92; env=0.32; caustic=1.45 @ 215</code>
+      <a class="video-link" href="assets/variant_w_vivid_caustic_gradient_hq.mp4">Open MP4 render</a>
+    </div>
+    <div class="variant">
+      <video controls muted loop playsinline preload="metadata" poster="assets/variant_x_dense_tropical_gradient_hq_poster.jpg" src="assets/variant_x_dense_tropical_gradient_hq.mp4"></video>
+      <strong>X. HQ dense tropical: 10,080 particles + gradient</strong>
+      <p class="caption">Combines the tropical gradient material with denser SPH particles. This reduces the particle-cell look before smoothing.</p>
+      <code class="settings">1280x720; frames=96; particles=10,080; shallow=(0.18, 0.96, 1.00); deep=(0.00, 0.40, 0.88); gradient=0.82; env=0.34; caustic=0.84 @ 150</code>
+      <a class="video-link" href="assets/variant_x_dense_tropical_gradient_hq.mp4">Open MP4 render</a>
+    </div>
+  </div>
+
+  <h3>HQ Gradient Settings Matrix</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Palette</th>
+        <th>Particles</th>
+        <th>Gradient settings</th>
+        <th>Render/material settings</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>S</td>
+        <td>Mint shallow to blue depth</td>
+        <td>1,008</td>
+        <td><code>shallow=(0.16,1.00,0.90)</code>, <code>deep=(0.00,0.42,0.84)</code>, <code>gradient=0.78</code></td>
+        <td><code>1280x720</code>, <code>blur=10 x 2.45</code>, <code>env=0.30</code>, <code>caustic=0.86 @ 145</code></td>
+      </tr>
+      <tr>
+        <td>T</td>
+        <td>Emerald lagoon</td>
+        <td>1,008</td>
+        <td><code>shallow=(0.05,0.96,0.74)</code>, <code>deep=(0.02,0.48,0.78)</code>, <code>gradient=0.88</code></td>
+        <td><code>1280x720</code>, <code>blur=9 x 2.35</code>, <code>env=0.24</code>, <code>caustic=0.95 @ 160</code></td>
+      </tr>
+      <tr>
+        <td>U</td>
+        <td>Cyan to cobalt reef</td>
+        <td>1,008</td>
+        <td><code>shallow=(0.20,0.95,1.00)</code>, <code>deep=(0.00,0.22,0.78)</code>, <code>gradient=0.95</code></td>
+        <td><code>1280x720</code>, <code>blur=10 x 2.45</code>, <code>env=0.42</code>, <code>caustic=0.74 @ 135</code></td>
+      </tr>
+      <tr>
+        <td>V</td>
+        <td>Pale sandbar mint</td>
+        <td>1,008</td>
+        <td><code>shallow=(0.56,1.00,0.82)</code>, <code>deep=(0.06,0.68,0.90)</code>, <code>gradient=0.64</code></td>
+        <td><code>1280x720</code>, <code>opacity=0.52</code>, <code>env=0.28</code>, <code>caustic=1.05 @ 170</code></td>
+      </tr>
+      <tr>
+        <td>W</td>
+        <td>Vivid caustic gradient</td>
+        <td>1,008</td>
+        <td><code>shallow=(0.12,0.96,0.95)</code>, <code>deep=(0.02,0.30,0.95)</code>, <code>gradient=0.92</code></td>
+        <td><code>1280x720</code>, <code>env=0.32</code>, <code>caustic=1.45 @ 215</code>, <code>refract=0.060</code></td>
+      </tr>
+      <tr>
+        <td>X</td>
+        <td>Dense tropical gradient</td>
+        <td>10,080</td>
+        <td><code>shallow=(0.18,0.96,1.00)</code>, <code>deep=(0.00,0.40,0.88)</code>, <code>gradient=0.82</code></td>
+        <td><code>1280x720</code>, <code>blur=10 x 2.15</code>, <code>env=0.34</code>, <code>caustic=0.84 @ 150</code></td>
+      </tr>
+    </tbody>
+  </table>
+
   <h2>Rendering Prototype</h2>
   <video class="video wide" controls muted loop playsinline preload="metadata" poster="assets/raw_particles_vs_fluid_poster.jpg" src="assets/raw_particles_vs_fluid.mp4"></video>
   <p class="caption">The same SPH state rendered as raw particle spheres and as the new ViewerGL fluid surface. The fluid path is rendering-only; it does not change solver state.</p>
@@ -490,7 +597,7 @@
   </table>
 
   <h2>Examples</h2>
-  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, and <code>--capture-graph</code>.</p>
+  <p>The branch adds <code>newton/examples/fluid/example_fluid_sph_dam_break.py</code>. It exposes the SPH parameters and ViewerGL fluid controls, including <code>--render-mode</code>, <code>--fluid-color</code>, <code>--fluid-deep-color</code>, <code>--fluid-color-gradient-strength</code>, <code>--fluid-radius-scale</code>, <code>--fluid-smoothing-iterations</code>, <code>--fluid-smoothing-radius</code>, <code>--fluid-thickness-scale</code>, <code>--fluid-env-map-strength</code>, <code>--fluid-caustic-strength</code>, <code>--fluid-caustic-scale</code>, and <code>--capture-graph</code>.</p>
   <p>Example invocation:</p>
   <pre><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer gl --headless --no-show-bounds</code></pre>
 
@@ -500,7 +607,7 @@
     <li><code>uv run --extra dev -m newton.tests -k test_viewer_fluid</code>: passed.</li>
     <li><code>uv run --extra dev -m newton.examples fluid_sph_dam_break --viewer null --test --num-frames 5</code>: passed.</li>
     <li>Headless OpenGL smoke tests generated nonblank frames through <code>ViewerGL.get_frame()</code> for raw particles, fluid rendering, and the env-map Fresnel water shader.</li>
-    <li>Report media check decoded 18 variant MP4 renders at 960x540: A-J have 54 frames each, and K-R have 72 frames each.</li>
+    <li>Report media check decoded 24 variant MP4 renders: A-J are 960x540 with 54 frames each, K-R are 960x540 with 72 frames each, and S-X are high-quality 1280x720 with 96 frames each.</li>
   </ul>
 
   <h2>Next Work</h2>
