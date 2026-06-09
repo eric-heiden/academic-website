@@ -158,26 +158,116 @@
   <header>
     <p class="eyebrow">Newton selection and USD import design</p>
     <h1>Newton assets without ArticulationRootAPI</h1>
-    <p class="lead">Investigation of how Newton should treat USD mechanisms that author rigid bodies and joints but no articulation root. The focus is RL-facing selection APIs, cyclic mechanisms, and whether importer-side compatibility should synthesize articulations.</p>
+    <p class="lead">Investigation of how Newton should treat USD mechanisms that author rigid bodies and joints but no articulation root, with a concrete mapping from Isaac Lab's <code>ArticulationData</code> contract to Newton APIs for rootless and closed-loop mechanisms.</p>
   </header>
   <main>
     <section>
       <h2>Executive summary</h2>
       <div class="cards">
-        <div class="card"><strong>Fix the importer inconsistency</strong><p>The local Newton fix is the right baseline: rootless body-to-world fixed joints should remain orphan joints, not create a one-joint articulation while the rest of the mechanism stays in articulation <code>-1</code>.</p></div>
-        <div class="card"><strong>Add a joint-centric selection API</strong><p>A <code>JointView</code> in <code>newton.selection</code> should be the primary RL answer for no-root maximal-coordinate mechanisms. It can query and set joint state, targets, and controls by path without pretending there is a kinematic tree.</p></div>
-        <div class="card"><strong>Keep invented articulations opt-in</strong><p>Importer-inferred articulations are useful for compatibility with <code>ArticulationView</code>, FK, and MuJoCo, but cyclic models require deterministic tree/loop partitioning and joint reordering. This should not be silent default behavior.</p></div>
+        <div class="card"><strong>Keep the importer invariant</strong><p>If a USD asset has no <code>PhysicsArticulationRootAPI</code>, Newton should not silently create partial articulation metadata. The local fix makes rootless joints consistently rootless.</p></div>
+        <div class="card"><strong>Expose mechanisms, not just joints</strong><p>Isaac Lab needs more than <code>joint_pos</code> and <code>joint_vel</code>. It needs an asset-level, batched state and command contract covering joints, bodies, root state, defaults, limits, and actuator metadata.</p></div>
+        <div class="card"><strong>Make tree inference explicit</strong><p>Invented articulations are a compatibility tool for FK, MuJoCo, and tree-only APIs. They should be opt-in because cyclic mechanisms require a spanning tree choice and loop-joint handling.</p></div>
       </div>
-      <p class="verdict">Recommendation: implement <code>JointView</code> first, then add an explicit importer compatibility mode such as <code>rootless_articulation_policy="infer_tree"</code>. Do not ask Isaac Lab to own this as a permanent <code>ClosedLoopView</code> workaround; the abstraction belongs in Newton because Newton owns the canonical joint labels, coordinate ranges, solver compatibility, and articulation metadata.</p>
-      <p>For Isaac Lab, the required replacement is larger than returning a list of joints. Isaac Lab's <code>ArticulationData</code> is a cached, batched tensor interface for robot state, default reset state, body/link state, joint state, joint properties, limits, and command targets. <code>JointView</code> is the right low-level primitive for rootless mechanisms, but Isaac Lab also needs a mechanism-level composition of joint, body, and root views to preserve its reset, observation, reward, and actuator paths.</p>
-      <p class="note">Raw data: <a href="no_articulation_results.json">asset analysis JSON</a> and <a href="solver_smoke_results.json">solver smoke JSON</a>. External context: Isaac Lab PR <a href="https://github.com/isaac-sim/IsaacLab/pull/6027">isaac-sim/IsaacLab#6027</a> and the Isaac Lab <a href="https://isaac-sim.github.io/IsaacLab/main/_modules/isaaclab/assets/articulation/articulation_data.html">ArticulationData source</a>.</p>
+      <p class="verdict">Recommendation: add a Newton-native <code>MechanismView</code> for rootless maximal-coordinate mechanisms, composed from <code>JointView</code>, <code>BodyView</code>, and a root/base policy. <code>JointView</code> is necessary, but not sufficient for Isaac Lab. Then add an explicit importer compatibility mode such as <code>rootless_articulation_policy="infer_tree"</code> for users who need tree-compatible tooling.</p>
+      <p class="note">Raw data: <a href="no_articulation_results.json">asset analysis JSON</a> and <a href="solver_smoke_results.json">solver smoke JSON</a>. External context: Isaac Lab PR <a href="https://github.com/isaac-sim/IsaacLab/pull/6027">isaac-sim/IsaacLab#6027</a>, the Isaac Lab <a href="https://isaac-sim.github.io/IsaacLab/main/_modules/isaaclab/assets/articulation/articulation_data.html">ArticulationData source</a>, and the Isaac Lab <a href="https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab/isaaclab/assets/articulation/articulation.py">Articulation source</a>.</p>
     </section>
 
     <section>
-      <h2>What changed in Newton</h2>
+      <h2>Importer baseline</h2>
       <p>The bug was not that Newton refused to treat a rootless asset as an articulation. The bug was that one special case did synthesize an articulation: a body-to-world fixed joint with no <code>PhysicsArticulationRootAPI</code>. That produced mixed metadata: the root joint belonged to articulation 0 while the rest of the asset remained in articulation <code>-1</code>.</p>
       <p>The committed fix removes that special case. A no-root asset now imports consistently as a set of orphan joints. Normal <code>finalize()</code> raises and tells the caller to use <code>skip_validation_joints=True</code>; maximal-coordinate solvers can then consume the authored joint graph directly.</p>
       <p class="warning verdict">This is deliberately not a user experience endpoint. It is a better invariant: no USD articulation root means no Newton articulation metadata unless a caller explicitly requests compatibility inference.</p>
+    </section>
+
+    <section>
+      <h2>What <code>ArticulationData</code> does</h2>
+      <p>In Isaac Lab, <code>ArticulationData</code> is the cached tensor state behind <code>Articulation.data</code>. It is not just a convenience wrapper around joint arrays. It is the robot data contract used by tasks, managers, actuators, reset events, observations, rewards, termination logic, sensors, and randomization code.</p>
+      <p>The surrounding <code>Articulation</code> class owns the simulator view, applies actuator models, writes commands to simulation, and exposes finders such as <code>find_joints()</code> and <code>find_bodies()</code>. <code>ArticulationData</code> stores and lazily updates the tensors those systems read.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>What <code>ArticulationData</code> provides</th><th>Why Isaac Lab needs it</th></tr></thead>
+          <tbody>
+            <tr><td>Identity and batching</td><td><code>body_names</code>, <code>joint_names</code>, tendon names, instance count, body count, joint count, and stable per-instance order.</td><td>Task configs address joints and bodies by name expressions. Managers need deterministic indices and identical tensor shapes across environments.</td></tr>
+            <tr><td>Default reset state</td><td><code>default_root_state</code>, <code>default_joint_pos</code>, <code>default_joint_vel</code>, default mass, inertia, and default joint properties parsed from simulation or config.</td><td>Reset events clone defaults, apply noise, clamp to limits, and write the state back into selected environments.</td></tr>
+            <tr><td>Root state</td><td><code>root_state_w</code>, <code>root_link_state_w</code>, <code>root_com_state_w</code>, plus sliced position, orientation, linear velocity, and angular velocity views.</td><td>Locomotion rewards, base observations, commands, terminations, and resets need a consistent base convention even when the USD did not define an articulation root.</td></tr>
+            <tr><td>Body and link state</td><td><code>body_state_w</code>, <code>body_link_state_w</code>, <code>body_com_state_w</code>, <code>body_com_acc_w</code>, and local COM poses.</td><td>Rewards, contacts, frame transforms, sensors, termination checks, and domain randomization often operate on links, not just joints.</td></tr>
+            <tr><td>Joint state</td><td><code>joint_pos</code>, <code>joint_vel</code>, and finite-difference <code>joint_acc</code>, shaped <code>(num_instances, num_joints)</code>.</td><td>Policies observe joint state, reset code writes joint state, and actuator models compute commands from joint position and velocity errors.</td></tr>
+            <tr><td>Joint properties</td><td>Position, velocity, and effort limits; stiffness; damping; armature; static, dynamic, and viscous friction; soft position and velocity limits; gear ratios.</td><td>Isaac Lab uses these for clipping actions, configuring actuator models, randomizing dynamics, computing safety regions, and validating reset states.</td></tr>
+            <tr><td>Command buffers</td><td><code>joint_pos_target</code>, <code>joint_vel_target</code>, <code>joint_effort_target</code>, <code>computed_torque</code>, and <code>applied_torque</code>.</td><td>Explicit actuators produce torques from targets. Implicit actuators pass targets to the simulator. RL code expects both paths to use the same asset interface.</td></tr>
+            <tr><td>Derived observations</td><td><code>projected_gravity_b</code>, <code>heading_w</code>, root velocities in base frame, COM-derived link velocities, and sliced convenience tensors.</td><td>Many standard locomotion and manipulation observations are built from these cached derived tensors.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="verdict">Therefore, Isaac Lab does not only need a Newton API that can select joints. It needs a Newton API that can act as the canonical batched mechanism handle for reset, control, observation, reward, and property access.</p>
+    </section>
+
+    <section>
+      <h2>What Isaac Lab needs from Newton</h2>
+      <p>For rootless closed-loop assets, Isaac Lab needs a Newton object that can replace the simulator-facing role of an articulation view without claiming reduced-coordinate tree semantics. The core requirement is a batched mechanism interface: select one robot per environment, expose stable joint/body/root tensors, write resets and commands, and surface properties for actuator setup and randomization.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Need</th><th>Newton should provide</th><th>Notes for no-root and closed-loop assets</th></tr></thead>
+          <tbody>
+            <tr><td>Asset selection</td><td>Path or regex matching for bodies, joints, and shapes under a robot path, with explicit include/exclude filters.</td><td>The workaround in PR #6027 assumes all bodies and joints in a world belong to the robot. Newton should not force Isaac Lab to make that assumption.</td></tr>
+            <tr><td>Stable indexing</td><td><code>joint_ids</code>, <code>body_ids</code>, <code>shape_ids</code>, <code>joint_coord_ids</code>, <code>joint_dof_ids</code>, names, labels, and deterministic per-world ordering.</td><td>Isaac Lab configs resolve names once, then use indices repeatedly. Reordering or hidden filtering must be explicit and reproducible.</td></tr>
+            <tr><td>Batched reads</td><td>Root, body, COM, and joint state tensors shaped by environment and selected entity: <code>(num_envs, ...)</code> or <code>(num_envs, num_entities, ...)</code>.</td><td>Use Warp gather/view kernels under the hood. Do not require Python indexing through global arrays for every task.</td></tr>
+            <tr><td>Batched writes</td><td>Per-environment writes for root pose/velocity, body pose/velocity where meaningful, joint position/velocity state, joint targets, efforts, and external body wrenches.</td><td>Reset code needs partial <code>env_ids</code> and partial <code>joint_ids</code>. It also expects cached data to be updated or invalidated consistently.</td></tr>
+            <tr><td>Actuator support</td><td>Joint target buffers, effort buffers, computed/applied effort reporting, and property tensors for explicit and implicit actuator models.</td><td>Closed-loop mechanisms still need action clipping, PD control, effort limits, and actuator grouping by joint-name expressions.</td></tr>
+            <tr><td>Properties and defaults</td><td>Default root state, default joint state, mass, inertia, joint limits, velocity limits, effort limits, stiffness, damping, armature, friction, soft limits, and gear ratios.</td><td>These are not optional for RL. They are used in resets, randomization, action scaling, and actuator initialization.</td></tr>
+            <tr><td>Root/base policy</td><td>A declared root body and base mode: fixed-base, authored floating-base, implicit floating-base, or no root state.</td><td>No-root USDs do not tell Isaac Lab which body should become the base. Newton should require or infer this policy and expose it in the view.</td></tr>
+            <tr><td>Closed-loop semantics</td><td>Loop joints remain normal solver-visible constraints in maximal-coordinate solvers. Tree-only features are marked unavailable or require an inferred tree mode.</td><td>Do not hide loop-closing joints from Kamino, XPBD, or Semi-Implicit just to satisfy <code>ArticulationView</code>-style APIs.</td></tr>
+            <tr><td>Unsupported tree features</td><td>Clear errors or capability flags for FK, Jacobians, mass matrices, and reduced-coordinate operations when no tree articulation exists.</td><td>Isaac Lab can branch on capabilities if Newton reports them directly.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Concrete adapter surface</h3>
+      <p>For Isaac Lab to remove a local <code>ClosedLoopView</code> workaround, Newton should provide enough of this surface directly or through a thin adapter:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Category</th><th>Expected surface</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Counts and names</td><td><code>count</code>, <code>world_count</code>, <code>count_per_world</code>, <code>joint_coord_count</code>, <code>joint_dof_count</code>, <code>link_count</code>, <code>joint_names</code>, <code>joint_dof_names</code>, <code>body_names</code>, <code>link_names</code>.</td><td>Let Isaac Lab size buffers, resolve name expressions, and maintain one robot view per environment.</td></tr>
+            <tr><td>Index maps</td><td><code>joint_ids</code>, <code>body_ids</code>, <code>shape_ids</code>, <code>joint_coord_ids</code>, <code>joint_dof_ids</code>, per-world strides, and selected global-array offsets.</td><td>Avoid raw-array guessing in Isaac Lab and make gathered tensors deterministic.</td></tr>
+            <tr><td>Base metadata</td><td><code>is_fixed_base</code>, <code>is_floating_base</code>, <code>root_body_id</code>, <code>root_joint_id</code> if authored, <code>implicit_free_base</code>, and capability flags.</td><td>Replace the articulation-root assumption with an explicit base convention.</td></tr>
+            <tr><td>State readers</td><td><code>get_root_transforms()</code>, <code>get_root_velocities()</code>, <code>get_link_transforms()</code>, <code>get_link_velocities()</code>, <code>get_body_coms()</code>, <code>get_dof_positions()</code>, <code>get_dof_velocities()</code>.</td><td>Feed <code>ArticulationData</code>-style cached tensors for observations, rewards, and resets.</td></tr>
+            <tr><td>State writers</td><td>Set root pose/velocity, joint position/velocity state, body pose/velocity when supported, and invalidate or refresh cached derived tensors.</td><td>Support Isaac Lab reset events with partial <code>env_ids</code> and partial joint/body selections.</td></tr>
+            <tr><td>Command writers</td><td>Set joint position targets, velocity targets, effort targets, direct joint forces, and external body forces/torques.</td><td>Support both implicit target-based control and explicit actuator models.</td></tr>
+            <tr><td>Property access</td><td>Read and optionally write joint limits, velocity limits, effort limits, stiffness, damping, armature, friction, mass, inertia, soft limits, and gear ratio data.</td><td>Support actuator initialization, action clipping, domain randomization, and safety limits.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="verdict">The minimum useful API is not <code>JointView</code>; it is <code>MechanismView</code>. <code>JointView</code> should be the joint slice of that mechanism, but Isaac Lab needs the whole mechanism contract.</p>
+    </section>
+
+    <section>
+      <h2>Proposed Newton API layers</h2>
+      <p>The clean architecture is to separate selection from semantics. A rootless mechanism can be selected and controlled without pretending it is a reduced-coordinate articulation.</p>
+      <div class="cards">
+        <div class="card"><strong><code>JointView</code></strong><p>Selects joints by path/name/type, maps joints to coordinate and DOF ranges, reads and writes joint state, targets, controls, and joint properties.</p></div>
+        <div class="card"><strong><code>BodyView</code></strong><p>Selects bodies and shapes by path/name, reads body/link/COM transforms and velocities, applies body wrenches, and exposes mass, inertia, shape membership, and contact-facing ids.</p></div>
+        <div class="card"><strong><code>MechanismView</code></strong><p>Composes joint, body, and root/base access for one asset per environment. This is the Newton object Isaac Lab should adapt to for rootless mechanisms.</p></div>
+      </div>
+      <p><code>MechanismView</code> should expose capability flags such as <code>supports_fk</code>, <code>supports_mass_matrix</code>, <code>supports_loop_joints</code>, <code>supports_root_state</code>, and <code>supports_articulation_tree</code>. Then Isaac Lab can distinguish a true articulation from a maximal-coordinate mechanism while keeping the same high-level reset/control/observation flow.</p>
+      <p class="warning verdict"><code>ArticulationView</code> should stay tree-centric. Extending it until it accepts arbitrary rootless joint graphs would blur reduced-coordinate and maximal-coordinate semantics, and would hide solver-specific limitations.</p>
+    </section>
+
+    <section>
+      <h2>Importer inference option</h2>
+      <p>The importer can still synthesize a compatibility articulation for a connected joint component with no USD articulation root. This is useful for FK, MuJoCo, and existing tree-only APIs. It should be explicit because cyclic mechanisms require choosing a spanning tree and leaving loop-closing joints outside the tree.</p>
+      <p>Newton already has metadata that can represent this layout: <code>articulation_start</code> points at the first tree joint, <code>articulation_end</code> points after the regular tree joints, and the next <code>articulation_start</code> acts as the upper bound when <code>include_loop_closing_joints=True</code>. The ordered synthetic four-bar and <code>boxes_fourbar.usda</code> confirm that <code>ArticulationView</code> skips loop joints by default and includes them when requested.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Requirement</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>Partition each rootless connected component into a deterministic spanning tree plus loop-closing edges.</td><td>Tree-compatible APIs need a unique parent chain, while maximal-coordinate solvers still need loop joints.</td></tr>
+            <tr><td>Emit or reorder joints so the tree block is contiguous and loop joints immediately follow it.</td><td><code>ArticulationView</code> assumes contiguous articulation joint ranges.</td></tr>
+            <tr><td>Add articulation metadata only for the tree block, and keep loop joints solver-visible.</td><td>Kamino, XPBD, and Semi-Implicit should still see authored loop constraints.</td></tr>
+            <tr><td>Expose an import summary containing inferred root, tree joints, loop joints, and any reordered coordinates.</td><td>Users and downstream libraries need to know what changed relative to the USD.</td></tr>
+            <tr><td>Put this behind <code>rootless_articulation_policy="infer_tree"</code>; keep <code>"none"</code> as the default.</td><td>Silent articulation synthesis changes semantics and can surprise users who intentionally authored no articulation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="danger verdict">Importer inference is not a substitute for <code>MechanismView</code>. It is a compatibility mode for tree-only consumers.</p>
     </section>
 
     <section>
@@ -195,50 +285,7 @@
           </tbody>
         </table>
       </div>
-      <p class="note">Interpretation: a JointView-style selector is robust to all five cases because it uses global joint arrays. Inventing articulations is viable only when the importer emits a contiguous tree-joint block followed by loop-closing joints.</p>
-    </section>
-
-    <section>
-      <h2>Option 1: add <code>JointView</code></h2>
-      <p><code>ArticulationView</code> starts from <code>model.articulation_label</code>. If <code>model.articulation_count == 0</code>, it raises <code>KeyError</code> before joint filters can help. That is correct for an articulation view, but it leaves RL users without a public, vectorized way to address joint state and control slots for rootless mechanisms.</p>
-      <p>A <code>JointView</code> should select directly from <code>model.joint_label</code>, then derive coordinate and DOF ranges from <code>joint_q_start</code> and <code>joint_qd_start</code>. It should provide the joint-state subset of <code>ArticulationView</code>, not the tree-only operations.</p>
-      <h3>Recommended surface</h3>
-      <ul>
-        <li><code>JointView(model, pattern, include_joints=None, exclude_joints=None, include_joint_types=None, exclude_joint_types=None)</code></li>
-        <li>Expose <code>joint_ids</code>, <code>joint_labels</code>, <code>joint_coord_ids</code>, and <code>joint_dof_ids</code>.</li>
-        <li>Implement <code>get_joint_positions()</code>, <code>set_joint_positions()</code>, <code>get_joint_velocities()</code>, <code>set_joint_velocities()</code>, target getters/setters, and control-force setters.</li>
-        <li>Expose joint properties needed by controllers and RL wrappers: stiffness, damping, armature, friction, position limits, velocity limits, effort limits, soft limits, and gear ratios when present.</li>
-        <li>Validate shape uniformity across worlds for batched RL use, mirroring the useful parts of <code>ArticulationView</code>.</li>
-        <li>Use Warp gather/scatter kernels, not repeated Python <code>.numpy()</code> indexing, for production paths.</li>
-      </ul>
-      <h3>Isaac Lab contract</h3>
-      <p>Isaac Lab's <code>ArticulationData</code> assumes that every robot asset has a batched view with stable names and tensor shapes. It lazily caches root state, body/link state, joint positions, joint velocities, joint accelerations, default reset values, and simulation-facing joint properties. That means a Newton-facing replacement must support the following paths, not only observation reads:</p>
-      <ul>
-        <li>Stable <code>joint_names</code>, <code>body_names</code>, and deterministic per-environment ordering.</li>
-        <li>Batched joint state tensors shaped like <code>(num_envs, num_joints)</code> for positions, velocities, and accelerations.</li>
-        <li>Batched writes for resets and control, including joint state, position/velocity targets, actuator effort, and direct joint forces.</li>
-        <li>Joint metadata for actuator setup, clipping, domain randomization, and reward terms: limits, stiffness, damping, friction, armature, effort limits, velocity limits, and gear ratios.</li>
-        <li>Body/link transforms and velocities for observations, rewards, termination checks, frame transforms, and contact/sensor plumbing.</li>
-        <li>A root/base convention for no-root mechanisms, especially the distinction between fixed-base, authored floating-base, and implicit floating-base assets.</li>
-      </ul>
-      <p class="verdict">This is the best near-term architectural move. It supports no-root mechanisms, explicit USD articulations, and loop-closing joints without changing importer semantics. It also gives Isaac Lab a Newton-native replacement for PR #6027's closed-loop workaround.</p>
-      <p class="warning verdict">Limit the promise: <code>JointView</code> should not imply FK, mass matrix, root-body state, or tree semantics. For Isaac Lab compatibility, compose it with a <code>BodyView</code> or higher-level <code>MechanismView</code>; do not overload a joint-only selector with root and body semantics.</p>
-    </section>
-
-    <section>
-      <h2>Option 2: infer articulations in the importer</h2>
-      <p>The importer can also synthesize a compatibility articulation for a connected joint component with no USD articulation root. The safe version is not to put every joint in an articulation. For cyclic mechanisms, the importer must choose a spanning tree and leave loop-closing joints outside the tree.</p>
-      <p>Newton already has the metadata shape for this: <code>articulation_start</code> points at the first tree joint, <code>articulation_end</code> points after the regular tree joints, and the next <code>articulation_start</code> acts as the upper bound when <code>include_loop_closing_joints=True</code>. The ordered synthetic four-bar and <code>boxes_fourbar.usda</code> both confirm that <code>ArticulationView</code> then skips loop joints by default and includes them when requested.</p>
-      <h3>Importer requirements</h3>
-      <ul>
-        <li>Partition each rootless connected component into a deterministic spanning tree and loop-closing edge set.</li>
-        <li>Emit or reorder joints so the tree block is contiguous and any loop joints for that component immediately follow it.</li>
-        <li>Add the articulation only for the tree block. Leave loop joints with <code>joint_articulation == -1</code> so validation treats them as loop joints, not true orphans.</li>
-        <li>Report the inferred root, tree joints, and loop joints in verbose output or a structured import summary.</li>
-        <li>Keep this behind an explicit option, for example <code>rootless_articulation_policy="infer_tree"</code>.</li>
-      </ul>
-      <p class="danger verdict">Do not silently invent articulations by default. It changes joint order, coordinate order, and view behavior; it also makes one arbitrary tree choice in a mechanism whose USD author may have intentionally avoided articulation semantics.</p>
-      <p>For Kamino, the key implication is that loop joints must remain solver-visible as joints. The no-root solver smoke below shows Kamino can step the pure orphan-joint version. An inferred-articulation mode should be tested to ensure Kamino still consumes the loop tail, while <code>ArticulationView</code> defaults remain tree-only unless <code>include_loop_closing_joints=True</code>.</p>
+      <p class="note">Interpretation: direct joint/body selection is robust to all five cases because it uses global model arrays. Inventing articulations is viable only when the importer emits a contiguous tree-joint block followed by loop-closing joints.</p>
     </section>
 
     <section>
@@ -258,30 +305,20 @@
     </section>
 
     <section>
-      <h2>Isaac Lab context</h2>
-      <p>Isaac Lab PR <a href="https://github.com/isaac-sim/IsaacLab/pull/6027">#6027</a> adds a <code>ClosedLoopView</code> to work around the same limitation: cyclic or rootless assets need joint state and control access, but <code>ArticulationView</code> is articulated-tree-centric. The prototype duck-types enough of Newton's <code>ArticulationView</code> for <code>ArticulationData</code> to read model, state, and control arrays directly.</p>
-      <p>The need is broader than closed-loop observation. Isaac Lab's <code>ArticulationData</code> is the object behind <code>Articulation.data</code>; tasks, managers, actuators, and reset logic use it as the canonical batched robot interface. It stores names, default root and joint state, default mass and inertia, joint limits and actuator properties, and lazily computed root, body, COM, and joint-state tensors. In practical RL terms, it feeds observations and rewards, scopes resets by environment, clips actions, applies actuator models, and restores default state.</p>
-      <p>This means <code>JointView</code> should provide the joint slice of that contract, while a Newton <code>MechanismView</code> or <code>JointView</code> + <code>BodyView</code> composition should provide the full asset contract. Otherwise Isaac Lab still has to infer root/body layout, per-world strides, implicit free-base behavior, and coordinate offsets from raw Newton arrays.</p>
-      <div class="cards">
-        <div class="card"><strong>Minimum Newton primitive</strong><p><code>JointView</code> should own label matching, joint-to-coordinate mapping, joint state reads/writes, command writes, and joint property tensors. This removes the most fragile part of the current workaround.</p></div>
-        <div class="card"><strong>Isaac Lab adapter</strong><p>A higher-level adapter should combine <code>JointView</code> with body and root access so <code>ArticulationData</code>-like code can keep its existing batched reset, observation, reward, and actuator assumptions.</p></div>
-        <div class="card"><strong>Compatibility inference</strong><p>Importer-inferred articulations remain useful when users need tree-only APIs, but they should be an explicit compatibility mode rather than the default path for maximal-coordinate mechanisms.</p></div>
-      </div>
-      <p class="verdict">The right home is Newton. Isaac Lab should not need to guess Newton's joint-coordinate layout or duplicate selection semantics. Newton can expose the global joint and body slices that maximal-coordinate solvers already use, while preserving an opt-in inferred-articulation path for FK, MuJoCo, and tree-compatible tooling.</p>
-    </section>
-
-    <section>
       <h2>Recommended implementation plan</h2>
       <ol>
-        <li>Add <code>newton.selection.JointView</code> with path matching over joint labels and batched gather/scatter for joint state, targets, and controls.</li>
-        <li>Add or compose body/root access as <code>BodyView</code> or <code>MechanismView</code> so Isaac Lab can replace <code>ClosedLoopView</code> without rebuilding Newton array-stride logic in Isaac Lab.</li>
-        <li>Expose the Isaac Lab-critical metadata: stable joint/body names, per-world ordering, joint coordinate and DOF ids, joint limits, effort/velocity limits, stiffness, damping, friction, armature, and default state helpers.</li>
-        <li>Update the importer warning to point rootless-joint users at <code>JointView</code> or <code>MechanismView</code> for maximal-coordinate workflows and at the future inference option for tree-compatibility workflows.</li>
+        <li>Add <code>newton.selection.JointView</code> for path matching over joint labels, joint-to-coordinate mapping, joint state reads/writes, target writes, effort writes, and joint property tensors.</li>
+        <li>Add <code>newton.selection.BodyView</code> for body/link/COM state, shape membership, body properties, and body wrench application.</li>
+        <li>Add <code>newton.selection.MechanismView</code> that composes <code>JointView</code>, <code>BodyView</code>, and a root/base policy for one asset per environment. This is the interface Isaac Lab should use for no-root assets.</li>
+        <li>Expose Isaac Lab-critical metadata: stable joint/body names, per-world ordering, joint coordinate and DOF ids, body ids, shape ids, root body id, base mode, limits, effort/velocity limits, stiffness, damping, friction, armature, default states, mass, and inertia.</li>
+        <li>Add batched gather/scatter kernels for state and command access. Avoid Python <code>.numpy()</code> indexing in production paths.</li>
+        <li>Update the importer warning to point rootless-joint users at <code>MechanismView</code> for maximal-coordinate workflows and at the future inference option for tree-compatibility workflows.</li>
         <li>Add importer option <code>rootless_articulation_policy="none" | "infer_tree"</code>. Keep <code>"none"</code> as default.</li>
         <li>When inference is enabled, build a deterministic spanning forest, emit tree joints first, emit loop joints immediately after each tree, and store an import summary of inferred tree and loop joints.</li>
         <li>Add regression coverage for the four cases in this report: open no-root chain, ordered four-bar, <code>boxes_fourbar.usda</code>, and both fourbar pole no-root variants.</li>
+        <li>Coordinate with Isaac Lab so its Newton backend can adapt <code>ArticulationData</code>-style code to <code>MechanismView</code> without preserving a local <code>ClosedLoopView</code> clone.</li>
       </ol>
-      <p class="verdict">Short version: do not force rootless mechanisms into <code>ArticulationView</code> just to make RL possible. Give RL a joint-native view, and make articulation inference an explicit compatibility layer for tree-only consumers.</p>
+      <p class="verdict">Short version: do not force rootless mechanisms into <code>ArticulationView</code> just to make RL possible. Give Isaac Lab a Newton-native mechanism interface with the same practical data coverage as <code>ArticulationData</code>, and make articulation inference an explicit compatibility layer for tree-only consumers.</p>
       <p class="note">Last updated: 2026-06-09.</p>
     </section>
   </main>
