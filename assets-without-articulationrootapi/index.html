@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newton assets without ArticulationRootAPI</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f7f5f0;
+      --panel: #fffdf8;
+      --ink: #1d2430;
+      --muted: #667085;
+      --line: #d8dee8;
+      --head: #ece7dc;
+      --teal: #0f766e;
+      --blue: #2456a6;
+      --green-bg: #dcfce7;
+      --green-ink: #166534;
+      --amber-bg: #fef3c7;
+      --amber-ink: #92400e;
+      --red-bg: #ffe4e6;
+      --red-ink: #9f1239;
+      --slate-bg: #e2e8f0;
+      --slate-ink: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header, main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+    header {
+      padding: 42px 0 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    main { padding: 28px 0 64px; }
+    h1 {
+      max-width: 980px;
+      margin: 0 0 14px;
+      font-size: clamp(2.2rem, 5vw, 4.4rem);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: clamp(1.45rem, 3vw, 2rem);
+      letter-spacing: 0;
+    }
+    h3 { margin: 18px 0 8px; }
+    p, li {
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 1rem;
+    }
+    a { color: var(--blue); }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    section {
+      padding: 28px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--teal);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .lead {
+      max-width: 920px;
+      margin: 0;
+      font-size: 1.08rem;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px 16px;
+    }
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+    .verdict {
+      border-left: 5px solid var(--teal);
+      padding: 14px 18px;
+      background: var(--panel);
+      color: var(--ink);
+    }
+    .warning { border-left-color: var(--amber-ink); }
+    .danger { border-left-color: var(--red-ink); }
+    .note {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+    .tag.good { background: var(--green-bg); color: var(--green-ink); }
+    .tag.mixed { background: var(--amber-bg); color: var(--amber-ink); }
+    .tag.bad { background: var(--red-bg); color: var(--red-ink); }
+    .tag.neutral { background: var(--slate-bg); color: var(--slate-ink); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 12px;
+      font-size: 0.92rem;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--ink);
+      background: var(--head);
+      font-weight: 750;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+    }
+    td { color: #303847; }
+    tr:last-child td { border-bottom: 0; }
+    td.numeric { text-align: right; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: 1fr; }
+      table { min-width: 860px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Newton selection and USD import design</p>
+    <h1>Newton assets without ArticulationRootAPI</h1>
+    <p class="lead">Investigation of how Newton should treat USD mechanisms that author rigid bodies and joints but no articulation root. The focus is RL-facing selection APIs, cyclic mechanisms, and whether importer-side compatibility should synthesize articulations.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Executive summary</h2>
+      <div class="cards">
+        <div class="card"><strong>Fix the importer inconsistency</strong><p>The local Newton fix is the right baseline: rootless body-to-world fixed joints should remain orphan joints, not create a one-joint articulation while the rest of the mechanism stays in articulation <code>-1</code>.</p></div>
+        <div class="card"><strong>Add a joint-centric selection API</strong><p>A <code>JointView</code> in <code>newton.selection</code> should be the primary RL answer for no-root maximal-coordinate mechanisms. It can query and set joint state, targets, and controls by path without pretending there is a kinematic tree.</p></div>
+        <div class="card"><strong>Keep invented articulations opt-in</strong><p>Importer-inferred articulations are useful for compatibility with <code>ArticulationView</code>, FK, and MuJoCo, but cyclic models require deterministic tree/loop partitioning and joint reordering. This should not be silent default behavior.</p></div>
+      </div>
+      <p class="verdict">Recommendation: implement <code>JointView</code> first, then add an explicit importer compatibility mode such as <code>rootless_articulation_policy="infer_tree"</code>. Do not ask Isaac Lab to own this as a permanent <code>ClosedLoopView</code> workaround; the abstraction belongs in Newton because Newton owns the canonical joint labels, coordinate ranges, solver compatibility, and articulation metadata.</p>
+      <p class="note">Raw data: <a href="no_articulation_results.json">asset analysis JSON</a> and <a href="solver_smoke_results.json">solver smoke JSON</a>. External context: Isaac Lab PR <a href="https://github.com/isaac-sim/IsaacLab/pull/6027">isaac-sim/IsaacLab#6027</a>.</p>
+    </section>
+
+    <section>
+      <h2>What changed in Newton</h2>
+      <p>The bug was not that Newton refused to treat a rootless asset as an articulation. The bug was that one special case did synthesize an articulation: a body-to-world fixed joint with no <code>PhysicsArticulationRootAPI</code>. That produced mixed metadata: the root joint belonged to articulation 0 while the rest of the asset remained in articulation <code>-1</code>.</p>
+      <p>The committed fix removes that special case. A no-root asset now imports consistently as a set of orphan joints. Normal <code>finalize()</code> raises and tells the caller to use <code>skip_validation_joints=True</code>; maximal-coordinate solvers can then consume the authored joint graph directly.</p>
+      <p class="warning verdict">This is deliberately not a user experience endpoint. It is a better invariant: no USD articulation root means no Newton articulation metadata unless a caller explicitly requests compatibility inference.</p>
+    </section>
+
+    <section>
+      <h2>Evidence from assets</h2>
+      <p>A scan of <code>newton/examples/assets</code> found three jointed USD assets without <code>PhysicsArticulationRootAPI</code>: <code>boxes_fourbar.usda</code>, <code>fourbar_pole_no_articulation.usda</code>, and <code>fourbar_pole_floating_no_articulation.usda</code>. The table also includes two synthetic no-root stages used to isolate edge cases.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Asset</th><th>Imported joints</th><th>Articulations</th><th>JointView-style match</th><th>Tree joints</th><th>Loop joints</th><th>Invented articulation probe</th></tr></thead>
+          <tbody>
+            <tr><td><code>single_hinge_no_root</code></td><td class="numeric">1</td><td class="numeric">0</td><td>1 joint, 1 coord</td><td><code>[0]</code></td><td>none</td><td><span class="tag good">works</span> <code>ArticulationView</code> sees 1 joint.</td></tr>
+            <tr><td><code>ordered_fourbar_no_root</code></td><td class="numeric">5</td><td class="numeric">0</td><td>5 joints, 4 coords</td><td><code>[0,1,2,3]</code></td><td><code>[4]</code></td><td><span class="tag good">works</span> default view sees 4 tree joints; <code>include_loop_closing_joints=True</code> sees all 5.</td></tr>
+            <tr><td><code>boxes_fourbar.usda</code></td><td class="numeric">4</td><td class="numeric">0</td><td>4 joints, 4 coords</td><td><code>[0,1,2]</code></td><td><code>[3]</code></td><td><span class="tag good">works</span> existing order already has tree first, loop last.</td></tr>
+            <tr><td><code>fourbar_pole_no_articulation.usda</code></td><td class="numeric">6</td><td class="numeric">0</td><td>6 joints, 5 coords</td><td><code>[0,1,2,3,5]</code></td><td><code>[4]</code></td><td><span class="tag mixed">needs reorder</span> post-import <code>add_articulation()</code> fails because tree joints are not contiguous.</td></tr>
+            <tr><td><code>fourbar_pole_floating_no_articulation.usda</code></td><td class="numeric">5</td><td class="numeric">0</td><td>5 joints, 5 coords</td><td><code>[0,1,2,4]</code></td><td><code>[3]</code></td><td><span class="tag mixed">needs reorder</span> post-import <code>add_articulation()</code> fails because the loop joint appears before a tree-tail joint.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Interpretation: a JointView-style selector is robust to all five cases because it uses global joint arrays. Inventing articulations is viable only when the importer emits a contiguous tree-joint block followed by loop-closing joints.</p>
+    </section>
+
+    <section>
+      <h2>Option 1: add <code>JointView</code></h2>
+      <p><code>ArticulationView</code> starts from <code>model.articulation_label</code>. If <code>model.articulation_count == 0</code>, it raises <code>KeyError</code> before joint filters can help. That is correct for an articulation view, but it leaves RL users without a public, vectorized way to address joint state and control slots for rootless mechanisms.</p>
+      <p>A <code>JointView</code> should select directly from <code>model.joint_label</code>, then derive coordinate and DOF ranges from <code>joint_q_start</code> and <code>joint_qd_start</code>. It should provide the joint-state subset of <code>ArticulationView</code>, not the tree-only operations.</p>
+      <h3>Recommended surface</h3>
+      <ul>
+        <li><code>JointView(model, pattern, include_joints=None, exclude_joints=None, include_joint_types=None, exclude_joint_types=None)</code></li>
+        <li>Expose <code>joint_ids</code>, <code>joint_labels</code>, <code>joint_coord_ids</code>, and <code>joint_dof_ids</code>.</li>
+        <li>Implement <code>get_joint_positions()</code>, <code>set_joint_positions()</code>, <code>get_joint_velocities()</code>, <code>set_joint_velocities()</code>, target getters/setters, and control-force setters.</li>
+        <li>Validate shape uniformity across worlds for batched RL use, mirroring the useful parts of <code>ArticulationView</code>.</li>
+        <li>Use Warp gather/scatter kernels, not repeated Python <code>.numpy()</code> indexing, for production paths.</li>
+      </ul>
+      <p class="verdict">This is the best near-term architectural move. It supports no-root mechanisms, explicit USD articulations, and loop-closing joints without changing importer semantics. It also gives Isaac Lab a Newton-native replacement for PR #6027's closed-loop workaround.</p>
+      <p class="warning verdict">Limit the promise: <code>JointView</code> should not imply FK, mass matrix, root-body state, or tree semantics. Those remain articulation-level concepts.</p>
+    </section>
+
+    <section>
+      <h2>Option 2: infer articulations in the importer</h2>
+      <p>The importer can also synthesize a compatibility articulation for a connected joint component with no USD articulation root. The safe version is not “put every joint in an articulation.” For cyclic mechanisms, the importer must choose a spanning tree and leave loop-closing joints outside the tree.</p>
+      <p>Newton already has the metadata shape for this: <code>articulation_start</code> points at the first tree joint, <code>articulation_end</code> points after the regular tree joints, and the next <code>articulation_start</code> acts as the upper bound when <code>include_loop_closing_joints=True</code>. The ordered synthetic four-bar and <code>boxes_fourbar.usda</code> both confirm that <code>ArticulationView</code> then skips loop joints by default and includes them when requested.</p>
+      <h3>Importer requirements</h3>
+      <ul>
+        <li>Partition each rootless connected component into a deterministic spanning tree and loop-closing edge set.</li>
+        <li>Emit or reorder joints so the tree block is contiguous and any loop joints for that component immediately follow it.</li>
+        <li>Add the articulation only for the tree block. Leave loop joints with <code>joint_articulation == -1</code> so validation treats them as loop joints, not true orphans.</li>
+        <li>Report the inferred root, tree joints, and loop joints in verbose output or a structured import summary.</li>
+        <li>Keep this behind an explicit option, for example <code>rootless_articulation_policy="infer_tree"</code>.</li>
+      </ul>
+      <p class="danger verdict">Do not silently invent articulations by default. It changes joint order, coordinate order, and view behavior; it also makes one arbitrary tree choice in a mechanism whose USD author may have intentionally avoided articulation semantics.</p>
+      <p>For Kamino, the key implication is that loop joints must remain solver-visible as joints. The no-root solver smoke below shows Kamino can step the pure orphan-joint version. An inferred-articulation mode should be tested to ensure Kamino still consumes the loop tail, while <code>ArticulationView</code> defaults remain tree-only unless <code>include_loop_closing_joints=True</code>.</p>
+    </section>
+
+    <section>
+      <h2>Solver smoke</h2>
+      <p>The floating fourbar pole asset was imported with no articulation and finalized with <code>skip_validation_joints=True</code>. No FK was called. Each solver stepped 20 cached iterations after one warmup step; timings include Python overhead and are smoke-scale only.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Solver</th><th>Status</th><th>Articulations</th><th>Joint articulation array</th><th>Finite state</th><th>Cached ms / step</th></tr></thead>
+          <tbody>
+            <tr><td>XPBD</td><td><span class="tag good">ok</span></td><td class="numeric">0</td><td><code>[-1,-1,-1,-1,-1]</code></td><td>yes</td><td class="numeric">2.65</td></tr>
+            <tr><td>Semi-Implicit</td><td><span class="tag good">ok</span></td><td class="numeric">0</td><td><code>[-1,-1,-1,-1,-1]</code></td><td>yes</td><td class="numeric">0.31</td></tr>
+            <tr><td>Kamino</td><td><span class="tag good">ok</span></td><td class="numeric">0</td><td><code>[-1,-1,-1,-1,-1]</code></td><td>yes</td><td class="numeric">5.59</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">These numbers are not intended as a solver comparison. They show that the consistent no-articulation model can be stepped by maximal-coordinate solvers without creating an articulation for selection.</p>
+    </section>
+
+    <section>
+      <h2>Isaac Lab context</h2>
+      <p>Isaac Lab PR <a href="https://github.com/isaac-sim/IsaacLab/pull/6027">#6027</a> adds a <code>ClosedLoopView</code> to work around the same limitation: cyclic or rootless assets need joint state and control access, but <code>ArticulationView</code> is articulated-tree-centric. The PR thread is useful because it shows this is not just an importer cleanliness issue; it affects RL reset, control, and observation plumbing.</p>
+      <p>The right home is Newton. Isaac Lab should not need to guess Newton's joint-coordinate layout or duplicate selection semantics. A Newton <code>JointView</code> can expose exactly the global joint slices that maximal-coordinate solvers already use, and an opt-in inferred-articulation mode can serve users who need tree-compatible APIs.</p>
+    </section>
+
+    <section>
+      <h2>Recommended implementation plan</h2>
+      <ol>
+        <li>Add <code>newton.selection.JointView</code> with path matching over joint labels and batched gather/scatter for joint state, targets, and controls.</li>
+        <li>Update the importer warning to point rootless-joint users at <code>JointView</code> for maximal-coordinate workflows and at the future inference option for tree-compatibility workflows.</li>
+        <li>Add importer option <code>rootless_articulation_policy="none" | "infer_tree"</code>. Keep <code>"none"</code> as default.</li>
+        <li>When inference is enabled, build a deterministic spanning forest, emit tree joints first, emit loop joints immediately after each tree, and store an import summary of inferred tree and loop joints.</li>
+        <li>Add regression coverage for the four cases in this report: open no-root chain, ordered four-bar, <code>boxes_fourbar.usda</code>, and both fourbar pole no-root variants.</li>
+      </ol>
+      <p class="verdict">Short version: do not force rootless mechanisms into <code>ArticulationView</code> just to make RL possible. Give RL a joint-native view, and make articulation inference an explicit compatibility layer for tree-only consumers.</p>
+      <p class="note">Last updated: 2026-06-09.</p>
+    </section>
+  </main>
+</body>
+</html>
