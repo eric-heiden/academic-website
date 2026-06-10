@@ -1,0 +1,35 @@
+{
+  "asset": "g1_hands",
+  "asset_label": "Unitree G1 with hands",
+  "branch_head": "ac101b97",
+  "env_count": 16384,
+  "rows": [
+    {
+      "label": "Public main",
+      "median_finalize_s": 105.16833748668432,
+      "note": "Unmodified public main baseline for this workload.",
+      "repeat_count": 3,
+      "rss_peak_delta_mb": 9897.2265625,
+      "speedup_vs_public_main": 1.0,
+      "variant": "baseline"
+    },
+    {
+      "label": "Fresh branch default",
+      "median_finalize_s": 23.752923537045717,
+      "note": "Default branch path: compact filters, wp.full custom-attribute defaults, cached mesh hashing, and identity geometry dedup.",
+      "repeat_count": 3,
+      "rss_peak_delta_mb": 422.08984375,
+      "speedup_vs_public_main": 4.427595505145329,
+      "variant": "compact_filters+wp.full+mesh_sha+geo_id"
+    },
+    {
+      "label": "Fresh branch + compact_finalize_storage()",
+      "median_finalize_s": 15.770839086733758,
+      "note": "Opt-in helper called before the measured finalize() timer; useful when finalize-only list conversion dominates.",
+      "repeat_count": 3,
+      "rss_peak_delta_mb": 128.53125,
+      "speedup_vs_public_main": 6.668531516192481,
+      "variant": "compact_filters+wp.full+mesh_sha+geo_id+compact_arrays"
+    }
+  ]
+}
