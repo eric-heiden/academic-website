@@ -109,15 +109,18 @@
       reference. V1 is +43 % per call but delivers the highest precision.
     </p>
     <p>
-      <strong>Follow-up:</strong> the V2 drift is real, but the likely source is now clearer.
+      <strong>Follow-up:</strong> the V2 drift is real, and the source is now isolated.
       It is not a Newton postprocessing or hashing bug. PR&nbsp;#1355 lowers Newton's scalar
       <code>volume</code> accumulator through the RUN_TO_RUN scalar CUB
       <code>ReduceByKey</code> shortcut, and that scalar path is not bit-exact in the dense
       cases tested here. A fresh local PR&nbsp;#1355 build reproduced scalar
-      <code>atomic_add(out, 0, value)</code> drift at 42k-70k terms, while the same probe under
-      <code>GPU_TO_GPU</code> and a <code>vec3</code> RUN_TO_RUN probe were bit-exact. So V2's
-      <strong>10 / 262 drifting meshes</strong> should be read as a Warp PR1355 RUN_TO_RUN scalar
-      reduction issue, not as evidence that deterministic lowering cannot work for Newton.
+      <code>atomic_add(out, 0, value)</code> drift at 42k-70k terms. The same probe under
+      <code>GPU_TO_GPU</code> was bit-exact; disabling only the scalar RUN_TO_RUN fast path made
+      RUN_TO_RUN match GPU_TO_GPU exactly; and a separate scatter + radix-sort probe showed the
+      sorted scalar input stream itself is byte-stable. So V2's
+      <strong>10 / 262 drifting meshes</strong> should be read as a Warp PR1355 scalar
+      <code>DeviceReduce::ReduceByKey</code> issue, not as evidence that deterministic lowering
+      cannot work for Newton.
       V2 also remains much slower than V0: <strong>+551 %</strong> per-call (median 19 ms vs
       V0's 2.9 ms).
     </p>
@@ -280,8 +283,10 @@ Plotly.newPlot("accuracy-bar", [{"x": ["apptronik_apollo", "booster_t1", "g1_wit
         pattern <code>wp.atomic_add(volume, 0, value)</code>. PR&nbsp;#1355 sorts scalar records by
         packed destination/thread key, then reduces them by destination through CUB
         <code>DeviceReduce::ReduceByKey</code> in RUN_TO_RUN mode. A local standalone scalar probe
-        reproduced multiple hashes for that exact pattern, so this is best treated as a Warp
-        RUN_TO_RUN scalar-reducer issue.</li>
+        reproduced multiple hashes for that exact pattern. Disabling only that scalar shortcut made
+        RUN_TO_RUN bit-exact and equal to GPU_TO_GPU, while an independent scatter + radix-sort
+        probe produced byte-identical sorted keys and values across reruns. This isolates the
+        remaining drift to the scalar CUB <code>ReduceByKey</code> reducer path.</li>
     <li><strong>Performance:</strong> median +551 % vs V0 (19 ms vs 2.9 ms per call). The CUB
         scatter-sort-reduce path has fixed overhead per launch that dominates these very small
         (single output slot) reductions. p90 is +2118 % (94 ms vs 4.2 ms) because the largest
@@ -301,13 +306,15 @@ Plotly.newPlot("accuracy-bar", [{"x": ["apptronik_apollo", "booster_t1", "g1_wit
     under <code>GPU_TO_GPU</code> produced 1 hash for every tested size, and a <code>vec3</code>
     RUN_TO_RUN probe also produced 1 hash for every tested size. A synthetic Newton
     <code>compute_inertia_mesh</code> case with 46,786 triangles produced 4 hashes over 30 reruns
-    under RUN_TO_RUN and 1 hash over 30 reruns under GPU_TO_GPU.
+    under RUN_TO_RUN and 1 hash over 30 reruns under GPU_TO_GPU. After temporarily routing scalar
+    RUN_TO_RUN through Warp's generic sequential segmented reducer, the same scalar sizes produced
+    1 hash across 50 reruns and matched GPU_TO_GPU exactly.
   </p>
   <p>
     For comparison, a stripped-down hand-rolled equivalent (each thread writes to its own buffer
     slot, then host-side <code>numpy.sum</code> in f32) gives <strong>bit-exact determinism
     (0/262 drift)</strong> at only <strong>+30 % runtime</strong>. This is structurally similar to
-    V1 except it stays in f32. PR&nbsp;#1355 could likely fix V2 for this workload either by using
+    V1 except it stays in f32. PR&nbsp;#1355 should fix V2 for this workload either by using
     the explicit segmented reducer for scalar RUN_TO_RUN too, or by adding a dedicated fast path for
     accumulate-into-one-slot reductions.
   </p>
@@ -353,7 +360,8 @@ Commits:  V0 = newton@main (839284af)
     <code>refs/pull/1355/head</code>, built in
     <code>/home/horde/repos/warp-pr1355-local/.venv</code> with CUDA 12.6, and installed Newton
     <code>main</code> (<code>529ec4d1</code>) into that venv. The full benchmark tables above still
-    use the original L40 measurements; the follow-up probes isolate the V2 drift mechanism.
+    use the original L40 measurements; the follow-up probes isolate the V2 drift mechanism to the
+    scalar <code>DeviceReduce::ReduceByKey</code> path.
     All 4 original variants use the same byte-identical inputs (extracted once with V0 active and
     persisted to <code>meshes.npz</code>).
   </div>
