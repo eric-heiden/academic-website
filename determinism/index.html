@@ -8,2101 +8,1218 @@
   <style>
     :root {
       color-scheme: light;
-      --ink: #1b1f27;
-      --muted: #5c6675;
-      --line: #d9dee7;
-      --paper: #f7f5f0;
-      --panel: #ffffff;
-      --ok: #087f5b;
-      --ok-bg: #dff7ed;
+      --bg: #f5f7fa;
+      --paper: #ffffff;
+      --ink: #17202a;
+      --muted: #596575;
+      --muted-2: #7a8492;
+      --line: #dce2ea;
+      --line-strong: #c7d0dc;
+      --ok: #157347;
+      --ok-bg: #e4f5ec;
       --warn: #a15c00;
-      --warn-bg: #fff2cc;
-      --bad: #a33a3a;
-      --bad-bg: #ffe2df;
-      --blue: #2456a6;
-      --teal: #0f766e;
-      --shadow: 0 18px 50px rgba(37, 43, 56, 0.12);
+      --warn-bg: #fff1d6;
+      --bad: #b42318;
+      --bad-bg: #ffe4df;
+      --empty: #eef2f6;
+      --xpbd: #2563eb;
+      --xpbd-bg: #dbeafe;
+      --featherstone: #7c3aed;
+      --featherstone-bg: #ede9fe;
+      --mujoco: #c2410c;
+      --mujoco-bg: #ffedd5;
+      --semi-implicit: #0f766e;
+      --semi-implicit-bg: #ccfbf1;
+      --vbd: #be185d;
+      --vbd-bg: #fce7f3;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--paper);
+      background: var(--bg);
       color: var(--ink);
-    }
-    header {
-      padding: 46px clamp(18px, 4vw, 64px) 28px;
-      border-bottom: 1px solid var(--line);
-      background:
-        linear-gradient(120deg, rgba(36, 86, 166, 0.13), transparent 34%),
-        linear-gradient(300deg, rgba(15, 118, 110, 0.12), transparent 38%),
-        #fffdf8;
-    }
-    .hero {
-      max-width: 1180px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-      gap: 32px;
-      align-items: end;
-    }
-    .eyebrow {
-      margin: 0 0 8px;
-      color: var(--teal);
-      font-size: 0.78rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-    h1 {
-      margin: 0;
-      max-width: 860px;
-      font-size: clamp(2.45rem, 6vw, 5.2rem);
-      line-height: 0.95;
-    }
-    .lead {
-      margin: 20px 0 0;
-      max-width: 780px;
-      color: var(--muted);
-      font-size: clamp(1rem, 2vw, 1.18rem);
-      line-height: 1.55;
-    }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .summary-tile {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 15px;
-      box-shadow: var(--shadow);
-    }
-    .summary-tile.emphasis {
-      border-color: rgba(36, 86, 166, 0.32);
-      background: linear-gradient(180deg, rgba(36, 86, 166, 0.06), rgba(255, 255, 255, 0.98));
-    }
-    .summary-tile span {
-      display: block;
-      color: var(--muted);
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .summary-tile strong {
-      display: block;
-      margin-top: 6px;
-      font-size: 1.75rem;
-      line-height: 1;
-    }
-    main {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 34px clamp(18px, 4vw, 64px) 64px;
-    }
-    .band {
-      margin: 0 0 34px;
-      padding: 24px 0;
-      border-bottom: 1px solid var(--line);
-    }
-    .band h2, .section-title {
-      margin: 0 0 14px;
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-    }
-    .findings-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-    .finding {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 18px;
-      box-shadow: var(--shadow);
-    }
-    .finding.ok { border-left: 5px solid var(--ok); }
-    .finding.warn { border-left: 5px solid var(--warn); }
-    .finding.bad { border-left: 5px solid var(--bad); }
-    .finding h3 {
-      margin: 0 0 8px;
-      font-size: 1.12rem;
-    }
-    .finding p {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    .method-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-    }
-    .method {
-      border-left: 4px solid var(--blue);
-      padding: 12px 14px;
-      background: rgba(255, 255, 255, 0.72);
-    }
-    .method strong { display: block; margin-bottom: 5px; }
-    .method p { margin: 0; color: var(--muted); line-height: 1.45; }
-    .scenario {
-      display: grid;
-      grid-template-columns: minmax(320px, 1.05fr) minmax(320px, 0.95fr);
-      gap: 22px;
-      align-items: stretch;
-      margin: 0 0 24px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }
-    .media {
-      min-height: 320px;
-      background: #151821;
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-    .solver-video {
-      background: #151821;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    }
-    .solver-video:last-child { border-bottom: 0; }
-    .video-label {
-      margin: 0;
-      padding: 10px 14px 0;
-      color: #f2f4fa;
-      background: #151821;
-      font-size: 0.86rem;
-      font-weight: 800;
-    }
-    video {
-      display: block;
-      width: 100%;
-      height: auto;
-      min-height: 320px;
-      object-fit: cover;
-      background: #151821;
-    }
-    .video-caption {
-      margin: 0;
-      padding: 10px 14px 14px;
-      color: #d7dbe7;
-      background: #151821;
-      font-size: 0.88rem;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
       line-height: 1.45;
     }
-    .scenario-body {
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .scenario-heading h2 {
-      margin: 0;
-      font-size: clamp(1.45rem, 2.7vw, 2rem);
-    }
-    .scenario-body p {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .metric {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      min-height: 78px;
-      background: #fbfcfd;
-    }
-    .metric span {
-      display: block;
-      color: var(--muted);
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .metric strong {
-      display: block;
-      margin-top: 7px;
-      font-size: 1.18rem;
-      overflow-wrap: anywhere;
-    }
-    .solver-cards {
-      display: grid;
-      gap: 10px;
-    }
-    .solver-card {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 14px;
-      background: #fbfcfd;
-    }
-    .solver-card.ok { border-left: 5px solid var(--ok); }
-    .solver-card.warn { border-left: 5px solid var(--warn); }
-    .solver-card.bad { border-left: 5px solid var(--bad); }
-    .solver-card-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: start;
-    }
-    .solver-card-head h3 {
-      margin: 0;
-      font-size: 1.05rem;
-    }
-    .solver-summary {
-      margin: 10px 0 0;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    .solver-stats {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .solver-stats div {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      background: #fff;
-      min-height: 74px;
-    }
-    .solver-stats span {
-      display: block;
-      color: var(--muted);
-      font-size: 0.76rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .solver-stats strong {
-      display: block;
-      margin-top: 6px;
-      font-size: 1rem;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
-    .error-log {
-      margin: 14px 0 0;
-      padding: 12px;
-      background: #161923;
-      color: #f4f7ff;
-      border-radius: 8px;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-size: 0.83rem;
-      line-height: 1.45;
-    }
+
     code {
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-family: var(--mono);
       font-size: 0.92em;
     }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 78px;
-      border-radius: 999px;
-      padding: 4px 9px;
-      font-size: 0.72rem;
-      font-weight: 800;
+
+    .wrap {
+      width: min(100% - 32px, 1320px);
+      margin: 0 auto;
+    }
+
+    .report-header {
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--paper);
+    }
+
+    .header-inner {
+      padding: 28px 0 22px;
+    }
+
+    .title-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+      gap: 28px;
+      align-items: start;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 760;
+      letter-spacing: 0;
       text-transform: uppercase;
     }
-    .pill.ok { color: var(--ok); background: var(--ok-bg); }
-    .pill.warn { color: var(--warn); background: var(--warn-bg); }
-    .pill.bad { color: var(--bad); background: var(--bad-bg); }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: clamp(1.75rem, 3vw, 2.55rem);
+      line-height: 1.05;
+      font-weight: 790;
+    }
+
+    .lead {
+      max-width: 840px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .timestamp-box {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #fbfcfe;
+      padding: 12px 14px;
+    }
+
+    .timestamp-box dt,
+    .timestamp-box dd {
+      margin: 0;
+    }
+
+    .timestamp-box dt {
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    .timestamp-box dd {
+      margin-top: 4px;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    .run-strip,
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .stat,
+    .run-item {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #fbfcfe;
+      padding: 9px 10px;
+      min-width: 0;
+    }
+
+    .stat span,
+    .run-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    .stat strong,
+    .run-item strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 1.02rem;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    .stat.ok strong {
+      color: var(--ok);
+    }
+
+    main {
+      padding: 26px 0 44px;
+    }
+
+    .section {
+      margin: 0 0 32px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--line-strong);
+      padding-bottom: 9px;
+    }
+
+    .section-head h2 {
+      font-size: 1.28rem;
+      line-height: 1.2;
+    }
+
+    .section-head p {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .result-banner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      border: 1px solid #a7d9bf;
+      border-left: 5px solid var(--ok);
+      border-radius: 4px;
+      background: var(--ok-bg);
+      padding: 13px 14px;
+    }
+
+    .result-banner strong {
+      display: block;
+      font-size: 1.02rem;
+    }
+
+    .result-banner span {
+      display: block;
+      margin-top: 3px;
+      color: #255d42;
+      font-size: 0.92rem;
+    }
+
     .table-wrap {
       overflow-x: auto;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      background: var(--paper);
     }
-    .section-copy {
-      margin: 0 0 16px;
-      max-width: 860px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 960px;
+      min-width: 900px;
     }
-    th, td {
-      padding: 13px 14px;
-      text-align: left;
+
+    th,
+    td {
       border-bottom: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
       vertical-align: middle;
     }
+
     th {
       color: var(--muted);
-      font-size: 0.78rem;
+      background: #f8fafc;
+      font-size: 0.72rem;
+      font-weight: 760;
       text-transform: uppercase;
-      background: #fbfcfd;
     }
-    tr:last-child td { border-bottom: 0; }
-    .list-grid {
+
+    tbody tr:last-child td,
+    tbody tr:last-child th {
+      border-bottom: 0;
+    }
+
+    .matrix th:first-child,
+    .matrix td:first-child {
+      min-width: 250px;
+      width: 30%;
+    }
+
+    .matrix .solver-head {
+      min-width: 132px;
+      border-top: 3px solid var(--solver-color);
+      background: var(--solver-bg);
+      color: var(--ink);
+    }
+
+    .group-row th {
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: #e9eef5;
+      color: #334155;
+      font-size: 0.74rem;
+      letter-spacing: 0;
+    }
+
+    .scenario-name {
+      display: block;
+      font-weight: 720;
+    }
+
+    .scenario-note {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
+    .matrix-cell {
+      min-width: 132px;
+      background: var(--paper);
+    }
+
+    .matrix-cell.has-result {
+      border-left: 4px solid var(--solver-color);
+      background: var(--solver-bg);
+    }
+
+    .matrix-cell.empty {
+      color: var(--muted-2);
+      background: var(--empty);
+      text-align: center;
+    }
+
+    .cell-sub {
+      display: block;
+      margin-top: 3px;
+      color: #334155;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.3;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.69rem;
+      font-weight: 780;
+      line-height: 1.35;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .status-ok {
+      color: var(--ok);
+      background: var(--ok-bg);
+      border: 1px solid #aedfc2;
+    }
+
+    .status-warn {
+      color: var(--warn);
+      background: var(--warn-bg);
+      border: 1px solid #f0ca80;
+    }
+
+    .status-bad {
+      color: var(--bad);
+      background: var(--bad-bg);
+      border: 1px solid #ffb4aa;
+    }
+
+    .protocol-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 24px;
-    }
-    .list-card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 20px;
-      box-shadow: var(--shadow);
-    }
-    .list-card h3 {
-      margin: 0 0 10px;
-      font-size: 1.15rem;
-    }
-    .list-card p {
-      margin: 0 0 10px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    .list-card ul {
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 8px;
       margin: 0;
-      padding-left: 20px;
-      color: var(--muted);
-      line-height: 1.55;
+      padding: 0;
+      list-style: none;
     }
-    footer {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 0 clamp(18px, 4vw, 64px) 42px;
-      color: var(--muted);
+
+    .protocol-grid li {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--paper);
+      padding: 10px 12px;
+    }
+
+    .protocol-grid strong,
+    .protocol-grid span {
+      display: block;
+    }
+
+    .protocol-grid strong {
       font-size: 0.9rem;
     }
-    @media (max-width: 980px) {
-      .hero, .scenario, .list-grid { grid-template-columns: 1fr; }
-      .findings-grid { grid-template-columns: 1fr; }
-      .method-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .solver-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .protocol-grid span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.84rem;
     }
-    @media (max-width: 560px) {
-      header { padding-top: 34px; }
-      main { padding-top: 24px; }
-      .method-grid, .metrics, .summary-grid, .solver-stats { grid-template-columns: 1fr; }
-      .scenario-body { padding: 18px; }
-      .media, video { min-height: 230px; }
+
+    .group-block {
+      margin-bottom: 22px;
+    }
+
+    .group-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: baseline;
+      margin-bottom: 8px;
+      color: #334155;
+    }
+
+    .group-title h3 {
+      font-size: 1rem;
+    }
+
+    .group-title span {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .scenario-detail {
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      background: var(--paper);
+    }
+
+    .scenario-detail + .scenario-detail {
+      margin-top: 10px;
+    }
+
+    .scenario-detail-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .scenario-detail h4 {
+      font-size: 1.02rem;
+    }
+
+    .scenario-detail p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .solver-chip-row,
+    .metric-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .solver-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--solver-color);
+      border-radius: 4px;
+      background: var(--solver-bg);
+      color: var(--ink);
+      padding: 3px 7px;
+      font-size: 0.76rem;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+
+    .solver-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--solver-color);
+    }
+
+    .metric-strip {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--paper);
+      padding: 5px 8px;
+    }
+
+    .metric span,
+    .metric strong {
+      display: inline;
+      font-size: 0.78rem;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-weight: 680;
+    }
+
+    .metric strong {
+      margin-left: 4px;
+      font-family: var(--mono);
+      font-weight: 680;
+    }
+
+    .scenario-content {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.95fr) minmax(420px, 1.05fr);
+      gap: 14px;
+      padding: 14px;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 260px));
+      gap: 10px;
+      align-content: start;
+    }
+
+    .video-tile {
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-left: 4px solid var(--solver-color);
+      border-radius: 4px;
+      background: #111827;
+    }
+
+    .video-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 5px 8px;
+      background: var(--solver-bg);
+      color: var(--ink);
+      font-size: 0.78rem;
+      font-weight: 740;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      max-height: 148px;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: #111827;
+    }
+
+    .small-table table {
+      min-width: 520px;
+      font-size: 0.84rem;
+    }
+
+    .small-table th,
+    .small-table td {
+      padding: 7px 8px;
+    }
+
+    .solver-row td:first-child {
+      border-left: 4px solid var(--solver-color);
+      background: var(--solver-bg);
+      font-weight: 720;
+    }
+
+    .warp-table td:nth-child(1) {
+      font-weight: 720;
+    }
+
+    .scope-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .scope-list li {
+      border-left: 4px solid #64748b;
+      background: var(--paper);
+      border-top: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .load-error {
+      border: 1px solid #ffb4aa;
+      border-left: 5px solid var(--bad);
+      border-radius: 4px;
+      background: var(--bad-bg);
+      padding: 14px;
+      color: var(--bad);
+      font-weight: 720;
+    }
+
+    footer {
+      border-top: 1px solid var(--line-strong);
+      color: var(--muted);
+      padding: 18px 0 28px;
+      font-size: 0.85rem;
+    }
+
+    .solver-xpbd {
+      --solver-color: var(--xpbd);
+      --solver-bg: var(--xpbd-bg);
+    }
+
+    .solver-featherstone {
+      --solver-color: var(--featherstone);
+      --solver-bg: var(--featherstone-bg);
+    }
+
+    .solver-mujoco {
+      --solver-color: var(--mujoco);
+      --solver-bg: var(--mujoco-bg);
+    }
+
+    .solver-semi-implicit {
+      --solver-color: var(--semi-implicit);
+      --solver-bg: var(--semi-implicit-bg);
+    }
+
+    .solver-vbd {
+      --solver-color: var(--vbd);
+      --solver-bg: var(--vbd-bg);
+    }
+
+    @media (max-width: 980px) {
+      .title-row,
+      .scenario-content,
+      .scenario-detail-head {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-head p {
+        margin-top: 5px;
+      }
+
+      .result-banner {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .wrap {
+        width: min(100% - 22px, 1320px);
+      }
+
+      .header-inner {
+        padding: 22px 0 18px;
+      }
+
+      h1 {
+        font-size: 1.65rem;
+      }
+
+      .video-grid {
+        grid-template-columns: 1fr;
+      }
+
+      video {
+        max-height: none;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="hero">
-      <div>
-        <p class="eyebrow">Newton determinism harness</p>
-        <h1>Solver run to run physics determinism report</h1>
-        <p class="lead">
-          12 Newton physics scenarios and 4 Warp lowering probes were replayed in independent subprocesses with
-          <code>solver_deterministic = "run_to_run"</code>. No process-global Warp deterministic mode is set for physics rows.
-          The videos are captured from headless <code>ViewerGL.get_frame()</code>; the verdicts
-          come from byte hashes of final physics state arrays. The full report covers the physics scenarios registered for this report. Contact scenarios use <code>CollisionPipeline(deterministic=True)</code> for contact ordering.
-        </p>
+  <header class="report-header">
+    <div class="wrap header-inner">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">Newton determinism harness</p>
+          <h1>Determinism Report</h1>
+          <p class="lead">
+            Fresh subprocess replays compare final physics-state hashes across Newton solver scenarios.
+            This view keeps the pass/fail signal, solver coverage, and diagnostics visible without repeating low-value run metadata.
+          </p>
+        </div>
+        <dl class="timestamp-box">
+          <dt>Data generated, Pacific time</dt>
+          <dd id="generated-at">Loading...</dd>
+        </dl>
       </div>
-      <div class="summary-grid">
-        <div class="summary-tile emphasis"><span>Scenarios</span><strong>12</strong></div>
-        <div class="summary-tile"><span>Solver pairs</span><strong>23</strong></div>
-        <div class="summary-tile"><span>Warp probes</span><strong>4</strong></div>
-        <div class="summary-tile"><span>Total checks</span><strong>27</strong></div>
-        <div class="summary-tile"><span>Bit-exact</span><strong>27</strong></div>
-        <div class="summary-tile"><span>Drift</span><strong>0</strong></div>
-        <div class="summary-tile"><span>Failures</span><strong>0</strong></div>
-      </div>
+      <div class="stat-strip" id="summary-stats"></div>
+      <div class="run-strip" id="run-config"></div>
     </div>
   </header>
 
-  <main>
-    <section class="band">
-      <h2>What This Run Shows</h2>
-      <div class="findings-grid">
+  <main class="wrap">
+    <noscript>
+      <div class="load-error">Enable JavaScript to load determinism_report.json.</div>
+    </noscript>
 
-        <article class="finding ok">
-          <p class="eyebrow">Key finding</p>
-          <h3>Replay health</h3>
-          <p>All 23 solver pairs completed 3 independent subprocess replays.</p>
-        </article>
+    <section class="section" id="result-section"></section>
 
-        <article class="finding ok">
-          <p class="eyebrow">Key finding</p>
-          <h3>Run-to-run verdict</h3>
-          <p>Every tested solver pair was bit-exact with solver_deterministic=&#x27;run_to_run&#x27;.</p>
-        </article>
-
-        <article class="finding ok">
-          <p class="eyebrow">Key finding</p>
-          <h3>Largest remaining gap</h3>
-          <p>No remaining run-to-run gap was observed in the tested harness slice on this GPU/software stack.</p>
-        </article>
-
-        <article class="finding ok">
-          <p class="eyebrow">Key finding</p>
-          <h3>Warp lowering probes</h3>
-          <p>4/4 focused Warp micro-probes were bit-exact.</p>
-        </article>
+    <section class="section">
+      <div class="section-head">
+        <h2>Solver Matrix</h2>
+        <p>Scenarios are grouped by workload type. Solver colors are consistent across the matrix, videos, and detail tables.</p>
       </div>
+      <div class="table-wrap" id="solver-matrix"></div>
     </section>
 
-    <section class="band">
-      <h2>Method</h2>
-      <div class="method-grid">
-        <div class="method">
-          <strong>Independent replays</strong>
-          <p>3 subprocess runs per supported scenario/solver pair.</p>
-        </div>
-        <div class="method">
-          <strong>Canonical hash</strong>
-          <p>Hashes include each scenario's canonical core arrays, such as rigid state, particle state, losses, and gradients.</p>
-        </div>
-        <div class="method">
-          <strong>Fixed workload</strong>
-          <p>180 frames, 10 substeps, 60 Hz, seed 0, world count 1.</p>
-        </div>
-        <div class="method">
-          <strong>Deterministic contacts</strong>
-          <p>Contact scenarios use <code>CollisionPipeline(deterministic=True)</code> with the report's global Warp determinism mode.</p>
-        </div>
-        <div class="method">
-          <strong>Visual capture</strong>
-          <p>Solver videos use one world and MP4 frames read through <code>ViewerGL.get_frame()</code>.</p>
-        </div>
+    <section class="section">
+      <div class="section-head">
+        <h2>Protocol</h2>
+        <p>Only the checks that affect interpretation are shown here.</p>
       </div>
+      <ul class="protocol-grid" id="protocol"></ul>
     </section>
 
-    <section>
-      <h2 class="section-title">Scenario Videos And Statistics</h2>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>featherstone</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_featherstone_poster.png">
-                        <source src="assets/falling_cube_featherstone.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>mujoco</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_mujoco_poster.png">
-                        <source src="assets/falling_cube_mujoco.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>semi_implicit</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_semi_implicit_poster.png">
-                        <source src="assets/falling_cube_semi_implicit.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>xpbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_xpbd_poster.png">
-                        <source src="assets/falling_cube_xpbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">falling_cube</p>
-                  <h2>Falling Cube</h2>
-                </div>
-                <p>Single free rigid body floor contact. Useful for detecting tiny contact drift after impact.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Final height mean</span>
-          <strong>0.15 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Final height range</span>
-          <strong>0.15-0.15 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Awake bodies</span>
-          <strong>0</strong>
-        </div>
-
-        <div class="metric">
-          <span>Mean speed</span>
-          <strong>0 m/s</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>4</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>featherstone</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
+    <section class="section">
+      <div class="section-head">
+        <h2>Scenario Details</h2>
+        <p>Videos are compact diagnostic clips. The tables below carry the determinism verdicts.</p>
       </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>48.799 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>mujoco</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>263.698 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>semi_implicit</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>22.221 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>xpbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>18.566 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>mujoco</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/box_stack_mujoco_poster.png">
-                        <source src="assets/box_stack_mujoco.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>vbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/box_stack_vbd_poster.png">
-                        <source src="assets/box_stack_vbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>xpbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/box_stack_xpbd_poster.png">
-                        <source src="assets/box_stack_xpbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">box_stack</p>
-                  <h2>Box Stack</h2>
-                </div>
-                <p>Twenty jittered boxes with many contacts. A compact stress case for ordering and reductions.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>COM drift</span>
-          <strong>0.055 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Kinetic energy proxy</span>
-          <strong>133.092</strong>
-        </div>
-
-        <div class="metric">
-          <span>Contact samples</span>
-          <strong>18</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>184</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>mujoco</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>349.492 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>vbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>31.86 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>xpbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.547 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>mujoco</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/domino_chain_mujoco_poster.png">
-                        <source src="assets/domino_chain_mujoco.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>vbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/domino_chain_vbd_poster.png">
-                        <source src="assets/domino_chain_vbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>xpbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/domino_chain_xpbd_poster.png">
-                        <source src="assets/domino_chain_xpbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">domino_chain</p>
-                  <h2>Domino Chain</h2>
-                </div>
-                <p>Sequential impacts amplify small timing changes into visible propagation differences.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Fallen dominos</span>
-          <strong>12</strong>
-        </div>
-
-        <div class="metric">
-          <span>Last-domino time</span>
-          <strong>75 steps</strong>
-        </div>
-
-        <div class="metric">
-          <span>First angle</span>
-          <strong>73.473 deg</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tracked fall events</span>
-          <strong>12</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>mujoco</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>359.002 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>vbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>32.436 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>xpbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>17.906 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>featherstone</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/arm_7dof_featherstone_poster.png">
-                        <source src="assets/arm_7dof_featherstone.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>mujoco</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/arm_7dof_mujoco_poster.png">
-                        <source src="assets/arm_7dof_mujoco.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>xpbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/arm_7dof_xpbd_poster.png">
-                        <source src="assets/arm_7dof_xpbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">arm_7dof</p>
-                  <h2>7-DOF Arm</h2>
-                </div>
-                <p>Franka arm tracks deterministic sinusoidal PD targets from a fixed base.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Max target error</span>
-          <strong>0.095 rad</strong>
-        </div>
-
-        <div class="metric">
-          <span>Mean target error</span>
-          <strong>0.095 rad</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak PD torque</span>
-          <strong>4.768 N*m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>0</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>featherstone</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>69.207 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>mujoco</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>287.208 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>xpbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>57.34 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>featherstone</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/humanoid_featherstone_poster.png">
-                        <source src="assets/humanoid_featherstone.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>mujoco</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/humanoid_mujoco_poster.png">
-                        <source src="assets/humanoid_mujoco.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>xpbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/humanoid_xpbd_poster.png">
-                        <source src="assets/humanoid_xpbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">humanoid</p>
-                  <h2>Humanoid Standing</h2>
-                </div>
-                <p>Unitree H1 holds a standing pose; drift or falling exposes articulated-contact robustness issues.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Final root height</span>
-          <strong>0.544 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Fell worlds</span>
-          <strong>1</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max COM XY drift</span>
-          <strong>0.86 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>24</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>featherstone</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>68.207 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>mujoco</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>275.179 s</strong></div>
-      </div>
-
-    </article>
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>xpbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>body_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>31.04 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>semi_implicit</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_ball_semi_implicit_poster.png">
-                        <source src="assets/diffsim_ball_semi_implicit.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">diffsim_ball</p>
-                  <h2>Diffsim Ball</h2>
-                </div>
-                <p>Differentiable particle target with wall and floor contacts; core includes loss and initial-velocity gradients. Diffsim ball target gradient inspired by ``example_diffsim_ball``.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Loss</span>
-          <strong>1.409</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max grad abs</span>
-          <strong>0.232</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max state abs</span>
-          <strong>1.746</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max velocity abs</span>
-          <strong>4.668</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>98</strong>
-        </div>
-
-        <div class="metric">
-          <span>Contact samples</span>
-          <strong>600</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tape frames</span>
-          <strong>60</strong>
-        </div>
-
-        <div class="metric">
-          <span>Effective substeps</span>
-          <strong>10</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>semi_implicit</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>25.629 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>semi_implicit</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_bear_semi_implicit_poster.png">
-                        <source src="assets/diffsim_bear_semi_implicit.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">diffsim_bear</p>
-                  <h2>Diffsim Bear</h2>
-                </div>
-                <p>Differentiable soft bear activation network; core includes the loss, COM velocity, and activation-weight gradients. Compact soft bear gradient inspired by ``example_diffsim_bear``.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Loss</span>
-          <strong>13.222</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max grad abs</span>
-          <strong>0.104</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max state abs</span>
-          <strong>5.872</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max velocity abs</span>
-          <strong>3.214</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>1986</strong>
-        </div>
-
-        <div class="metric">
-          <span>Contact samples</span>
-          <strong>1</strong>
-        </div>
-
-        <div class="metric">
-          <span>Particles</span>
-          <strong>1986</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tets</span>
-          <strong>5354</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tape frames</span>
-          <strong>12</strong>
-        </div>
-
-        <div class="metric">
-          <span>Effective substeps</span>
-          <strong>80</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>semi_implicit</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>59.097 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>semi_implicit</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_cloth_com_semi_implicit_poster.png">
-                        <source src="assets/diffsim_cloth_com_semi_implicit.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">diffsim_cloth_com</p>
-                  <h2>Diffsim Cloth COM</h2>
-                </div>
-                <p>Small differentiable cloth target; COM uses an atomic accumulation before backpropagating gradients. Small cloth gradient scenario inspired by ``example_diffsim_cloth``.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Loss</span>
-          <strong>2.122</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max grad abs</span>
-          <strong>0.106</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max state abs</span>
-          <strong>1.2</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max velocity abs</span>
-          <strong>0.1</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tape frames</span>
-          <strong>120</strong>
-        </div>
-
-        <div class="metric">
-          <span>Effective substeps</span>
-          <strong>16</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>semi_implicit</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>39.599 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>semi_implicit</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_soft_body_semi_implicit_poster.png">
-                        <source src="assets/diffsim_soft_body_semi_implicit.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">diffsim_soft_body</p>
-                  <h2>Diffsim Soft Body</h2>
-                </div>
-                <p>Small differentiable soft-body material target with dynamic soft contacts and material-parameter gradients. Small soft-body material gradient inspired by ``example_diffsim_soft_body``.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Loss</span>
-          <strong>0.733</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max grad abs</span>
-          <strong>5.253e-04</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max state abs</span>
-          <strong>0.84</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max velocity abs</span>
-          <strong>9.887</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>9</strong>
-        </div>
-
-        <div class="metric">
-          <span>Contact samples</span>
-          <strong>960</strong>
-        </div>
-
-        <div class="metric">
-          <span>Particles</span>
-          <strong>27</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tets</span>
-          <strong>40</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tape frames</span>
-          <strong>60</strong>
-        </div>
-
-        <div class="metric">
-          <span>Effective substeps</span>
-          <strong>16</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>semi_implicit</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>57.981 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>semi_implicit</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_spring_cage_semi_implicit_poster.png">
-                        <source src="assets/diffsim_spring_cage_semi_implicit.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">diffsim_spring_cage</p>
-                  <h2>Diffsim Spring Cage</h2>
-                </div>
-                <p>Differentiable spring-cage target; core includes loss and spring rest-length gradients. Spring rest-length gradient inspired by ``example_diffsim_spring_cage``.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Loss</span>
-          <strong>2.313</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max grad abs</span>
-          <strong>0.03</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max state abs</span>
-          <strong>1.8</strong>
-        </div>
-
-        <div class="metric">
-          <span>Max velocity abs</span>
-          <strong>1.307</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>114</strong>
-        </div>
-
-        <div class="metric">
-          <span>Contact samples</span>
-          <strong>600</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tape frames</span>
-          <strong>60</strong>
-        </div>
-
-        <div class="metric">
-          <span>Effective substeps</span>
-          <strong>10</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>semi_implicit</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>final_particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>29.339 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>vbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/vbd_cloth_patch_vbd_poster.png">
-                        <source src="assets/vbd_cloth_patch_vbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">vbd_cloth_patch</p>
-                  <h2>VBD Cloth Patch</h2>
-                </div>
-                <p>Pinned cloth patch with ground contact, using VBD bending-aware coloring. Pinned cloth patch evaluated with the VBD solver.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Particles</span>
-          <strong>77</strong>
-        </div>
-
-        <div class="metric">
-          <span>Pinned particles</span>
-          <strong>11</strong>
-        </div>
-
-        <div class="metric">
-          <span>Height range</span>
-          <strong>0.01-0.306 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>24</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>vbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>38.582 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
-
-            <article class="scenario">
-              <div class="media">
-
-                    <div class="solver-video">
-                      <p class="video-label"><code>vbd</code></p>
-                      <video controls muted loop playsinline preload="metadata" poster="assets/vbd_soft_body_vbd_poster.png">
-                        <source src="assets/vbd_soft_body_vbd.mp4" type="video/mp4">
-                      </video>
-                      <p class="video-caption">
-                        61 frames encoded at 24 fps
-                        (960x540, stride 3).
-                      </p>
-                    </div>
-              </div>
-              <div class="scenario-body">
-                <div class="scenario-heading">
-                  <p class="eyebrow">vbd_soft_body</p>
-                  <h2>VBD Soft Body</h2>
-                </div>
-                <p>Pinned tetrahedral block with ground contact, using VBD particle/tet solve paths. Pinned tetrahedral block evaluated with the VBD solver.</p>
-                <div class="metrics">
-
-        <div class="metric">
-          <span>Particles</span>
-          <strong>80</strong>
-        </div>
-
-        <div class="metric">
-          <span>Pinned particles</span>
-          <strong>16</strong>
-        </div>
-
-        <div class="metric">
-          <span>Height range</span>
-          <strong>0-0.24 m</strong>
-        </div>
-
-        <div class="metric">
-          <span>Peak contacts</span>
-          <strong>20</strong>
-        </div>
-
-        <div class="metric">
-          <span>Tets</span>
-          <strong>180</strong>
-        </div>
-                </div>
-                <div class="solver-cards">
-
-    <article class="solver-card ok">
-      <div class="solver-card-head">
-        <div>
-          <h3><code>vbd</code></h3>
-        </div>
-        <span class="pill ok">BIT-EXACT</span>
-      </div>
-      <p class="solver-summary">3/3 subprocess replays matched byte-for-byte with CUDA graph enabled.</p>
-      <div class="solver-stats">
-        <div><span>Execution</span><strong>CUDA graph</strong></div>
-        <div><span>Unique hashes</span><strong>1</strong></div>
-        <div><span>Dominant core drift</span><strong>particle_q (0)</strong></div>
-        <div><span>Dominant extra drift</span><strong>none</strong></div>
-        <div><span>Max core diff</span><strong>0</strong></div>
-        <div><span>Duration</span><strong>41.72 s</strong></div>
-      </div>
-
-    </article>
-                </div>
-              </div>
-            </article>
+      <div id="scenario-details"></div>
     </section>
 
-    <section class="band">
-      <h2>Solver Matrix</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Scenario</th>
-              <th>Solver</th>
-              <th>Verdict</th>
-              <th>Unique hashes</th>
-              <th>Dominant core signal</th>
-              <th>Max core diff</th>
-              <th>Max extras diff</th>
-              <th>Duration</th>
-            </tr>
-          </thead>
-          <tbody>
-
-            <tr>
-              <td>7-DOF Arm</td>
-              <td><code>featherstone</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>69.207 s</td>
-            </tr>
-
-            <tr>
-              <td>7-DOF Arm</td>
-              <td><code>mujoco</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>287.208 s</td>
-            </tr>
-
-            <tr>
-              <td>7-DOF Arm</td>
-              <td><code>xpbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>57.34 s</td>
-            </tr>
-
-            <tr>
-              <td>Box Stack</td>
-              <td><code>mujoco</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>349.492 s</td>
-            </tr>
-
-            <tr>
-              <td>Box Stack</td>
-              <td><code>vbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>31.86 s</td>
-            </tr>
-
-            <tr>
-              <td>Box Stack</td>
-              <td><code>xpbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>17.547 s</td>
-            </tr>
-
-            <tr>
-              <td>Diffsim Ball</td>
-              <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>final_particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>25.629 s</td>
-            </tr>
-
-            <tr>
-              <td>Diffsim Bear</td>
-              <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>final_particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>59.097 s</td>
-            </tr>
-
-            <tr>
-              <td>Diffsim Cloth COM</td>
-              <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>final_particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>39.599 s</td>
-            </tr>
-
-            <tr>
-              <td>Diffsim Soft Body</td>
-              <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>final_particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>57.981 s</td>
-            </tr>
-
-            <tr>
-              <td>Diffsim Spring Cage</td>
-              <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>final_particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>29.339 s</td>
-            </tr>
-
-            <tr>
-              <td>Domino Chain</td>
-              <td><code>mujoco</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>359.002 s</td>
-            </tr>
-
-            <tr>
-              <td>Domino Chain</td>
-              <td><code>vbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>32.436 s</td>
-            </tr>
-
-            <tr>
-              <td>Domino Chain</td>
-              <td><code>xpbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>17.906 s</td>
-            </tr>
-
-            <tr>
-              <td>Falling Cube</td>
-              <td><code>featherstone</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>48.799 s</td>
-            </tr>
-
-            <tr>
-              <td>Falling Cube</td>
-              <td><code>mujoco</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>263.698 s</td>
-            </tr>
-
-            <tr>
-              <td>Falling Cube</td>
-              <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>22.221 s</td>
-            </tr>
-
-            <tr>
-              <td>Falling Cube</td>
-              <td><code>xpbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>18.566 s</td>
-            </tr>
-
-            <tr>
-              <td>Humanoid Standing</td>
-              <td><code>featherstone</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>68.207 s</td>
-            </tr>
-
-            <tr>
-              <td>Humanoid Standing</td>
-              <td><code>mujoco</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>275.179 s</td>
-            </tr>
-
-            <tr>
-              <td>Humanoid Standing</td>
-              <td><code>xpbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>body_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>31.04 s</td>
-            </tr>
-
-            <tr>
-              <td>VBD Cloth Patch</td>
-              <td><code>vbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>38.582 s</td>
-            </tr>
-
-            <tr>
-              <td>VBD Soft Body</td>
-              <td><code>vbd</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>particle_q (0)</td>
-              <td>0</td>
-              <td>0</td>
-              <td>41.72 s</td>
-            </tr>
-          </tbody>
-        </table>
+    <section class="section">
+      <div class="section-head">
+        <h2>Warp Probes</h2>
+        <p>Focused compiler/runtime checks are reported separately from the solver matrix.</p>
       </div>
+      <div class="table-wrap" id="warp-probes"></div>
     </section>
 
-    <section class="band">
-      <h2>Warp Lowering Micro-Probes</h2>
-      <p class="section-copy">
-        These headless workloads are not Newton solver scenarios, so they stay out of the solver matrix.
-        They capture the focused Warp atomic and adjoint patterns that motivated the determinism work.
-      </p>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Probe</th>
-              <th>ID</th>
-              <th>Verdict</th>
-              <th>Unique hashes</th>
-              <th>Dominant core signal</th>
-              <th>Max core diff</th>
-              <th>Targeted pattern</th>
-            </tr>
-          </thead>
-          <tbody>
-
-            <tr>
-              <td>Warp Indexed Counter</td>
-              <td><code>warp_counter_indexed</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>counts (0)</td>
-              <td>0</td>
-              <td>dynamic consumed-return counter index</td>
-            </tr>
-
-            <tr>
-              <td>Warp Sliced Counter</td>
-              <td><code>warp_counter_sliced</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>counts (0)</td>
-              <td>0</td>
-              <td>sliced counter target with dynamic prefix/index</td>
-            </tr>
-
-            <tr>
-              <td>Warp Static Counter Index</td>
-              <td><code>warp_counter_static_index</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>counts (0)</td>
-              <td>0</td>
-              <td>nonzero static consumed-return counter index</td>
-            </tr>
-
-            <tr>
-              <td>Warp Custom Adjoint</td>
-              <td><code>warp_custom_adjoint</code></td>
-              <td><span class="pill ok">BIT-EXACT</span></td>
-              <td>1</td>
-              <td>y (0)</td>
-              <td>0</td>
-              <td>deterministic target mapping for wp.adjoint[array]</td>
-            </tr>
-          </tbody>
-        </table>
+    <section class="section">
+      <div class="section-head">
+        <h2>Scope</h2>
+        <p>How to read the result.</p>
       </div>
-    </section>
-
-    <section class="band">
-      <h2>Observed Gaps And Scope</h2>
-      <div class="list-grid">
-        <div class="list-card">
-          <h3>Observed gaps in this run</h3>
-          <p>These notes are generated from the actual solver results above rather than a static message.</p>
-          <ul>
-            <li>No observed run-to-run determinism gaps remain in this tested report slice.</li>
-          </ul>
-        </div>
-        <div class="list-card">
-          <h3>What the report does and does not prove</h3>
-          <p>The current harness is precise about repeated local replays, but it intentionally stops short of broader claims.</p>
-          <ul>
-            <li>This report only checks repeated runs on the same machine, driver, GPU, and Warp/Newton build; it does not prove cross-GPU or cross-driver reproducibility.</li>
-<li>The verdict is based on final core state hashes. Videos and scenario extras are diagnostic evidence, not the primary pass/fail signal.</li>
-<li>Warp lowering micro-probes are headless compiler/runtime workloads, not Newton solver scenarios; they are reported separately from the solver matrix.</li>
-          </ul>
-        </div>
-        <div class="list-card">
-          <h3>Controls in this harness</h3>
-          <ul>
-            <li>Newton solver kernels receive deterministic module options through solver constructors.</li>
-            <li><code>wp.config.deterministic</code> is only set when an explicit global Warp mode is requested, mostly for standalone Warp probes.</li>
-            <li>MJWarp dynamic solver-atomic capacity is passed as a solver deterministic module option when <code>--mujoco-deterministic-max-records</code> is set.</li>
-            <li>Each scenario owns a seeded NumPy RNG, so pose jitter and control trajectories are reproducible.</li>
-            <li>The comparison boundary is process-level: no Python or GPU state is reused between replays.</li>
-            <li>Only final core state decides the verdict; scenario extras are diagnostic and reported separately.</li>
-          </ul>
-        </div>
-      </div>
+      <ul class="scope-list" id="scope-list"></ul>
     </section>
   </main>
 
   <footer>
-    Generated 2026-06-05 14:03:35 Pacific Daylight Time. Raw machine-readable data: <code>determinism_report.json</code>.
+    <div class="wrap">Report data timestamp: <span id="footer-generated-at">Loading...</span></div>
   </footer>
+
+  <script>
+    const SOLVERS = [
+      { id: "xpbd", label: "XPBD" },
+      { id: "featherstone", label: "Featherstone" },
+      { id: "mujoco", label: "MuJoCo" },
+      { id: "semi_implicit", label: "Semi-implicit" },
+      { id: "vbd", label: "VBD" },
+    ];
+
+    const SOLVER_INDEX = new Map(SOLVERS.map((solver, index) => [solver.id, index]));
+    const SOLVER_LABELS = new Map(SOLVERS.map((solver) => [solver.id, solver.label]));
+
+    const GROUPS = [
+      {
+        label: "Rigid contact",
+        scenarios: ["falling_cube", "box_stack", "domino_chain"],
+      },
+      {
+        label: "Articulated bodies",
+        scenarios: ["arm_7dof", "humanoid"],
+      },
+      {
+        label: "Differentiable examples",
+        scenarios: ["diffsim_ball", "diffsim_bear", "diffsim_cloth_com", "diffsim_soft_body", "diffsim_spring_cage"],
+      },
+      {
+        label: "VBD scenes",
+        scenarios: ["vbd_cloth_patch", "vbd_soft_body"],
+      },
+    ];
+
+    const SCENARIO_COPY = {
+      falling_cube: "Free rigid body with floor contact.",
+      box_stack: "Twenty-box contact stack.",
+      domino_chain: "Sequential impacts through a domino chain.",
+      arm_7dof: "Franka arm with fixed-base PD targets.",
+      humanoid: "Unitree H1 standing pose with contact.",
+      diffsim_ball: "Particle target with loss and velocity-gradient checks.",
+      diffsim_bear: "Soft-body control target with activation-gradient checks.",
+      diffsim_cloth_com: "Cloth center-of-mass target with gradient checks.",
+      diffsim_soft_body: "Soft-body material target with gradient checks.",
+      diffsim_spring_cage: "Spring rest-length target with gradient checks.",
+      vbd_cloth_patch: "Pinned cloth patch evaluated with VBD.",
+      vbd_soft_body: "Pinned tetrahedral block evaluated with VBD.",
+    };
+
+    const METRIC_PRIORITY = [
+      "Loss",
+      "Final height mean",
+      "COM drift",
+      "Fallen dominos",
+      "Max target error",
+      "Final root height",
+      "Peak contacts",
+      "Max grad abs",
+      "Max state abs",
+      "Mean speed",
+      "Particles",
+      "Tets",
+    ];
+
+    const OMIT_METRICS = new Set(["Contact samples", "Tape frames", "Effective substeps"]);
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char]);
+    }
+
+    function solverClass(solver) {
+      return `solver-${String(solver).replace(/_/g, "-")}`;
+    }
+
+    function solverLabel(solver) {
+      return SOLVER_LABELS.get(solver) || solver.replace(/_/g, " ");
+    }
+
+    function titleForScenario(report, id) {
+      return report.scenarios?.[id]?.title || report.micro_scenarios?.[id]?.title || id.replace(/_/g, " ");
+    }
+
+    function copyForScenario(report, id) {
+      return SCENARIO_COPY[id] || stripMarkup(report.scenarios?.[id]?.note || report.scenarios?.[id]?.doc || "");
+    }
+
+    function stripMarkup(text) {
+      return String(text || "").replace(/``/g, "").replace(/\s+/g, " ").trim();
+    }
+
+    function toneForStatus(status) {
+      if (status === "bit_exact") return "ok";
+      if (status === "failed" || status === "error") return "bad";
+      return "warn";
+    }
+
+    function statusLabel(status) {
+      if (status === "bit_exact") return "Exact";
+      if (status === "failed") return "Failed";
+      if (status === "drift") return "Drift";
+      return String(status || "Unknown").replace(/_/g, " ");
+    }
+
+    function statusPill(status) {
+      const tone = toneForStatus(status);
+      return `<span class="status-pill status-${tone}">${escapeHtml(statusLabel(status))}</span>`;
+    }
+
+    function formatDiff(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "n/a";
+      if (number === 0) return "0";
+      if (Math.abs(number) < 0.001) return number.toExponential(2);
+      if (Math.abs(number) < 10) return number.toPrecision(3);
+      return number.toFixed(2);
+    }
+
+    function formatDuration(seconds) {
+      const value = Number(seconds);
+      if (!Number.isFinite(value)) return "n/a";
+      if (value >= 60) return `${(value / 60).toFixed(1)} min`;
+      return `${value.toFixed(1)} s`;
+    }
+
+    function formatGeneratedAt(value) {
+      const raw = String(value || "").trim();
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) Pacific (Daylight|Standard) Time$/);
+      if (!match) return raw || "Unavailable";
+      const [, year, month, day, hour, minute, second, pacificMode] = match;
+      const offset = pacificMode === "Daylight" ? "-07:00" : "-08:00";
+      const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}${offset}`);
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZoneName: "short",
+      }).format(date);
+    }
+
+    function plural(value, singular, pluralLabel = `${singular}s`) {
+      return Number(value) === 1 ? singular : pluralLabel;
+    }
+
+    function usefulMetrics(metrics) {
+      return (metrics || [])
+        .map((metric, index) => ({ ...metric, index }))
+        .filter((metric) => !OMIT_METRICS.has(metric.label))
+        .sort((a, b) => {
+          const aRank = METRIC_PRIORITY.indexOf(a.label);
+          const bRank = METRIC_PRIORITY.indexOf(b.label);
+          return (aRank === -1 ? 100 : aRank) - (bRank === -1 ? 100 : bRank) || a.index - b.index;
+        })
+        .slice(0, 4);
+    }
+
+    function buildIndexes(report) {
+      const microScenarios = new Set(report.micro_scenario_order || []);
+      const solverResults = report.solver_results || [];
+      const physicsResults = solverResults.filter((result) => !microScenarios.has(result.scenario));
+      const embeddedMicroResults = solverResults.filter((result) => microScenarios.has(result.scenario));
+      const microResults = (report.micro_results || []).length ? report.micro_results : embeddedMicroResults;
+      const allResults = [...physicsResults, ...microResults];
+      const resultByScenarioSolver = new Map();
+      for (const result of physicsResults) {
+        resultByScenarioSolver.set(`${result.scenario}:${result.solver}`, result);
+      }
+      const videosByScenario = new Map();
+      for (const video of report.videos || []) {
+        if (!videosByScenario.has(video.scenario)) videosByScenario.set(video.scenario, []);
+        videosByScenario.get(video.scenario).push(video);
+      }
+      for (const videos of videosByScenario.values()) {
+        videos.sort((a, b) => (SOLVER_INDEX.get(a.solver) ?? 99) - (SOLVER_INDEX.get(b.solver) ?? 99));
+      }
+      return { physicsResults, microResults, allResults, resultByScenarioSolver, videosByScenario };
+    }
+
+    function renderSummary(report, indexes) {
+      const allResults = indexes.allResults;
+      const exactCount = allResults.filter((result) => result.status === "bit_exact").length;
+      const driftCount = allResults.filter((result) => result.status !== "bit_exact").length;
+      const generatedAt = formatGeneratedAt(report.generated_at);
+
+      document.getElementById("generated-at").textContent = generatedAt;
+      document.getElementById("footer-generated-at").textContent = generatedAt;
+
+      document.getElementById("summary-stats").innerHTML = [
+        ["Scenarios", report.scenario_order?.length || 0],
+        ["Solver checks", indexes.physicsResults.length],
+        ["Warp probes", indexes.microResults.length],
+        ["Total checks", allResults.length],
+        ["Bit-exact", exactCount, "ok"],
+        ["Drift/failures", driftCount, driftCount === 0 ? "ok" : ""],
+      ].map(([label, value, className]) => `
+        <div class="stat ${className || ""}">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `).join("");
+    }
+
+    function renderRunConfig(report) {
+      const config = report.config || {};
+      document.getElementById("run-config").innerHTML = [
+        ["Replay count", `${config.runs ?? "n/a"} ${plural(config.runs, "subprocess", "subprocesses")}`],
+        ["Workload", `${config.num_steps ?? "n/a"} steps / ${config.substeps ?? "n/a"} substeps`],
+        ["Rate", `${config.fps ?? "n/a"} Hz`],
+        ["Worlds", config.world_count ?? "n/a"],
+        ["Seed", config.seed ?? "n/a"],
+        ["Solver mode", config.solver_deterministic || "n/a"],
+      ].map(([label, value]) => `
+        <div class="run-item">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `).join("");
+    }
+
+    function renderResultBanner(report, indexes) {
+      const allResults = indexes.allResults;
+      const exactCount = allResults.filter((result) => result.status === "bit_exact").length;
+      const driftCount = allResults.length - exactCount;
+      const statusText = driftCount === 0
+        ? "All tested rows are bit-exact."
+        : `${driftCount} check ${plural(driftCount, "needs", "need")} review.`;
+      const detail = `${indexes.physicsResults.length} solver/scenario checks and ${indexes.microResults.length} Warp probes matched across ${report.config?.runs ?? "n/a"} fresh subprocess replays.`;
+      document.getElementById("result-section").innerHTML = `
+        <div class="result-banner">
+          <div>
+            <strong>${escapeHtml(statusText)}</strong>
+            <span>${escapeHtml(detail)}</span>
+          </div>
+          ${statusPill(driftCount === 0 ? "bit_exact" : "drift")}
+        </div>
+      `;
+    }
+
+    function renderProtocol(report) {
+      const config = report.config || {};
+      const items = [
+        ["Replay isolation", `${config.runs ?? "n/a"} independent subprocess runs per supported solver/scenario pair.`],
+        ["Hash verdict", "Final state arrays, losses, and gradients are compared through canonical byte hashes."],
+        ["Fixed workload", `${config.num_steps ?? "n/a"} steps, ${config.substeps ?? "n/a"} substeps, ${config.fps ?? "n/a"} Hz, seed ${config.seed ?? "n/a"}.`],
+        ["Contacts", "Contact scenarios use deterministic collision ordering."],
+        ["Visuals", "Videos are diagnostic evidence; pass/fail comes from state hashes."],
+        ["Scope", "Same machine, driver, GPU, and Newton/Warp build."],
+      ];
+      document.getElementById("protocol").innerHTML = items.map(([label, value]) => `
+        <li>
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(value)}</span>
+        </li>
+      `).join("");
+    }
+
+    function renderMatrix(report, indexes) {
+      const header = `
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              ${SOLVERS.map((solver) => `<th class="solver-head ${solverClass(solver.id)}">${escapeHtml(solver.label)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      const rows = GROUPS.map((group) => {
+        const scenarioRows = group.scenarios
+          .filter((scenarioId) => (report.scenario_order || []).includes(scenarioId))
+          .map((scenarioId) => {
+            const cells = SOLVERS.map((solver) => {
+              const result = indexes.resultByScenarioSolver.get(`${scenarioId}:${solver.id}`);
+              if (!result) return `<td class="matrix-cell empty">-</td>`;
+              return `
+                <td class="matrix-cell has-result ${solverClass(solver.id)}">
+                  ${statusPill(result.status)}
+                  <span class="cell-sub">${escapeHtml(result.unique_hashes)} hash / max diff ${escapeHtml(formatDiff(result.max_core_diff_overall))}</span>
+                </td>
+              `;
+            }).join("");
+            return `
+              <tr>
+                <td>
+                  <span class="scenario-name">${escapeHtml(titleForScenario(report, scenarioId))}</span>
+                  <span class="scenario-note">${escapeHtml(copyForScenario(report, scenarioId))}</span>
+                </td>
+                ${cells}
+              </tr>
+            `;
+          }).join("");
+
+        if (!scenarioRows) return "";
+        return `
+          <tr class="group-row"><th colspan="${SOLVERS.length + 1}">${escapeHtml(group.label)}</th></tr>
+          ${scenarioRows}
+        `;
+      }).join("");
+
+      document.getElementById("solver-matrix").innerHTML = `${header}${rows}</tbody></table>`;
+    }
+
+    function renderMetricStrip(metrics) {
+      if (!metrics.length) return "";
+      return `
+        <div class="metric-strip">
+          ${metrics.map((metric) => `
+            <div class="metric">
+              <span>${escapeHtml(metric.label)}</span>
+              <strong>${escapeHtml(metric.value)}</strong>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderVideoTile(video) {
+      const solver = video.solver;
+      return `
+        <div class="video-tile ${solverClass(solver)}">
+          <div class="video-title">
+            <span class="solver-dot"></span>
+            <span>${escapeHtml(solverLabel(solver))}</span>
+          </div>
+          <video controls muted loop playsinline preload="metadata" poster="assets/${escapeHtml(video.poster)}">
+            <source src="assets/${escapeHtml(video.video)}" type="video/mp4">
+          </video>
+        </div>
+      `;
+    }
+
+    function renderSolverRows(results) {
+      const sorted = [...results].sort((a, b) => (SOLVER_INDEX.get(a.solver) ?? 99) - (SOLVER_INDEX.get(b.solver) ?? 99));
+      return `
+        <div class="table-wrap small-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Solver</th>
+                <th>Status</th>
+                <th>Hashes</th>
+                <th>Max diff</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sorted.map((result) => `
+                <tr class="solver-row ${solverClass(result.solver)}">
+                  <td>${escapeHtml(solverLabel(result.solver))}</td>
+                  <td>${statusPill(result.status)}</td>
+                  <td>${escapeHtml(result.unique_hashes)}</td>
+                  <td>${escapeHtml(formatDiff(result.max_core_diff_overall))}</td>
+                  <td>${escapeHtml(formatDuration(result.duration_s))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderScenario(report, indexes, scenarioId) {
+      const results = indexes.physicsResults.filter((result) => result.scenario === scenarioId);
+      if (!results.length) return "";
+      const representativeSolver = report.scenarios?.[scenarioId]?.representative_solver;
+      const representative = results.find((result) => result.solver === representativeSolver) || results[0];
+      const videos = indexes.videosByScenario.get(scenarioId) || [];
+      const metrics = usefulMetrics(representative.metrics);
+      return `
+        <article class="scenario-detail">
+          <div class="scenario-detail-head">
+            <div>
+              <h4>${escapeHtml(titleForScenario(report, scenarioId))}</h4>
+              <p>${escapeHtml(copyForScenario(report, scenarioId))}</p>
+            </div>
+            <div class="solver-chip-row">
+              ${results
+                .sort((a, b) => (SOLVER_INDEX.get(a.solver) ?? 99) - (SOLVER_INDEX.get(b.solver) ?? 99))
+                .map((result) => `
+                  <span class="solver-chip ${solverClass(result.solver)}">
+                    <span class="solver-dot"></span>
+                    ${escapeHtml(solverLabel(result.solver))}
+                  </span>
+                `).join("")}
+            </div>
+          </div>
+          ${renderMetricStrip(metrics)}
+          <div class="scenario-content">
+            <div class="video-grid">
+              ${videos.map(renderVideoTile).join("")}
+            </div>
+            ${renderSolverRows(results)}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderScenarioDetails(report, indexes) {
+      document.getElementById("scenario-details").innerHTML = GROUPS.map((group) => {
+        const scenarioMarkup = group.scenarios
+          .filter((scenarioId) => (report.scenario_order || []).includes(scenarioId))
+          .map((scenarioId) => renderScenario(report, indexes, scenarioId))
+          .join("");
+        if (!scenarioMarkup) return "";
+        return `
+          <section class="group-block">
+            <div class="group-title">
+              <h3>${escapeHtml(group.label)}</h3>
+              <span>${group.scenarios.filter((scenarioId) => (report.scenario_order || []).includes(scenarioId)).length} scenarios</span>
+            </div>
+            ${scenarioMarkup}
+          </section>
+        `;
+      }).join("");
+    }
+
+    function renderWarpProbes(report, indexes) {
+      const rows = indexes.microResults
+        .sort((a, b) => (report.micro_scenario_order || []).indexOf(a.scenario) - (report.micro_scenario_order || []).indexOf(b.scenario))
+        .map((result) => {
+          const scenario = report.micro_scenarios?.[result.scenario] || {};
+          return `
+            <tr>
+              <td>${escapeHtml(scenario.title || result.scenario)}</td>
+              <td>${escapeHtml(stripMarkup(scenario.doc))}</td>
+              <td>${statusPill(result.status)}</td>
+              <td>${escapeHtml(result.unique_hashes)}</td>
+              <td>${escapeHtml(formatDiff(result.max_core_diff_overall))}</td>
+              <td>${escapeHtml(formatDuration(result.duration_s))}</td>
+            </tr>
+          `;
+        }).join("");
+
+      document.getElementById("warp-probes").innerHTML = `
+        <table class="warp-table">
+          <thead>
+            <tr>
+              <th>Probe</th>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Hashes</th>
+              <th>Max diff</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderScope() {
+      const scopeItems = [
+        "The result covers repeated runs on the same machine, driver, GPU, and Newton/Warp build.",
+        "State hashes determine pass/fail. Videos are included to make the scenario behavior easy to inspect.",
+        "Warp probes exercise focused runtime behavior and are not counted as solver scenarios.",
+      ];
+      document.getElementById("scope-list").innerHTML = scopeItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    }
+
+    async function init() {
+      try {
+        const response = await fetch("determinism_report.json", { cache: "no-cache" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const report = await response.json();
+        const indexes = buildIndexes(report);
+        renderSummary(report, indexes);
+        renderRunConfig(report);
+        renderResultBanner(report, indexes);
+        renderMatrix(report, indexes);
+        renderProtocol(report);
+        renderScenarioDetails(report, indexes);
+        renderWarpProbes(report, indexes);
+        renderScope(report);
+      } catch (error) {
+        document.querySelector("main").innerHTML = `
+          <div class="load-error">
+            Could not load determinism_report.json: ${escapeHtml(error.message)}
+          </div>
+        `;
+      }
+    }
+
+    init();
+  </script>
 </body>
 </html>
