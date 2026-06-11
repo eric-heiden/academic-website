@@ -90,13 +90,17 @@
     (G1 29-DoF with hands, H1, Apptronik Apollo, Booster T1, Shadow Hand, UR5e, Wonik Allegro)
     via <code>newton.ModelBuilder.add_usd()</code> with monkey-patched
     <code>compute_inertia_mesh</code>. 5 reruns per (variant × mesh).
+    <br>
+    Reviewed 2026-06-11 with a fresh local build of NVIDIA/warp PR&nbsp;#1355
+    (<code>e78684d21</code>) in a dedicated <code>uv</code> venv and current Newton
+    <code>main</code> (<code>529ec4d1</code>).
   </div>
 
   <div class="tldr">
     <h2>TL;DR</h2>
     <p>
-      Newton's mesh-inertia kernel on <code>main</code> uses <code>wp.atomic_add</code> into a
-      single float32 accumulator. This is empirically <strong>non-deterministic on every single
+      Newton's mesh-inertia kernel on <code>main</code> uses <code>wp.atomic_add</code> into
+      single-slot float32 accumulators. This is empirically <strong>non-deterministic on every single
       mesh tested</strong> (262/262 with run-to-run drift), with relative inertia drift up to
       <strong>5&nbsp;×&nbsp;10⁻⁴</strong>. V1 (Andrew Kaufman's per-triangle device buffer + numpy
       f64 host reduce) and V3 (<code>wp.tile_sum</code> in-kernel reduce) both recover bit-exact
@@ -105,15 +109,17 @@
       reference. V1 is +43 % per call but delivers the highest precision.
     </p>
     <p>
-      <strong>Unexpected:</strong> Warp PR&nbsp;#1355's automatic <code>deterministic = run_to_run</code>
-      lowering (V2) <em>does not</em> achieve full bit-exact reproducibility on these workloads:
-      <strong>10 / 262 meshes still drift</strong>, all on dense meshes (≥36 k triangles), with
-      sub-ULP rounding differences (~3 × 10⁻⁷ relative). The slowdown is also substantially worse
-      than expected: <strong>+551 %</strong> per-call (median 19 ms vs V0's 2.9 ms), because the
-      CUB scatter-sort-reduce machinery has fixed overhead that dominates these very small (single
-      accumulator slot) reductions. The simple per-thread-output + CUB-equivalent host reduce
-      emulation we ran earlier is fully deterministic and 60 % cheaper — suggesting PR #1355's
-      automatic path has further tuning headroom for atomic-into-scalar patterns.
+      <strong>Follow-up:</strong> the V2 drift is real, but the likely source is now clearer.
+      It is not a Newton postprocessing or hashing bug. PR&nbsp;#1355 lowers Newton's scalar
+      <code>volume</code> accumulator through the RUN_TO_RUN scalar CUB
+      <code>ReduceByKey</code> shortcut, and that scalar path is not bit-exact in the dense
+      cases tested here. A fresh local PR&nbsp;#1355 build reproduced scalar
+      <code>atomic_add(out, 0, value)</code> drift at 42k-70k terms, while the same probe under
+      <code>GPU_TO_GPU</code> and a <code>vec3</code> RUN_TO_RUN probe were bit-exact. So V2's
+      <strong>10 / 262 drifting meshes</strong> should be read as a Warp PR1355 RUN_TO_RUN scalar
+      reduction issue, not as evidence that deterministic lowering cannot work for Newton.
+      V2 also remains much slower than V0: <strong>+551 %</strong> per-call (median 19 ms vs
+      V0's 2.9 ms).
     </p>
   </div>
 
@@ -151,10 +157,11 @@ Plotly.newPlot("runtime-bar", [{"x": ["apptronik_apollo", "booster_t1", "g1_with
 </script>
 
   <p>
-    V3 (<code>tile_sum</code>) is within noise of V0 on every robot. V1 and V2 both pay the
-    overhead of writing per-triangle device buffers and reading them back to the host. Per-call
-    overhead is ~1–2 ms regardless of mesh size for V1/V2 due to the host-side numpy reduction
-    cost; for very large meshes (apptronik_apollo, G1) the relative overhead drops.
+    V3 (<code>tile_sum</code>) is within noise of V0 on every robot. V1 pays for writing
+    per-triangle device buffers and reducing them on the host. V2 pays for deterministic scatter
+    buffers, a record-count readback outside graph capture, and CUB sort/reduce postpasses. That
+    fixed machinery dominates this single-output reduction workload; for very large meshes
+    (apptronik_apollo, G1) the relative overhead drops.
   </p>
 
   
@@ -185,7 +192,7 @@ Plotly.newPlot("scaling-plot", [{"x": [13456, 17716, 15384, 9046, 13206, 4332, 1
     the kind of nondeterminism that breaks hash-based snapshot regression tests on Newton models.
   </p>
   <p>
-    The histogram below shows the absolute drift distribution. The bimodal shape is real:
+    The log-binned chart below shows the absolute drift distribution. The bimodal shape is real:
     very small meshes drift in the 1e-15 to 1e-10 range (sub-ULP for f32 / numerical noise);
     large meshes drift in the 1 to 1e5 range (because both the per-triangle integrand and the
     absolute inertia magnitude grow with mesh size).
@@ -193,9 +200,22 @@ Plotly.newPlot("scaling-plot", [{"x": [13456, 17716, 15384, 9046, 13206, 4332, 1
   
 <div id="drift-hist" class="plot"></div>
 <script>
-Plotly.newPlot("drift-hist",
-  [{x: [6.912159733474255e-11, 4.217781679471955e-11, 3.524291969370097e-12, 2.837623469531536e-10, 2.510205376893282e-10, 6.0254023992456496e-12, 4.501998773775995e-11, 4.206412995699793e-12, 2.837623469531536e-10, 1.3278622645884752e-10, 1.057287590811029e-11, 2.61643435806036e-08, 1.2803980098397005e-11, 1.375610736431554e-11, 3.4503955248510465e-11, 1.1050360626541078e-10, 5.1386450650170445e-11, 5.6843418860808015e-12, 3.851141627819743e-11, 5.184119800105691e-11, 7.275957614183426e-11, 8.708411769475788e-11, 8.242295734817162e-12, 2.1600499167107046e-12, 1.2505552149377763e-11, 5.6843418860808015e-11, 1.0822986951097846e-10, 3.219646771412954e-15, 1.1425527191022411e-11, 2.6147972675971687e-12, 1.3415046851150692e-11, 6.093614501878619e-11, 7.958078640513122e-11, 4.3298697960381105e-15, 7.787548383930698e-12, 2.1316282072803006e-13, 3.885780586188048e-16, 1.076841726899147e-09, 6.114220241215662e-12, 2.204615157097578e-09, 3.652189661806915e-12, 2.7569058147491887e-12, 1.9326762412674725e-12, 2.6290081223123707e-12, 6.394884621840902e-14, 1.1368683772161603e-13, 5.240252676230739e-14, 2.5508484213787597e-12, 2.1804780203638074e-13, 1.3455903058456897e-13, 5.10702591327572e-14, 1.212363542890671e-13, 4.440892098500626e-16, 3.4638958368304884e-14, 5.0182080713057076e-14, 2.5721647034515627e-12, 1.1084466677857563e-12, 4.490630090003833e-12, 1.1368683772161603e-12, 5.950795411990839e-14, 7.673861546209082e-13, 5.417888360170764e-14, 4.39825953435502e-12, 2.686739719592879e-13, 6.505906924303417e-14, 1.0791367799356522e-13, 8.038014698286133e-14, 1.5543122344752192e-15, 2.828848266744899e-13, 1.290079154614432e-13, 6.45172804070171e-12, 5.229594535194337e-12, 1.3642420526593924e-11, 8.549250196665525e-11, 1.5779733075760305e-10, 1.887379141862766e-15, 6.30961949354969e-12, 9.094947017729282e-12, 8.003553375601768e-11, 1.2641976354643703e-10, 2.3314683517128287e-15, 1.8335413187742233e-09, 2.23008100874722e-09, 4.718003765447065e-12, 1.6768808563938364e-12, 2.398081733190338e-14, 2.984279490192421e-13, 6.128431095930864e-14, 3.979039320256561e-12, 1.2212453270876722e-15, 2.930988785010413e-14, 2.1271873151818e-13, 8.193445921733655e-14, 3.494982081519993e-13, 9.348077867343818e-14, 2.1032064978498966e-12, 1.0942358130705543e-12, 2.0872192862952943e-14, 2.7000623958883807e-13, 9.85878045867139e-14, 4.973799150320701e-12, 1.5543122344752192e-15, 8.393286066166183e-14, 2.113864638886298e-13, 1.1657341758564144e-13, 8.970602038971265e-14, 8.348877145181177e-14, 208.0, 152576.0, 25.0, 496.0, 0.0390625, 13.25, 1.375, 6.125, 44.0, 0.0703125, 25.0, 1.0, 8.25, 0.0390625, 25.25, 1.0, 11.109375, 0.0390625, 9.5, 1.375, 7.578125, 10.0, 11.5, 7.78125, 25600.0, 1.265625, 7.859375, 4.4375, 9.328125, 10.125, 3.0740920919924974e-10, 2.3987922759260982e-11, 8.171241461241152e-14, 9.38598532229662e-10, 5.984475137665868e-10, 9.769962616701378e-14, 2.1827872842550278e-11, 2.5579538487363607e-11, 1.3500311979441904e-13, 2.9613147489726543e-09, 4.256435204297304e-10, 2.7755575615628914e-14, 6.02540239924565e-11, 4.490630090003833e-12, 4.547473508864641e-13, 9.89530235528946e-09, 3.8620839859504486e-10, 3.80168785341084e-10, 3.952393967665557e-14, 1.4281908988778014e-12, 2.874003257602453e-10, 1.2448708730516955e-11, 4.5133674575481564e-11, 1.3877787807814457e-14, 3.161915174132446e-13, 2.020605904817785e-14, 2.6645352591003757e-15, 1.0977885267493548e-12, 2.886579864025407e-15, 3.6637359812630166e-15, 4.829470157119431e-15, 1.5543122344752192e-15, 1.3211653993039363e-14, 1.5543122344752192e-15, 7.16093850883226e-15, 2.220446049250313e-15, 1.2212453270876722e-15, 1.4210854715202004e-14, 2.495426087989472e-11, 1.3278622645884752e-10, 4.3076653355456074e-14, 1.0658141036401503e-12, 3.356035449542105e-10, 7.048583938740194e-12, 1.3642420526593924e-11, 1.6653345369377348e-15, 2.984279490192421e-13, 2.020605904817785e-14, 4.3298697960381105e-15, 1.1084466677857563e-12, 7.494005416219807e-15, 1.887379141862766e-15, 6.439293542825908e-15, 1.4432899320127035e-15, 4.829470157119431e-15, 2.1094237467877974e-15, 4.551914400963142e-15, 1.4988010832439613e-15, 1.7763568394002505e-15, 3.108624468950438e-14, 1.7535057850182056e-09, 2.8705926524708048e-12, 6.075140390748857e-13, 3.7630343285854906e-11, 4.160938260611147e-11, 2.3305801732931286e-12, 5.329070518200751e-13, 5.10453901370056e-11, 4.297362465877086e-11, 4.760636329592671e-13, 1.1732481652870774e-10, 6.59383658785373e-12, 7.105427357601002e-13, 1.3642420526593924e-12, 3.115019353572279e-11, 6.116351869422942e-11, 1.021405182655144e-14, 1.432454155292362e-11, 5.115907697472721e-13, 1.8758328224066645e-12, 2.9331204132176936e-11, 6.207301339600235e-11, 9.325873406851315e-15, 9.094947017729282e-12, 5.286437954055145e-12, 1.5404344466674047e-15, 1.1546319456101628e-14, 2.5757174171303632e-14, 9.992007221626409e-16, 3.885780586188048e-16, 1.0269562977782698e-15, 1.3145040611561853e-13, 1.865174681370263e-14, 8.326672684688674e-16, 4.996003610813204e-16, 1.4432899320127035e-15, 1.163513729807164e-13, 3.3306690738754696e-14, 1.3322676295501878e-15, 5.551115123125783e-16, 1.5365486660812167e-13, 3.469446951953614e-16, 2.0872192862952943e-14, 6.439293542825908e-15, 5.551115123125783e-16, 7.759126674500294e-12, 2.7284841053187847e-12, 7.389644451905042e-12, 1.5347723092418164e-12, 5.6843418860808015e-12, 8.640199666842818e-12, 1.0368239600211382e-10, 1.2951204553246498e-09, 7.930793799459934e-10, 1.3324097380973399e-10, 1.000444171950221e-11, 1.0118128557223827e-11, 1.5643308870494366e-10, 3.965716643961059e-13, 1.475086719437968e-11, 2.2964741219766438e-11, 5.95967719618784e-13, 9.166001291305292e-12, 1.0800249583553523e-11, 1.8616219676914625e-12], type: "histogram", marker: {color: "#dc2626"} , nbinsx: 50 }],
-  {"title": "V0 run-to-run inertia drift (max abs \u2016I\u2016 diff across 5 reruns per mesh)", "xaxis": {"title": "max |\u0394I| across reruns", "type": "log"}, "yaxis": {"title": "# meshes"}, "template": "plotly_white", "height": 360});
+Plotly.newPlot("drift-hist", [{
+  x: [-15.146963597396319, -14.521411295167136, -13.895858992937955, -13.270306690708773, -12.644754388479592, -12.01920208625041, -11.393649784021228, -10.768097481792047, -10.142545179562866, -9.516992877333683, -8.8914405751045, -8.26588827287532, -7.640335970646138, -1.3848129483543214, -0.1337083438959574, 0.4918439583332237, 1.1173962605624048, 1.742948562791586, 2.368500865020769, 2.9940531672499517, 4.245157771708314],
+  y: [14, 22, 17, 25, 22, 20, 33, 26, 29, 12, 8, 2, 1, 4, 5, 2, 14, 1, 1, 1, 1],
+  customdata: ["3.5e-16 - 1.5e-15", "1.5e-15 - 6.2e-15", "6.2e-15 - 2.6e-14", "2.6e-14 - 1.1e-13", "1.1e-13 - 4.7e-13", "4.7e-13 - 2.0e-12", "2.0e-12 - 8.3e-12", "8.3e-12 - 3.5e-11", "3.5e-11 - 1.5e-10", "1.5e-10 - 6.2e-10", "6.2e-10 - 2.6e-09", "2.6e-09 - 1.1e-08", "1.1e-08 - 4.7e-08", "2.0e-02 - 8.5e-02", "3.6e-01 - 1.5e+00", "1.5e+00 - 6.4e+00", "6.4e+00 - 2.7e+01", "2.7e+01 - 1.1e+02", "1.1e+02 - 4.8e+02", "4.8e+02 - 2.0e+03", "8.6e+03 - 3.6e+04"],
+  type: "bar",
+  width: 0.42,
+  marker: {color: "#dc2626"},
+  hovertemplate: "drift bin: %{customdata}<br>meshes: %{y}<extra></extra>"
+}], {
+  title: "V0 run-to-run inertia drift (log-binned max abs ||I|| diff across 5 reruns per mesh)",
+  xaxis: {title: "log10(max |Delta I| across reruns)", dtick: 2},
+  yaxis: {title: "# meshes"},
+  template: "plotly_white",
+  height: 360,
+  bargap: 0.05
+});
 </script>
 
 
@@ -248,17 +268,20 @@ Plotly.newPlot("accuracy-bar", [{"x": ["apptronik_apollo", "booster_t1", "g1_wit
   <p>
     The motivation for V2 was: <em>can we get determinism with no source changes, just by setting
     <code>wp.config.deterministic = run_to_run</code>?</em> The answer on this workload is
-    <strong>almost yes, but not quite:</strong>
+    <strong>almost yes, but the scalar reduction fast path is still a problem:</strong>
   </p>
   <ul>
     <li><strong>Determinism:</strong>
         10 of 262
         meshes still drift across 5 reruns. All drifting meshes are large (≥36 k triangles), all
-        on G1 / H1 / Apollo, and the drift is sub-ULP — single-bit f32 rounding differences in the
-        scattered output. The PR docs do guarantee bit-exact run_to_run on the same architecture,
-        so this looks like a fitting subject for a Warp issue: the kernel under test is the simple
-        pattern <code>wp.atomic_add(accum, 0, value)</code>, all writes target slot 0, and the
-        scatter buffer is single-key (deterministically sorted by thread_id).</li>
+        on G1 / H1 / Apollo, and the raw saved rows show the first differing field is
+        <code>volume</code> / <code>mass</code>, with deltas between
+        <code>7.28e-12</code> and <code>9.31e-10</code>. Newton computes volume with the simple
+        pattern <code>wp.atomic_add(volume, 0, value)</code>. PR&nbsp;#1355 sorts scalar records by
+        packed destination/thread key, then reduces them by destination through CUB
+        <code>DeviceReduce::ReduceByKey</code> in RUN_TO_RUN mode. A local standalone scalar probe
+        reproduced multiple hashes for that exact pattern, so this is best treated as a Warp
+        RUN_TO_RUN scalar-reducer issue.</li>
     <li><strong>Performance:</strong> median +551 % vs V0 (19 ms vs 2.9 ms per call). The CUB
         scatter-sort-reduce path has fixed overhead per launch that dominates these very small
         (single output slot) reductions. p90 is +2118 % (94 ms vs 4.2 ms) because the largest
@@ -269,13 +292,24 @@ Plotly.newPlot("accuracy-bar", [{"x": ["apptronik_apollo", "booster_t1", "g1_wit
         order).</li>
   </ul>
   <p>
+    Local follow-up on 2026-06-11 used a fresh checkout of
+    <code>git@github.com:NVIDIA/warp.git</code>, fetched PR&nbsp;#1355 as a git remote ref, built
+    it locally in <code>/home/horde/repos/warp-pr1355-local/.venv</code>, and installed current
+    Newton <code>main</code> into that same venv. A synthetic scalar
+    <code>atomic_add(out, 0, value)</code> probe under RUN_TO_RUN produced 3 unique hashes at
+    42,802 terms, 3 at 46,786 terms, and 2 at 70,000 terms across 50 reruns. The same scalar probe
+    under <code>GPU_TO_GPU</code> produced 1 hash for every tested size, and a <code>vec3</code>
+    RUN_TO_RUN probe also produced 1 hash for every tested size. A synthetic Newton
+    <code>compute_inertia_mesh</code> case with 46,786 triangles produced 4 hashes over 30 reruns
+    under RUN_TO_RUN and 1 hash over 30 reruns under GPU_TO_GPU.
+  </p>
+  <p>
     For comparison, a stripped-down hand-rolled equivalent (each thread writes to its own buffer
-    slot, then host-side <code>numpy.sum</code> in f32) — which is essentially what PR #1355
-    <em>should</em> reduce to for an atomic-into-scalar pattern — gives <strong>bit-exact
-    determinism (0/262 drift)</strong> at only <strong>+30 % runtime</strong>. This is also
-    structurally similar to V1 except it stays in f32. The native CUB integration's overhead in
-    PR #1355 thus suggests there's room for the PR to add a fast-path for accumulate-into-single-
-    slot launches (which are extremely common in Warp code: every reduction kernel does this).
+    slot, then host-side <code>numpy.sum</code> in f32) gives <strong>bit-exact determinism
+    (0/262 drift)</strong> at only <strong>+30 % runtime</strong>. This is structurally similar to
+    V1 except it stays in f32. PR&nbsp;#1355 could likely fix V2 for this workload either by using
+    the explicit segmented reducer for scalar RUN_TO_RUN too, or by adding a dedicated fast path for
+    accumulate-into-one-slot reductions.
   </p>
 
   <h2>7 · Memory footprint</h2>
@@ -301,7 +335,7 @@ Plotly.newPlot("mem-bar", [{"x": ["apptronik_apollo", "booster_t1", "g1_with_han
 
   <h2>9 · Reproducibility</h2>
   <pre>Hardware: NVIDIA L40 (49 GiB, sm_89)
-Warp:     1.14.0 (V0/V1/V3); V2 = PR1355 emulation (see note below)
+Warp:     1.14.0 (V0/V1/V3); V2 = native NVIDIA/warp PR #1355 RUN_TO_RUN (see note below)
 Newton:   eric-heiden/deterministic-mesh-inertia-investigation@HEAD (off newton-physics/newton@main)
 Assets:   newton-assets repo (newton.utils.download_asset)
 Reruns:   5 per (variant × mesh), 1 warmup pass discarded
@@ -312,13 +346,16 @@ Commits:  V0 = newton@main (839284af)
 </pre>
 
   <div class="footnote">
-    <strong>Note on V2:</strong> Built NVIDIA/warp PR #1355 from source on this machine
-    (CUDA 12.4 toolkit installed to ~/cuda-12.4 specifically for this build) and ran V2 with
-    <code>wp.config.deterministic = DeterministicMode.RUN_TO_RUN</code> via a dedicated venv
-    pointing at the editable install of <code>/home/horde/repos/warp-determinism-pr1355</code>.
-    Warp build: <code>1.15.0.dev0</code>. Mode reported by harness: <code>warp_pr1355_native</code>.
-    All 4 variants use the same byte-identical inputs (extracted once with V0 active and persisted
-    to <code>meshes.npz</code>).
+    <strong>Note on V2:</strong> The original full-table V2 run used a local NVIDIA/warp PR #1355
+    source build and <code>wp.config.deterministic = DeterministicMode.RUN_TO_RUN</code>. The
+    2026-06-11 follow-up repeated the setup from a fresh
+    <code>git@github.com:NVIDIA/warp.git</code> checkout at <code>e78684d21</code>, fetched via
+    <code>refs/pull/1355/head</code>, built in
+    <code>/home/horde/repos/warp-pr1355-local/.venv</code> with CUDA 12.6, and installed Newton
+    <code>main</code> (<code>529ec4d1</code>) into that venv. The full benchmark tables above still
+    use the original L40 measurements; the follow-up probes isolate the V2 drift mechanism.
+    All 4 original variants use the same byte-identical inputs (extracted once with V0 active and
+    persisted to <code>meshes.npz</code>).
   </div>
 </main>
 </body>
