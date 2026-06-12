@@ -121,6 +121,22 @@ def atomic_solid_mesh_inertia(...):
     wp.atomic_add(first, 0, f)
     wp.atomic_add(second, 0, s)</pre>
 
+  <h2>Why V2 Is Slow</h2>
+  <p>
+    PR #1355 makes the all-to-one atomics bit-exact by recording scatter updates, sorting them, and reducing them after the kernel. The original mesh inertia path emits three forward scatter targets per triangle: <code>volume</code> has 1 float component, <code>first</code> has 3, and <code>second</code> has 9. The <code>mat33</code> target dominates the cost.
+  </p>
+  <table>
+    <thead><tr><th>150k-record deterministic post-pass target</th><th>Components</th><th>Measured time</th></tr></thead>
+    <tbody>
+      <tr><td><code>volume</code> / scalar float</td><td>1</td><td>0.28 ms after warmup</td></tr>
+      <tr><td><code>first</code> / <code>vec3</code></td><td>3</td><td>82.0 ms</td></tr>
+      <tr><td><code>second</code> / <code>mat33</code></td><td>9</td><td>363.8 ms</td></tr>
+    </tbody>
+  </table>
+  <p>
+    The scalar RUN_TO_RUN path has a specialized reduce-by-key implementation. Multi-component values currently use Warp's generic deterministic path: after sorting, one segment-head thread walks the whole destination segment sequentially for each component. For this workload every record targets index 0, so the <code>mat33</code> pass is effectively one thread doing 150k ordered additions for each of 9 components.
+  </p>
+
   <h2>Runtime</h2>
   <div id="runtime-bar" class="plot"></div>
   <script>
@@ -219,6 +235,7 @@ Current data:
   deterministic-mesh-inertia/v0_current_atomic_pr1355_20260612.json
   deterministic-mesh-inertia/v2_latest_pr1355_20260612.json
   deterministic-mesh-inertia/v3_current_tile_sum_pr1355_20260612.json
+  deterministic-mesh-inertia/determinism_overhead_probe_20260612.json
 Historical data:
   deterministic-mesh-inertia/results_20260610T184709.json</pre>
 
