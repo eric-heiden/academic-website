@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Deterministic mesh inertia · Reports · Eric Heiden</title>
+  <title>Deterministic mesh inertia &middot; Reports &middot; Eric Heiden</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
   <style>
@@ -62,57 +62,59 @@
 <main>
   <header>
     <h1>Deterministic mesh inertia</h1>
-    <a href="../">← All reports</a>
+    <a href="../">&larr; All reports</a>
   </header>
 
   <div class="meta">
-    Updated 2026-06-12. Current rerun: 262 mesh shapes from seven USD-converted MuJoCo Menagerie robots, 20 measured reruns per mesh, Warp PR #1355 at <code>825f50ce6</code>, Newton <code>main</code> at <code>40fed42d</code>, NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb.
+    Updated 2026-06-13. Current rerun: 262 mesh shapes from seven USD-converted MuJoCo Menagerie robots, 20 measured reruns per mesh, Warp PR #1355 at <code>48b1927c5</code>, Newton <code>main</code> at <code>40fed42d</code>, NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb.
   </div>
 
   <div class="tldr">
-    <p><strong>V2 no longer drifts.</strong> With the original atomic mesh-inertia kernels compiled in a Warp module with <code>deterministic=RUN_TO_RUN</code>, latest PR #1355 produced <strong>0/262</strong> drifting meshes across 20 reruns.</p>
-    <p><strong>V2 is correct but slow.</strong> On the same current machine, V2 is 93.8x slower than the current Newton V3 <code>tile_sum</code> path by summed per-mesh medians. V3 is also deterministic.</p>
+    <p><strong>V2 is bit-exact with the latest PR.</strong> The original atomic mesh-inertia kernels compiled with <code>deterministic=RUN_TO_RUN</code> now produced <strong>0/262</strong> drifting meshes across 20 reruns.</p>
+    <p><strong>The 100x slowdown is gone.</strong> Latest PR #1355 reduced V2's summed per-mesh medians from 10,028 ms to <strong>332 ms</strong>, a 30.2x speedup over the previous PR snapshot used in this report. V2 is now 1.8x V0 and 3.1x V3.</p>
   </div>
 
   <h2>Current Same-Machine Results</h2>
   <table>
-    <thead><tr><th>Variant</th><th>Reduction path</th><th>Run-to-run result</th><th>Median ms/call</th><th>P90 median ms</th><th>Sum median ms</th><th>Sum vs V3</th></tr></thead>
+    <thead><tr><th>Variant</th><th>Reduction path</th><th>Run-to-run result</th><th>Median ms/call</th><th>Median p90 ms</th><th>Sum median ms</th><th>Relative sum</th></tr></thead>
     <tbody>
       <tr>
-<td><strong>V0</strong><br><small>Original atomic</small></td>
-<td>native unordered atomics</td>
-<td class="c-bad">262/262 drift</td>
-<td>0.45</td>
-<td>0.96</td>
-<td>146</td>
-<td class="c-warn">1.4x</td>
-</tr><tr>
-<td><strong>V2</strong><br><small>Original atomic + PR1355 RUN_TO_RUN</small></td>
-<td>module_options RUN_TO_RUN</td>
-<td class="c-good">0/262 drift</td>
-<td>18.0</td>
-<td>117</td>
-<td>10,028</td>
-<td class="c-bad">93.8x</td>
-</tr><tr>
-<td><strong>V3</strong><br><small>Current Newton tile_sum</small></td>
-<td>fixed-lane tile_sum</td>
-<td class="c-good">0/262 drift</td>
-<td>0.38</td>
-<td>0.48</td>
-<td>107</td>
-<td class="c-ref">reference</td>
-</tr>
+        <td><strong>V0</strong><br><small>Original atomic</small></td>
+        <td>native unordered atomics</td>
+        <td class="c-bad">262/262 drift</td>
+        <td>0.49</td>
+        <td>0.51</td>
+        <td>186</td>
+        <td>1.8x V3</td>
+      </tr>
+      <tr>
+        <td><strong>V2</strong><br><small>Original atomic + PR1355 RUN_TO_RUN</small></td>
+        <td>deterministic atomic lowering</td>
+        <td class="c-good">0/262 drift</td>
+        <td>1.22</td>
+        <td>1.25</td>
+        <td>332</td>
+        <td>3.1x V3</td>
+      </tr>
+      <tr>
+        <td><strong>V3</strong><br><small>Current Newton tile_sum</small></td>
+        <td>fixed-lane tile_sum</td>
+        <td class="c-good">0/262 drift</td>
+        <td>0.38</td>
+        <td>0.40</td>
+        <td>105</td>
+        <td>reference</td>
+      </tr>
     </tbody>
   </table>
 
   <p>
-    These three rows were rerun from the same captured USD importer mesh sequence. V0 and V2 use the original mesh inertia computation with <code>wp.atomic_add</code>; V2 differs only by PR #1355 deterministic lowering. V3 is the current Newton implementation.
+    V0 and V2 use the original mesh inertia computation with <code>wp.atomic_add</code>; V2 differs by PR #1355 deterministic lowering. V3 is the current Newton implementation based on fixed-lane <code>tile_sum</code> reductions.
   </p>
 
-  <h2>Harness Note</h2>
+  <h2>Harness</h2>
   <p>
-    The V2 rerun uses the latest PR #1355 checkout and compiles the original atomic kernels directly with deterministic module options. Warp captures the global deterministic setting when the kernel module is created, so setting <code>wp.config.deterministic</code> later, after <code>@wp.kernel</code> decoration, is not enough for an existing module.
+    The V2 rerun uses the original atomic kernels with deterministic module options set at decoration time. That is the important part: setting <code>wp.config.deterministic</code> after the kernel module already exists is not enough to change an existing module.
   </p>
   <pre>@wp.kernel(module="unique", module_options={"deterministic": wp.DeterministicMode.RUN_TO_RUN}, enable_backward=False)
 def atomic_solid_mesh_inertia(...):
@@ -121,41 +123,79 @@ def atomic_solid_mesh_inertia(...):
     wp.atomic_add(first, 0, f)
     wp.atomic_add(second, 0, s)</pre>
 
-  <h2>Why V2 Is Slow</h2>
+  <h2>What Changed</h2>
   <p>
-    PR #1355 makes the all-to-one atomics bit-exact by recording scatter updates, sorting them, and reducing them after the kernel. The original mesh inertia path emits three forward scatter targets per triangle: <code>volume</code> has 1 float component, <code>first</code> has 3, and <code>second</code> has 9. The <code>mat33</code> target dominates the cost.
+    PR #1355 now includes the multi-component deterministic reduction work at <code>de4674f30</code>. The previous PR snapshot made V2 bit-exact but handled <code>vec3</code> and <code>mat33</code> atomics through a much slower generic path. The latest branch keeps the same run-to-run determinism and brings the mesh-like deterministic atomic probe down to 2.71 ms for 150k records.
   </p>
   <table>
-    <thead><tr><th>150k-record deterministic post-pass target</th><th>Components</th><th>Measured time</th></tr></thead>
+    <thead><tr><th>Records</th><th>Unordered atomics ms</th><th>RUN_TO_RUN atomics ms</th><th>tile_sum ms</th><th>RUN_TO_RUN / unordered</th><th>RUN_TO_RUN / tile_sum</th></tr></thead>
     <tbody>
-      <tr><td><code>volume</code> / scalar float</td><td>1</td><td>0.28 ms after warmup</td></tr>
-      <tr><td><code>first</code> / <code>vec3</code></td><td>3</td><td>82.0 ms</td></tr>
-      <tr><td><code>second</code> / <code>mat33</code></td><td>9</td><td>363.8 ms</td></tr>
+      <tr>
+        <td>176</td>
+        <td>0.02</td>
+        <td>0.50</td>
+        <td>0.03</td>
+        <td>22.3x</td>
+        <td>15.7x</td>
+      </tr>
+      <tr>
+        <td>1,438</td>
+        <td>0.04</td>
+        <td>0.63</td>
+        <td>0.03</td>
+        <td>15.5x</td>
+        <td>19.6x</td>
+      </tr>
+      <tr>
+        <td>5,928</td>
+        <td>0.11</td>
+        <td>0.80</td>
+        <td>0.04</td>
+        <td>7.3x</td>
+        <td>22.4x</td>
+      </tr>
+      <tr>
+        <td>46,786</td>
+        <td>0.62</td>
+        <td>1.26</td>
+        <td>0.06</td>
+        <td>2.0x</td>
+        <td>19.4x</td>
+      </tr>
+      <tr>
+        <td>150,000</td>
+        <td>1.88</td>
+        <td>2.71</td>
+        <td>0.14</td>
+        <td>1.4x</td>
+        <td>19.6x</td>
+      </tr>
     </tbody>
   </table>
-  <p>
-    The scalar RUN_TO_RUN path has a specialized reduce-by-key implementation. Multi-component values currently use Warp's generic deterministic path: after sorting, one segment-head thread walks the whole destination segment sequentially for each component. For this workload every record targets index 0, so the <code>mat33</code> pass is effectively one thread doing 150k ordered additions for each of 9 components.
-  </p>
+  <div id="probe-line" class="plot"></div>
+  <script>
+    Plotly.newPlot("probe-line", [{"x": [176, 1438, 5928, 46786, 150000], "y": [0.02238500746898353, 0.04062999505549669, 0.10938500054180622, 0.6237000052351505, 1.8817145028151572], "name": "mesh-like unordered atomics", "type": "scatter", "mode": "lines+markers", "line": {"color": "#b42318"}, "hovertemplate": "records=%{x}<br>median ms=%{y:.3f}<extra></extra>"}, {"x": [176, 1438, 5928, 46786, 150000], "y": [0.5002050020266324, 0.6317200022749603, 0.8004344854271039, 1.2628149997908622, 2.7060694992542267], "name": "mesh-like RUN_TO_RUN atomics", "type": "scatter", "mode": "lines+markers", "line": {"color": "#7c3aed"}, "hovertemplate": "records=%{x}<br>median ms=%{y:.3f}<extra></extra>"}, {"x": [176, 1438, 5928, 46786, 150000], "y": [0.03193500742781907, 0.03226500120945275, 0.03571499837562442, 0.06495500565506518, 0.13839500024914742], "name": "tile_sum reference", "type": "scatter", "mode": "lines+markers", "line": {"color": "#2563eb"}, "hovertemplate": "records=%{x}<br>median ms=%{y:.3f}<extra></extra>"}], {"title": "Focused mesh-like atomic probe", "xaxis": {"title": "records", "type": "log"}, "yaxis": {"title": "median ms", "type": "log"}, "template": "plotly_white", "height": 430, "margin": {"t": 55, "r": 20, "b": 75, "l": 70}}, {responsive: true, displayModeBar: false});
+  </script>
 
   <h2>Runtime</h2>
   <div id="runtime-bar" class="plot"></div>
   <script>
-    Plotly.newPlot("runtime-bar", [{"x": ["h1", "g1_with_hands", "shadow_hand", "apptronik_apollo", "booster_t1", "wonik_allegro", "ur5e"], "y": [11.831488001917023, 48.16216946346685, 12.203887541545555, 45.31013948144391, 11.25211550242966, 8.274145511677489, 9.187402501993347], "name": "V0 Original atomic", "type": "bar", "marker": {"color": "#b42318"}, "hovertemplate": "%{x}<br>sum median ms=%{y:.2f}<extra></extra>"}, {"x": ["h1", "g1_with_hands", "shadow_hand", "apptronik_apollo", "booster_t1", "wonik_allegro", "ur5e"], "y": [855.4652554812492, 3395.3608039810206, 242.1387804861297, 4604.773928047507, 496.6802290000487, 77.55047446698882, 356.107976520434], "name": "V2 Original atomic + PR1355 RUN_TO_RUN", "type": "bar", "marker": {"color": "#9333ea"}, "hovertemplate": "%{x}<br>sum median ms=%{y:.2f}<extra></extra>"}, {"x": ["h1", "g1_with_hands", "shadow_hand", "apptronik_apollo", "booster_t1", "wonik_allegro", "ur5e"], "y": [8.614578997367062, 34.99990150157828, 11.336603507515974, 26.778529427247122, 9.382078977068886, 7.913692519650795, 7.894488990132231], "name": "V3 Current Newton tile_sum", "type": "bar", "marker": {"color": "#2563eb"}, "hovertemplate": "%{x}<br>sum median ms=%{y:.2f}<extra></extra>"}], {"barmode": "group", "title": "Current same-machine runtime by robot", "xaxis": {"title": "robot"}, "yaxis": {"title": "sum of per-mesh median ms"}, "template": "plotly_white", "height": 460, "margin": {"t": 55, "r": 20, "b": 90, "l": 70}}, {responsive: true, displayModeBar: false});
+    Plotly.newPlot("runtime-bar", [{"x": ["h1", "g1_with_hands", "shadow_hand", "apptronik_apollo", "booster_t1", "wonik_allegro", "ur5e"], "y": [11.62441300402861, 47.33793101331685, 11.944998055696487, 44.93651005032007, 11.183846014318988, 35.07420650566928, 24.392598003032617], "name": "V0 unordered atomics", "type": "bar", "marker": {"color": "#b42318"}, "hovertemplate": "%{x}<br>sum median ms=%{y:.2f}<extra></extra>"}, {"x": ["h1", "g1_with_hands", "shadow_hand", "apptronik_apollo", "booster_t1", "wonik_allegro", "ur5e"], "y": [28.108443526434712, 110.48484648927115, 32.612332463031635, 86.20538460672833, 28.749393051839434, 21.759798983111978, 23.66135896591004], "name": "V2 PR1355 RUN_TO_RUN atomics", "type": "bar", "marker": {"color": "#7c3aed"}, "hovertemplate": "%{x}<br>sum median ms=%{y:.2f}<extra></extra>"}, {"x": ["h1", "g1_with_hands", "shadow_hand", "apptronik_apollo", "booster_t1", "wonik_allegro", "ur5e"], "y": [8.49278797977604, 34.503449001931585, 11.098743445472792, 26.337471455917694, 9.229182498529553, 7.782368527841754, 7.827142035239376], "name": "V3 current tile_sum", "type": "bar", "marker": {"color": "#2563eb"}, "hovertemplate": "%{x}<br>sum median ms=%{y:.2f}<extra></extra>"}], {"barmode": "group", "title": "Current same-machine runtime by robot", "xaxis": {"title": "robot"}, "yaxis": {"title": "sum of per-mesh median ms"}, "template": "plotly_white", "height": 460, "margin": {"t": 55, "r": 20, "b": 90, "l": 70}}, {responsive: true, displayModeBar: false});
   </script>
   <p>
-    V2 pays for deterministic atomic ordering. It is bit-exact, but it is not competitive with V3 for this Newton importer workload. V3 avoids scalar atomic reduction order entirely and is faster than V0 on this run.
+    V3 remains fastest for this Newton importer workload. V2 is useful because it validates that Warp's deterministic lowering can make the original atomic implementation bit-exact, but it still pays the deterministic ordering cost.
   </p>
 
   <h2>V0 Drift Plot</h2>
   <p>
-    The broken V0 drift plot is fixed. This version is computed from the current V0 rerun outputs: for each mesh, it plots the largest Frobenius norm difference in inertia tensor against the first rerun.
+    The V0 drift plot is generated from the 2026-06-13 V0 rerun. For each mesh, it plots the largest Frobenius norm difference in inertia tensor against the first rerun.
   </p>
   <div id="drift-hist" class="plot"></div>
   <script>
-    Plotly.newPlot("drift-hist", [{"x": ["1e-16 to 1e-15", "1e-15 to 1e-14", "1e-14 to 1e-13", "1e-13 to 1e-12", "1e-12 to 1e-11", "1e-11 to 1e-10", "1e-10 to 1e-9", "1e-9 to 1e-8", "1e-8 to 1e-7", "1e-7 to 1e-6", "1e-6 to 1e-5", "1e-5 to 1e-4", "1e-4 to 1e-3", "1e-3 to 1e-2", "1e-2 to 1e-1", "1e-1 to 1e0", "1e0 to 1e1", "1e1 to 1e2", "1e2 to 1e3", "1e3 to 1e4", "1e4 to 1e5", "1e5 to 1e6", "1e6 to 1e7"], "y": [5, 29, 31, 38, 42, 49, 27, 10, 1, 0, 0, 0, 0, 0, 2, 2, 7, 14, 2, 1, 1, 1, 0], "type": "bar", "marker": {"color": "#b42318"}, "hovertemplate": "drift bin=%{x}<br>meshes=%{y}<extra></extra>"}], {"title": "V0 run-to-run inertia drift", "xaxis": {"title": "max Frobenius drift bin", "tickangle": -35}, "yaxis": {"title": "mesh count"}, "template": "plotly_white", "height": 430, "margin": {"t": 55, "r": 20, "b": 130, "l": 65}}, {responsive: true, displayModeBar: false});
+    Plotly.newPlot("drift-hist", [{"x": ["1e-16 to 1e-15", "1e-15 to 1e-14", "1e-14 to 1e-13", "1e-13 to 1e-12", "1e-12 to 1e-11", "1e-11 to 1e-10", "1e-10 to 1e-9", "1e-9 to 1e-8", "1e-8 to 1e-7", "1e-7 to 1e-6", "1e-6 to 1e-5", "1e-5 to 1e-4", "1e-4 to 1e-3", "1e-3 to 1e-2", "1e-2 to 1e-1", "1e-1 to 1e0", "1e0 to 1e1", "1e1 to 1e2", "1e2 to 1e3", "1e3 to 1e4", "1e4 to 1e5", "1e5 to 1e6", "1e6 to 1e7"], "y": [7, 28, 27, 39, 45, 45, 28, 11, 2, 0, 0, 0, 0, 0, 3, 1, 9, 13, 1, 1, 1, 1, 0], "type": "bar", "marker": {"color": "#b42318"}, "hovertemplate": "drift bin=%{x}<br>meshes=%{y}<extra></extra>"}], {"title": "V0 run-to-run inertia drift", "xaxis": {"title": "max Frobenius drift bin", "tickangle": -35}, "yaxis": {"title": "mesh count"}, "template": "plotly_white", "height": 430, "margin": {"t": 55, "r": 20, "b": 130, "l": 65}}, {responsive: true, displayModeBar: false});
   </script>
   <p>
-    Current V0 drift is positive for all 262 meshes. The observed range is 6.60e-16 to 3.08e+05.
+    Current V0 drift is positive for all 262 meshes. The observed range is 6.57e-16 to 3.80e+05.
   </p>
 
   <h2>Per-Robot Breakdown</h2>
@@ -163,84 +203,86 @@ def atomic_solid_mesh_inertia(...):
     <thead><tr><th>Robot</th><th>Meshes</th><th>Triangles</th><th>V0 sum median ms</th><th>V2 sum median ms</th><th>V3 sum median ms</th><th>Drift counts</th></tr></thead>
     <tbody>
       <tr>
-<td>h1</td>
-<td>21</td>
-<td>286,408</td>
-<td>11.8</td>
-<td class="c-bad">855<br><small>99.3x V3</small></td>
-<td class="c-ref">8.61</td>
-<td><small>V0 21/21, V2 0/21, V3 0/21</small></td>
-</tr><tr>
-<td>g1_with_hands</td>
-<td>86</td>
-<td>1,150,196</td>
-<td>48.2</td>
-<td class="c-bad">3,395<br><small>97.0x V3</small></td>
-<td class="c-ref">35.0</td>
-<td><small>V0 86/86, V2 0/86, V3 0/86</small></td>
-</tr><tr>
-<td>shadow_hand</td>
-<td>30</td>
-<td>84,436</td>
-<td>12.2</td>
-<td class="c-bad">242<br><small>21.4x V3</small></td>
-<td class="c-ref">11.3</td>
-<td><small>V0 30/30, V2 0/30, V3 0/30</small></td>
-</tr><tr>
-<td>apptronik_apollo</td>
-<td>60</td>
-<td>1,553,699</td>
-<td>45.3</td>
-<td class="c-bad">4,605<br><small>172.0x V3</small></td>
-<td class="c-ref">26.8</td>
-<td><small>V0 60/60, V2 0/60, V3 0/60</small></td>
-</tr><tr>
-<td>booster_t1</td>
-<td>24</td>
-<td>168,582</td>
-<td>11.3</td>
-<td class="c-bad">497<br><small>52.9x V3</small></td>
-<td class="c-ref">9.38</td>
-<td><small>V0 24/24, V2 0/24, V3 0/24</small></td>
-</tr><tr>
-<td>wonik_allegro</td>
-<td>21</td>
-<td>32,916</td>
-<td>8.27</td>
-<td class="c-bad">77.6<br><small>9.8x V3</small></td>
-<td class="c-ref">7.91</td>
-<td><small>V0 21/21, V2 0/21, V3 0/21</small></td>
-</tr><tr>
-<td>ur5e</td>
-<td>20</td>
-<td>121,783</td>
-<td>9.19</td>
-<td class="c-bad">356<br><small>45.1x V3</small></td>
-<td class="c-ref">7.89</td>
-<td><small>V0 20/20, V2 0/20, V3 0/20</small></td>
-</tr>
+        <td>h1</td>
+        <td>21</td>
+        <td>286,408</td>
+        <td>11.6</td>
+        <td>28.1<br><small>3.3x V3</small></td>
+        <td>8.49</td>
+        <td><small>V0 21/21, V2 0/21, V3 0/21</small></td>
+      </tr>
+      <tr>
+        <td>g1_with_hands</td>
+        <td>86</td>
+        <td>1,150,196</td>
+        <td>47.3</td>
+        <td>110<br><small>3.2x V3</small></td>
+        <td>34.5</td>
+        <td><small>V0 86/86, V2 0/86, V3 0/86</small></td>
+      </tr>
+      <tr>
+        <td>shadow_hand</td>
+        <td>30</td>
+        <td>84,436</td>
+        <td>11.9</td>
+        <td>32.6<br><small>2.9x V3</small></td>
+        <td>11.1</td>
+        <td><small>V0 30/30, V2 0/30, V3 0/30</small></td>
+      </tr>
+      <tr>
+        <td>apptronik_apollo</td>
+        <td>60</td>
+        <td>1,553,699</td>
+        <td>44.9</td>
+        <td>86.2<br><small>3.3x V3</small></td>
+        <td>26.3</td>
+        <td><small>V0 60/60, V2 0/60, V3 0/60</small></td>
+      </tr>
+      <tr>
+        <td>booster_t1</td>
+        <td>24</td>
+        <td>168,582</td>
+        <td>11.2</td>
+        <td>28.7<br><small>3.1x V3</small></td>
+        <td>9.23</td>
+        <td><small>V0 24/24, V2 0/24, V3 0/24</small></td>
+      </tr>
+      <tr>
+        <td>wonik_allegro</td>
+        <td>21</td>
+        <td>32,916</td>
+        <td>35.1</td>
+        <td>21.8<br><small>2.8x V3</small></td>
+        <td>7.78</td>
+        <td><small>V0 21/21, V2 0/21, V3 0/21</small></td>
+      </tr>
+      <tr>
+        <td>ur5e</td>
+        <td>20</td>
+        <td>121,783</td>
+        <td>24.4</td>
+        <td>23.7<br><small>3.0x V3</small></td>
+        <td>7.83</td>
+        <td><small>V0 20/20, V2 0/20, V3 0/20</small></td>
+      </tr>
     </tbody>
   </table>
 
-  <h2>Historical V1 Context</h2>
-  <p>
-    V1, the f64 host-reduce reference, was not rerun in this same-machine pass. The stored L40 benchmark has V1 at <strong>0/262 drift</strong>, median <strong>4.18 ms</strong>, P90 <strong>10.7 ms</strong>, and summed medians <strong>1,451 ms</strong>. That row remains useful as a reference implementation, but the speed comparison above uses only current same-machine data.
-  </p>
-
   <h2>Reproducibility</h2>
-  <pre>Warp source: /home/horde/repos/warp-pr1355-local, PR #1355, 825f50ce6
+  <pre>Warp source: /home/horde/repos/warp-pr1355-local, PR #1355, 48b1927c5
+Warp build: release, --use-dynamic-cuda, --use-libmathdx
 Newton source: /home/horde/repos/newton, main, 40fed42d
 Runner: /home/horde/repos/newton-mesh-inertia-investigation/tools/rerun_v2_mesh_inertia_pr1355.py
 Current data:
-  deterministic-mesh-inertia/v0_current_atomic_pr1355_20260612.json
-  deterministic-mesh-inertia/v2_latest_pr1355_20260612.json
-  deterministic-mesh-inertia/v3_current_tile_sum_pr1355_20260612.json
-  deterministic-mesh-inertia/determinism_overhead_probe_20260612.json
-Historical data:
+  deterministic-mesh-inertia/v0_current_atomic_pr1355_20260613.json
+  deterministic-mesh-inertia/v2_latest_pr1355_20260613.json
+  deterministic-mesh-inertia/v3_current_tile_sum_pr1355_20260613.json
+  deterministic-mesh-inertia/determinism_overhead_probe_20260613.json
+Historical baseline:
   deterministic-mesh-inertia/results_20260610T184709.json</pre>
 
   <div class="footnote">
-    The V2 row shown here is from the latest PR #1355 checkout and the original atomic mesh-inertia kernel compiled with deterministic module options.
+    Historical V1 host-reduce data was not rerun in this same-machine pass. The comparison above uses only current V0, V2, and V3 data from the rebuilt Warp PR #1355 checkout.
   </div>
 </main>
 </body>
