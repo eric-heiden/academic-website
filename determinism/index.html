@@ -112,6 +112,8 @@
       padding: 18px;
       border-left: 5px solid var(--blue);
     }
+    .finding.ok { border-left-color: var(--ok); }
+    .finding.warn { border-left-color: var(--warn); }
     .finding h3 {
       margin: 0 0 8px;
       font-size: 1.12rem;
@@ -126,7 +128,7 @@
     }
     table {
       width: 100%;
-      min-width: 1420px;
+      min-width: 760px;
       border-collapse: collapse;
     }
     th, td {
@@ -143,6 +145,37 @@
       text-transform: uppercase;
     }
     tr:last-child td { border-bottom: 0; }
+    .scenario-group th {
+      padding-top: 18px;
+      color: var(--ink);
+      background: #eef2f7;
+      font-size: 0.86rem;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .ratio {
+      display: inline-flex;
+      min-width: 74px;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-weight: 800;
+    }
+    .ratio.good { color: var(--ok); background: var(--ok-bg); }
+    .ratio.neutral { color: var(--muted); background: #eef2f6; }
+    .ratio.bad { color: var(--bad); background: var(--bad-bg); }
+    .subtle {
+      display: inline-block;
+      margin-left: 8px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .compact-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
     .pill {
       display: inline-flex;
       justify-content: center;
@@ -212,453 +245,356 @@
         <h1>Warp PR1355 determinism comparison</h1>
         <p class="lead">
           The same Newton determinism report was regenerated with Warp before <code>de4674f</code>
-          and with the latest fetched PR1355 head. Videos are reused from the existing report; only
-          deterministic replay verdicts and performance numbers were regenerated.
+          and with the latest fetched PR1355 head. This view focuses on speed ratios for the latest
+          branch. Ratios use <code>before / latest</code>, so values above 1.0x mean latest is faster.
+          Determinism is only called out when a verdict changes.
         </p>
       </div>
       <div class="summary-grid">
-        <div class="summary-tile"><span>Before physics</span><strong>23/23 bit-exact</strong></div>
-        <div class="summary-tile"><span>Latest physics</span><strong>23/23 bit-exact</strong></div>
-        <div class="summary-tile"><span>Before micro</span><strong>4/4 bit-exact</strong></div>
-        <div class="summary-tile"><span>Latest micro</span><strong>4/4 bit-exact</strong></div>
+        <div class="summary-tile"><span>Median physics speed</span><strong>0.77x</strong></div>
+        <div class="summary-tile"><span>Median micro speed</span><strong>1x</strong></div>
+        <div class="summary-tile"><span>Rows compared</span><strong>23 physics + 4 micro</strong></div>
+        <div class="summary-tile"><span>Build range</span><strong><code>825f50ce6</code> to <code>48b1927c5</code></strong></div>
       </div>
     </div>
   </header>
   <main>
     <section>
-      <h2>Builds Compared</h2>
+      <h2>Readout</h2>
       <div class="findings-grid">
         <article class="finding">
-          <p class="eyebrow">Before</p>
-          <h3><code>825f50ce6</code></h3>
-          <p>Parent of de4674f302e5f51a14808621256d35ad42e99bd5.</p>
+          <p class="eyebrow">Physics median</p>
+          <h3>0.77x</h3>
+          <p>Median latest speedup across matched Newton physics solver rows. The reciprocal step-time ratio is 1.3x.</p>
         </article>
         <article class="finding">
-          <p class="eyebrow">Latest PR1355</p>
-          <h3><code>48b1927c5</code></h3>
-          <p>Current head of NVIDIA/warp PR1355 fetched on 2026-06-13 UTC.</p>
+          <p class="eyebrow">Largest physics spread</p>
+          <h3>0.99x / 0.19x</h3>
+          <p>Best: Domino Chain / mujoco. Slowest relative row: Domino Chain / vbd.</p>
         </article>
         <article class="finding">
-          <p class="eyebrow">Median latest / before</p>
-          <h3>1.3x</h3>
-          <p>Median deterministic physics step time ratio across matched solver rows. Micro-probe median: 1x.</p>
+          <p class="eyebrow">Micro-probes</p>
+          <h3>1x</h3>
+          <p>Median latest speedup for focused Warp lowering probes. Best micro row: Warp Custom Adjoint.</p>
         </article>
+
       </div>
     </section>
 
     <section>
-      <h2>Physics Solver Matrix</h2>
+      <h2>Physics Speed Ratios</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Scenario</th>
               <th>Solver</th>
-              <th>Before verdict</th>
-              <th>Before det step</th>
-              <th>Before plain step</th>
-              <th>Before det/plain</th>
-              <th>Before CUDA pool</th>
-              <th>Latest verdict</th>
+              <th>Latest speed vs before</th>
+              <th>Latest det/plain cost</th>
               <th>Latest det step</th>
               <th>Latest plain step</th>
-              <th>Latest det/plain</th>
-              <th>Latest CUDA pool</th>
-              <th>Latest/before step</th>
-              <th>Latest dominant drift</th>
             </tr>
           </thead>
           <tbody>
 
+            <tr class="scenario-group">
+              <th colspan="5">Falling Cube</th>
+            </tr>
+
             <tr>
-              <td>Falling Cube</td>
               <td><code>featherstone</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>561.6 ms</td>
-              <td>223.2 ms</td>
-              <td>2.52x</td>
-              <td>0.4 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.56x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">4.54x</span></td>
               <td>1.01 s</td>
               <td>223.1 ms</td>
-              <td>4.54x</td>
-              <td>0.4 MiB</td>
-              <td>1.8x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Falling Cube</td>
               <td><code>mujoco</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>106.31 s</td>
-              <td>3.75 s</td>
-              <td>28.33x</td>
-              <td>0.5 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio neutral">0.99x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">28.7x</span></td>
               <td>107.73 s</td>
               <td>3.75 s</td>
-              <td>28.7x</td>
-              <td>0.5 MiB</td>
-              <td>1.01x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Falling Cube</td>
               <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>288.0 ms</td>
-              <td>106.1 ms</td>
-              <td>2.72x</td>
-              <td>0.4 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.38x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">7.06x</span></td>
               <td>749.4 ms</td>
               <td>106.2 ms</td>
-              <td>7.06x</td>
-              <td>0.4 MiB</td>
-              <td>2.6x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Falling Cube</td>
               <td><code>xpbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>573.1 ms</td>
-              <td>161.2 ms</td>
-              <td>3.56x</td>
-              <td>0.4 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.33x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">10.67x</span></td>
               <td>1.72 s</td>
               <td>161.3 ms</td>
-              <td>10.67x</td>
-              <td>0.4 MiB</td>
-              <td>3x</td>
-              <td>body_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Box Stack</th>
             </tr>
 
             <tr>
-              <td>Box Stack</td>
               <td><code>mujoco</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>159.4 s</td>
-              <td>6.52 s</td>
-              <td>24.46x</td>
-              <td>0.7 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio neutral">0.99x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">24.84x</span></td>
               <td>160.88 s</td>
               <td>6.48 s</td>
-              <td>24.84x</td>
-              <td>0.7 MiB</td>
-              <td>1.01x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Box Stack</td>
               <td><code>vbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>2.93 s</td>
-              <td>410.1 ms</td>
-              <td>7.13x</td>
-              <td>0.5 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.19x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">38.05x</span></td>
               <td>15.62 s</td>
               <td>410.4 ms</td>
-              <td>38.05x</td>
-              <td>0.5 MiB</td>
-              <td>5.34x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Box Stack</td>
               <td><code>xpbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>671.2 ms</td>
-              <td>241.3 ms</td>
-              <td>2.78x</td>
-              <td>0.5 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.38x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">7.44x</span></td>
               <td>1.79 s</td>
               <td>240.2 ms</td>
-              <td>7.44x</td>
-              <td>0.5 MiB</td>
-              <td>2.66x</td>
-              <td>body_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Domino Chain</th>
             </tr>
 
             <tr>
-              <td>Domino Chain</td>
               <td><code>mujoco</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>160.85 s</td>
-              <td>6.65 s</td>
-              <td>24.17x</td>
-              <td>0.6 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio neutral">0.99x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">24.15x</span></td>
               <td>162.3 s</td>
               <td>6.72 s</td>
-              <td>24.15x</td>
-              <td>0.6 MiB</td>
-              <td>1.01x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Domino Chain</td>
               <td><code>vbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>2.93 s</td>
-              <td>411.7 ms</td>
-              <td>7.11x</td>
-              <td>0.4 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.19x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">38.08x</span></td>
               <td>15.68 s</td>
               <td>411.8 ms</td>
-              <td>38.08x</td>
-              <td>0.4 MiB</td>
-              <td>5.36x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Domino Chain</td>
               <td><code>xpbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>671.0 ms</td>
-              <td>238.7 ms</td>
-              <td>2.81x</td>
-              <td>0.4 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.37x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">7.56x</span></td>
               <td>1.8 s</td>
               <td>238.2 ms</td>
-              <td>7.56x</td>
-              <td>0.4 MiB</td>
-              <td>2.68x</td>
-              <td>body_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">7-DOF Arm</th>
             </tr>
 
             <tr>
-              <td>7-DOF Arm</td>
               <td><code>featherstone</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>4.01 s</td>
-              <td>3.63 s</td>
-              <td>1.11x</td>
-              <td>101.2 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.78x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">1.42x</span></td>
               <td>5.13 s</td>
               <td>3.63 s</td>
-              <td>1.42x</td>
-              <td>101.2 MiB</td>
-              <td>1.28x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>7-DOF Arm</td>
               <td><code>mujoco</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>108.54 s</td>
-              <td>4.09 s</td>
-              <td>26.53x</td>
-              <td>101.4 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.92x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">28.8x</span></td>
               <td>118.05 s</td>
               <td>4.1 s</td>
-              <td>28.8x</td>
-              <td>101.4 MiB</td>
-              <td>1.09x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>7-DOF Arm</td>
               <td><code>xpbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1.01 s</td>
-              <td>212.5 ms</td>
-              <td>4.76x</td>
-              <td>101.2 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.37x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">12.8x</span></td>
               <td>2.72 s</td>
               <td>212.7 ms</td>
-              <td>12.8x</td>
-              <td>101.2 MiB</td>
-              <td>2.69x</td>
-              <td>body_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Humanoid Standing</th>
             </tr>
 
             <tr>
-              <td>Humanoid Standing</td>
               <td><code>featherstone</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>20.74 s</td>
-              <td>20.19 s</td>
-              <td>1.03x</td>
-              <td>104 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio neutral">0.98x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">1.05x</span></td>
               <td>21.19 s</td>
               <td>20.19 s</td>
-              <td>1.05x</td>
-              <td>104 MiB</td>
-              <td>1.02x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Humanoid Standing</td>
               <td><code>mujoco</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>125.49 s</td>
-              <td>4.71 s</td>
-              <td>26.66x</td>
-              <td>104.1 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.96x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">27.71x</span></td>
               <td>130.57 s</td>
               <td>4.71 s</td>
-              <td>27.71x</td>
-              <td>104.1 MiB</td>
-              <td>1.04x</td>
-              <td>body_q (0)</td>
             </tr>
 
             <tr>
-              <td>Humanoid Standing</td>
               <td><code>xpbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>723.1 ms</td>
-              <td>304.6 ms</td>
-              <td>2.37x</td>
-              <td>103.9 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.39x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">6.12x</span></td>
               <td>1.87 s</td>
               <td>304.7 ms</td>
-              <td>6.12x</td>
-              <td>103.9 MiB</td>
-              <td>2.58x</td>
-              <td>body_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Diffsim Ball</th>
             </tr>
 
             <tr>
-              <td>Diffsim Ball</td>
               <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1.35 s</td>
-              <td>496.8 ms</td>
-              <td>2.72x</td>
-              <td>18.7 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.94x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">2.91x</span></td>
               <td>1.44 s</td>
               <td>494.5 ms</td>
-              <td>2.91x</td>
-              <td>18.7 MiB</td>
-              <td>1.07x</td>
-              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Diffsim Bear</th>
             </tr>
 
             <tr>
-              <td>Diffsim Bear</td>
               <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>4.96 s</td>
-              <td>985.5 ms</td>
-              <td>5.03x</td>
-              <td>152.9 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.83x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">6.07x</span></td>
               <td>6 s</td>
               <td>987.7 ms</td>
-              <td>6.07x</td>
-              <td>154.2 MiB</td>
-              <td>1.21x</td>
-              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Diffsim Cloth COM</th>
             </tr>
 
             <tr>
-              <td>Diffsim Cloth COM</td>
               <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>2.41 s</td>
-              <td>449.4 ms</td>
-              <td>5.37x</td>
-              <td>22.6 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.77x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">6.93x</span></td>
               <td>3.13 s</td>
               <td>451.1 ms</td>
-              <td>6.93x</td>
-              <td>22.6 MiB</td>
-              <td>1.3x</td>
-              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Diffsim Soft Body</th>
             </tr>
 
             <tr>
-              <td>Diffsim Soft Body</td>
               <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>4.87 s</td>
-              <td>1.78 s</td>
-              <td>2.74x</td>
-              <td>158 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.9x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">3.08x</span></td>
               <td>5.4 s</td>
               <td>1.76 s</td>
-              <td>3.08x</td>
-              <td>158.1 MiB</td>
-              <td>1.11x</td>
-              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">Diffsim Spring Cage</th>
             </tr>
 
             <tr>
-              <td>Diffsim Spring Cage</td>
               <td><code>semi_implicit</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1.84 s</td>
-              <td>525.9 ms</td>
-              <td>3.51x</td>
-              <td>19 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.9x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">3.91x</span></td>
               <td>2.04 s</td>
               <td>520.7 ms</td>
-              <td>3.91x</td>
-              <td>19.1 MiB</td>
-              <td>1.11x</td>
-              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">VBD Cloth Patch</th>
             </tr>
 
             <tr>
-              <td>VBD Cloth Patch</td>
               <td><code>vbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>6.24 s</td>
-              <td>2.67 s</td>
-              <td>2.33x</td>
-              <td>16.5 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.25x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">9.27x</span></td>
               <td>24.78 s</td>
               <td>2.67 s</td>
-              <td>9.27x</td>
-              <td>16.5 MiB</td>
-              <td>3.97x</td>
-              <td>particle_q (0)</td>
+            </tr>
+
+            <tr class="scenario-group">
+              <th colspan="5">VBD Soft Body</th>
             </tr>
 
             <tr>
-              <td>VBD Soft Body</td>
               <td><code>vbd</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>7.68 s</td>
-              <td>4.06 s</td>
-              <td>1.89x</td>
-              <td>16.5 MiB</td>
-              <td><span class="pill ok">bit exact</span></td>
+              <td>
+                <span class="ratio bad">0.29x</span>
+                <span class="subtle">latest slower</span>
+              </td>
+              <td><span class="ratio bad">6.44x</span></td>
               <td>26.04 s</td>
               <td>4.04 s</td>
-              <td>6.44x</td>
-              <td>16.5 MiB</td>
-              <td>3.39x</td>
-              <td>particle_q (0)</td>
             </tr>
           </tbody>
         </table>
@@ -666,10 +602,11 @@
     </section>
 
     <section>
-      <h2>Warp Lowering Micro-Probes</h2>
+      <h2>Warp Micro-Probe Speed Ratios</h2>
       <p class="lead">
         These rows are the focused Warp atomic/adjoint workloads rerun with
-        <code>wp.config.deterministic = "run_to_run"</code>. They are separate from the Newton solver matrix.
+        <code>wp.config.deterministic = "run_to_run"</code>. They are separate from the Newton solver matrix;
+        verdicts are omitted here because none changed.
       </p>
       <div class="table-wrap">
         <table>
@@ -677,15 +614,10 @@
             <tr>
               <th>Probe</th>
               <th>ID</th>
-              <th>Before verdict</th>
-              <th>Before hashes</th>
-              <th>Before det step</th>
-              <th>Before det/plain</th>
-              <th>Latest verdict</th>
-              <th>Latest hashes</th>
+              <th>Latest speed vs before</th>
+              <th>Latest det/plain cost</th>
               <th>Latest det step</th>
-              <th>Latest det/plain</th>
-              <th>Latest/before step</th>
+              <th>Latest plain step</th>
             </tr>
           </thead>
           <tbody>
@@ -693,57 +625,49 @@
             <tr>
               <td>Warp Indexed Counter</td>
               <td><code>warp_counter_indexed</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
+              <td>
+                <span class="ratio neutral">1x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">12.42x</span></td>
               <td>7.5 ms</td>
-              <td>12.68x</td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
-              <td>7.5 ms</td>
-              <td>12.42x</td>
-              <td>1x</td>
+              <td>0.6 ms</td>
             </tr>
 
             <tr>
               <td>Warp Static Counter Index</td>
               <td><code>warp_counter_static_index</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
-              <td>7.5 ms</td>
-              <td>12.34x</td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
+              <td>
+                <span class="ratio neutral">1.01x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">12.45x</span></td>
               <td>7.4 ms</td>
-              <td>12.45x</td>
-              <td>0.99x</td>
+              <td>0.6 ms</td>
             </tr>
 
             <tr>
               <td>Warp Sliced Counter</td>
               <td><code>warp_counter_sliced</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
+              <td>
+                <span class="ratio neutral">1x</span>
+                <span class="subtle">about the same</span>
+              </td>
+              <td><span class="ratio bad">12.65x</span></td>
               <td>7.5 ms</td>
-              <td>12.38x</td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
-              <td>7.5 ms</td>
-              <td>12.65x</td>
-              <td>1x</td>
+              <td>0.6 ms</td>
             </tr>
 
             <tr>
               <td>Warp Custom Adjoint</td>
               <td><code>warp_custom_adjoint</code></td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
-              <td>225.0 ms</td>
-              <td>36.46x</td>
-              <td><span class="pill ok">bit exact</span></td>
-              <td>1</td>
+              <td>
+                <span class="ratio good">3.57x</span>
+                <span class="subtle">latest faster</span>
+              </td>
+              <td><span class="ratio bad">10.23x</span></td>
               <td>63.0 ms</td>
-              <td>10.23x</td>
-              <td>0.28x</td>
+              <td>6.2 ms</td>
             </tr>
           </tbody>
         </table>
@@ -762,7 +686,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">falling_cube</p>
                 <h3>Falling Cube</h3>
-                <p>Closest latest/before step ratio: <code>mujoco</code> 1.01x.</p>
+                <p>Closest speed ratio: <code>mujoco</code> 0.99x.</p>
               </div>
             </article>
 
@@ -774,7 +698,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">box_stack</p>
                 <h3>Box Stack</h3>
-                <p>Closest latest/before step ratio: <code>mujoco</code> 1.01x.</p>
+                <p>Closest speed ratio: <code>mujoco</code> 0.99x.</p>
               </div>
             </article>
 
@@ -786,7 +710,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">domino_chain</p>
                 <h3>Domino Chain</h3>
-                <p>Closest latest/before step ratio: <code>mujoco</code> 1.01x.</p>
+                <p>Closest speed ratio: <code>mujoco</code> 0.99x.</p>
               </div>
             </article>
 
@@ -798,7 +722,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">arm_7dof</p>
                 <h3>7-DOF Arm</h3>
-                <p>Closest latest/before step ratio: <code>mujoco</code> 1.09x.</p>
+                <p>Closest speed ratio: <code>mujoco</code> 0.92x.</p>
               </div>
             </article>
 
@@ -810,7 +734,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">humanoid</p>
                 <h3>Humanoid Standing</h3>
-                <p>Closest latest/before step ratio: <code>featherstone</code> 1.02x.</p>
+                <p>Closest speed ratio: <code>featherstone</code> 0.98x.</p>
               </div>
             </article>
 
@@ -822,7 +746,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">diffsim_ball</p>
                 <h3>Diffsim Ball</h3>
-                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.07x.</p>
+                <p>Closest speed ratio: <code>semi_implicit</code> 0.94x.</p>
               </div>
             </article>
 
@@ -834,7 +758,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">diffsim_bear</p>
                 <h3>Diffsim Bear</h3>
-                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.21x.</p>
+                <p>Closest speed ratio: <code>semi_implicit</code> 0.83x.</p>
               </div>
             </article>
 
@@ -846,7 +770,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">diffsim_cloth_com</p>
                 <h3>Diffsim Cloth COM</h3>
-                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.3x.</p>
+                <p>Closest speed ratio: <code>semi_implicit</code> 0.77x.</p>
               </div>
             </article>
 
@@ -858,7 +782,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">diffsim_soft_body</p>
                 <h3>Diffsim Soft Body</h3>
-                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.11x.</p>
+                <p>Closest speed ratio: <code>semi_implicit</code> 0.9x.</p>
               </div>
             </article>
 
@@ -870,7 +794,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">diffsim_spring_cage</p>
                 <h3>Diffsim Spring Cage</h3>
-                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.11x.</p>
+                <p>Closest speed ratio: <code>semi_implicit</code> 0.9x.</p>
               </div>
             </article>
 
@@ -882,7 +806,7 @@
               <div class="scenario-copy">
                 <p class="eyebrow">vbd_cloth_patch</p>
                 <h3>VBD Cloth Patch</h3>
-                <p>Closest latest/before step ratio: <code>vbd</code> 3.97x.</p>
+                <p>Closest speed ratio: <code>vbd</code> 0.25x.</p>
               </div>
             </article>
 
@@ -894,14 +818,14 @@
               <div class="scenario-copy">
                 <p class="eyebrow">vbd_soft_body</p>
                 <h3>VBD Soft Body</h3>
-                <p>Closest latest/before step ratio: <code>vbd</code> 3.39x.</p>
+                <p>Closest speed ratio: <code>vbd</code> 0.29x.</p>
               </div>
             </article>
       </div>
     </section>
   </main>
   <footer>
-    Generated 2026-06-13 01:29:09 UTC. Raw combined data: <code>determinism_report.json</code>.
+    Generated 2026-06-13 17:14:12 UTC. Raw combined data: <code>determinism_report.json</code>.
   </footer>
 </body>
 </html>
