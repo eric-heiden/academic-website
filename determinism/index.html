@@ -3,1314 +3,905 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Newton Determinism Report</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Newton Determinism: Warp PR1355 Comparison</title>
+  <link rel="icon" href="data:,">
   <style>
     :root {
       color-scheme: light;
-      --bg: #f5f7fa;
-      --paper: #ffffff;
-      --ink: #17202a;
-      --muted: #596575;
-      --muted-2: #7a8492;
-      --line: #dce2ea;
-      --line-strong: #c7d0dc;
-      --ok: #157347;
-      --ok-bg: #e4f5ec;
-      --warn: #a15c00;
-      --warn-bg: #fff1d6;
-      --bad: #b42318;
-      --bad-bg: #ffe4df;
-      --empty: #eef2f6;
-      --xpbd: #2563eb;
-      --xpbd-bg: #dbeafe;
-      --featherstone: #7c3aed;
-      --featherstone-bg: #ede9fe;
-      --mujoco: #c2410c;
-      --mujoco-bg: #ffedd5;
-      --semi-implicit: #0f766e;
-      --semi-implicit-bg: #ccfbf1;
-      --vbd: #be185d;
-      --vbd-bg: #fce7f3;
-      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --ink: #1c2028;
+      --muted: #5f6876;
+      --line: #d8dee8;
+      --paper: #f6f7f9;
+      --panel: #ffffff;
+      --ok: #087f5b;
+      --warn: #a45d00;
+      --bad: #a33a3a;
+      --ok-bg: #def7ec;
+      --warn-bg: #fff0c2;
+      --bad-bg: #ffe1dd;
+      --blue: #2456a6;
+      --teal: #0f766e;
+      --shadow: 0 14px 38px rgba(26, 32, 44, 0.10);
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 15px;
-      line-height: 1.45;
+      background: var(--paper);
+      color: var(--ink);
     }
-
-    code {
-      font-family: var(--mono);
-      font-size: 0.92em;
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 30px clamp(18px, 4vw, 52px) 24px;
     }
-
-    .wrap {
-      width: min(100% - 32px, 1320px);
+    .hero, main, footer {
+      max-width: 1280px;
       margin: 0 auto;
     }
-
-    .report-header {
-      border-bottom: 1px solid var(--line-strong);
-      background: var(--paper);
-    }
-
-    .header-inner {
-      padding: 28px 0 22px;
-    }
-
-    .title-row {
+    .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-      gap: 28px;
-      align-items: start;
-    }
-
-    .eyebrow {
-      margin: 0 0 6px;
-      color: var(--muted);
-      font-size: 0.75rem;
-      font-weight: 760;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-
-    h1,
-    h2,
-    h3,
-    h4 {
-      margin: 0;
-      letter-spacing: 0;
-    }
-
-    h1 {
-      font-size: clamp(1.75rem, 3vw, 2.55rem);
-      line-height: 1.05;
-      font-weight: 790;
-    }
-
-    .lead {
-      max-width: 840px;
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 0.98rem;
-    }
-
-    .timestamp-box {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: #fbfcfe;
-      padding: 12px 14px;
-    }
-
-    .timestamp-box dt,
-    .timestamp-box dd {
-      margin: 0;
-    }
-
-    .timestamp-box dt {
-      color: var(--muted);
-      font-size: 0.72rem;
-      font-weight: 760;
-      text-transform: uppercase;
-    }
-
-    .timestamp-box dd {
-      margin-top: 4px;
-      font-family: var(--mono);
-      font-size: 0.9rem;
-    }
-
-    .run-strip,
-    .stat-strip {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
-      gap: 8px;
-      margin-top: 18px;
-    }
-
-    .stat,
-    .run-item {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: #fbfcfe;
-      padding: 9px 10px;
-      min-width: 0;
-    }
-
-    .stat span,
-    .run-item span {
-      display: block;
-      color: var(--muted);
-      font-size: 0.7rem;
-      font-weight: 760;
-      text-transform: uppercase;
-    }
-
-    .stat strong,
-    .run-item strong {
-      display: block;
-      margin-top: 3px;
-      font-size: 1.02rem;
-      line-height: 1.2;
-      overflow-wrap: anywhere;
-    }
-
-    .stat.ok strong {
-      color: var(--ok);
-    }
-
-    main {
-      padding: 26px 0 44px;
-    }
-
-    .section {
-      margin: 0 0 32px;
-    }
-
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 18px;
+      grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+      gap: 24px;
       align-items: end;
-      margin-bottom: 12px;
-      border-bottom: 1px solid var(--line-strong);
-      padding-bottom: 9px;
     }
-
-    .section-head h2 {
-      font-size: 1.28rem;
-      line-height: 1.2;
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--teal);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
     }
-
-    .section-head p {
-      max-width: 760px;
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(2rem, 4vw, 3.7rem);
+      line-height: 1;
+    }
+    .lead {
+      margin: 14px 0 0;
+      max-width: 880px;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.55;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .summary-tile, .finding, .scenario-card, .table-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .summary-tile {
+      padding: 14px;
+      min-height: 92px;
+    }
+    .summary-tile span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .summary-tile strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 1.35rem;
+      line-height: 1.15;
+    }
+    main {
+      padding: 24px clamp(18px, 4vw, 52px) 54px;
+    }
+    section {
+      margin: 0 0 26px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: clamp(1.55rem, 2.6vw, 2.15rem);
+    }
+    .findings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .finding {
+      padding: 18px;
+      border-left: 5px solid var(--blue);
+    }
+    .finding h3 {
+      margin: 0 0 8px;
+      font-size: 1.12rem;
+    }
+    .finding p {
       margin: 0;
       color: var(--muted);
-      font-size: 0.92rem;
+      line-height: 1.5;
     }
-
-    .result-banner {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 18px;
-      align-items: center;
-      border: 1px solid #a7d9bf;
-      border-left: 5px solid var(--ok);
-      border-radius: 4px;
-      background: var(--ok-bg);
-      padding: 13px 14px;
-    }
-
-    .result-banner strong {
-      display: block;
-      font-size: 1.02rem;
-    }
-
-    .result-banner span {
-      display: block;
-      margin-top: 3px;
-      color: #255d42;
-      font-size: 0.92rem;
-    }
-
     .table-wrap {
       overflow-x: auto;
-      border: 1px solid var(--line-strong);
-      border-radius: 4px;
-      background: var(--paper);
     }
-
     table {
       width: 100%;
+      min-width: 1420px;
       border-collapse: collapse;
-      min-width: 900px;
     }
-
-    th,
-    td {
-      border-bottom: 1px solid var(--line);
-      padding: 8px 10px;
+    th, td {
+      padding: 10px 11px;
       text-align: left;
+      border-bottom: 1px solid var(--line);
       vertical-align: middle;
+      white-space: nowrap;
     }
-
     th {
       color: var(--muted);
-      background: #f8fafc;
-      font-size: 0.72rem;
-      font-weight: 760;
-      text-transform: uppercase;
-    }
-
-    tbody tr:last-child td,
-    tbody tr:last-child th {
-      border-bottom: 0;
-    }
-
-    .matrix th:first-child,
-    .matrix td:first-child {
-      min-width: 250px;
-      width: 30%;
-    }
-
-    .matrix .solver-head {
-      min-width: 132px;
-      border-top: 3px solid var(--solver-color);
-      background: var(--solver-bg);
-      color: var(--ink);
-    }
-
-    .group-row th {
-      border-top: 1px solid var(--line-strong);
-      border-bottom: 1px solid var(--line-strong);
-      background: #e9eef5;
-      color: #334155;
-      font-size: 0.74rem;
-      letter-spacing: 0;
-    }
-
-    .scenario-name {
-      display: block;
-      font-weight: 720;
-    }
-
-    .scenario-note {
-      display: block;
-      margin-top: 2px;
-      color: var(--muted);
-      font-size: 0.82rem;
-      line-height: 1.35;
-    }
-
-    .matrix-cell {
-      min-width: 132px;
-      background: var(--paper);
-    }
-
-    .matrix-cell.has-result {
-      border-left: 4px solid var(--solver-color);
-      background: var(--solver-bg);
-    }
-
-    .matrix-cell.empty {
-      color: var(--muted-2);
-      background: var(--empty);
-      text-align: center;
-    }
-
-    .cell-sub {
-      display: block;
-      margin-top: 3px;
-      color: #334155;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      line-height: 1.3;
-    }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      padding: 2px 6px;
-      font-size: 0.69rem;
-      font-weight: 780;
-      line-height: 1.35;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    .status-ok {
-      color: var(--ok);
-      background: var(--ok-bg);
-      border: 1px solid #aedfc2;
-    }
-
-    .status-warn {
-      color: var(--warn);
-      background: var(--warn-bg);
-      border: 1px solid #f0ca80;
-    }
-
-    .status-bad {
-      color: var(--bad);
-      background: var(--bad-bg);
-      border: 1px solid #ffb4aa;
-    }
-
-    .protocol-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 8px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .protocol-grid li {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: var(--paper);
-      padding: 10px 12px;
-    }
-
-    .protocol-grid strong,
-    .protocol-grid span {
-      display: block;
-    }
-
-    .protocol-grid strong {
-      font-size: 0.9rem;
-    }
-
-    .protocol-grid span {
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 0.84rem;
-    }
-
-    .group-block {
-      margin-bottom: 22px;
-    }
-
-    .group-title {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: baseline;
-      margin-bottom: 8px;
-      color: #334155;
-    }
-
-    .group-title h3 {
-      font-size: 1rem;
-    }
-
-    .group-title span {
-      color: var(--muted);
-      font-size: 0.82rem;
-    }
-
-    .scenario-detail {
-      border: 1px solid var(--line-strong);
-      border-radius: 4px;
-      background: var(--paper);
-    }
-
-    .scenario-detail + .scenario-detail {
-      margin-top: 10px;
-    }
-
-    .scenario-detail-head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 16px;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .scenario-detail h4 {
-      font-size: 1.02rem;
-    }
-
-    .scenario-detail p {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
-    .solver-chip-row,
-    .metric-strip {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-    }
-
-    .solver-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid var(--solver-color);
-      border-radius: 4px;
-      background: var(--solver-bg);
-      color: var(--ink);
-      padding: 3px 7px;
+      background: #fbfcfd;
       font-size: 0.76rem;
-      font-weight: 720;
-      white-space: nowrap;
+      text-transform: uppercase;
     }
-
-    .solver-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 99px;
-      background: var(--solver-color);
+    tr:last-child td { border-bottom: 0; }
+    .pill {
+      display: inline-flex;
+      justify-content: center;
+      min-width: 92px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
     }
-
-    .metric-strip {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--line);
-      background: #fbfcfe;
-    }
-
-    .metric {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: var(--paper);
-      padding: 5px 8px;
-    }
-
-    .metric span,
-    .metric strong {
-      display: inline;
-      font-size: 0.78rem;
-    }
-
-    .metric span {
-      color: var(--muted);
-      font-weight: 680;
-    }
-
-    .metric strong {
-      margin-left: 4px;
-      font-family: var(--mono);
-      font-weight: 680;
-    }
-
-    .scenario-content {
+    .pill.ok { color: var(--ok); background: var(--ok-bg); }
+    .pill.warn { color: var(--warn); background: var(--warn-bg); }
+    .pill.bad { color: var(--bad); background: var(--bad-bg); }
+    .scenario-grid {
       display: grid;
-      grid-template-columns: minmax(260px, 0.95fr) minmax(420px, 1.05fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
-      padding: 14px;
     }
-
-    .video-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(210px, 260px));
-      gap: 10px;
-      align-content: start;
-    }
-
-    .video-tile {
+    .scenario-card {
       overflow: hidden;
-      border: 1px solid var(--line-strong);
-      border-left: 4px solid var(--solver-color);
-      border-radius: 4px;
-      background: #111827;
     }
-
-    .video-title {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-height: 28px;
-      padding: 5px 8px;
-      background: var(--solver-bg);
-      color: var(--ink);
-      font-size: 0.78rem;
-      font-weight: 740;
+    .media {
+      background: #151821;
+      min-height: 180px;
     }
-
-    .video-caption {
-      margin: 0;
-      padding: 7px 8px 9px;
-      color: #d7dbe7;
-      font-size: 0.74rem;
-      line-height: 1.35;
-    }
-
     video {
       display: block;
       width: 100%;
-      max-height: 148px;
       aspect-ratio: 16 / 9;
       object-fit: cover;
-      background: #111827;
+      background: #151821;
     }
-
-    .small-table table {
-      min-width: 760px;
-      font-size: 0.84rem;
-    }
-
-    .small-table th,
-    .small-table td {
-      padding: 7px 8px;
-    }
-
-    .solver-row td:first-child {
-      border-left: 4px solid var(--solver-color);
-      background: var(--solver-bg);
-      font-weight: 720;
-    }
-
-    .plain-comparison {
-      color: var(--muted);
-      font-size: 0.78rem;
-      line-height: 1.35;
-    }
-
-    .warp-table td:nth-child(1) {
-      font-weight: 720;
-    }
-
-    .scope-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 8px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .scope-list li {
-      border-left: 4px solid #64748b;
-      background: var(--paper);
-      border-top: 1px solid var(--line);
-      border-right: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 10px 12px;
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
-    .load-error {
-      border: 1px solid #ffb4aa;
-      border-left: 5px solid var(--bad);
-      border-radius: 4px;
-      background: var(--bad-bg);
+    .scenario-copy {
       padding: 14px;
-      color: var(--bad);
-      font-weight: 720;
     }
-
-    footer {
-      border-top: 1px solid var(--line-strong);
+    .scenario-copy h3 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+    .scenario-copy p {
+      margin: 0;
       color: var(--muted);
-      padding: 18px 0 28px;
-      font-size: 0.85rem;
+      line-height: 1.45;
     }
-
-    .solver-xpbd {
-      --solver-color: var(--xpbd);
-      --solver-bg: var(--xpbd-bg);
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
     }
-
-    .solver-featherstone {
-      --solver-color: var(--featherstone);
-      --solver-bg: var(--featherstone-bg);
+    footer {
+      padding: 0 clamp(18px, 4vw, 52px) 44px;
+      color: var(--muted);
+      font-size: 0.9rem;
     }
-
-    .solver-mujoco {
-      --solver-color: var(--mujoco);
-      --solver-bg: var(--mujoco-bg);
-    }
-
-    .solver-semi-implicit {
-      --solver-color: var(--semi-implicit);
-      --solver-bg: var(--semi-implicit-bg);
-    }
-
-    .solver-vbd {
-      --solver-color: var(--vbd);
-      --solver-bg: var(--vbd-bg);
-    }
-
     @media (max-width: 980px) {
-      .title-row,
-      .scenario-content,
-      .scenario-detail-head {
-        grid-template-columns: 1fr;
-      }
-
-      .section-head {
-        display: block;
-      }
-
-      .section-head p {
-        margin-top: 5px;
-      }
-
-      .result-banner {
-        grid-template-columns: 1fr;
-      }
+      .hero, .findings-grid, .scenario-grid { grid-template-columns: 1fr; }
     }
-
-    @media (max-width: 620px) {
-      .wrap {
-        width: min(100% - 22px, 1320px);
-      }
-
-      .header-inner {
-        padding: 22px 0 18px;
-      }
-
-      h1 {
-        font-size: 1.65rem;
-      }
-
-      .video-grid {
-        grid-template-columns: 1fr;
-      }
-
-      video {
-        max-height: none;
-      }
+    @media (max-width: 560px) {
+      .summary-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <header class="report-header">
-    <div class="wrap header-inner">
-      <div class="title-row">
-        <div>
-          <p class="eyebrow">Newton determinism harness</p>
-          <h1>Determinism Report</h1>
-          <p class="lead">
-            Fresh subprocess replays compare final physics-state hashes across Newton solver scenarios.
-            This view keeps the pass/fail signal, solver coverage, and diagnostics visible without repeating low-value run metadata.
-          </p>
-        </div>
-        <dl class="timestamp-box">
-          <dt>Data generated, Pacific time</dt>
-          <dd id="generated-at">Loading...</dd>
-        </dl>
+  <header>
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Newton determinism harness</p>
+        <h1>Warp PR1355 determinism comparison</h1>
+        <p class="lead">
+          The same Newton determinism report was regenerated with Warp before <code>de4674f</code>
+          and with the latest fetched PR1355 head. Videos are reused from the existing report; only
+          deterministic replay verdicts and performance numbers were regenerated.
+        </p>
       </div>
-      <div class="stat-strip" id="summary-stats"></div>
-      <div class="run-strip" id="run-config"></div>
+      <div class="summary-grid">
+        <div class="summary-tile"><span>Before physics</span><strong>23/23 bit-exact</strong></div>
+        <div class="summary-tile"><span>Latest physics</span><strong>23/23 bit-exact</strong></div>
+        <div class="summary-tile"><span>Before micro</span><strong>4/4 bit-exact</strong></div>
+        <div class="summary-tile"><span>Latest micro</span><strong>4/4 bit-exact</strong></div>
+      </div>
     </div>
   </header>
-
-  <main class="wrap">
-    <noscript>
-      <div class="load-error">Enable JavaScript to load determinism_report.json.</div>
-    </noscript>
-
-    <section class="section" id="result-section"></section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2>Solver Matrix</h2>
-        <p>Scenarios are grouped by workload type. Solver colors are consistent across the matrix, videos, and detail tables.</p>
+  <main>
+    <section>
+      <h2>Builds Compared</h2>
+      <div class="findings-grid">
+        <article class="finding">
+          <p class="eyebrow">Before</p>
+          <h3><code>825f50ce6</code></h3>
+          <p>Parent of de4674f302e5f51a14808621256d35ad42e99bd5.</p>
+        </article>
+        <article class="finding">
+          <p class="eyebrow">Latest PR1355</p>
+          <h3><code>48b1927c5</code></h3>
+          <p>Current head of NVIDIA/warp PR1355 fetched on 2026-06-13 UTC.</p>
+        </article>
+        <article class="finding">
+          <p class="eyebrow">Median latest / before</p>
+          <h3>1.3x</h3>
+          <p>Median deterministic physics step time ratio across matched solver rows. Micro-probe median: 1x.</p>
+        </article>
       </div>
-      <div class="table-wrap" id="solver-matrix"></div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <h2>Protocol</h2>
-        <p>Only the checks that affect interpretation are shown here.</p>
-      </div>
-      <ul class="protocol-grid" id="protocol"></ul>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2>Scenario Details</h2>
-        <p>Videos are compact diagnostic clips. The tables below carry the determinism verdicts.</p>
-      </div>
-      <div id="scenario-details"></div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2>Warp Probes</h2>
-        <p>Focused compiler/runtime checks are reported separately from the solver matrix.</p>
-      </div>
-      <div class="table-wrap" id="warp-probes"></div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2>Scope</h2>
-        <p>How to read the result.</p>
-      </div>
-      <ul class="scope-list" id="scope-list"></ul>
-    </section>
-  </main>
-
-  <footer>
-    <div class="wrap">Report data timestamp: <span id="footer-generated-at">Loading...</span></div>
-  </footer>
-
-  <script>
-    const SOLVERS = [
-      { id: "xpbd", label: "XPBD" },
-      { id: "featherstone", label: "Featherstone" },
-      { id: "mujoco", label: "MuJoCo" },
-      { id: "semi_implicit", label: "Semi-implicit" },
-      { id: "vbd", label: "VBD" },
-    ];
-
-    const SOLVER_INDEX = new Map(SOLVERS.map((solver, index) => [solver.id, index]));
-    const SOLVER_LABELS = new Map(SOLVERS.map((solver) => [solver.id, solver.label]));
-
-    const GROUPS = [
-      {
-        label: "Rigid contact",
-        scenarios: ["falling_cube", "box_stack", "domino_chain"],
-      },
-      {
-        label: "Articulated bodies",
-        scenarios: ["arm_7dof", "humanoid"],
-      },
-      {
-        label: "Differentiable examples",
-        scenarios: ["diffsim_ball", "diffsim_bear", "diffsim_cloth_com", "diffsim_soft_body", "diffsim_spring_cage"],
-      },
-      {
-        label: "VBD scenes",
-        scenarios: ["vbd_cloth_patch", "vbd_soft_body"],
-      },
-    ];
-
-    const SCENARIO_COPY = {
-      falling_cube: "Free rigid body with floor contact.",
-      box_stack: "Twenty-box contact stack.",
-      domino_chain: "Sequential impacts through a domino chain.",
-      arm_7dof: "Franka arm with fixed-base PD targets.",
-      humanoid: "Unitree H1 standing pose with contact.",
-      diffsim_ball: "Particle target with loss and velocity-gradient checks.",
-      diffsim_bear: "Soft-body control target with activation-gradient checks.",
-      diffsim_cloth_com: "Cloth center-of-mass target with gradient checks.",
-      diffsim_soft_body: "Soft-body material target with gradient checks.",
-      diffsim_spring_cage: "Spring rest-length target with gradient checks.",
-      vbd_cloth_patch: "Pinned cloth patch evaluated with VBD.",
-      vbd_soft_body: "Pinned tetrahedral block evaluated with VBD.",
-    };
-
-    const METRIC_PRIORITY = [
-      "Loss",
-      "Final height mean",
-      "COM drift",
-      "Fallen dominos",
-      "Max target error",
-      "Final root height",
-      "Peak contacts",
-      "First contact frame",
-      "First contact sample",
-      "Contact samples",
-      "Tape frames",
-      "Effective substeps",
-      "Max grad abs",
-      "Max state abs",
-      "Mean speed",
-      "Particles",
-      "Tets",
-    ];
-
-    const OMIT_METRICS = new Set();
-
-    function escapeHtml(value) {
-      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[char]);
-    }
-
-    function solverClass(solver) {
-      return `solver-${String(solver).replace(/_/g, "-")}`;
-    }
-
-    function solverLabel(solver) {
-      return SOLVER_LABELS.get(solver) || solver.replace(/_/g, " ");
-    }
-
-    function titleForScenario(report, id) {
-      return report.scenarios?.[id]?.title || report.micro_scenarios?.[id]?.title || id.replace(/_/g, " ");
-    }
-
-    function copyForScenario(report, id) {
-      return SCENARIO_COPY[id] || stripMarkup(report.scenarios?.[id]?.note || report.scenarios?.[id]?.doc || "");
-    }
-
-    function stripMarkup(text) {
-      return String(text || "").replace(/``/g, "").replace(/\s+/g, " ").trim();
-    }
-
-    function toneForStatus(status) {
-      if (status === "bit_exact") return "ok";
-      if (status === "failed" || status === "error") return "bad";
-      return "warn";
-    }
-
-    function statusLabel(status) {
-      if (status === "bit_exact") return "Exact";
-      if (status === "failed") return "Failed";
-      if (status === "drift") return "Drift";
-      return String(status || "Unknown").replace(/_/g, " ");
-    }
-
-    function statusPill(status) {
-      const tone = toneForStatus(status);
-      return `<span class="status-pill status-${tone}">${escapeHtml(statusLabel(status))}</span>`;
-    }
-
-    function formatDiff(value) {
-      const number = Number(value);
-      if (!Number.isFinite(number)) return "n/a";
-      if (number === 0) return "0";
-      if (Math.abs(number) < 0.001) return number.toExponential(2);
-      if (Math.abs(number) < 10) return number.toPrecision(3);
-      return number.toFixed(2);
-    }
-
-    function formatDuration(seconds) {
-      const value = Number(seconds);
-      if (!Number.isFinite(value)) return "n/a";
-      if (value >= 60) return `${(value / 60).toFixed(1)} min`;
-      return `${value.toFixed(1)} s`;
-    }
-
-    function formatStep(seconds) {
-      const value = Number(seconds);
-      if (!Number.isFinite(value)) return "n/a";
-      if (value >= 60) return `${(value / 60).toFixed(2)} min`;
-      if (value >= 1) return `${value.toFixed(2)} s`;
-      return `${(value * 1000).toFixed(1)} ms`;
-    }
-
-    function formatBytes(bytes) {
-      const value = Number(bytes);
-      if (!Number.isFinite(value)) return "n/a";
-      if (value === 0) return "0 B";
-      const units = ["B", "KiB", "MiB", "GiB"];
-      let scaled = Math.abs(value);
-      let unit = 0;
-      while (scaled >= 1024 && unit < units.length - 1) {
-        scaled /= 1024;
-        unit += 1;
-      }
-      const signed = value < 0 ? -scaled : scaled;
-      return `${signed.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
-    }
-
-    function formatRatio(value) {
-      const ratio = Number(value);
-      if (!Number.isFinite(ratio)) return "n/a";
-      return `${ratio.toFixed(ratio >= 10 ? 1 : 2)}x`;
-    }
-
-    function formatGeneratedAt(value) {
-      const raw = String(value || "").trim();
-      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) Pacific (Daylight|Standard) Time$/);
-      if (!match) return raw || "Unavailable";
-      const [, year, month, day, hour, minute, second, pacificMode] = match;
-      const offset = pacificMode === "Daylight" ? "-07:00" : "-08:00";
-      const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}${offset}`);
-      return new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Los_Angeles",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZoneName: "short",
-      }).format(date);
-    }
-
-    function plural(value, singular, pluralLabel = `${singular}s`) {
-      return Number(value) === 1 ? singular : pluralLabel;
-    }
-
-    function videoCaption(video) {
-      const parts = [];
-      if (Number.isFinite(Number(video.frames))) {
-        const simSteps = Number.isFinite(Number(video.sim_steps)) ? ` from ${video.sim_steps} visual steps` : "";
-        const fps = Number.isFinite(Number(video.fps)) ? ` at ${video.fps} fps` : "";
-        parts.push(`${video.frames} encoded frames${simSteps}${fps}`);
-      }
-      const detail = [];
-      if (Number.isFinite(Number(video.width)) && Number.isFinite(Number(video.height))) {
-        detail.push(`${video.width}x${video.height}`);
-      }
-      if (Number.isFinite(Number(video.frame_stride))) {
-        detail.push(`stride ${video.frame_stride}`);
-      }
-      if (detail.length) {
-        parts.push(`(${detail.join(", ")})`);
-      }
-      if (Number.isFinite(Number(video.horizon_steps))) {
-        const substeps = Number.isFinite(Number(video.horizon_substeps)) ? ` x ${video.horizon_substeps} substeps` : "";
-        const replay = video.horizon_replay ? " Replay uses the recorded tape states for the longer visualization." : "";
-        parts.push(`Tape horizon ${video.horizon_steps} frames${substeps}.${replay}`);
-      }
-      return parts.join(" ");
-    }
-
-    function performanceSummary(result) {
-      const performance = result.performance;
-      if (!performance) return "";
-      const detStep = formatStep(performance.det_step_s);
-      const plainStep = formatStep(performance.plain_step_s);
-      const ratio = formatRatio(performance.step_ratio);
-      const detPool = formatBytes(performance.det_cuda_mempool_high_bytes);
-      const plainPool = formatBytes(performance.plain_cuda_mempool_high_bytes);
-      return `Step ${detStep} vs ${plainStep} plain (${ratio}); CUDA pool ${detPool} vs ${plainPool}.`;
-    }
-
-    function usefulMetrics(metrics) {
-      return (metrics || [])
-        .map((metric, index) => ({ ...metric, index }))
-        .filter((metric) => !OMIT_METRICS.has(metric.label))
-        .sort((a, b) => {
-          const aRank = METRIC_PRIORITY.indexOf(a.label);
-          const bRank = METRIC_PRIORITY.indexOf(b.label);
-          return (aRank === -1 ? 100 : aRank) - (bRank === -1 ? 100 : bRank) || a.index - b.index;
-        })
-        .slice(0, 6);
-    }
-
-    function buildIndexes(report) {
-      const microScenarios = new Set(report.micro_scenario_order || []);
-      const solverResults = report.solver_results || [];
-      const physicsResults = solverResults.filter((result) => !microScenarios.has(result.scenario));
-      const embeddedMicroResults = solverResults.filter((result) => microScenarios.has(result.scenario));
-      const microResults = (report.micro_results || []).length ? report.micro_results : embeddedMicroResults;
-      const allResults = [...physicsResults, ...microResults];
-      const resultByScenarioSolver = new Map();
-      for (const result of physicsResults) {
-        resultByScenarioSolver.set(`${result.scenario}:${result.solver}`, result);
-      }
-      const videosByScenario = new Map();
-      for (const video of report.videos || []) {
-        if (!videosByScenario.has(video.scenario)) videosByScenario.set(video.scenario, []);
-        videosByScenario.get(video.scenario).push(video);
-      }
-      for (const videos of videosByScenario.values()) {
-        videos.sort((a, b) => (SOLVER_INDEX.get(a.solver) ?? 99) - (SOLVER_INDEX.get(b.solver) ?? 99));
-      }
-      return { physicsResults, microResults, allResults, resultByScenarioSolver, videosByScenario };
-    }
-
-    function renderSummary(report, indexes) {
-      const allResults = indexes.allResults;
-      const exactCount = allResults.filter((result) => result.status === "bit_exact").length;
-      const driftCount = allResults.filter((result) => result.status !== "bit_exact").length;
-      const generatedAt = formatGeneratedAt(report.generated_at);
-
-      document.getElementById("generated-at").textContent = generatedAt;
-      document.getElementById("footer-generated-at").textContent = generatedAt;
-
-      document.getElementById("summary-stats").innerHTML = [
-        ["Scenarios", report.scenario_order?.length || 0],
-        ["Solver checks", indexes.physicsResults.length],
-        ["Warp probes", indexes.microResults.length],
-        ["Videos", report.videos?.length || 0],
-        ["Total checks", allResults.length],
-        ["Bit-exact", exactCount, "ok"],
-        ["Drift/failures", driftCount, driftCount === 0 ? "ok" : ""],
-      ].map(([label, value, className]) => `
-        <div class="stat ${className || ""}">
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
-        </div>
-      `).join("");
-    }
-
-    function renderRunConfig(report) {
-      const config = report.config || {};
-      document.getElementById("run-config").innerHTML = [
-        ["Replay count", `${config.runs ?? "n/a"} ${plural(config.runs, "subprocess", "subprocesses")}`],
-        ["Workload", `${config.num_steps ?? "n/a"} steps / ${config.substeps ?? "n/a"} substeps`],
-        ["Rate", `${config.fps ?? "n/a"} Hz`],
-        ["Worlds", config.world_count ?? "n/a"],
-        ["Seed", config.seed ?? "n/a"],
-        ["Solver mode", config.solver_deterministic || "n/a"],
-        ["MuJoCo records", config.mujoco_deterministic_max_records ?? "n/a"],
-      ].map(([label, value]) => `
-        <div class="run-item">
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
-        </div>
-      `).join("");
-    }
-
-    function renderResultBanner(report, indexes) {
-      const allResults = indexes.allResults;
-      const exactCount = allResults.filter((result) => result.status === "bit_exact").length;
-      const driftCount = allResults.length - exactCount;
-      const statusText = driftCount === 0
-        ? "All tested rows are bit-exact."
-        : `${driftCount} check ${plural(driftCount, "needs", "need")} review.`;
-      const detail = `${indexes.physicsResults.length} solver/scenario checks and ${indexes.microResults.length} Warp probes matched across ${report.config?.runs ?? "n/a"} fresh subprocess replays.`;
-      document.getElementById("result-section").innerHTML = `
-        <div class="result-banner">
-          <div>
-            <strong>${escapeHtml(statusText)}</strong>
-            <span>${escapeHtml(detail)}</span>
-          </div>
-          ${statusPill(driftCount === 0 ? "bit_exact" : "drift")}
-        </div>
-      `;
-    }
-
-    function renderProtocol(report) {
-      const config = report.config || {};
-      const representativeVideo = (report.videos || [])[0] || {};
-      const items = [
-        ["Replay isolation", `${config.runs ?? "n/a"} independent subprocess runs per supported solver/scenario pair.`],
-        ["Hash verdict", "Final state arrays, losses, and gradients are compared through canonical byte hashes."],
-        ["Fixed workload", `${config.num_steps ?? "n/a"} steps, ${config.substeps ?? "n/a"} substeps, ${config.fps ?? "n/a"} Hz, seed ${config.seed ?? "n/a"}, world count ${config.world_count ?? "n/a"}.`],
-        ["Contacts", `Contact scenarios use deterministic collision ordering. MuJoCo dynamic atomics use deterministic_max_records = ${config.mujoco_deterministic_max_records ?? "n/a"}.`],
-        ["Visuals", `Videos are diagnostic evidence; pass/fail comes from state hashes. Current clips use ${representativeVideo.frames ?? "n/a"} encoded frames from ${representativeVideo.sim_steps ?? "n/a"} visual steps.`],
-        ["Plain comparison", report.compare_plain ? "Rows include same-workload plain runs with solver-level deterministic options omitted." : "Plain comparison was not requested for this report."],
-        ["Scope", "Same machine, driver, GPU, and Newton/Warp build."],
-      ];
-      document.getElementById("protocol").innerHTML = items.map(([label, value]) => `
-        <li>
-          <strong>${escapeHtml(label)}</strong>
-          <span>${escapeHtml(value)}</span>
-        </li>
-      `).join("");
-    }
-
-    function renderMatrix(report, indexes) {
-      const header = `
-        <table class="matrix">
+    <section>
+      <h2>Physics Solver Matrix</h2>
+      <div class="table-wrap">
+        <table>
           <thead>
             <tr>
               <th>Scenario</th>
-              ${SOLVERS.map((solver) => `<th class="solver-head ${solverClass(solver.id)}">${escapeHtml(solver.label)}</th>`).join("")}
+              <th>Solver</th>
+              <th>Before verdict</th>
+              <th>Before det step</th>
+              <th>Before plain step</th>
+              <th>Before det/plain</th>
+              <th>Before CUDA pool</th>
+              <th>Latest verdict</th>
+              <th>Latest det step</th>
+              <th>Latest plain step</th>
+              <th>Latest det/plain</th>
+              <th>Latest CUDA pool</th>
+              <th>Latest/before step</th>
+              <th>Latest dominant drift</th>
             </tr>
           </thead>
           <tbody>
-      `;
 
-      const rows = GROUPS.map((group) => {
-        const scenarioRows = group.scenarios
-          .filter((scenarioId) => (report.scenario_order || []).includes(scenarioId))
-          .map((scenarioId) => {
-            const cells = SOLVERS.map((solver) => {
-              const result = indexes.resultByScenarioSolver.get(`${scenarioId}:${solver.id}`);
-              if (!result) return `<td class="matrix-cell empty">-</td>`;
-              return `
-                <td class="matrix-cell has-result ${solverClass(solver.id)}">
-                  ${statusPill(result.status)}
-                  <span class="cell-sub">${escapeHtml(result.unique_hashes)} hash / max diff ${escapeHtml(formatDiff(result.max_core_diff_overall))}</span>
-                </td>
-              `;
-            }).join("");
-            return `
-              <tr>
-                <td>
-                  <span class="scenario-name">${escapeHtml(titleForScenario(report, scenarioId))}</span>
-                  <span class="scenario-note">${escapeHtml(copyForScenario(report, scenarioId))}</span>
-                </td>
-                ${cells}
-              </tr>
-            `;
-          }).join("");
-
-        if (!scenarioRows) return "";
-        return `
-          <tr class="group-row"><th colspan="${SOLVERS.length + 1}">${escapeHtml(group.label)}</th></tr>
-          ${scenarioRows}
-        `;
-      }).join("");
-
-      document.getElementById("solver-matrix").innerHTML = `${header}${rows}</tbody></table>`;
-    }
-
-    function renderMetricStrip(metrics) {
-      if (!metrics.length) return "";
-      return `
-        <div class="metric-strip">
-          ${metrics.map((metric) => `
-            <div class="metric">
-              <span>${escapeHtml(metric.label)}</span>
-              <strong>${escapeHtml(metric.value)}</strong>
-            </div>
-          `).join("")}
-        </div>
-      `;
-    }
-
-    function renderVideoTile(video) {
-      const solver = video.solver;
-      return `
-        <div class="video-tile ${solverClass(solver)}">
-          <div class="video-title">
-            <span class="solver-dot"></span>
-            <span>${escapeHtml(solverLabel(solver))}</span>
-          </div>
-          <video controls muted loop playsinline preload="metadata" poster="assets/${escapeHtml(video.poster)}">
-            <source src="assets/${escapeHtml(video.video)}" type="video/mp4">
-          </video>
-          <p class="video-caption">${escapeHtml(videoCaption(video))}</p>
-        </div>
-      `;
-    }
-
-    function renderSolverRows(results) {
-      const sorted = [...results].sort((a, b) => (SOLVER_INDEX.get(a.solver) ?? 99) - (SOLVER_INDEX.get(b.solver) ?? 99));
-      return `
-        <div class="table-wrap small-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Solver</th>
-                  <th>Status</th>
-                  <th>Hashes</th>
-                  <th>Max diff</th>
-                  <th>Time</th>
-                  <th>Plain comparison</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${sorted.map((result) => `
-                  <tr class="solver-row ${solverClass(result.solver)}">
-                  <td>${escapeHtml(solverLabel(result.solver))}</td>
-                    <td>${statusPill(result.status)}</td>
-                    <td>${escapeHtml(result.unique_hashes)}</td>
-                    <td>${escapeHtml(formatDiff(result.max_core_diff_overall))}</td>
-                    <td>${escapeHtml(formatDuration(result.duration_s))}</td>
-                    <td class="plain-comparison">${escapeHtml(performanceSummary(result) || "n/a")}</td>
-                  </tr>
-                `).join("")}
-              </tbody>
-            </table>
-        </div>
-      `;
-    }
-
-    function renderScenario(report, indexes, scenarioId) {
-      const results = indexes.physicsResults.filter((result) => result.scenario === scenarioId);
-      if (!results.length) return "";
-      const representativeSolver = report.scenarios?.[scenarioId]?.representative_solver;
-      const representative = results.find((result) => result.solver === representativeSolver) || results[0];
-      const videos = indexes.videosByScenario.get(scenarioId) || [];
-      const metrics = usefulMetrics(representative.metrics);
-      return `
-        <article class="scenario-detail">
-          <div class="scenario-detail-head">
-            <div>
-              <h4>${escapeHtml(titleForScenario(report, scenarioId))}</h4>
-              <p>${escapeHtml(copyForScenario(report, scenarioId))}</p>
-            </div>
-            <div class="solver-chip-row">
-              ${results
-                .sort((a, b) => (SOLVER_INDEX.get(a.solver) ?? 99) - (SOLVER_INDEX.get(b.solver) ?? 99))
-                .map((result) => `
-                  <span class="solver-chip ${solverClass(result.solver)}">
-                    <span class="solver-dot"></span>
-                    ${escapeHtml(solverLabel(result.solver))}
-                  </span>
-                `).join("")}
-            </div>
-          </div>
-          ${renderMetricStrip(metrics)}
-          <div class="scenario-content">
-            <div class="video-grid">
-              ${videos.map(renderVideoTile).join("")}
-            </div>
-            ${renderSolverRows(results)}
-          </div>
-        </article>
-      `;
-    }
-
-    function renderScenarioDetails(report, indexes) {
-      document.getElementById("scenario-details").innerHTML = GROUPS.map((group) => {
-        const scenarioMarkup = group.scenarios
-          .filter((scenarioId) => (report.scenario_order || []).includes(scenarioId))
-          .map((scenarioId) => renderScenario(report, indexes, scenarioId))
-          .join("");
-        if (!scenarioMarkup) return "";
-        return `
-          <section class="group-block">
-            <div class="group-title">
-              <h3>${escapeHtml(group.label)}</h3>
-              <span>${group.scenarios.filter((scenarioId) => (report.scenario_order || []).includes(scenarioId)).length} scenarios</span>
-            </div>
-            ${scenarioMarkup}
-          </section>
-        `;
-      }).join("");
-    }
-
-    function renderWarpProbes(report, indexes) {
-      const rows = indexes.microResults
-        .sort((a, b) => (report.micro_scenario_order || []).indexOf(a.scenario) - (report.micro_scenario_order || []).indexOf(b.scenario))
-        .map((result) => {
-          const scenario = report.micro_scenarios?.[result.scenario] || {};
-          return `
             <tr>
-              <td>${escapeHtml(scenario.title || result.scenario)}</td>
-              <td>${escapeHtml(stripMarkup(scenario.doc))}</td>
-              <td>${statusPill(result.status)}</td>
-              <td>${escapeHtml(result.unique_hashes)}</td>
-              <td>${escapeHtml(formatDiff(result.max_core_diff_overall))}</td>
-              <td>${escapeHtml(formatDuration(result.duration_s))}</td>
+              <td>Falling Cube</td>
+              <td><code>featherstone</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>561.6 ms</td>
+              <td>223.2 ms</td>
+              <td>2.52x</td>
+              <td>0.4 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.01 s</td>
+              <td>223.1 ms</td>
+              <td>4.54x</td>
+              <td>0.4 MiB</td>
+              <td>1.8x</td>
+              <td>body_q (0)</td>
             </tr>
-          `;
-        }).join("");
 
-      document.getElementById("warp-probes").innerHTML = `
-        <table class="warp-table">
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>106.31 s</td>
+              <td>3.75 s</td>
+              <td>28.33x</td>
+              <td>0.5 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>107.73 s</td>
+              <td>3.75 s</td>
+              <td>28.7x</td>
+              <td>0.5 MiB</td>
+              <td>1.01x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>288.0 ms</td>
+              <td>106.1 ms</td>
+              <td>2.72x</td>
+              <td>0.4 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>749.4 ms</td>
+              <td>106.2 ms</td>
+              <td>7.06x</td>
+              <td>0.4 MiB</td>
+              <td>2.6x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Falling Cube</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>573.1 ms</td>
+              <td>161.2 ms</td>
+              <td>3.56x</td>
+              <td>0.4 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.72 s</td>
+              <td>161.3 ms</td>
+              <td>10.67x</td>
+              <td>0.4 MiB</td>
+              <td>3x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Box Stack</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>159.4 s</td>
+              <td>6.52 s</td>
+              <td>24.46x</td>
+              <td>0.7 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>160.88 s</td>
+              <td>6.48 s</td>
+              <td>24.84x</td>
+              <td>0.7 MiB</td>
+              <td>1.01x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Box Stack</td>
+              <td><code>vbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>2.93 s</td>
+              <td>410.1 ms</td>
+              <td>7.13x</td>
+              <td>0.5 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>15.62 s</td>
+              <td>410.4 ms</td>
+              <td>38.05x</td>
+              <td>0.5 MiB</td>
+              <td>5.34x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Box Stack</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>671.2 ms</td>
+              <td>241.3 ms</td>
+              <td>2.78x</td>
+              <td>0.5 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.79 s</td>
+              <td>240.2 ms</td>
+              <td>7.44x</td>
+              <td>0.5 MiB</td>
+              <td>2.66x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Domino Chain</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>160.85 s</td>
+              <td>6.65 s</td>
+              <td>24.17x</td>
+              <td>0.6 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>162.3 s</td>
+              <td>6.72 s</td>
+              <td>24.15x</td>
+              <td>0.6 MiB</td>
+              <td>1.01x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Domino Chain</td>
+              <td><code>vbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>2.93 s</td>
+              <td>411.7 ms</td>
+              <td>7.11x</td>
+              <td>0.4 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>15.68 s</td>
+              <td>411.8 ms</td>
+              <td>38.08x</td>
+              <td>0.4 MiB</td>
+              <td>5.36x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Domino Chain</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>671.0 ms</td>
+              <td>238.7 ms</td>
+              <td>2.81x</td>
+              <td>0.4 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.8 s</td>
+              <td>238.2 ms</td>
+              <td>7.56x</td>
+              <td>0.4 MiB</td>
+              <td>2.68x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>7-DOF Arm</td>
+              <td><code>featherstone</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>4.01 s</td>
+              <td>3.63 s</td>
+              <td>1.11x</td>
+              <td>101.2 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>5.13 s</td>
+              <td>3.63 s</td>
+              <td>1.42x</td>
+              <td>101.2 MiB</td>
+              <td>1.28x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>7-DOF Arm</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>108.54 s</td>
+              <td>4.09 s</td>
+              <td>26.53x</td>
+              <td>101.4 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>118.05 s</td>
+              <td>4.1 s</td>
+              <td>28.8x</td>
+              <td>101.4 MiB</td>
+              <td>1.09x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>7-DOF Arm</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.01 s</td>
+              <td>212.5 ms</td>
+              <td>4.76x</td>
+              <td>101.2 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>2.72 s</td>
+              <td>212.7 ms</td>
+              <td>12.8x</td>
+              <td>101.2 MiB</td>
+              <td>2.69x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Humanoid Standing</td>
+              <td><code>featherstone</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>20.74 s</td>
+              <td>20.19 s</td>
+              <td>1.03x</td>
+              <td>104 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>21.19 s</td>
+              <td>20.19 s</td>
+              <td>1.05x</td>
+              <td>104 MiB</td>
+              <td>1.02x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Humanoid Standing</td>
+              <td><code>mujoco</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>125.49 s</td>
+              <td>4.71 s</td>
+              <td>26.66x</td>
+              <td>104.1 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>130.57 s</td>
+              <td>4.71 s</td>
+              <td>27.71x</td>
+              <td>104.1 MiB</td>
+              <td>1.04x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Humanoid Standing</td>
+              <td><code>xpbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>723.1 ms</td>
+              <td>304.6 ms</td>
+              <td>2.37x</td>
+              <td>103.9 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.87 s</td>
+              <td>304.7 ms</td>
+              <td>6.12x</td>
+              <td>103.9 MiB</td>
+              <td>2.58x</td>
+              <td>body_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Ball</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.35 s</td>
+              <td>496.8 ms</td>
+              <td>2.72x</td>
+              <td>18.7 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.44 s</td>
+              <td>494.5 ms</td>
+              <td>2.91x</td>
+              <td>18.7 MiB</td>
+              <td>1.07x</td>
+              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Bear</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>4.96 s</td>
+              <td>985.5 ms</td>
+              <td>5.03x</td>
+              <td>152.9 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>6 s</td>
+              <td>987.7 ms</td>
+              <td>6.07x</td>
+              <td>154.2 MiB</td>
+              <td>1.21x</td>
+              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Cloth COM</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>2.41 s</td>
+              <td>449.4 ms</td>
+              <td>5.37x</td>
+              <td>22.6 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>3.13 s</td>
+              <td>451.1 ms</td>
+              <td>6.93x</td>
+              <td>22.6 MiB</td>
+              <td>1.3x</td>
+              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Soft Body</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>4.87 s</td>
+              <td>1.78 s</td>
+              <td>2.74x</td>
+              <td>158 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>5.4 s</td>
+              <td>1.76 s</td>
+              <td>3.08x</td>
+              <td>158.1 MiB</td>
+              <td>1.11x</td>
+              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>Diffsim Spring Cage</td>
+              <td><code>semi_implicit</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1.84 s</td>
+              <td>525.9 ms</td>
+              <td>3.51x</td>
+              <td>19 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>2.04 s</td>
+              <td>520.7 ms</td>
+              <td>3.91x</td>
+              <td>19.1 MiB</td>
+              <td>1.11x</td>
+              <td>final_particle_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>VBD Cloth Patch</td>
+              <td><code>vbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>6.24 s</td>
+              <td>2.67 s</td>
+              <td>2.33x</td>
+              <td>16.5 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>24.78 s</td>
+              <td>2.67 s</td>
+              <td>9.27x</td>
+              <td>16.5 MiB</td>
+              <td>3.97x</td>
+              <td>particle_q (0)</td>
+            </tr>
+
+            <tr>
+              <td>VBD Soft Body</td>
+              <td><code>vbd</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>7.68 s</td>
+              <td>4.06 s</td>
+              <td>1.89x</td>
+              <td>16.5 MiB</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>26.04 s</td>
+              <td>4.04 s</td>
+              <td>6.44x</td>
+              <td>16.5 MiB</td>
+              <td>3.39x</td>
+              <td>particle_q (0)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Warp Lowering Micro-Probes</h2>
+      <p class="lead">
+        These rows are the focused Warp atomic/adjoint workloads rerun with
+        <code>wp.config.deterministic = "run_to_run"</code>. They are separate from the Newton solver matrix.
+      </p>
+      <div class="table-wrap">
+        <table>
           <thead>
             <tr>
               <th>Probe</th>
-              <th>Target</th>
-              <th>Status</th>
-              <th>Hashes</th>
-              <th>Max diff</th>
-              <th>Time</th>
+              <th>ID</th>
+              <th>Before verdict</th>
+              <th>Before hashes</th>
+              <th>Before det step</th>
+              <th>Before det/plain</th>
+              <th>Latest verdict</th>
+              <th>Latest hashes</th>
+              <th>Latest det step</th>
+              <th>Latest det/plain</th>
+              <th>Latest/before step</th>
             </tr>
           </thead>
-          <tbody>${rows}</tbody>
+          <tbody>
+
+            <tr>
+              <td>Warp Indexed Counter</td>
+              <td><code>warp_counter_indexed</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>7.5 ms</td>
+              <td>12.68x</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>7.5 ms</td>
+              <td>12.42x</td>
+              <td>1x</td>
+            </tr>
+
+            <tr>
+              <td>Warp Static Counter Index</td>
+              <td><code>warp_counter_static_index</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>7.5 ms</td>
+              <td>12.34x</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>7.4 ms</td>
+              <td>12.45x</td>
+              <td>0.99x</td>
+            </tr>
+
+            <tr>
+              <td>Warp Sliced Counter</td>
+              <td><code>warp_counter_sliced</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>7.5 ms</td>
+              <td>12.38x</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>7.5 ms</td>
+              <td>12.65x</td>
+              <td>1x</td>
+            </tr>
+
+            <tr>
+              <td>Warp Custom Adjoint</td>
+              <td><code>warp_custom_adjoint</code></td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>225.0 ms</td>
+              <td>36.46x</td>
+              <td><span class="pill ok">bit exact</span></td>
+              <td>1</td>
+              <td>63.0 ms</td>
+              <td>10.23x</td>
+              <td>0.28x</td>
+            </tr>
+          </tbody>
         </table>
-      `;
-    }
+      </div>
+    </section>
 
-    function renderScope() {
-      const scopeItems = [
-        "The result covers repeated runs on the same machine, driver, GPU, and Newton/Warp build.",
-        "State hashes determine pass/fail. Videos are included to make the scenario behavior easy to inspect.",
-        "Warp probes exercise focused runtime behavior and are not counted as solver scenarios.",
-      ];
-      document.getElementById("scope-list").innerHTML = scopeItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
-    }
+    <section>
+      <h2>Reused Scenario Videos</h2>
+      <div class="scenario-grid">
 
-    async function init() {
-      try {
-        const response = await fetch("determinism_report.json", { cache: "no-cache" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const report = await response.json();
-        const indexes = buildIndexes(report);
-        renderSummary(report, indexes);
-        renderRunConfig(report);
-        renderResultBanner(report, indexes);
-        renderMatrix(report, indexes);
-        renderProtocol(report);
-        renderScenarioDetails(report, indexes);
-        renderWarpProbes(report, indexes);
-        renderScope(report);
-      } catch (error) {
-        document.querySelector("main").innerHTML = `
-          <div class="load-error">
-            Could not load determinism_report.json: ${escapeHtml(error.message)}
-          </div>
-        `;
-      }
-    }
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/falling_cube_xpbd_poster.png">
+              <source src="assets/falling_cube_xpbd.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">falling_cube</p>
+                <h3>Falling Cube</h3>
+                <p>Closest latest/before step ratio: <code>mujoco</code> 1.01x.</p>
+              </div>
+            </article>
 
-    init();
-  </script>
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/box_stack_xpbd_poster.png">
+              <source src="assets/box_stack_xpbd.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">box_stack</p>
+                <h3>Box Stack</h3>
+                <p>Closest latest/before step ratio: <code>mujoco</code> 1.01x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/domino_chain_xpbd_poster.png">
+              <source src="assets/domino_chain_xpbd.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">domino_chain</p>
+                <h3>Domino Chain</h3>
+                <p>Closest latest/before step ratio: <code>mujoco</code> 1.01x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/arm_7dof_featherstone_poster.png">
+              <source src="assets/arm_7dof_featherstone.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">arm_7dof</p>
+                <h3>7-DOF Arm</h3>
+                <p>Closest latest/before step ratio: <code>mujoco</code> 1.09x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/humanoid_featherstone_poster.png">
+              <source src="assets/humanoid_featherstone.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">humanoid</p>
+                <h3>Humanoid Standing</h3>
+                <p>Closest latest/before step ratio: <code>featherstone</code> 1.02x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_ball_semi_implicit_poster.png">
+              <source src="assets/diffsim_ball_semi_implicit.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">diffsim_ball</p>
+                <h3>Diffsim Ball</h3>
+                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.07x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_bear_semi_implicit_poster.png">
+              <source src="assets/diffsim_bear_semi_implicit.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">diffsim_bear</p>
+                <h3>Diffsim Bear</h3>
+                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.21x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_cloth_com_semi_implicit_poster.png">
+              <source src="assets/diffsim_cloth_com_semi_implicit.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">diffsim_cloth_com</p>
+                <h3>Diffsim Cloth COM</h3>
+                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.3x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_soft_body_semi_implicit_poster.png">
+              <source src="assets/diffsim_soft_body_semi_implicit.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">diffsim_soft_body</p>
+                <h3>Diffsim Soft Body</h3>
+                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.11x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_spring_cage_semi_implicit_poster.png">
+              <source src="assets/diffsim_spring_cage_semi_implicit.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">diffsim_spring_cage</p>
+                <h3>Diffsim Spring Cage</h3>
+                <p>Closest latest/before step ratio: <code>semi_implicit</code> 1.11x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/vbd_cloth_patch_vbd_poster.png">
+              <source src="assets/vbd_cloth_patch_vbd.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">vbd_cloth_patch</p>
+                <h3>VBD Cloth Patch</h3>
+                <p>Closest latest/before step ratio: <code>vbd</code> 3.97x.</p>
+              </div>
+            </article>
+
+            <article class="scenario-card">
+              <div class="media">
+            <video controls muted loop playsinline preload="metadata" poster="assets/vbd_soft_body_vbd_poster.png">
+              <source src="assets/vbd_soft_body_vbd.mp4" type="video/mp4">
+            </video></div>
+              <div class="scenario-copy">
+                <p class="eyebrow">vbd_soft_body</p>
+                <h3>VBD Soft Body</h3>
+                <p>Closest latest/before step ratio: <code>vbd</code> 3.39x.</p>
+              </div>
+            </article>
+      </div>
+    </section>
+  </main>
+  <footer>
+    Generated 2026-06-13 01:29:09 UTC. Raw combined data: <code>determinism_report.json</code>.
+  </footer>
 </body>
 </html>
