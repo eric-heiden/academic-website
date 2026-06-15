@@ -9,60 +9,54 @@
   <style>
     :root {
       color-scheme: light;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #d9e1ec;
-      --paper: #f4f7fb;
+      --ink: #162033;
+      --muted: #5d697c;
+      --paper: #f5f7fb;
       --panel: #ffffff;
-      --teal: #0f766e;
+      --line: #d9e2ef;
       --blue: #2563eb;
-      --amber: #d97706;
+      --teal: #0f766e;
       --coral: #e45757;
+      --amber: #d97706;
       --green: #15803d;
       --violet: #7c3aed;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-        linear-gradient(180deg, #eef5fb 0, #f4f7fb 260px, #f8fafc 100%);
+        linear-gradient(180deg, #edf5fb 0, #f7fafc 320px, #fbfdff 100%);
       color: var(--ink);
     }
 
-    a {
-      color: var(--blue);
-    }
-
     main {
-      width: min(1180px, calc(100% - 36px));
+      width: min(1120px, calc(100% - 34px));
       margin: 0 auto;
-      padding: 36px 0 64px;
+      padding: 32px 0 64px;
     }
 
     header {
       display: grid;
-      grid-template-columns: 1.35fr 0.65fr;
-      gap: 28px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+      gap: 24px;
       align-items: end;
-      padding: 24px 0 20px;
+      padding: 18px 0 18px;
     }
 
     h1 {
       margin: 0 0 10px;
-      font-size: clamp(2rem, 4.5vw, 3.25rem);
-      line-height: 1.02;
+      font-size: clamp(2rem, 4vw, 2.85rem);
+      line-height: 1.06;
       letter-spacing: 0;
     }
 
     h2 {
-      margin: 0 0 14px;
-      font-size: 1.28rem;
-      line-height: 1.2;
+      margin: 0 0 12px;
+      font-size: 1.22rem;
+      line-height: 1.25;
       letter-spacing: 0;
     }
 
@@ -75,37 +69,34 @@
     p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.58;
+    }
+
+    a { color: var(--blue); }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #eef2ff;
+      color: #2f3a8f;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 0;
+      padding: 14px;
+      border-radius: 8px;
+      background: #111827;
+      color: #e5e7eb;
+      font-size: 0.88rem;
+      line-height: 1.5;
     }
 
     .lede {
-      max-width: 760px;
-      font-size: 1.05rem;
-    }
-
-    .stamp {
-      justify-self: end;
-      width: min(100%, 330px);
-      padding: 18px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.82);
-      box-shadow: 0 10px 34px rgba(23, 32, 51, 0.08);
-    }
-
-    .stamp strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 0.86rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .stamp span {
-      display: block;
-      font-size: 1rem;
-      line-height: 1.4;
+      max-width: 770px;
+      font-size: 1.03rem;
     }
 
     .chips {
@@ -124,79 +115,80 @@
       border-radius: 999px;
       background: #ffffff;
       color: #234173;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       text-decoration: none;
     }
 
-    .grid {
-      display: grid;
-      gap: 18px;
-    }
-
-    .two {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .three {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
+    .stamp,
     .panel {
-      padding: 18px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
-      box-shadow: 0 8px 22px rgba(23, 32, 51, 0.05);
+      box-shadow: 0 8px 22px rgba(22, 32, 51, 0.05);
     }
 
-    .metric {
-      border-top: 4px solid var(--teal);
+    .stamp {
+      padding: 17px;
     }
 
-    .metric:nth-child(2) {
-      border-top-color: var(--amber);
-    }
-
-    .metric:nth-child(3) {
-      border-top-color: var(--coral);
-    }
-
+    .stamp strong,
     .metric .label {
+      display: block;
       color: var(--muted);
-      font-size: 0.82rem;
+      font-size: 0.8rem;
+      font-weight: 680;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
 
+    .stamp span {
+      display: block;
+      margin-top: 5px;
+      font-size: 0.98rem;
+      line-height: 1.4;
+    }
+
+    section { margin-top: 26px; }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .panel { padding: 17px; }
+
+    .metric { border-top: 4px solid var(--teal); }
+    .metric:nth-child(2) { border-top-color: var(--blue); }
+    .metric:nth-child(3) { border-top-color: var(--amber); }
+
     .metric .value {
       margin-top: 8px;
-      font-size: 1.55rem;
-      font-weight: 730;
+      font-size: 1.46rem;
+      font-weight: 740;
       line-height: 1.05;
     }
 
     .metric .note {
       margin-top: 8px;
-      font-size: 0.92rem;
+      font-size: 0.9rem;
     }
 
-    section {
-      margin-top: 28px;
+    .ok {
+      border-left: 5px solid var(--green);
+      background: #effaf3;
+    }
+
+    .warn {
+      border-left: 5px solid var(--amber);
+      background: #fff8e6;
     }
 
     .chart {
       width: 100%;
-      height: 360px;
-    }
-
-    .video-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-    }
-
-    figure {
-      margin: 0;
+      height: 350px;
     }
 
     video {
@@ -210,14 +202,16 @@
     figcaption {
       margin-top: 9px;
       color: var(--muted);
-      font-size: 0.94rem;
+      font-size: 0.93rem;
       line-height: 1.45;
     }
+
+    figure { margin: 0; }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.95rem;
+      font-size: 0.94rem;
     }
 
     th,
@@ -230,63 +224,19 @@
 
     th {
       color: var(--muted);
-      font-weight: 650;
+      font-weight: 660;
     }
 
-    code {
-      padding: 2px 5px;
-      border-radius: 5px;
-      background: #eef2ff;
-      color: #2f3a8f;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.9em;
-    }
-
-    pre {
-      overflow-x: auto;
-      margin: 0;
-      padding: 14px;
-      border-radius: 8px;
-      background: #111827;
-      color: #e5e7eb;
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-
-    .callout {
-      border-left: 5px solid var(--amber);
-      background: #fff8e6;
-    }
-
-    .ok {
-      border-left: 5px solid var(--green);
-      background: #effaf3;
-    }
-
-    .warn {
-      border-left: 5px solid var(--coral);
-      background: #fff1f1;
-    }
-
-    .muted {
-      color: var(--muted);
-    }
+    .muted { color: var(--muted); }
 
     @media (max-width: 860px) {
       header,
       .two,
-      .three,
-      .video-grid {
+      .three {
         grid-template-columns: 1fr;
       }
 
-      .stamp {
-        justify-self: stretch;
-      }
-
-      .chart {
-        height: 320px;
-      }
+      .chart { height: 315px; }
     }
   </style>
 </head>
@@ -296,14 +246,15 @@
       <div>
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
-          A first Newton bridge for differentiable MuJoCo Warp stepping, using the MJWarp differentiability PR as the backend for
-          <code>SolverMuJoCo</code> and a DiffRL-style short-horizon actor update.
+          Cartpole-focused rerun of Newton's differentiable MuJoCo Warp bridge. This update fixes the cartpole model orientation,
+          removes rollout overlays, and switches the harness from an actor-only short-horizon test to a closer SHAC-style
+          actor/critic loop.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
           <a class="chip" href="https://github.com/NVlabs/DiffRL">NVlabs/DiffRL</a>
           <span class="chip">Newton branch: <code>shac</code></span>
-          <span class="chip">CUDA MJWarp backend</span>
+          <span class="chip">Raw <code>ViewerGL.get_frame()</code> video</span>
         </div>
       </div>
       <aside class="stamp">
@@ -314,81 +265,70 @@
 
     <section class="grid three" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Cartpole best reward</div>
-        <div class="value" id="cartpole-best">...</div>
-        <p class="note">Short-horizon training reward, selected checkpoint.</p>
+        <div class="label">240-step return</div>
+        <div class="value" id="eval-return">...</div>
+        <p class="note">Deterministic rollout from the hanging initial state.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Ant best reward</div>
-        <div class="value" id="ant-best">...</div>
-        <p class="note">Contacts and backward pass ran, but the long rollout is unstable.</p>
-      </div>
-      <div class="panel metric">
-        <div class="label">Mean simulation FPS</div>
+        <div class="label">Mean training FPS</div>
         <div class="value" id="mean-fps">...</div>
-        <p class="note">Average training throughput across both experiments.</p>
+        <p class="note">64 envs, 32 differentiable steps per epoch.</p>
+      </div>
+      <div class="panel metric">
+        <div class="label">Peak CUDA memory</div>
+        <div class="value" id="memory">...</div>
+        <p class="note">PyTorch-reported allocation during training.</p>
       </div>
     </section>
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>What Worked</h2>
+        <h2>Dynamics Fix</h2>
         <p>
-          The MJWarp PR exposes gradient-enabled data fields that can be enabled from Newton. Cartpole produces nonzero actor
-          gradients and improves from the down equilibrium to a swing-up behavior over 100 differentiable policy updates.
+          The first cartpole run loaded the DiffRL URDF directly into a Y-up Newton model. DiffRL actually applies a
+          <code>-pi/2</code> rotation about X before setting the pole joint to <code>-pi</code>. Without that transform, gravity and
+          the pole axis were mismatched, producing the sideways-looking behavior. The Newton harness now applies the same transform.
         </p>
       </article>
       <article class="panel warn">
-        <h2>What Did Not Yet Work</h2>
+        <h2>Training Fix</h2>
         <p>
-          Ant contact dynamics are differentiable enough to run backward and improve the first few short-horizon updates, but this
-          actor-only bridge is not stable over a longer 3 second rollout. A full SHAC critic, better reset handling, and contact-aware
-          constraints are the next required pieces.
+          The earlier harness reset every epoch and optimized only a truncated actor objective. The rerun keeps persistent 240-step
+          episodes, samples the stochastic actor during training, normalizes observations, and trains a TD-lambda critic target like
+          DiffRL SHAC. The policy now swings up and finishes upright near the rail center.
         </p>
       </article>
     </section>
 
     <section class="grid two">
       <div class="panel">
-        <h2>Cartpole Training</h2>
-        <div id="cartpole-chart" class="chart"></div>
+        <h2>Training Reward</h2>
+        <div id="reward-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Ant Training</h2>
-        <div id="ant-chart" class="chart"></div>
+        <h2>Selection Rollout</h2>
+        <div id="selection-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Gradient Norms</h2>
-        <div id="grad-chart" class="chart"></div>
+        <h2>Losses</h2>
+        <div id="loss-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Throughput</h2>
-        <div id="fps-chart" class="chart"></div>
+        <h2>Throughput and Gradients</h2>
+        <div id="perf-chart" class="chart"></div>
       </div>
     </section>
 
-    <section>
-      <h2>Rollout Media</h2>
-      <div class="video-grid">
-        <figure>
-          <video controls preload="metadata" poster="assets/cartpole_poster.png">
-            <source src="assets/cartpole_rollout.mp4" type="video/mp4">
-          </video>
-          <figcaption>
-            Cartpole selected checkpoint, rendered from <code>ViewerGL.get_frame()</code> frames with a state overlay for the cart,
-            pole, and tip trace.
-          </figcaption>
-        </figure>
-        <figure>
-          <video controls preload="metadata" poster="assets/ant_poster.png">
-            <source src="assets/ant_rollout.mp4" type="video/mp4">
-          </video>
-          <figcaption>
-            Ant selected checkpoint, shown as a top-down body/path overlay on <code>ViewerGL.get_frame()</code> frames. The gait is
-            not stable over the full rollout.
-          </figcaption>
-        </figure>
-      </div>
+    <section class="panel">
+      <h2>Final Rollout</h2>
+      <figure>
+        <video controls preload="metadata" poster="assets/cartpole_poster.png">
+          <source src="assets/cartpole_rollout.mp4" type="video/mp4">
+        </video>
+        <figcaption>
+          Pure frames returned by <code>ViewerGL.get_frame()</code>. No state labels, traces, or composited overlays are applied.
+        </figcaption>
+      </figure>
     </section>
 
     <section class="panel">
@@ -403,7 +343,7 @@
             <th>Runtime</th>
             <th>Mean FPS</th>
             <th>Peak CUDA memory</th>
-            <th>Long rollout return</th>
+            <th>Final observation</th>
           </tr>
         </thead>
         <tbody id="perf-body"></tbody>
@@ -414,18 +354,16 @@
       <article class="panel">
         <h2>Implementation Notes</h2>
         <p>
-          Newton's <code>SolverMuJoCo</code> now has opt-in <code>requires_grad</code> support and public
-          <code>enable_grad()</code>/<code>disable_grad()</code> helpers. The report harness wraps one Newton/MJWarp step in a
-          custom PyTorch autograd function: forward runs Newton normally, backward replays the same step under a Warp tape and returns
-          the MJWarp adjoints to PyTorch.
+          Newton's <code>SolverMuJoCo</code> uses the MJWarp differentiability branch with opt-in gradient-enabled data fields.
+          The harness wraps one Newton/MJWarp step in a PyTorch autograd function: forward runs the solver normally, backward
+          replays the step under a Warp tape and returns MJWarp adjoints to PyTorch.
         </p>
       </article>
-      <article class="panel callout">
-        <h2>Scope</h2>
+      <article class="panel">
+        <h2>Status</h2>
         <p>
-          This is not yet the complete DiffRL SHAC trainer. It uses the DiffRL deterministic actor model and a short-horizon
-          differentiable objective to test whether the MJWarp differentiability branch can train through Newton. The critic update and
-          replay buffer from full SHAC are intentionally left for the next pass.
+          Cartpole is now physically plausible and trains to an upright stabilizing policy. Ant remains deferred for the next pass;
+          it needs the same full SHAC treatment plus contact-specific validation before its published numbers should be trusted.
         </p>
       </article>
     </section>
@@ -433,33 +371,33 @@
     <section class="panel">
       <h2>Reproduction</h2>
       <pre><code>uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
-  --with imageio --with imageio-ffmpeg --with pillow \
+  --with imageio --with imageio-ffmpeg \
   python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
-  --env cartpole --num-envs 64 --epochs 100 --horizon 48 --eval-horizon 240 \
-  --force-scale 750 --reset-noise 0.35 --lr 0.003 --grad-clip 25 \
-  --render-video --video-num-envs 1
-
-uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
-  --with imageio --with imageio-ffmpeg --with pillow \
-  python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
-  --env ant --num-envs 8 --epochs 25 --horizon 12 --eval-horizon 180 \
-  --force-scale 80 --reset-noise 0.0 --lr 0.0005 --grad-clip 10 \
-  --render-video --video-num-envs 1</code></pre>
+  --env cartpole --num-envs 64 --epochs 200 --horizon 32 \
+  --eval-horizon 240 --selection-horizon 240 --episode-length 240 \
+  --force-scale 1000 --stochastic-init --stochastic-actor \
+  --use-critic --obs-rms --critic-method td-lambda --td-lambda 0.95 \
+  --lr 0.01 --critic-lr 0.001 --lr-schedule linear \
+  --adam-beta1 0.7 --adam-beta2 0.95 --grad-clip 1 \
+  --critic-iterations 16 --critic-batch-size 512 \
+  --target-critic-alpha 0.2 --render-video --video-num-envs 1</code></pre>
     </section>
   </main>
 
   <script>
     const colors = {
-      cartpole: "#2563eb",
-      ant: "#e45757",
-      gradCart: "#0f766e",
-      gradAnt: "#d97706",
-      fpsCart: "#7c3aed",
-      fpsAnt: "#15803d"
+      reward: "#2563eb",
+      final: "#0f766e",
+      selection: "#e45757",
+      loss: "#7c3aed",
+      value: "#d97706",
+      fps: "#15803d",
+      grad: "#e45757"
     };
 
     const plotConfig = {
       responsive: true,
+      displayModeBar: false,
       displaylogo: false,
       modeBarButtonsToRemove: ["lasso2d", "select2d"]
     };
@@ -468,11 +406,10 @@ uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
       margin: { t: 18, r: 18, b: 46, l: 58 },
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "#fbfdff",
-      font: { family: "Inter, system-ui, sans-serif", color: "#172033" },
+      font: { family: "Inter, system-ui, sans-serif", color: "#162033" },
       xaxis: { title: "Epoch", gridcolor: "#e7edf5", zeroline: false },
       yaxis: { gridcolor: "#e7edf5", zeroline: false },
       hovermode: "x unified",
-      showlegend: true,
       legend: { orientation: "h", y: -0.22 }
     };
 
@@ -484,102 +421,98 @@ uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
       });
     }
 
-    function envLabel(name) {
-      return name === "cartpole" ? "Cartpole" : "Ant";
-    }
-
-    function rewardTrace(result, color) {
-      return {
-        type: "scatter",
-        mode: "lines+markers",
-        name: "Mean reward",
-        x: result.history.map((row) => row.epoch),
-        y: result.history.map((row) => row.mean_reward),
-        line: { color, width: 3 },
-        marker: { size: 5, color }
-      };
-    }
-
-    function bestMarker(result, color) {
-      const bestEpoch = result.best_epoch || result.history.reduce((best, row) => (
-        row.mean_reward > best.mean_reward ? row : best
-      ), result.history[0]).epoch;
-      const row = result.history.find((entry) => entry.epoch === bestEpoch) || result.history[0];
-      return {
-        type: "scatter",
-        mode: "markers",
-        name: "Selected checkpoint",
-        x: [row.epoch],
-        y: [row.mean_reward],
-        marker: { size: 12, color: "#ffffff", line: { color, width: 3 } }
-      };
-    }
-
-    function renderEnvChart(id, result, color) {
-      const layout = {
-        ...baseLayout,
-        yaxis: { ...baseLayout.yaxis, title: "Mean reward" }
-      };
-      Plotly.newPlot(id, [rewardTrace(result, color), bestMarker(result, color)], layout, plotConfig);
-    }
-
-    function lineTrace(result, key, name, color) {
+    function line(result, key, name, color, axis = "y") {
       return {
         type: "scatter",
         mode: "lines",
         name,
         x: result.history.map((row) => row.epoch),
         y: result.history.map((row) => row[key]),
+        yaxis: axis,
         line: { color, width: 3 }
       };
     }
 
+    function selectedMarker(result, key, color) {
+      const row = result.history.find((entry) => entry.epoch === result.best_epoch) || result.history[0];
+      return {
+        type: "scatter",
+        mode: "markers",
+        name: "Selected checkpoint",
+        x: [row.epoch],
+        y: [row[key]],
+        marker: { size: 12, color: "#ffffff", line: { color, width: 3 } }
+      };
+    }
+
+    function pacificStamp(value) {
+      return new Date(value).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "long",
+        timeZone: "America/Los_Angeles"
+      });
+    }
+
     async function load() {
-      const [cartpole, ant] = await Promise.all([
-        fetch("assets/cartpole_results.json").then((res) => res.json()),
-        fetch("assets/ant_results.json").then((res) => res.json())
-      ]);
+      const result = await fetch("assets/cartpole_results.json").then((res) => res.json());
+      const finalObs = result.eval.final_obs_mean;
 
-      document.getElementById("report-stamp").textContent =
-        `Cartpole ${cartpole.timestamp_pacific}; Ant ${ant.timestamp_pacific}`;
-      document.getElementById("cartpole-best").textContent = fmt(cartpole.best_train_reward, 2);
-      document.getElementById("ant-best").textContent = fmt(ant.best_train_reward, 2);
-      document.getElementById("mean-fps").textContent = fmt((cartpole.mean_fps + ant.mean_fps) / 2, 0);
+      document.getElementById("report-stamp").textContent = pacificStamp(result.timestamp_pacific);
+      document.getElementById("eval-return").textContent = fmt(result.eval.return, 1);
+      document.getElementById("mean-fps").textContent = fmt(result.mean_fps, 0);
+      document.getElementById("memory").textContent = `${fmt(result.max_cuda_memory_allocated_mb, 1)} MB`;
 
-      renderEnvChart("cartpole-chart", cartpole, colors.cartpole);
-      renderEnvChart("ant-chart", ant, colors.ant);
-
-      Plotly.newPlot("grad-chart", [
-        lineTrace(cartpole, "grad_norm", "Cartpole", colors.gradCart),
-        lineTrace(ant, "grad_norm", "Ant", colors.gradAnt)
+      Plotly.newPlot("reward-chart", [
+        line(result, "mean_reward", "Mean step reward", colors.reward),
+        line(result, "final_step_reward", "Final step reward", colors.final),
+        selectedMarker(result, "mean_reward", colors.reward)
       ], {
         ...baseLayout,
-        yaxis: { ...baseLayout.yaxis, title: "Gradient norm", type: "log" }
+        yaxis: { ...baseLayout.yaxis, title: "Reward" }
       }, plotConfig);
 
-      Plotly.newPlot("fps-chart", [
-        lineTrace(cartpole, "fps", "Cartpole", colors.fpsCart),
-        lineTrace(ant, "fps", "Ant", colors.fpsAnt)
+      Plotly.newPlot("selection-chart", [
+        line(result, "selection_return", "240-step return", colors.selection),
+        selectedMarker(result, "selection_return", colors.selection)
       ], {
         ...baseLayout,
-        yaxis: { ...baseLayout.yaxis, title: "Steps per second", type: "log" }
+        yaxis: { ...baseLayout.yaxis, title: "Return" }
       }, plotConfig);
 
-      const rows = [cartpole, ant].map((result) => {
-        const peak = `${fmt(result.max_cuda_memory_allocated_mb, 1)} MB allocated / ${fmt(result.max_cuda_memory_reserved_mb, 1)} MB reserved`;
-        const bestReward = result.best_train_reward ?? Math.max(...result.history.map((row) => row.mean_reward));
-        return `<tr>
-          <td>${envLabel(result.env)}<br><span class="muted">best reward ${fmt(bestReward, 2)}</span></td>
-          <td>${result.num_envs} envs</td>
-          <td>${result.epochs} x ${result.horizon}</td>
-          <td>${result.best_epoch || "n/a"}</td>
-          <td>${fmt(result.total_seconds, 2)} s</td>
-          <td>${fmt(result.mean_fps, 0)}</td>
-          <td>${peak}</td>
-          <td>${fmt(result.eval.return, 2)}<br><span class="muted">mean ${fmt(result.eval.mean_reward, 2)}</span></td>
-        </tr>`;
-      }).join("");
-      document.getElementById("perf-body").innerHTML = rows;
+      Plotly.newPlot("loss-chart", [
+        line(result, "loss", "Actor loss", colors.loss),
+        line(result, "value_loss", "Critic loss", colors.value)
+      ], {
+        ...baseLayout,
+        yaxis: { ...baseLayout.yaxis, title: "Loss", type: "log" }
+      }, plotConfig);
+
+      Plotly.newPlot("perf-chart", [
+        line(result, "fps", "FPS", colors.fps),
+        line(result, "grad_norm", "Grad norm", colors.grad, "y2")
+      ], {
+        ...baseLayout,
+        yaxis: { ...baseLayout.yaxis, title: "FPS" },
+        yaxis2: {
+          title: "Grad norm",
+          overlaying: "y",
+          side: "right",
+          gridcolor: "rgba(0,0,0,0)",
+          zeroline: false
+        }
+      }, plotConfig);
+
+      document.getElementById("perf-body").innerHTML = `<tr>
+        <td>Cartpole<br><span class="muted">stochastic actor, TD-lambda critic</span></td>
+        <td>${result.num_envs} envs</td>
+        <td>${result.epochs} x ${result.horizon}</td>
+        <td>${result.best_epoch}</td>
+        <td>${fmt(result.total_seconds, 2)} s<br><span class="muted">${fmt(result.mean_epoch_seconds, 3)} s/epoch</span></td>
+        <td>${fmt(result.mean_fps, 0)}</td>
+        <td>${fmt(result.max_cuda_memory_allocated_mb, 1)} MB allocated<br><span class="muted">${fmt(result.max_cuda_memory_reserved_mb, 1)} MB reserved</span></td>
+        <td>x ${fmt(finalObs[0], 3)}, xdot ${fmt(finalObs[1], 3)}<br>
+          sin ${fmt(finalObs[2], 3)}, cos ${fmt(finalObs[3], 3)}, theta dot ${fmt(finalObs[4], 3)}</td>
+      </tr>`;
     }
 
     load().catch((error) => {

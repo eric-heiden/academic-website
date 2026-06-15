@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -26,12 +27,23 @@ import newton
 import newton.examples
 from newton.solvers import SolverMuJoCo
 
-from models.actor import ActorDeterministicMLP
+from models.actor import ActorDeterministicMLP, ActorStochasticMLP
+from models.critic import CriticMLP
+from utils.running_mean_std import RunningMeanStd
 
 
 @dataclass
 class StepContext:
     env: "NewtonMuJoCoTorchEnv"
+
+
+@dataclass
+class CartpoleRewardWeights:
+    pole_angle: float = 1.0
+    pole_velocity: float = 0.1
+    cart_position: float = 0.05
+    cart_velocity: float = 0.1
+    action: float = 0.0
 
 
 class NewtonMuJoCoStep(torch.autograd.Function):
@@ -104,6 +116,7 @@ class NewtonMuJoCoTorchEnv:
         dt: float,
         force_scale: float,
         use_contacts: bool,
+        cartpole_reward: CartpoleRewardWeights | None = None,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -112,6 +125,7 @@ class NewtonMuJoCoTorchEnv:
         self.dt = dt
         self.force_scale = force_scale
         self.use_contacts = use_contacts
+        self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
 
         if env_name == "cartpole":
             self._build_cartpole()
@@ -152,7 +166,15 @@ class NewtonMuJoCoTorchEnv:
         source = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(source)
         source.default_joint_cfg.armature = 0.1
-        source.add_urdf(str(DIFFRL_ROOT / "envs" / "assets" / "cartpole.urdf"), floating=False, up_axis="Y")
+        source.add_urdf(
+            str(DIFFRL_ROOT / "envs" / "assets" / "cartpole.urdf"),
+            floating=False,
+            up_axis="Y",
+            xform=wp.transform(
+                wp.vec3(0.0, 0.0, 0.0),
+                wp.quat_from_axis_angle(wp.vec3(1.0, 0.0, 0.0), -0.5 * math.pi),
+            ),
+        )
         source.joint_q[-1] = -math.pi
 
         builder = newton.ModelBuilder(up_axis="Y")
@@ -229,13 +251,43 @@ class NewtonMuJoCoTorchEnv:
     def step(self, q: torch.Tensor, qd: torch.Tensor, joint_f: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return NewtonMuJoCoStep.apply(q, qd, joint_f, self.step_ctx)
 
-    def reset(self, noise: float = 0.0) -> tuple[torch.Tensor, torch.Tensor]:
+    def reset(self, noise: float = 0.0, stochastic_init: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
         q = self.start_q.clone()
         qd = self.start_qd.clone()
-        if noise > 0.0:
+        if stochastic_init:
+            q = q + math.pi * (torch.rand_like(q) - 0.5)
+            qd = qd + 0.5 * (torch.rand_like(qd) - 0.5)
+        elif noise > 0.0:
             q = q + noise * torch.randn_like(q)
             qd = qd + 0.25 * noise * torch.randn_like(qd)
         return q, qd
+
+    def reset_done(
+        self,
+        q: torch.Tensor,
+        qd: torch.Tensor,
+        env_ids: torch.Tensor,
+        *,
+        stochastic_init: bool,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if env_ids.numel() == 0:
+            return q, qd
+        reset_q = self.start_q[env_ids].clone()
+        reset_qd = self.start_qd[env_ids].clone()
+        if stochastic_init:
+            reset_q = reset_q + math.pi * (torch.rand_like(reset_q) - 0.5)
+            reset_qd = reset_qd + 0.5 * (torch.rand_like(reset_qd) - 0.5)
+
+        mask_q = torch.zeros((self.num_envs, 1), dtype=torch.bool, device=self.torch_device)
+        mask_q[env_ids] = True
+        mask_qd = mask_q
+        q_next = torch.where(mask_q, self.start_q, q)
+        qd_next = torch.where(mask_qd, self.start_qd, qd)
+        q_next = q_next.clone()
+        qd_next = qd_next.clone()
+        q_next[env_ids] = reset_q
+        qd_next[env_ids] = reset_qd
+        return q_next, qd_next
 
     def observe(self, q: torch.Tensor, qd: torch.Tensor) -> torch.Tensor:
         if self.env_name == "cartpole":
@@ -266,12 +318,13 @@ class NewtonMuJoCoTorchEnv:
             theta = torch.atan2(torch.sin(q[:, 1]), torch.cos(q[:, 1]))
             xdot = qd[:, 0]
             theta_dot = qd[:, 1]
+            weights = self.cartpole_reward
             return -(
-                theta.square()
-                + 0.1 * theta_dot.square()
-                + 0.05 * x.square()
-                + 0.1 * xdot.square()
-                + 0.001 * action[:, 0].square()
+                weights.pole_angle * theta.square()
+                + weights.pole_velocity * theta_dot.square()
+                + weights.cart_position * x.square()
+                + weights.cart_velocity * xdot.square()
+                + weights.action * action[:, 0].square()
             )
 
         forward = qd[:, 0]
@@ -289,16 +342,75 @@ class NewtonMuJoCoTorchEnv:
         return state
 
 
-def make_actor(env: NewtonMuJoCoTorchEnv) -> torch.nn.Module:
+def make_actor(env: NewtonMuJoCoTorchEnv, stochastic: bool = False) -> torch.nn.Module:
     cfg = {
         "actor_mlp": {"units": [64, 64], "activation": "elu"},
+        "actor_logstd_init": -1.0,
     }
-    actor = ActorDeterministicMLP(env.num_obs, env.num_actions, cfg, device=str(env.torch_device))
-    final = actor.actor[-1]
-    if isinstance(final, torch.nn.Linear):
-        torch.nn.init.zeros_(final.weight)
-        torch.nn.init.zeros_(final.bias)
+    if stochastic:
+        actor = ActorStochasticMLP(env.num_obs, env.num_actions, cfg, device=str(env.torch_device))
+    else:
+        actor = ActorDeterministicMLP(env.num_obs, env.num_actions, cfg, device=str(env.torch_device))
+        final = actor.actor[-1]
+        if isinstance(final, torch.nn.Linear):
+            torch.nn.init.zeros_(final.weight)
+            torch.nn.init.zeros_(final.bias)
     return actor
+
+
+def make_critic(env: NewtonMuJoCoTorchEnv) -> torch.nn.Module:
+    cfg = {
+        "critic_mlp": {"units": [64, 64], "activation": "elu"},
+    }
+    return CriticMLP(env.num_obs, cfg, device=str(env.torch_device))
+
+
+def obs_rms_snapshot(obs_rms: RunningMeanStd | None) -> tuple[torch.Tensor, torch.Tensor] | None:
+    if obs_rms is None:
+        return None
+    return obs_rms.mean.clone(), obs_rms.var.clone()
+
+
+def normalize_obs(obs: torch.Tensor, stats: tuple[torch.Tensor, torch.Tensor] | RunningMeanStd | None) -> torch.Tensor:
+    if stats is None:
+        return obs
+    if isinstance(stats, RunningMeanStd):
+        return stats.normalize(obs)
+    mean, var = stats
+    return (obs - mean) / torch.sqrt(var + 1.0e-5)
+
+
+@torch.no_grad()
+def compute_critic_targets(
+    rewards: torch.Tensor,
+    done_mask: torch.Tensor,
+    next_values: torch.Tensor,
+    *,
+    gamma: float,
+    critic_method: str,
+    td_lambda: float,
+) -> torch.Tensor:
+    if critic_method == "one-step":
+        return rewards + gamma * next_values
+    if critic_method != "td-lambda":
+        raise ValueError(f"unknown critic method: {critic_method}")
+
+    steps_num, num_envs = rewards.shape
+    targets = torch.zeros_like(rewards)
+    ai = torch.zeros(num_envs, dtype=torch.float32, device=rewards.device)
+    bi = torch.zeros(num_envs, dtype=torch.float32, device=rewards.device)
+    lam = torch.ones(num_envs, dtype=torch.float32, device=rewards.device)
+    for step in reversed(range(steps_num)):
+        done = done_mask[step]
+        lam = lam * td_lambda * (1.0 - done) + done
+        ai = (1.0 - done) * (
+            td_lambda * gamma * ai
+            + gamma * next_values[step]
+            + (1.0 - lam) / (1.0 - td_lambda) * rewards[step]
+        )
+        bi = gamma * (next_values[step] * done + bi * (1.0 - done)) + rewards[step]
+        targets[step] = (1.0 - td_lambda) * ai + lam * bi
+    return targets
 
 
 def run_training(args: argparse.Namespace) -> dict:
@@ -313,13 +425,35 @@ def run_training(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         use_contacts=args.env == "ant",
+        cartpole_reward=CartpoleRewardWeights(
+            pole_angle=args.cartpole_pole_angle_penalty,
+            pole_velocity=args.cartpole_pole_velocity_penalty,
+            cart_position=args.cartpole_cart_position_penalty,
+            cart_velocity=args.cartpole_cart_velocity_penalty,
+            action=args.cartpole_action_penalty,
+        ),
     )
-    actor = make_actor(env)
-    optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr)
+    actor = make_actor(env, stochastic=args.stochastic_actor)
+    adam_betas = (args.adam_beta1, args.adam_beta2)
+    optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
+    critic = None
+    target_critic = None
+    critic_optimizer = None
+    if args.use_critic:
+        critic = make_critic(env)
+        target_critic = copy.deepcopy(critic)
+        for param in target_critic.parameters():
+            param.requires_grad_(False)
+        critic_optimizer = torch.optim.Adam(critic.parameters(), lr=args.critic_lr, betas=adam_betas)
+    obs_rms = RunningMeanStd(shape=(env.num_obs,), device=env.torch_device) if args.obs_rms else None
     history = []
     best_state = None
+    best_obs_rms = None
     best_epoch = 0
     best_train_reward = -float("inf")
+    best_eval_return = -float("inf")
+    q, qd = env.reset(noise=args.reset_noise, stochastic_init=args.stochastic_init)
+    progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
 
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats(env.torch_device)
@@ -328,34 +462,153 @@ def run_training(args: argparse.Namespace) -> dict:
     t0 = time.perf_counter()
     for epoch in range(args.epochs):
         epoch_t0 = time.perf_counter()
-        q, qd = env.reset(noise=args.reset_noise)
+        if args.lr_schedule == "linear":
+            denom = max(1, args.epochs - 1)
+            actor_lr = (args.min_lr - args.lr) * float(epoch / denom) + args.lr
+            critic_lr = (args.min_lr - args.critic_lr) * float(epoch / denom) + args.critic_lr
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = actor_lr
+            if critic_optimizer is not None:
+                for param_group in critic_optimizer.param_groups:
+                    param_group["lr"] = critic_lr
+
+        if args.reset_each_epoch:
+            q, qd = env.reset(noise=args.reset_noise, stochastic_init=args.stochastic_init)
+            progress.zero_()
+        else:
+            q = q.detach().clone()
+            qd = qd.detach().clone()
+
         optimizer.zero_grad(set_to_none=True)
         rewards = []
-        discount = 1.0
-        objective = torch.zeros((), dtype=torch.float32, device=env.torch_device)
+        critic_obs = []
+        critic_rewards = []
+        critic_done_mask = []
+        critic_next_values = []
+        gamma_vec = torch.ones(env.num_envs, dtype=torch.float32, device=env.torch_device)
+        reward_acc = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
+        actor_loss = torch.zeros((), dtype=torch.float32, device=env.torch_device)
+        norm_stats = obs_rms_snapshot(obs_rms)
 
-        for _ in range(args.horizon):
-            obs = env.observe(q, qd)
-            action = torch.tanh(actor(obs, deterministic=True))
-            q, qd = env.step(q, qd, env.action_to_joint_f(action))
-            rew = env.reward(q, qd, action)
+        for step_idx in range(args.horizon):
+            obs_raw = env.observe(q, qd)
+            if obs_rms is not None:
+                with torch.no_grad():
+                    obs_rms.update(obs_raw.detach())
+            obs = normalize_obs(obs_raw, norm_stats)
+            if args.use_critic:
+                critic_obs.append(obs.detach())
+            raw_action = actor(obs, deterministic=not args.stochastic_actor)
+            action = torch.tanh(raw_action)
+            q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
+            rew = env.reward(q_next, qd_next, action)
+            scaled_rew = rew * args.rew_scale
             rewards.append(rew.detach().mean())
-            objective = objective + discount * rew.mean()
-            discount *= args.gamma
+            if args.use_critic:
+                critic_rewards.append(scaled_rew.detach())
 
-        loss = -objective / args.horizon
+            progress = progress + 1
+            done = progress >= args.episode_length
+            next_obs = normalize_obs(env.observe(q_next, qd_next), norm_stats)
+            if args.use_critic:
+                assert target_critic is not None
+                next_value = target_critic(next_obs).squeeze(-1)
+                critic_next_values.append(next_value.detach())
+                if step_idx < args.horizon - 1:
+                    critic_done_mask.append(done.detach().to(torch.float32))
+                else:
+                    critic_done_mask.append(torch.ones_like(scaled_rew))
+            else:
+                next_value = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
+
+            reward_acc = reward_acc + gamma_vec * scaled_rew
+            if step_idx < args.horizon - 1:
+                loss_mask = done
+            else:
+                loss_mask = torch.ones_like(done)
+            if args.use_critic:
+                segment_return = reward_acc + args.gamma * gamma_vec * next_value
+            else:
+                segment_return = reward_acc
+            actor_loss = actor_loss - segment_return[loss_mask].sum()
+
+            gamma_vec = gamma_vec * args.gamma
+            if done.any():
+                done_ids = done.nonzero(as_tuple=False).squeeze(-1)
+                q_next, qd_next = env.reset_done(q_next, qd_next, done_ids, stochastic_init=args.stochastic_init)
+                progress = torch.where(done, torch.zeros_like(progress), progress)
+                gamma_vec = torch.where(done, torch.ones_like(gamma_vec), gamma_vec)
+                reward_acc = torch.where(done, torch.zeros_like(reward_acc), reward_acc)
+            q, qd = q_next, qd_next
+
+        loss = actor_loss / (args.horizon * args.num_envs)
         loss.backward()
+        for param in actor.parameters():
+            if param.grad is not None:
+                param.grad.nan_to_num_(0.0, 0.0, 0.0)
         grad_norm = float(torch.nn.utils.clip_grad_norm_(actor.parameters(), args.grad_clip).detach().cpu())
         mean_reward = float(torch.stack(rewards).mean().detach().cpu())
         final_reward = float(rewards[-1].detach().cpu())
-        if mean_reward > best_train_reward:
+        optimizer.step()
+
+        value_loss = None
+        if args.use_critic:
+            assert critic is not None
+            assert target_critic is not None
+            assert critic_optimizer is not None
+            with torch.no_grad():
+                obs_flat = torch.cat([obs.detach() for obs in critic_obs], dim=0)
+                target_values = compute_critic_targets(
+                    torch.stack(critic_rewards),
+                    torch.stack(critic_done_mask),
+                    torch.stack(critic_next_values),
+                    gamma=args.gamma,
+                    critic_method=args.critic_method,
+                    td_lambda=args.td_lambda,
+                )
+                target_flat = target_values.reshape(-1)
+
+            sample_count = obs_flat.shape[0]
+            batch_size = min(args.critic_batch_size, sample_count)
+            last_loss = None
+            for _ in range(args.critic_iterations):
+                order = torch.randperm(sample_count, device=env.torch_device)
+                for start in range(0, sample_count, batch_size):
+                    idx = order[start : start + batch_size]
+                    pred = critic(obs_flat[idx]).squeeze(-1)
+                    critic_loss = (pred - target_flat[idx]).square().mean()
+                    critic_optimizer.zero_grad(set_to_none=True)
+                    critic_loss.backward()
+                    for param in critic.parameters():
+                        if param.grad is not None:
+                            param.grad.nan_to_num_(0.0, 0.0, 0.0)
+                    torch.nn.utils.clip_grad_norm_(critic.parameters(), args.grad_clip)
+                    critic_optimizer.step()
+                    last_loss = critic_loss
+
+            with torch.no_grad():
+                alpha = args.target_critic_alpha
+                for param, target_param in zip(critic.parameters(), target_critic.parameters()):
+                    target_param.mul_(alpha)
+                    target_param.add_((1.0 - alpha) * param)
+            value_loss = float(last_loss.detach().cpu()) if last_loss is not None else None
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(env.torch_device)
+
+        selection_horizon = args.selection_horizon or args.eval_horizon
+        selection_rollout = evaluate_policy(env, actor, selection_horizon, obs_rms=obs_rms)
+        if selection_rollout["return"] > best_eval_return:
+            best_eval_return = selection_rollout["return"]
             best_train_reward = mean_reward
             best_epoch = epoch + 1
             best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
-
-        optimizer.step()
-        if torch.cuda.is_available():
-            torch.cuda.synchronize(env.torch_device)
+            if obs_rms is not None:
+                best_obs_rms = {
+                    "mean": obs_rms.mean.detach().clone(),
+                    "var": obs_rms.var.detach().clone(),
+                    "count": obs_rms.count,
+                }
 
         epoch_s = time.perf_counter() - epoch_t0
         history.append(
@@ -365,6 +618,9 @@ def run_training(args: argparse.Namespace) -> dict:
                 "final_step_reward": final_reward,
                 "loss": float(loss.detach().cpu()),
                 "grad_norm": grad_norm,
+                "value_loss": value_loss,
+                "selection_return": selection_rollout["return"],
+                "selection_mean_reward": selection_rollout["mean_reward"],
                 "epoch_seconds": epoch_s,
                 "fps": args.num_envs * args.horizon / epoch_s,
             }
@@ -379,9 +635,20 @@ def run_training(args: argparse.Namespace) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     if best_state is not None:
         actor.load_state_dict(best_state)
+    if obs_rms is not None and best_obs_rms is not None:
+        obs_rms.mean = best_obs_rms["mean"]
+        obs_rms.var = best_obs_rms["var"]
+        obs_rms.count = best_obs_rms["count"]
     torch.save(actor.state_dict(), out_dir / f"{args.env}_actor.pt")
+    if critic is not None:
+        torch.save(critic.state_dict(), out_dir / f"{args.env}_critic.pt")
+    if obs_rms is not None:
+        torch.save(
+            {"mean": obs_rms.mean, "var": obs_rms.var, "count": obs_rms.count},
+            out_dir / f"{args.env}_obs_rms.pt",
+        )
 
-    rollout = evaluate_policy(env, actor, args.eval_horizon)
+    rollout = evaluate_policy(env, actor, args.eval_horizon, obs_rms=obs_rms)
     video_path = None
     poster_path = None
     if args.render_video:
@@ -394,8 +661,16 @@ def run_training(args: argparse.Namespace) -> dict:
                 dt=args.dt,
                 force_scale=args.force_scale,
                 use_contacts=args.env == "ant",
+                cartpole_reward=env.cartpole_reward,
             )
-        video_path, poster_path = render_rollout(render_env, actor, out_dir, args.eval_horizon, args.env)
+        video_path, poster_path = render_rollout(
+            render_env,
+            actor,
+            out_dir,
+            args.eval_horizon,
+            args.env,
+            obs_rms=obs_rms,
+        )
 
     result = {
         "env": args.env,
@@ -407,11 +682,23 @@ def run_training(args: argparse.Namespace) -> dict:
         "horizon": args.horizon,
         "epochs": args.epochs,
         "dt": args.dt,
+        "episode_length": args.episode_length,
+        "stochastic_init": args.stochastic_init,
+        "stochastic_actor": args.stochastic_actor,
+        "use_critic": args.use_critic,
+        "obs_rms": args.obs_rms,
+        "critic_method": args.critic_method,
+        "td_lambda": args.td_lambda,
+        "rew_scale": args.rew_scale,
+        "reset_each_epoch": args.reset_each_epoch,
+        "lr_schedule": args.lr_schedule,
+        "cartpole_reward": env.cartpole_reward.__dict__,
         "total_seconds": total_s,
         "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
         "mean_fps": float(np.mean([h["fps"] for h in history])),
         "best_epoch": best_epoch,
         "best_train_reward": best_train_reward,
+        "best_eval_return": best_eval_return,
         "max_cuda_memory_allocated_mb": (
             float(torch.cuda.max_memory_allocated(env.torch_device) / (1024**2)) if torch.cuda.is_available() else None
         ),
@@ -430,20 +717,29 @@ def run_training(args: argparse.Namespace) -> dict:
 
 
 @torch.no_grad()
-def evaluate_policy(env: NewtonMuJoCoTorchEnv, actor: torch.nn.Module, horizon: int) -> dict:
+def evaluate_policy(
+    env: NewtonMuJoCoTorchEnv,
+    actor: torch.nn.Module,
+    horizon: int,
+    *,
+    obs_rms: RunningMeanStd | None = None,
+) -> dict:
     q, qd = env.reset(noise=0.0)
     rewards = []
     final_obs = None
+    final_obs_normalized = None
     for _ in range(horizon):
-        obs = env.observe(q, qd)
+        obs = normalize_obs(env.observe(q, qd), obs_rms)
         action = torch.tanh(actor(obs, deterministic=True))
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
         rewards.append(env.reward(q, qd, action).mean())
         final_obs = env.observe(q, qd)
+        final_obs_normalized = normalize_obs(final_obs, obs_rms)
     return {
         "mean_reward": float(torch.stack(rewards).mean().cpu()),
         "return": float(torch.stack(rewards).sum().cpu()),
         "final_obs_mean": [float(x) for x in final_obs.mean(dim=0).cpu().tolist()],
+        "final_obs_normalized_mean": [float(x) for x in final_obs_normalized.mean(dim=0).cpu().tolist()],
     }
 
 
@@ -453,16 +749,20 @@ def render_rollout(
     out_dir: Path,
     horizon: int,
     env_name: str,
+    *,
+    obs_rms: RunningMeanStd | None = None,
 ) -> tuple[Path, Path]:
     import imageio.v2 as imageio
-    from PIL import Image, ImageDraw
 
     viewer = newton.viewer.ViewerGL(width=960, height=544, headless=True)
+    viewer.show_static = True
+    viewer.show_collision = True
     viewer.set_model(env.model)
     if env_name == "cartpole":
-        viewer.set_camera(pos=wp.vec3(7.3, -14.0, 2.3), pitch=-5.0, yaw=-225.0)
+        viewer.set_camera(pos=wp.vec3(0.0, 2.0, 7.0), pitch=0.0, yaw=-90.0)
+        viewer.camera.look_at((0.0, 0.0, 0.0))
         if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 90.0
+            viewer.camera.fov = 45.0
     else:
         viewer.set_camera(pos=wp.vec3(3.0, -5.0, 2.0), pitch=-18.0, yaw=-135.0)
         if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
@@ -472,7 +772,6 @@ def render_rollout(
     video_path = out_dir / f"{env_name}_rollout.mp4"
     poster_path = out_dir / f"{env_name}_poster.png"
     frames = []
-    trail: list[tuple[float, float]] = []
     with imageio.get_writer(video_path, fps=max(1, int(round(1.0 / env.dt))), codec="libx264", quality=8) as writer:
         with torch.no_grad():
             for frame_idx in range(horizon):
@@ -481,124 +780,16 @@ def render_rollout(
                 viewer.log_state(state)
                 viewer.end_frame()
                 frame = viewer.get_frame().numpy()
-                frame = decorate_rollout_frame(frame, env_name, q, state, env, trail, Image, ImageDraw)
                 frames.append(frame)
                 writer.append_data(frame)
-                obs = env.observe(q, qd)
+                obs = normalize_obs(env.observe(q, qd), obs_rms)
                 action = torch.tanh(actor(obs, deterministic=True))
                 q, qd = env.step(q, qd, env.action_to_joint_f(action))
                 q = torch.nan_to_num(q, nan=0.0, posinf=0.0, neginf=0.0)
                 qd = torch.nan_to_num(qd, nan=0.0, posinf=0.0, neginf=0.0)
     viewer.close()
-    Image.fromarray(frames[len(frames) // 2]).save(poster_path)
+    imageio.imwrite(poster_path, frames[len(frames) // 2])
     return video_path, poster_path
-
-
-def decorate_rollout_frame(
-    frame: np.ndarray,
-    env_name: str,
-    q: torch.Tensor,
-    state: newton.State,
-    env: NewtonMuJoCoTorchEnv,
-    trail: list[tuple[float, float]],
-    image_cls,
-    image_draw,
-) -> np.ndarray:
-    image = image_cls.fromarray(frame)
-    draw = image_draw.Draw(image, "RGBA")
-    width, height = image.size
-
-    if env_name == "cartpole":
-        q_np = np.nan_to_num(q[0].detach().cpu().numpy(), nan=0.0, posinf=0.0, neginf=0.0)
-        cart_x = float(q_np[0])
-        theta = float(q_np[1])
-        pivot = (cart_x, 0.0)
-        tip = (cart_x + math.sin(theta), math.cos(theta))
-        trail.append(tip)
-        if len(trail) > 120:
-            del trail[: len(trail) - 120]
-
-        margin = 56
-        x_min, x_max = -2.5, 5.0
-        z_min, z_max = -1.25, 1.35
-
-        def project(point: tuple[float, float]) -> tuple[int, int]:
-            x, z = point
-            sx = margin + (x - x_min) / (x_max - x_min) * (width - 2 * margin)
-            sy = height - margin - (z - z_min) / (z_max - z_min) * (height - 2 * margin)
-            return int(round(sx)), int(round(sy))
-
-        rail_a = project((x_min, 0.0))
-        rail_b = project((x_max, 0.0))
-        draw.line([rail_a, rail_b], fill=(244, 209, 96, 210), width=5)
-
-        if len(trail) > 1:
-            trail_points = [project(p) for p in trail]
-            draw.line(trail_points, fill=(116, 206, 238, 130), width=3)
-
-        cx, cy = project(pivot)
-        cart_w = max(28, int(0.38 / (x_max - x_min) * (width - 2 * margin)))
-        cart_h = 26
-        draw.rounded_rectangle(
-            [cx - cart_w, cy - cart_h // 2, cx + cart_w, cy + cart_h // 2],
-            radius=4,
-            fill=(48, 79, 145, 235),
-            outline=(184, 225, 255, 240),
-            width=2,
-        )
-        tip_px = project(tip)
-        draw.line([project(pivot), tip_px], fill=(244, 115, 90, 245), width=7)
-        draw.ellipse(
-            [tip_px[0] - 9, tip_px[1] - 9, tip_px[0] + 9, tip_px[1] + 9],
-            fill=(255, 230, 109, 245),
-            outline=(255, 255, 255, 230),
-            width=2,
-        )
-        return np.asarray(image)
-
-    body_q = np.nan_to_num(state.body_q.numpy().reshape(-1, 7), nan=0.0, posinf=0.0, neginf=0.0)
-    bodies_per_env = env.model.body_count // env.num_envs
-    body_q = body_q[:bodies_per_env]
-    root = body_q[0, :3]
-    trail.append((float(root[0]), float(root[1])))
-    if len(trail) > 180:
-        del trail[: len(trail) - 180]
-
-    margin = 64
-    span = 2.6
-    center_x = float(root[0])
-    center_y = float(root[1])
-
-    def project_xy(point: np.ndarray | tuple[float, float]) -> tuple[int, int]:
-        px, py = float(point[0]), float(point[1])
-        sx = margin + ((px - center_x) / span + 0.5) * (width - 2 * margin)
-        sy = height - margin - ((py - center_y) / span + 0.5) * (height - 2 * margin)
-        return int(round(sx)), int(round(sy))
-
-    for offset in np.linspace(-span * 0.5, span * 0.5, 5):
-        a = project_xy((center_x - span * 0.5, center_y + float(offset)))
-        b = project_xy((center_x + span * 0.5, center_y + float(offset)))
-        c = project_xy((center_x + float(offset), center_y - span * 0.5))
-        d = project_xy((center_x + float(offset), center_y + span * 0.5))
-        draw.line([a, b], fill=(111, 124, 143, 80), width=1)
-        draw.line([c, d], fill=(111, 124, 143, 80), width=1)
-
-    if len(trail) > 1:
-        trail_points = [project_xy(p) for p in trail]
-        draw.line(trail_points, fill=(92, 214, 178, 150), width=4)
-
-    root_px = project_xy(root[:2])
-    for point in body_q[1:, :2]:
-        p = project_xy(point)
-        draw.line([root_px, p], fill=(111, 179, 255, 190), width=4)
-        draw.ellipse([p[0] - 6, p[1] - 6, p[0] + 6, p[1] + 6], fill=(251, 191, 36, 235))
-    draw.ellipse(
-        [root_px[0] - 12, root_px[1] - 12, root_px[0] + 12, root_px[1] + 12],
-        fill=(239, 68, 68, 235),
-        outline=(255, 255, 255, 220),
-        width=2,
-    )
-    return np.asarray(image)
 
 
 def query_gpu() -> str | None:
@@ -632,15 +823,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--horizon", type=int, default=48)
     parser.add_argument("--eval-horizon", type=int, default=180)
+    parser.add_argument("--episode-length", type=int, default=240)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--lr", type=float, default=2.0e-3)
+    parser.add_argument("--min-lr", type=float, default=1.0e-5)
+    parser.add_argument("--lr-schedule", choices=["constant", "linear"], default="constant")
+    parser.add_argument("--adam-beta1", type=float, default=0.9)
+    parser.add_argument("--adam-beta2", type=float, default=0.999)
     parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--rew-scale", type=float, default=1.0)
     parser.add_argument("--force-scale", type=float, default=1000.0)
     parser.add_argument("--grad-clip", type=float, default=100.0)
     parser.add_argument("--reset-noise", type=float, default=0.05)
+    parser.add_argument("--reset-each-epoch", action="store_true")
+    parser.add_argument("--stochastic-init", action="store_true")
+    parser.add_argument("--stochastic-actor", action="store_true")
+    parser.add_argument("--use-critic", action="store_true")
+    parser.add_argument("--obs-rms", action="store_true")
+    parser.add_argument("--critic-lr", type=float, default=1.0e-3)
+    parser.add_argument("--critic-iterations", type=int, default=8)
+    parser.add_argument("--critic-batch-size", type=int, default=1024)
+    parser.add_argument("--critic-method", choices=["one-step", "td-lambda"], default="one-step")
+    parser.add_argument("--td-lambda", type=float, default=0.95)
+    parser.add_argument("--target-critic-alpha", type=float, default=0.2)
+    parser.add_argument("--cartpole-pole-angle-penalty", type=float, default=1.0)
+    parser.add_argument("--cartpole-pole-velocity-penalty", type=float, default=0.1)
+    parser.add_argument("--cartpole-cart-position-penalty", type=float, default=0.05)
+    parser.add_argument("--cartpole-cart-velocity-penalty", type=float, default=0.1)
+    parser.add_argument("--cartpole-action-penalty", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
+    parser.add_argument("--selection-horizon", type=int, default=None)
     return parser.parse_args()
 
 
