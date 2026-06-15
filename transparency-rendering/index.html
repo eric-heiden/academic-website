@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ViewerGL Transparency Benchmark Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --ink: #1d2433;
+      --muted: #5f6b7a;
+      --line: #d9e0ea;
+      --accent: #2374ab;
+      --good: #2f855a;
+      --warn: #b7791f;
+      --shadow: 0 18px 45px rgba(35, 44, 63, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 36px 24px 56px;
+    }
+
+    header {
+      margin-bottom: 28px;
+      padding: 30px;
+      background: linear-gradient(135deg, #ffffff 0%, #eef6fb 100%);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.16;
+    }
+
+    h1 {
+      font-size: 34px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-top: 34px;
+      margin-bottom: 14px;
+      font-size: 22px;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+      font-size: 17px;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .subtitle {
+      max-width: 860px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 6px 11px;
+      color: #253044;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(35, 44, 63, 0.08);
+      overflow: hidden;
+    }
+
+    .card-body {
+      padding: 18px;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric strong {
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .good {
+      color: var(--good);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(35, 44, 63, 0.08);
+    }
+
+    th,
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    th {
+      color: #344054;
+      background: #eef3f8;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      background: #edf2f7;
+      border-radius: 4px;
+      font-family: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+
+    .scene-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #111827;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .caption {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 16px 18px;
+      background: #f0f7fb;
+      border: 1px solid #c9e2f0;
+      border-radius: 10px;
+    }
+
+    .callout strong {
+      color: #174d73;
+    }
+
+    .support {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .foot {
+      margin-top: 36px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .grid,
+      .grid.two,
+      .support {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .page {
+        padding: 22px 14px 42px;
+      }
+
+      header {
+        padding: 22px;
+      }
+
+      h1 {
+        font-size: 27px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>ViewerGL Transparency Benchmark</h1>
+      <p class="subtitle">
+        1080p comparison of sorted back-to-front blending and weighted order-independent transparency
+        for transparent rigid meshes, triangle surfaces, and cloth.
+      </p>
+      <div class="meta">
+        <span class="pill"><span class="dot"></span>Generated: June 15, 2026, 1:32:14 PM Pacific Time (UTC-07:00)</span>
+        <span class="pill">Resolution: 1920 x 1080</span>
+        <span class="pill">Warmup: 5 frames</span>
+        <span class="pill">Measured: 30 frames</span>
+        <span class="pill">Opacity: 0.45</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Executive Summary</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="good">2.4% faster</strong>
+            <span>Weighted OIT vs sorted blending on <code>tri_surface_96</code>.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="good">7.5% faster</strong>
+            <span>Weighted OIT vs sorted blending on <code>g1_multibody_1</code>.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">5.3% slower</strong>
+            <span>Weighted OIT vs sorted blending on the Style3D <code>cloth_h1</code> scene.</span>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <p>
+          <strong>Sorted blending:</strong> renders transparent meshes after opaque geometry in
+          back-to-front order, so standard alpha blending composes farther surfaces before nearer
+          ones.
+        </p>
+        <p>
+          <strong>Weighted OIT:</strong> OIT stands for order-independent transparency; this path
+          accumulates transparent fragments with opacity/depth weights, so the result does not
+          depend on object draw order but is approximate.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Frame Time Results</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Scene</th>
+            <th>Mode</th>
+            <th class="num">Mean ms</th>
+            <th class="num">Median ms</th>
+            <th class="num">Min ms</th>
+            <th class="num">Max ms</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>tri_surface_96</code></td>
+            <td>sorted</td>
+            <td class="num">11.513</td>
+            <td class="num">11.098</td>
+            <td class="num">10.404</td>
+            <td class="num">17.403</td>
+          </tr>
+          <tr>
+            <td><code>tri_surface_96</code></td>
+            <td>weighted OIT</td>
+            <td class="num">11.235</td>
+            <td class="num">10.956</td>
+            <td class="num">9.956</td>
+            <td class="num">17.506</td>
+          </tr>
+          <tr>
+            <td><code>g1_multibody_1</code></td>
+            <td>sorted</td>
+            <td class="num">6.721</td>
+            <td class="num">6.596</td>
+            <td class="num">5.896</td>
+            <td class="num">8.418</td>
+          </tr>
+          <tr>
+            <td><code>g1_multibody_1</code></td>
+            <td>weighted OIT</td>
+            <td class="num">6.219</td>
+            <td class="num">6.183</td>
+            <td class="num">5.435</td>
+            <td class="num">7.793</td>
+          </tr>
+          <tr>
+            <td><code>cloth_h1</code></td>
+            <td>sorted</td>
+            <td class="num">22.368</td>
+            <td class="num">21.971</td>
+            <td class="num">20.494</td>
+            <td class="num">27.553</td>
+          </tr>
+          <tr>
+            <td><code>cloth_h1</code></td>
+            <td>weighted OIT</td>
+            <td class="num">23.543</td>
+            <td class="num">23.010</td>
+            <td class="num">20.674</td>
+            <td class="num">28.343</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>1080p Screenshots</h2>
+      <div class="grid">
+        <article class="card scene-card">
+          <a href="tri_surface_96_compare.png">
+            <img src="tri_surface_96_compare.png" alt="Weighted OIT and sorted comparison for tri_surface_96">
+          </a>
+          <div class="card-body">
+            <h3><code>tri_surface_96</code></h3>
+            <p class="caption">55,296 transparent cloth triangles in crossing surfaces with uniform opacity.</p>
+          </div>
+        </article>
+        <article class="card scene-card">
+          <a href="g1_multibody_1_compare.png">
+            <img src="g1_multibody_1_compare.png" alt="Weighted OIT and sorted comparison for g1_multibody_1">
+          </a>
+          <div class="card-body">
+            <h3><code>g1_multibody_1</code></h3>
+            <p class="caption">54 shapes from the Unitree G1 multibody asset with non-plane shapes at 0.45 opacity.</p>
+          </div>
+        </article>
+        <article class="card scene-card">
+          <a href="cloth_h1_compare.png">
+            <img src="cloth_h1_compare.png" alt="Weighted OIT and sorted comparison for cloth_h1">
+          </a>
+          <div class="card-body">
+            <h3><code>cloth_h1</code></h3>
+            <p class="caption">H1 jacket cloth scene with transparent cloth triangles and transparent robot shapes.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Scene Details</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Scene</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>tri_surface_96</code></td>
+            <td>55,296 transparent cloth triangles in crossing surfaces with uniform opacity.</td>
+          </tr>
+          <tr>
+            <td><code>g1_multibody_1</code></td>
+            <td>54 shapes from the Unitree G1 multibody asset; non-plane shapes use opacity 0.45.</td>
+          </tr>
+          <tr>
+            <td><code>cloth_h1</code></td>
+            <td>H1 jacket cloth reference scene with 66,930 transparent cloth triangles and 99 transparent robot/ground shapes.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p class="foot">
+      Generated from <code>results.json</code> and 1080p PNG captures.
+      Times are per rendered ViewerGL frame after warmup. Comparison images place weighted OIT on
+      the left and sorted blending on the right.
+    </p>
+  </main>
+</body>
+</html>
