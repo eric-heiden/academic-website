@@ -247,7 +247,7 @@
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
           Newton differentiable MuJoCo Warp experiments using a SHAC-style actor/critic loop. This update keeps the corrected
-          cartpole result and adds the first grounded ant locomotion pass with MuJoCo contacts and Newton differentiable contacts.
+          cartpole result, grounded ant locomotion runs, and finite-difference gradient checks for the ant SHAC objective.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -290,11 +290,13 @@
         </p>
       </article>
       <article class="panel warn">
-        <h2>Ant Fix</h2>
+        <h2>Ant Diagnosis</h2>
         <p>
           The ant MJCF import was missing an explicit ground plane, so both contact backends initially let the ant fall through the
           world. The ant builder now uses DiffRL's Y-up transform, rest pose, contact material, previous-action observation, early
-          termination, and a Y-up ground plane before SolverMuJoCo is constructed.
+          termination, and a Y-up ground plane. The remaining bad-looking gait is consistent with a state-gradient problem rather
+          than a contact-backend choice: finite differences match the one-step action gradient, but not the qpos-driven state
+          transition gradients used by multi-step SHAC.
         </p>
       </article>
     </section>
@@ -339,6 +341,33 @@
         <h2>Ant Reset Diagnostics</h2>
         <div id="ant-reset-chart" class="chart"></div>
       </div>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>Ant Gradient Error</h2>
+        <div id="grad-error-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>State Gradient Components</h2>
+        <div id="grad-component-chart" class="chart"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Finite-Difference Check</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Backend</th>
+            <th>SHAC policy gradient</th>
+            <th>One-step action gradient</th>
+            <th>One-step state/action gradient</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody id="grad-body"></tbody>
+      </table>
     </section>
 
     <section class="panel">
@@ -387,8 +416,9 @@
         <h2>Status</h2>
         <p>
           Cartpole is physically plausible and stabilizes. Ant now has correct ground contact and trains with both MuJoCo contacts
-          and Newton differentiable contacts. Newton contacts produced the strongest return in this pass, but the policy can still
-          exploit hopping/high-height motions, so the report separates speed-oriented return from clean-rollout diagnostics.
+          and Newton differentiable contacts. The finite-difference checks show that the remaining failure is not specific to
+          MuJoCo contacts versus Newton contacts: qpos-related transition gradients disagree with finite differences even when
+          contacts are disabled, while the immediate action gradient is accurate.
         </p>
       </article>
     </section>
@@ -412,6 +442,12 @@
   --num-envs 64 --epochs 100 --horizon 32 \
   --eval-horizon 240 --selection-horizon 240 \
   --critic-iterations 8 --critic-batch-size 2048</code></pre>
+      <pre><code>uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
+  python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
+  --mode gradcheck --env ant --contact-backend newton --force-scale 100 \
+  --num-envs 4 --horizon 8 --grad-check-directions 8 \
+  --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_actor.pt \
+  --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_obs_rms.pt</code></pre>
     </section>
   </main>
 
@@ -428,7 +464,8 @@
       teal: "#0f766e",
       coral: "#e45757",
       amber: "#d97706",
-      violet: "#7c3aed"
+      violet: "#7c3aed",
+      slate: "#475569"
     };
 
     const plotConfig = {
@@ -492,6 +529,37 @@
       };
     }
 
+    function gradTrace(grad, section, name, color) {
+      return {
+        type: "scatter",
+        mode: "lines+markers",
+        name,
+        x: grad[section].epsilon_sweep.map((row) => row.epsilon),
+        y: grad[section].epsilon_sweep.map((row) => row.mean_relative_error),
+        line: { color, width: 3 },
+        marker: { size: 7 }
+      };
+    }
+
+    function bestRow(rows) {
+      return rows.reduce((best, row) => {
+        if (!best || row.mean_relative_error < best.mean_relative_error) return row;
+        return best;
+      }, null);
+    }
+
+    function componentNames(grad) {
+      return Object.keys(grad.one_step_state_action.components);
+    }
+
+    function componentErrors(grad) {
+      return componentNames(grad).map((key) => bestRow(grad.one_step_state_action.components[key]).mean_relative_error);
+    }
+
+    function componentLabels(grad) {
+      return componentNames(grad).map((key) => key.replaceAll("_", " "));
+    }
+
     function pacificStamp(value) {
       return new Date(value).toLocaleString(undefined, {
         dateStyle: "medium",
@@ -501,11 +569,14 @@
     }
 
     async function load() {
-      const [result, antNewton, antFast, antMujoco] = await Promise.all([
+      const [result, antNewton, antFast, antMujoco, gradNewton, gradMujoco, gradNone] = await Promise.all([
         fetch("assets/cartpole_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_force100_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_run1/ant_results.json").then((res) => res.json()),
-        fetch("assets/ant_mujoco_ground_run1/ant_results.json").then((res) => res.json())
+        fetch("assets/ant_mujoco_ground_run1/ant_results.json").then((res) => res.json()),
+        fetch("assets/ant_gradcheck_newton_force100/ant_gradient_check.json").then((res) => res.json()),
+        fetch("assets/ant_gradcheck_mujoco_force100/ant_gradient_check.json").then((res) => res.json()),
+        fetch("assets/ant_gradcheck_nocontact_force100/ant_gradient_check.json").then((res) => res.json())
       ]);
       const finalObs = result.eval.final_obs_mean;
 
@@ -573,6 +644,62 @@
         yaxis: { ...baseLayout.yaxis, title: "Resets per epoch" }
       }, plotConfig);
 
+      Plotly.newPlot("grad-error-chart", [
+        gradTrace(gradNewton, "policy", "Policy, Newton contacts", colors.blue),
+        gradTrace(gradNewton, "one_step_state_action", "State/action, Newton contacts", colors.coral),
+        gradTrace(gradNewton, "one_step_action", "Action only, Newton contacts", colors.fps),
+        gradTrace(gradMujoco, "policy", "Policy, MuJoCo contacts", colors.teal),
+        gradTrace(gradNone, "policy", "Policy, no contacts", colors.slate)
+      ], {
+        ...baseLayout,
+        xaxis: { ...baseLayout.xaxis, title: "Finite-difference epsilon", type: "log", autorange: "reversed" },
+        yaxis: { ...baseLayout.yaxis, title: "Mean relative error", type: "log" },
+        legend: { orientation: "h", y: -0.32 }
+      }, plotConfig);
+
+      const componentAxisLabels = componentLabels(gradNewton);
+      const backendAxisLabels = ["Newton contacts", "MuJoCo contacts", "No contacts"];
+      const componentZ = [componentErrors(gradNewton), componentErrors(gradMujoco), componentErrors(gradNone)];
+      const componentText = backendAxisLabels.map((backend) => componentAxisLabels.map((label) => `${backend}<br>${label}`));
+      Plotly.newPlot("grad-component-chart", [
+        {
+          type: "heatmap",
+          x: componentAxisLabels.map((_, index) => index),
+          y: backendAxisLabels.map((_, index) => index),
+          z: componentZ,
+          text: componentText,
+          colorscale: [
+            [0.0, "#ecfeff"],
+            [0.2, "#bfdbfe"],
+            [0.5, "#fef3c7"],
+            [0.75, "#fb923c"],
+            [1.0, "#b91c1c"]
+          ],
+          zmin: 0,
+          zmax: 1.1,
+          colorbar: { title: "Rel. error" },
+          hovertemplate: "%{text}<br>relative error %{z:.3f}<extra></extra>"
+        }
+      ], {
+        ...baseLayout,
+        xaxis: {
+          ...baseLayout.xaxis,
+          title: "",
+          tickmode: "array",
+          tickvals: componentAxisLabels.map((_, index) => index),
+          ticktext: componentAxisLabels,
+          tickangle: -24
+        },
+        yaxis: {
+          ...baseLayout.yaxis,
+          title: "",
+          tickmode: "array",
+          tickvals: backendAxisLabels.map((_, index) => index),
+          ticktext: backendAxisLabels
+        },
+        margin: { t: 18, r: 72, b: 82, l: 118 }
+      }, plotConfig);
+
       function perfRow(envName, result, note, obsText) {
         return `<tr>
           <td>${envName}<br><span class="muted">${note}</span></td>
@@ -609,6 +736,36 @@
         antMujoco,
         `MuJoCo contacts, force scale 200; resets ${antMujoco.eval.reset_count} (${antMujoco.eval.invalid_count} invalid, ${antMujoco.eval.fall_count} fall)`,
         `return ${fmt(antMujoco.eval.return, 1)}<br><span class="muted">Grounded MuJoCo-contact comparison.</span>`
+      );
+
+      function gradCell(row) {
+        return `eps ${row.epsilon}<br><span class="muted">rel ${fmt(row.mean_relative_error, 3)}, sign ${fmt(row.sign_agreement, 2)}</span>`;
+      }
+
+      function gradRow(name, grad) {
+        const policy = bestRow(grad.policy.epsilon_sweep);
+        const action = bestRow(grad.one_step_action.epsilon_sweep);
+        const state = bestRow(grad.one_step_state_action.epsilon_sweep);
+        const rootQuat = bestRow(grad.one_step_state_action.components.root_quat_q);
+        const jointQ = bestRow(grad.one_step_state_action.components.joint_q);
+        return `<tr>
+          <td>${name}<br><span class="muted">${grad.horizon}-step SHAC, ${grad.directions} directions</span></td>
+          <td>${gradCell(policy)}</td>
+          <td>${gradCell(action)}</td>
+          <td>${gradCell(state)}</td>
+          <td>Action path matches finite differences. qpos path does not: root quat rel ${fmt(rootQuat.mean_relative_error, 3)}, joint q rel ${fmt(jointQ.mean_relative_error, 3)}.</td>
+        </tr>`;
+      }
+
+      document.getElementById("grad-body").innerHTML = gradRow(
+        "Newton contacts",
+        gradNewton
+      ) + gradRow(
+        "MuJoCo contacts",
+        gradMujoco
+      ) + gradRow(
+        "Contacts disabled",
+        gradNone
       );
     }
 

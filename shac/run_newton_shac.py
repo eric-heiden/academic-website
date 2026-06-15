@@ -12,6 +12,7 @@ import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -54,6 +55,7 @@ ANT_HEIGHT_REWARD_CAP = 0.6
 ANT_INVALID_PENALTY = -50.0
 ANT_JOINT_VEL_OBS_SCALING = 0.1
 ANT_ACTION_PENALTY = 0.0
+DEFAULT_GRAD_CHECK_EPS = (1.0e-1, 3.0e-2, 1.0e-2, 3.0e-3, 1.0e-3, 3.0e-4, 1.0e-4)
 
 
 def normalize_vec(x: torch.Tensor, eps: float = 1.0e-9) -> torch.Tensor:
@@ -96,6 +98,99 @@ def quat_from_angle_axis(angle: torch.Tensor, axis: torch.Tensor) -> torch.Tenso
     theta = (angle / 2.0).unsqueeze(-1)
     xyz = normalize_vec(axis) * theta.sin()
     return normalize_vec(torch.cat([xyz, theta.cos()], dim=-1))
+
+
+def json_safe(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return json_safe(value.tolist())
+    if isinstance(value, torch.Tensor):
+        return json_safe(value.detach().cpu().tolist())
+    if isinstance(value, np.generic):
+        return json_safe(value.item())
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, int | str | bool) or value is None:
+        return value
+    return value
+
+
+def write_json(path: Path, payload: dict) -> None:
+    with path.open("w") as f:
+        json.dump(json_safe(payload), f, indent=2, allow_nan=False)
+
+
+def finite_float(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return float(value) if math.isfinite(float(value)) else None
+
+
+def sanitize_and_clip_grad_norm(parameters, max_norm: float, value_clip: float) -> float:
+    grads = []
+    for param in parameters:
+        if param.grad is None:
+            continue
+        param.grad.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
+        if value_clip > 0.0:
+            param.grad.clamp_(min=-value_clip, max=value_clip)
+        grads.append(param.grad)
+    if not grads:
+        return 0.0
+
+    total_sq = torch.zeros((), dtype=torch.float64, device=grads[0].device)
+    for grad in grads:
+        grad64 = grad.detach().to(torch.float64)
+        total_sq = total_sq + grad64.square().sum()
+    total_norm = torch.sqrt(total_sq)
+    if not torch.isfinite(total_norm):
+        for grad in grads:
+            grad.zero_()
+        return float("inf")
+
+    total_norm_f = float(total_norm.detach().cpu())
+    if max_norm > 0.0 and total_norm_f > max_norm:
+        scale = max_norm / (total_norm_f + 1.0e-12)
+        for grad in grads:
+            grad.mul_(scale)
+    return total_norm_f
+
+
+def trainable_parameters(module: torch.nn.Module) -> list[torch.nn.Parameter]:
+    return [param for param in module.parameters() if param.requires_grad]
+
+
+def flatten_parameters(parameters: list[torch.nn.Parameter]) -> torch.Tensor:
+    return torch.cat([param.detach().reshape(-1) for param in parameters])
+
+
+def flatten_gradients(parameters: list[torch.nn.Parameter]) -> torch.Tensor:
+    chunks = []
+    for param in parameters:
+        if param.grad is None:
+            chunks.append(torch.zeros_like(param.detach()).reshape(-1))
+        else:
+            chunks.append(torch.nan_to_num(param.grad.detach(), nan=0.0, posinf=0.0, neginf=0.0).reshape(-1))
+    return torch.cat(chunks)
+
+
+def assign_flat_parameters(parameters: list[torch.nn.Parameter], values: torch.Tensor) -> None:
+    offset = 0
+    with torch.no_grad():
+        for param in parameters:
+            count = param.numel()
+            param.copy_(values[offset : offset + count].view_as(param))
+            offset += count
+
+
+def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor, torch.Tensor] | None:
+    if path is None:
+        return None
+    data = torch.load(path, map_location=device)
+    return data["mean"].to(device), data["var"].to(device)
 
 
 class NewtonMuJoCoStep(torch.autograd.Function):
@@ -580,6 +675,444 @@ def compute_critic_targets(
     return targets
 
 
+def shac_rollout_loss(
+    env: NewtonMuJoCoTorchEnv,
+    actor: torch.nn.Module,
+    *,
+    horizon: int,
+    gamma: float,
+    rew_scale: float,
+    termination_penalty: float,
+    obs_stats: tuple[torch.Tensor, torch.Tensor] | None,
+    q0: torch.Tensor,
+    qd0: torch.Tensor,
+    prev_action0: torch.Tensor,
+    stochastic_actor: bool,
+) -> tuple[torch.Tensor, dict]:
+    q = q0.clone()
+    qd = qd0.clone()
+    prev_action = prev_action0.clone()
+    gamma_vec = torch.ones(env.num_envs, dtype=torch.float32, device=env.torch_device)
+    loss = torch.zeros((), dtype=torch.float32, device=env.torch_device)
+    rewards = []
+    invalid_count = 0
+    fall_count = 0
+    for _ in range(horizon):
+        obs = normalize_obs(env.observe(q, qd, prev_action), obs_stats)
+        raw_action = actor(obs, deterministic=not stochastic_actor)
+        action = torch.tanh(raw_action)
+        q, qd = env.step(q, qd, env.action_to_joint_f(action))
+        invalid = env.invalid_state(q, qd)
+        fell = torch.logical_and(env.fallen_state(q), ~invalid)
+        next_obs = env.observe(q, qd, action)
+        rew = env.reward(q, qd, action, obs=next_obs)
+        rew = torch.where(invalid, torch.full_like(rew, ANT_INVALID_PENALTY), rew)
+        if termination_penalty > 0.0:
+            rew = torch.where(fell, rew - termination_penalty, rew)
+        rewards.append(rew.detach().mean())
+        loss = loss - (gamma_vec * rew * rew_scale).sum()
+        done = torch.logical_or(invalid, fell)
+        invalid_count += int(invalid.detach().sum().cpu())
+        fall_count += int(fell.detach().sum().cpu())
+        gamma_vec = gamma_vec * gamma * (~done).to(torch.float32)
+        prev_action = action
+    denom = max(1, horizon * env.num_envs)
+    return loss / denom, {
+        "mean_reward": float(torch.stack(rewards).mean().detach().cpu()) if rewards else None,
+        "invalid_count": invalid_count,
+        "fall_count": fall_count,
+    }
+
+
+def one_step_action_loss(
+    env: NewtonMuJoCoTorchEnv,
+    *,
+    q0: torch.Tensor,
+    qd0: torch.Tensor,
+    action: torch.Tensor,
+    termination_penalty: float,
+) -> tuple[torch.Tensor, dict]:
+    q, qd = env.step(q0, qd0, env.action_to_joint_f(action))
+    invalid = env.invalid_state(q, qd)
+    fell = torch.logical_and(env.fallen_state(q), ~invalid)
+    obs = env.observe(q, qd, action)
+    rew = env.reward(q, qd, action, obs=obs)
+    rew = torch.where(invalid, torch.full_like(rew, ANT_INVALID_PENALTY), rew)
+    if termination_penalty > 0.0:
+        rew = torch.where(fell, rew - termination_penalty, rew)
+    return -rew.mean(), {
+        "mean_reward": float(rew.detach().mean().cpu()),
+        "invalid_count": int(invalid.detach().sum().cpu()),
+        "fall_count": int(fell.detach().sum().cpu()),
+    }
+
+
+def central_difference_rows(
+    *,
+    base_values: torch.Tensor,
+    analytic_grad: torch.Tensor,
+    directions: torch.Tensor,
+    epsilons: list[float],
+    evaluate,
+    assign,
+) -> list[dict]:
+    rows = []
+    analytic_directional = torch.mv(directions, analytic_grad).detach().cpu().numpy()
+    for eps in epsilons:
+        fd_values = []
+        losses_plus = []
+        losses_minus = []
+        for direction in directions:
+            assign(base_values + eps * direction)
+            plus = evaluate()
+            assign(base_values - eps * direction)
+            minus = evaluate()
+            fd_values.append((plus - minus) / (2.0 * eps))
+            losses_plus.append(plus)
+            losses_minus.append(minus)
+        assign(base_values)
+
+        fd = np.asarray(fd_values, dtype=np.float64)
+        ad = analytic_directional.astype(np.float64)
+        abs_error = np.abs(ad - fd)
+        denom = np.maximum(np.maximum(np.abs(fd), np.abs(ad)), 1.0e-12)
+        rel_error = abs_error / denom
+        rows.append(
+            {
+                "epsilon": eps,
+                "mean_abs_error": float(abs_error.mean()),
+                "median_abs_error": float(np.median(abs_error)),
+                "max_abs_error": float(abs_error.max()),
+                "mean_relative_error": float(rel_error.mean()),
+                "median_relative_error": float(np.median(rel_error)),
+                "max_relative_error": float(rel_error.max()),
+                "sign_agreement": float(np.mean(np.sign(ad) == np.sign(fd))),
+                "mean_fd_abs": float(np.mean(np.abs(fd))),
+                "mean_ad_abs": float(np.mean(np.abs(ad))),
+                "per_direction": [
+                    {
+                        "direction": int(i),
+                        "analytic": float(ad[i]),
+                        "finite_difference": float(fd[i]),
+                        "abs_error": float(abs_error[i]),
+                        "relative_error": float(rel_error[i]),
+                        "loss_plus": float(losses_plus[i]),
+                        "loss_minus": float(losses_minus[i]),
+                    }
+                    for i in range(len(fd_values))
+                ],
+            }
+        )
+    return rows
+
+
+def masked_random_directions(
+    *,
+    count: int,
+    width: int,
+    mask: torch.Tensor,
+    seed: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    generator = torch.Generator(device=device)
+    generator.manual_seed(seed)
+    directions = torch.randn((count, width), generator=generator, dtype=dtype, device=device)
+    directions = directions * mask.view(1, -1).to(dtype=dtype, device=device)
+    return directions / directions.norm(dim=1, keepdim=True).clamp(min=1.0e-12)
+
+
+def run_gradient_check(args: argparse.Namespace) -> dict:
+    if args.env != "ant":
+        raise ValueError("gradient checks are currently configured for the ant environment")
+    if args.contact_backend is None:
+        args.contact_backend = "newton"
+    if args.horizon is None:
+        args.horizon = args.grad_check_horizon
+    if args.eval_horizon is None:
+        args.eval_horizon = args.horizon
+    if args.episode_length is None:
+        args.episode_length = 1000
+    if args.force_scale is None:
+        args.force_scale = 100.0
+    if args.reset_noise is None:
+        args.reset_noise = 0.0
+    if args.termination_penalty is None:
+        args.termination_penalty = 10.0
+    if args.stochastic_actor is None:
+        args.stochastic_actor = True
+    if args.obs_rms is None:
+        args.obs_rms = args.obs_rms_path is not None
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    wp.init()
+
+    env = NewtonMuJoCoTorchEnv(
+        env_name=args.env,
+        num_envs=args.num_envs,
+        device=args.device,
+        dt=args.dt,
+        force_scale=args.force_scale,
+        contact_backend=args.contact_backend,
+    )
+    actor = make_actor(env, stochastic=args.stochastic_actor)
+    if args.actor_path is not None:
+        actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
+    obs_stats = load_obs_rms(args.obs_rms_path, env.torch_device) if args.obs_rms_path is not None else None
+
+    q0, qd0 = env.reset(noise=0.0, stochastic_init=False)
+    prev0 = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
+    params = trainable_parameters(actor)
+    base_params = flatten_parameters(params)
+    epsilons = args.grad_check_eps or list(DEFAULT_GRAD_CHECK_EPS)
+
+    def eval_policy_loss() -> float:
+        torch.manual_seed(args.seed + 1000)
+        with torch.no_grad():
+            loss_value, _ = shac_rollout_loss(
+                env,
+                actor,
+                horizon=args.horizon,
+                gamma=args.gamma,
+                rew_scale=args.rew_scale,
+                termination_penalty=args.termination_penalty,
+                obs_stats=obs_stats,
+                q0=q0,
+                qd0=qd0,
+                prev_action0=prev0,
+                stochastic_actor=args.stochastic_actor,
+            )
+        return float(loss_value.detach().cpu())
+
+    actor.zero_grad(set_to_none=True)
+    torch.manual_seed(args.seed + 1000)
+    policy_loss, policy_metrics = shac_rollout_loss(
+        env,
+        actor,
+        horizon=args.horizon,
+        gamma=args.gamma,
+        rew_scale=args.rew_scale,
+        termination_penalty=args.termination_penalty,
+        obs_stats=obs_stats,
+        q0=q0,
+        qd0=qd0,
+        prev_action0=prev0,
+        stochastic_actor=args.stochastic_actor,
+    )
+    policy_loss.backward()
+    policy_grad = flatten_gradients(params)
+    policy_grad_norm = float(policy_grad.to(torch.float64).norm().detach().cpu())
+
+    generator = torch.Generator(device=env.torch_device)
+    generator.manual_seed(args.seed + 2000)
+    policy_directions = torch.randn(
+        (args.grad_check_directions, base_params.numel()),
+        generator=generator,
+        dtype=base_params.dtype,
+        device=base_params.device,
+    )
+    policy_directions = policy_directions / policy_directions.norm(dim=1, keepdim=True).clamp(min=1.0e-12)
+    policy_rows = central_difference_rows(
+        base_values=base_params,
+        analytic_grad=policy_grad,
+        directions=policy_directions,
+        epsilons=epsilons,
+        evaluate=eval_policy_loss,
+        assign=lambda values: assign_flat_parameters(params, values),
+    )
+
+    with torch.no_grad():
+        obs0 = normalize_obs(env.observe(q0, qd0, prev0), obs_stats)
+        action0 = torch.tanh(actor(obs0, deterministic=True)).detach()
+    action0.requires_grad_(True)
+    action_loss, action_metrics = one_step_action_loss(
+        env,
+        q0=q0,
+        qd0=qd0,
+        action=action0,
+        termination_penalty=args.termination_penalty,
+    )
+    action_loss.backward()
+    action_grad = torch.nan_to_num(action0.grad.detach().reshape(-1), nan=0.0, posinf=0.0, neginf=0.0)
+    action_base = action0.detach().reshape(-1)
+    action_generator = torch.Generator(device=env.torch_device)
+    action_generator.manual_seed(args.seed + 3000)
+    action_directions = torch.randn(
+        (args.grad_check_directions, action_base.numel()),
+        generator=action_generator,
+        dtype=action_base.dtype,
+        device=action_base.device,
+    )
+    action_directions = action_directions / action_directions.norm(dim=1, keepdim=True).clamp(min=1.0e-12)
+    mutable_action = action_base.clone()
+
+    def assign_action(values: torch.Tensor) -> None:
+        mutable_action.copy_(values)
+
+    def eval_action_loss() -> float:
+        with torch.no_grad():
+            loss_value, _ = one_step_action_loss(
+                env,
+                q0=q0,
+                qd0=qd0,
+                action=mutable_action.view_as(action0),
+                termination_penalty=args.termination_penalty,
+            )
+        return float(loss_value.detach().cpu())
+
+    action_rows = central_difference_rows(
+        base_values=action_base,
+        analytic_grad=action_grad,
+        directions=action_directions,
+        epsilons=epsilons,
+        evaluate=eval_action_loss,
+        assign=assign_action,
+    )
+
+    state_q = q0.detach().clone().requires_grad_(True)
+    state_qd = qd0.detach().clone().requires_grad_(True)
+    state_action = action0.detach().clone().requires_grad_(True)
+    state_action_loss, state_action_metrics = one_step_action_loss(
+        env,
+        q0=state_q,
+        qd0=state_qd,
+        action=state_action,
+        termination_penalty=args.termination_penalty,
+    )
+    state_action_loss.backward()
+    state_grad = torch.cat(
+        [
+            torch.nan_to_num(state_q.grad.detach(), nan=0.0, posinf=0.0, neginf=0.0).reshape(-1),
+            torch.nan_to_num(state_qd.grad.detach(), nan=0.0, posinf=0.0, neginf=0.0).reshape(-1),
+            torch.nan_to_num(state_action.grad.detach(), nan=0.0, posinf=0.0, neginf=0.0).reshape(-1),
+        ]
+    )
+    state_base = torch.cat([q0.detach().reshape(-1), qd0.detach().reshape(-1), action0.detach().reshape(-1)])
+    state_generator = torch.Generator(device=env.torch_device)
+    state_generator.manual_seed(args.seed + 4000)
+    state_directions = torch.randn(
+        (args.grad_check_directions, state_base.numel()),
+        generator=state_generator,
+        dtype=state_base.dtype,
+        device=state_base.device,
+    )
+    state_directions = state_directions / state_directions.norm(dim=1, keepdim=True).clamp(min=1.0e-12)
+    mutable_state = state_base.clone()
+    q_count = q0.numel()
+    qd_count = qd0.numel()
+
+    def assign_state(values: torch.Tensor) -> None:
+        mutable_state.copy_(values)
+
+    def eval_state_action_loss() -> float:
+        with torch.no_grad():
+            q_eval = mutable_state[:q_count].view_as(q0)
+            qd_eval = mutable_state[q_count : q_count + qd_count].view_as(qd0)
+            action_eval = mutable_state[q_count + qd_count :].view_as(action0)
+            loss_value, _ = one_step_action_loss(
+                env,
+                q0=q_eval,
+                qd0=qd_eval,
+                action=action_eval,
+                termination_penalty=args.termination_penalty,
+            )
+        return float(loss_value.detach().cpu())
+
+    state_action_rows = central_difference_rows(
+        base_values=state_base,
+        analytic_grad=state_grad,
+        directions=state_directions,
+        epsilons=epsilons,
+        evaluate=eval_state_action_loss,
+        assign=assign_state,
+    )
+    component_masks: dict[str, torch.Tensor] = {}
+    state_width = state_base.numel()
+    for component in [
+        "root_pos_q",
+        "root_quat_q",
+        "joint_q",
+        "root_qd",
+        "joint_qd",
+        "action",
+    ]:
+        component_masks[component] = torch.zeros(state_width, dtype=torch.float32, device=env.torch_device)
+    for env_id in range(env.num_envs):
+        q_offset = env_id * env.q_dim
+        qd_offset = q_count + env_id * env.qd_dim
+        action_offset = q_count + qd_count + env_id * env.num_actions
+        component_masks["root_pos_q"][q_offset : q_offset + 3] = 1.0
+        component_masks["root_quat_q"][q_offset + 3 : q_offset + 7] = 1.0
+        component_masks["joint_q"][q_offset + 7 : q_offset + env.q_dim] = 1.0
+        component_masks["root_qd"][qd_offset : qd_offset + 6] = 1.0
+        component_masks["joint_qd"][qd_offset + 6 : qd_offset + env.qd_dim] = 1.0
+        component_masks["action"][action_offset : action_offset + env.num_actions] = 1.0
+
+    component_rows = {}
+    for idx, (component, mask) in enumerate(component_masks.items()):
+        directions = masked_random_directions(
+            count=args.grad_check_directions,
+            width=state_width,
+            mask=mask,
+            seed=args.seed + 5000 + idx,
+            device=env.torch_device,
+            dtype=state_base.dtype,
+        )
+        component_rows[component] = central_difference_rows(
+            base_values=state_base,
+            analytic_grad=state_grad,
+            directions=directions,
+            epsilons=epsilons,
+            evaluate=eval_state_action_loss,
+            assign=assign_state,
+        )
+
+    result = {
+        "env": args.env,
+        "mode": "gradcheck",
+        "title": "SHAC with MuJoCo Warp",
+        "timestamp_pacific": pacific_now_iso(),
+        "contact_backend": args.contact_backend,
+        "num_envs": args.num_envs,
+        "horizon": args.horizon,
+        "dt": args.dt,
+        "force_scale": args.force_scale,
+        "stochastic_actor": args.stochastic_actor,
+        "actor_path": str(args.actor_path) if args.actor_path is not None else None,
+        "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
+        "epsilon_values": epsilons,
+        "directions": args.grad_check_directions,
+        "policy": {
+            "loss": float(policy_loss.detach().cpu()),
+            "analytic_grad_norm": finite_float(policy_grad_norm),
+            "metrics": policy_metrics,
+            "epsilon_sweep": policy_rows,
+        },
+        "one_step_action": {
+            "loss": float(action_loss.detach().cpu()),
+            "analytic_grad_norm": finite_float(float(action_grad.to(torch.float64).norm().detach().cpu())),
+            "metrics": action_metrics,
+            "epsilon_sweep": action_rows,
+        },
+        "one_step_state_action": {
+            "loss": float(state_action_loss.detach().cpu()),
+            "analytic_grad_norm": finite_float(float(state_grad.to(torch.float64).norm().detach().cpu())),
+            "metrics": state_action_metrics,
+            "epsilon_sweep": state_action_rows,
+            "components": component_rows,
+        },
+        "gpu": query_gpu(),
+    }
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / args.grad_check_file
+    write_json(out_path, result)
+    print(f"wrote gradient check to {out_path}")
+    return result
+
+
 def run_training(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco" if args.env == "ant" else "none"
@@ -771,10 +1304,9 @@ def run_training(args: argparse.Namespace) -> dict:
 
         loss = actor_loss / (args.horizon * args.num_envs)
         loss.backward()
-        for param in actor.parameters():
-            if param.grad is not None:
-                param.grad.nan_to_num_(0.0, 0.0, 0.0)
-        grad_norm = float(torch.nn.utils.clip_grad_norm_(actor.parameters(), args.grad_clip).detach().cpu())
+        grad_norm = sanitize_and_clip_grad_norm(
+            trainable_parameters(actor), args.grad_clip, args.grad_value_clip
+        )
         mean_reward = float(torch.stack(rewards).mean().detach().cpu())
         final_reward = float(rewards[-1].detach().cpu())
         optimizer.step()
@@ -807,10 +1339,9 @@ def run_training(args: argparse.Namespace) -> dict:
                     critic_loss = (pred - target_flat[idx]).square().mean()
                     critic_optimizer.zero_grad(set_to_none=True)
                     critic_loss.backward()
-                    for param in critic.parameters():
-                        if param.grad is not None:
-                            param.grad.nan_to_num_(0.0, 0.0, 0.0)
-                    torch.nn.utils.clip_grad_norm_(critic.parameters(), args.grad_clip)
+                    sanitize_and_clip_grad_norm(
+                        trainable_parameters(critic), args.grad_clip, args.grad_value_clip
+                    )
                     critic_optimizer.step()
                     last_loss = critic_loss
 
@@ -949,8 +1480,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "poster": poster_path.name if poster_path else None,
         "gpu": query_gpu(),
     }
-    with (out_dir / f"{args.env}_results.json").open("w") as f:
-        json.dump(result, f, indent=2)
+    write_json(out_dir / f"{args.env}_results.json", result)
     return result
 
 
@@ -1104,8 +1634,13 @@ def pacific_now_iso() -> str:
     return datetime.now(tz).isoformat(timespec="seconds")
 
 
+def parse_float_list(value: str) -> list[float]:
+    return [float(item.strip()) for item in value.split(",") if item.strip()]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["train", "gradcheck"], default="train")
     parser.add_argument("--env", choices=["cartpole", "ant"], default="cartpole")
     parser.add_argument("--out-dir", default=str(Path(__file__).resolve().parent / "assets"))
     parser.add_argument("--device", default="cuda:0")
@@ -1124,6 +1659,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rew-scale", type=float, default=1.0)
     parser.add_argument("--force-scale", type=float, default=None)
     parser.add_argument("--grad-clip", type=float, default=None)
+    parser.add_argument("--grad-value-clip", type=float, default=1.0e6)
     parser.add_argument("--reset-noise", type=float, default=None)
     parser.add_argument("--termination-penalty", type=float, default=None)
     parser.add_argument("--reset-each-epoch", action="store_true")
@@ -1151,9 +1687,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--video-num-envs", type=int, default=1)
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
+    parser.add_argument("--actor-path", type=Path, default=None)
+    parser.add_argument("--obs-rms-path", type=Path, default=None)
+    parser.add_argument("--grad-check-file", default="ant_gradient_check.json")
+    parser.add_argument("--grad-check-horizon", type=int, default=8)
+    parser.add_argument("--grad-check-directions", type=int, default=8)
+    parser.add_argument("--grad-check-eps", type=parse_float_list, default=None)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     os.environ.setdefault("MJWARP_ENABLE_AD", "1")
-    run_training(parse_args())
+    parsed_args = parse_args()
+    if parsed_args.mode == "gradcheck":
+        run_gradient_check(parsed_args)
+    else:
+        run_training(parsed_args)
