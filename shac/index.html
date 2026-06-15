@@ -246,9 +246,8 @@
       <div>
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
-          Cartpole-focused rerun of Newton's differentiable MuJoCo Warp bridge. This update fixes the cartpole model orientation,
-          removes rollout overlays, and switches the harness from an actor-only short-horizon test to a closer SHAC-style
-          actor/critic loop.
+          Newton differentiable MuJoCo Warp experiments using a SHAC-style actor/critic loop. This update keeps the corrected
+          cartpole result and adds the first grounded ant locomotion pass with MuJoCo contacts and Newton differentiable contacts.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -265,25 +264,25 @@
 
     <section class="grid three" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">240-step return</div>
+        <div class="label">Cartpole 240-step return</div>
         <div class="value" id="eval-return">...</div>
         <p class="note">Deterministic rollout from the hanging initial state.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Mean training FPS</div>
-        <div class="value" id="mean-fps">...</div>
-        <p class="note">64 envs, 32 differentiable steps per epoch.</p>
+        <div class="label">Ant 240-step return</div>
+        <div class="value" id="ant-return">...</div>
+        <p class="note">Newton contacts, force scale 100 rendered checkpoint.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Peak CUDA memory</div>
+        <div class="label">Ant mean training FPS</div>
         <div class="value" id="memory">...</div>
-        <p class="note">PyTorch-reported allocation during training.</p>
+        <p class="note">64 envs, 32 differentiable steps per epoch.</p>
       </div>
     </section>
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Dynamics Fix</h2>
+        <h2>Cartpole Fix</h2>
         <p>
           The first cartpole run loaded the DiffRL URDF directly into a Y-up Newton model. DiffRL actually applies a
           <code>-pi/2</code> rotation about X before setting the pole joint to <code>-pi</code>. Without that transform, gravity and
@@ -291,11 +290,11 @@
         </p>
       </article>
       <article class="panel warn">
-        <h2>Training Fix</h2>
+        <h2>Ant Fix</h2>
         <p>
-          The earlier harness reset every epoch and optimized only a truncated actor objective. The rerun keeps persistent 240-step
-          episodes, samples the stochastic actor during training, normalizes observations, and trains a TD-lambda critic target like
-          DiffRL SHAC. The policy now swings up and finishes upright near the rail center.
+          The ant MJCF import was missing an explicit ground plane, so both contact backends initially let the ant fall through the
+          world. The ant builder now uses DiffRL's Y-up transform, rest pose, contact material, previous-action observation, early
+          termination, and a Y-up ground plane before SolverMuJoCo is constructed.
         </p>
       </article>
     </section>
@@ -320,13 +319,38 @@
     </section>
 
     <section class="panel">
-      <h2>Final Rollout</h2>
+      <h2>Cartpole Rollout</h2>
       <figure>
         <video controls preload="metadata" poster="assets/cartpole_poster.png">
           <source src="assets/cartpole_rollout.mp4" type="video/mp4">
         </video>
         <figcaption>
           Pure frames returned by <code>ViewerGL.get_frame()</code>. No state labels, traces, or composited overlays are applied.
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>Ant Selection Return</h2>
+        <div id="ant-selection-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Ant Reset Diagnostics</h2>
+        <div id="ant-reset-chart" class="chart"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Ant Rollout</h2>
+      <figure>
+        <video controls preload="metadata" poster="assets/ant_newton_ground_force100_run1/ant_poster.png">
+          <source src="assets/ant_newton_ground_force100_run1/ant_rollout.mp4" type="video/mp4">
+        </video>
+        <figcaption>
+          Raw <code>ViewerGL.get_frame()</code> frames from the Newton-contact force-scale-100 checkpoint. The video is the first
+          150 simulation steps so it shows the learned motion before the high-height guard reset that occurs later in the 240-step
+          evaluation.
         </figcaption>
       </figure>
     </section>
@@ -362,8 +386,9 @@
       <article class="panel">
         <h2>Status</h2>
         <p>
-          Cartpole is now physically plausible and trains to an upright stabilizing policy. Ant remains deferred for the next pass;
-          it needs the same full SHAC treatment plus contact-specific validation before its published numbers should be trusted.
+          Cartpole is physically plausible and stabilizes. Ant now has correct ground contact and trains with both MuJoCo contacts
+          and Newton differentiable contacts. Newton contacts produced the strongest return in this pass, but the policy can still
+          exploit hopping/high-height motions, so the report separates speed-oriented return from clean-rollout diagnostics.
         </p>
       </article>
     </section>
@@ -381,6 +406,12 @@
   --adam-beta1 0.7 --adam-beta2 0.95 --grad-clip 1 \
   --critic-iterations 16 --critic-batch-size 512 \
   --target-critic-alpha 0.2 --render-video --video-num-envs 1</code></pre>
+      <pre><code>uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
+  python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
+  --env ant --contact-backend newton --force-scale 100 \
+  --num-envs 64 --epochs 100 --horizon 32 \
+  --eval-horizon 240 --selection-horizon 240 \
+  --critic-iterations 8 --critic-batch-size 2048</code></pre>
     </section>
   </main>
 
@@ -392,7 +423,12 @@
       loss: "#7c3aed",
       value: "#d97706",
       fps: "#15803d",
-      grad: "#e45757"
+      grad: "#e45757",
+      blue: "#2563eb",
+      teal: "#0f766e",
+      coral: "#e45757",
+      amber: "#d97706",
+      violet: "#7c3aed"
     };
 
     const plotConfig = {
@@ -445,6 +481,17 @@
       };
     }
 
+    function resultLine(result, key, name, color) {
+      return {
+        type: "scatter",
+        mode: "lines",
+        name,
+        x: result.history.map((row) => row.epoch),
+        y: result.history.map((row) => row[key] ?? 0),
+        line: { color, width: 3 }
+      };
+    }
+
     function pacificStamp(value) {
       return new Date(value).toLocaleString(undefined, {
         dateStyle: "medium",
@@ -454,13 +501,18 @@
     }
 
     async function load() {
-      const result = await fetch("assets/cartpole_results.json").then((res) => res.json());
+      const [result, antNewton, antFast, antMujoco] = await Promise.all([
+        fetch("assets/cartpole_results.json").then((res) => res.json()),
+        fetch("assets/ant_newton_ground_force100_run1/ant_results.json").then((res) => res.json()),
+        fetch("assets/ant_newton_ground_run1/ant_results.json").then((res) => res.json()),
+        fetch("assets/ant_mujoco_ground_run1/ant_results.json").then((res) => res.json())
+      ]);
       const finalObs = result.eval.final_obs_mean;
 
-      document.getElementById("report-stamp").textContent = pacificStamp(result.timestamp_pacific);
+      document.getElementById("report-stamp").textContent = pacificStamp(antNewton.timestamp_pacific || result.timestamp_pacific);
       document.getElementById("eval-return").textContent = fmt(result.eval.return, 1);
-      document.getElementById("mean-fps").textContent = fmt(result.mean_fps, 0);
-      document.getElementById("memory").textContent = `${fmt(result.max_cuda_memory_allocated_mb, 1)} MB`;
+      document.getElementById("ant-return").textContent = fmt(antNewton.eval.return, 1);
+      document.getElementById("memory").textContent = fmt(antNewton.mean_fps, 0);
 
       Plotly.newPlot("reward-chart", [
         line(result, "mean_reward", "Mean step reward", colors.reward),
@@ -502,17 +554,62 @@
         }
       }, plotConfig);
 
-      document.getElementById("perf-body").innerHTML = `<tr>
-        <td>Cartpole<br><span class="muted">stochastic actor, TD-lambda critic</span></td>
-        <td>${result.num_envs} envs</td>
-        <td>${result.epochs} x ${result.horizon}</td>
-        <td>${result.best_epoch}</td>
-        <td>${fmt(result.total_seconds, 2)} s<br><span class="muted">${fmt(result.mean_epoch_seconds, 3)} s/epoch</span></td>
-        <td>${fmt(result.mean_fps, 0)}</td>
-        <td>${fmt(result.max_cuda_memory_allocated_mb, 1)} MB allocated<br><span class="muted">${fmt(result.max_cuda_memory_reserved_mb, 1)} MB reserved</span></td>
-        <td>x ${fmt(finalObs[0], 3)}, xdot ${fmt(finalObs[1], 3)}<br>
-          sin ${fmt(finalObs[2], 3)}, cos ${fmt(finalObs[3], 3)}, theta dot ${fmt(finalObs[4], 3)}</td>
-      </tr>`;
+      Plotly.newPlot("ant-selection-chart", [
+        resultLine(antNewton, "selection_return", "Newton contacts, force 100", colors.blue),
+        resultLine(antFast, "selection_return", "Newton contacts, force 200", colors.violet),
+        resultLine(antMujoco, "selection_return", "MuJoCo contacts, force 200", colors.teal)
+      ], {
+        ...baseLayout,
+        yaxis: { ...baseLayout.yaxis, title: "240-step return" }
+      }, plotConfig);
+
+      Plotly.newPlot("ant-reset-chart", [
+        resultLine(antNewton, "invalid_resets", "Invalid guard, force 100", colors.coral),
+        resultLine(antNewton, "fall_resets", "Fall resets, force 100", colors.amber),
+        resultLine(antFast, "invalid_resets", "Invalid guard, force 200", colors.violet),
+        resultLine(antMujoco, "invalid_resets", "MuJoCo invalid guard", colors.teal)
+      ], {
+        ...baseLayout,
+        yaxis: { ...baseLayout.yaxis, title: "Resets per epoch" }
+      }, plotConfig);
+
+      function perfRow(envName, result, note, obsText) {
+        return `<tr>
+          <td>${envName}<br><span class="muted">${note}</span></td>
+          <td>${result.num_envs} envs</td>
+          <td>${result.epochs} x ${result.horizon}</td>
+          <td>${result.best_epoch}</td>
+          <td>${fmt(result.total_seconds, 2)} s<br><span class="muted">${fmt(result.mean_epoch_seconds, 3)} s/epoch</span></td>
+          <td>${fmt(result.mean_fps, 0)}</td>
+          <td>${fmt(result.max_cuda_memory_allocated_mb, 1)} MB allocated<br><span class="muted">${fmt(result.max_cuda_memory_reserved_mb, 1)} MB reserved</span></td>
+          <td>${obsText}</td>
+        </tr>`;
+      }
+
+      const antObs = antNewton.eval.final_obs_mean;
+      document.getElementById("perf-body").innerHTML = perfRow(
+        "Cartpole",
+        result,
+        "stochastic actor, TD-lambda critic",
+        `x ${fmt(finalObs[0], 3)}, xdot ${fmt(finalObs[1], 3)}<br>
+          sin ${fmt(finalObs[2], 3)}, cos ${fmt(finalObs[3], 3)}, theta dot ${fmt(finalObs[4], 3)}`
+      ) + perfRow(
+        "Ant",
+        antNewton,
+        `Newton contacts, force scale 100; resets ${antNewton.eval.reset_count} (${antNewton.eval.invalid_count} invalid, ${antNewton.eval.fall_count} fall, ${antNewton.eval.timeout_count} timeout)`,
+        `height ${fmt(antObs[0], 3)}, forward vel ${fmt(antObs[5], 3)}<br>
+          heading ${fmt(antObs[28], 3)}, return ${fmt(antNewton.eval.return, 1)}`
+      ) + perfRow(
+        "Ant",
+        antFast,
+        `Newton contacts, force scale 200; resets ${antFast.eval.reset_count} (${antFast.eval.invalid_count} invalid, ${antFast.eval.fall_count} fall)`,
+        `return ${fmt(antFast.eval.return, 1)}<br><span class="muted">Higher return, high-height guard triggers earlier.</span>`
+      ) + perfRow(
+        "Ant",
+        antMujoco,
+        `MuJoCo contacts, force scale 200; resets ${antMujoco.eval.reset_count} (${antMujoco.eval.invalid_count} invalid, ${antMujoco.eval.fall_count} fall)`,
+        `return ${fmt(antMujoco.eval.return, 1)}<br><span class="muted">Grounded MuJoCo-contact comparison.</span>`
+      );
     }
 
     load().catch((error) => {
