@@ -158,7 +158,11 @@
     .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-    .panel { padding: 17px; }
+    .panel {
+      min-width: 0;
+      overflow-x: auto;
+      padding: 17px;
+    }
 
     .metric { border-top: 4px solid var(--teal); }
     .metric:nth-child(2) { border-top-color: var(--blue); }
@@ -189,6 +193,7 @@
     .chart {
       width: 100%;
       height: 350px;
+      overflow: hidden;
     }
 
     video {
@@ -247,7 +252,8 @@
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
           Newton differentiable MuJoCo Warp experiments using a SHAC-style actor/critic loop. This update keeps the corrected
-          cartpole result, grounded ant locomotion runs, and finite-difference gradient checks for the ant SHAC objective.
+          cartpole result, grounded ant locomotion runs, finite-difference gradient checks, and minimal solver scenes that isolate
+          the ant gradient failure to q-dependent multi-body dynamics.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -295,8 +301,8 @@
           The ant MJCF import was missing an explicit ground plane, so both contact backends initially let the ant fall through the
           world. The ant builder now uses DiffRL's Y-up transform, rest pose, contact material, previous-action observation, early
           termination, and a Y-up ground plane. The remaining bad-looking gait is consistent with a state-gradient problem rather
-          than a contact-backend choice: finite differences match the one-step action gradient, but not the qpos-driven state
-          transition gradients used by multi-step SHAC.
+          than a contact-backend choice. The new minimal scenes narrow this further: one-link and free-body state bridges pass, but
+          two-link q-position derivatives fail when acceleration depends on the q-dependent mass matrix.
         </p>
       </article>
     </section>
@@ -370,6 +376,39 @@
       </table>
     </section>
 
+    <section class="grid two">
+      <div class="panel">
+        <h2>Solver Drilldown</h2>
+        <div id="solver-drilldown-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Two-Link Epsilon Sweep</h2>
+        <div id="solver-sweep-chart" class="chart"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Root Cause Drilldown</h2>
+      <p>
+        The isolated zero-gravity, zero-velocity, forced two-link scene has no contacts, no gravity, and no Coriolis term. The
+        only q sensitivity is the mass-matrix solve <code>qacc = M(q)^-1 f</code>. Its force gradient matches finite differences,
+        but its q-position gradient is nearly absent in the analytic path. This points to the MJWarp smooth-acceleration adjoint
+        through <code>M</code>/<code>qLD</code>/<code>qLDiagInv</code>, not to SHAC, contacts, rendering, or Newton's q/qd bridge.
+      </p>
+      <table style="margin-top: 12px;">
+        <thead>
+          <tr>
+            <th>Scene</th>
+            <th>Checked block</th>
+            <th>Best relative error</th>
+            <th>Analytic vs finite difference</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody id="solver-body"></tbody>
+      </table>
+    </section>
+
     <section class="panel">
       <h2>Ant Rollout</h2>
       <figure>
@@ -417,8 +456,8 @@
         <p>
           Cartpole is physically plausible and stabilizes. Ant now has correct ground contact and trains with both MuJoCo contacts
           and Newton differentiable contacts. The finite-difference checks show that the remaining failure is not specific to
-          MuJoCo contacts versus Newton contacts: qpos-related transition gradients disagree with finite differences even when
-          contacts are disabled, while the immediate action gradient is accurate.
+          MuJoCo contacts versus Newton contacts. Minimal two-link scenes show that the failing term is q-position sensitivity of
+          multi-body acceleration through the q-dependent mass matrix. Immediate hinge action gradients are accurate.
         </p>
       </article>
     </section>
@@ -448,6 +487,8 @@
   --num-envs 4 --horizon 8 --grad-check-directions 8 \
   --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_actor.pt \
   --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_obs_rms.pt</code></pre>
+      <pre><code>uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
+  python /home/horde/repos/academic-website-reports/shac/run_solver_gradient_diagnostics.py</code></pre>
     </section>
   </main>
 
@@ -462,6 +503,7 @@
       grad: "#e45757",
       blue: "#2563eb",
       teal: "#0f766e",
+      green: "#15803d",
       coral: "#e45757",
       amber: "#d97706",
       violet: "#7c3aed",
@@ -548,6 +590,29 @@
       }, null);
     }
 
+    function bestSolverRow(rows) {
+      return rows.reduce((best, row) => {
+        if (!best || row.relative_error < best.relative_error) return row;
+        return best;
+      }, null);
+    }
+
+    function solverCase(diag, name) {
+      return diag.cases.find((entry) => entry.case === name);
+    }
+
+    function solverGroup(diag, caseName, groupName) {
+      return solverCase(diag, caseName).groups[groupName];
+    }
+
+    function solverBest(diag, caseName, groupName) {
+      return bestSolverRow(solverGroup(diag, caseName, groupName).epsilon_sweep);
+    }
+
+    function vectorText(values) {
+      return `[${values.map((value) => fmt(value, 4)).join(", ")}]`;
+    }
+
     function componentNames(grad) {
       return Object.keys(grad.one_step_state_action.components);
     }
@@ -569,18 +634,19 @@
     }
 
     async function load() {
-      const [result, antNewton, antFast, antMujoco, gradNewton, gradMujoco, gradNone] = await Promise.all([
+      const [result, antNewton, antFast, antMujoco, gradNewton, gradMujoco, gradNone, solverDiag] = await Promise.all([
         fetch("assets/cartpole_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_force100_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_mujoco_ground_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_gradcheck_newton_force100/ant_gradient_check.json").then((res) => res.json()),
         fetch("assets/ant_gradcheck_mujoco_force100/ant_gradient_check.json").then((res) => res.json()),
-        fetch("assets/ant_gradcheck_nocontact_force100/ant_gradient_check.json").then((res) => res.json())
+        fetch("assets/ant_gradcheck_nocontact_force100/ant_gradient_check.json").then((res) => res.json()),
+        fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics.json").then((res) => res.json())
       ]);
       const finalObs = result.eval.final_obs_mean;
 
-      document.getElementById("report-stamp").textContent = pacificStamp(antNewton.timestamp_pacific || result.timestamp_pacific);
+      document.getElementById("report-stamp").textContent = pacificStamp(solverDiag.timestamp_pacific || antNewton.timestamp_pacific || result.timestamp_pacific);
       document.getElementById("eval-return").textContent = fmt(result.eval.return, 1);
       document.getElementById("ant-return").textContent = fmt(antNewton.eval.return, 1);
       document.getElementById("memory").textContent = fmt(antNewton.mean_fps, 0);
@@ -767,6 +833,92 @@
         "Contacts disabled",
         gradNone
       );
+
+      const twoLinkCases = [
+        ["two_link_gravity_static_qd_out", "gravity only"],
+        ["two_link_zero_g_dynamic_qd_out", "velocity only"],
+        ["two_link_zero_g_forced_qd_out", "M(q)^-1 force"],
+        ["two_link_qd_out", "gravity + velocity"]
+      ];
+      Plotly.newPlot("solver-drilldown-chart", [
+        {
+          type: "bar",
+          orientation: "h",
+          name: "joint q",
+          y: twoLinkCases.map((item) => item[1]),
+          x: twoLinkCases.map((item) => solverBest(solverDiag, item[0], "joint_q").relative_error),
+          marker: { color: colors.coral }
+        },
+        {
+          type: "bar",
+          orientation: "h",
+          name: "joint qd",
+          y: twoLinkCases.map((item) => item[1]),
+          x: twoLinkCases.map((item) => solverBest(solverDiag, item[0], "joint_qd").relative_error),
+          marker: { color: colors.blue }
+        },
+        {
+          type: "bar",
+          orientation: "h",
+          name: "joint force",
+          y: twoLinkCases.map((item) => item[1]),
+          x: twoLinkCases.map((item) => solverBest(solverDiag, item[0], "joint_force").relative_error),
+          marker: { color: colors.green }
+        }
+      ], {
+        ...baseLayout,
+        barmode: "group",
+        xaxis: { ...baseLayout.xaxis, title: "Best relative error", type: "log" },
+        yaxis: { ...baseLayout.yaxis, title: "", automargin: true },
+        legend: { orientation: "h", y: -0.3 },
+        margin: { t: 18, r: 18, b: 72, l: 126 }
+      }, plotConfig);
+
+      function solverSweep(caseName, groupName, name, color) {
+        const rows = solverGroup(solverDiag, caseName, groupName).epsilon_sweep;
+        return {
+          type: "scatter",
+          mode: "lines+markers",
+          name,
+          x: rows.map((row) => row.epsilon),
+          y: rows.map((row) => row.relative_error),
+          line: { color, width: 3 },
+          marker: { size: 7 }
+        };
+      }
+
+      Plotly.newPlot("solver-sweep-chart", [
+        solverSweep("pendulum_qd_out", "joint_q", "one-link q", colors.teal),
+        solverSweep("two_link_gravity_static_qd_out", "joint_q", "two-link gravity q", colors.coral),
+        solverSweep("two_link_zero_g_forced_qd_out", "joint_q", "two-link M(q)^-1 force q", colors.violet),
+        solverSweep("two_link_zero_g_forced_qd_out", "joint_force", "two-link force", colors.green)
+      ], {
+        ...baseLayout,
+        xaxis: { ...baseLayout.xaxis, title: "Finite-difference epsilon", type: "log", autorange: "reversed" },
+        yaxis: { ...baseLayout.yaxis, title: "Relative error", type: "log" },
+        legend: { orientation: "h", y: -0.32 }
+      }, plotConfig);
+
+      function solverRow(caseName, label, groupName, meaning) {
+        const row = solverBest(solverDiag, caseName, groupName);
+        return `<tr>
+          <td>${label}</td>
+          <td>${groupName.replaceAll("_", " ")}</td>
+          <td>eps ${row.epsilon}<br><span class="muted">rel ${fmt(row.relative_error, 4)}</span></td>
+          <td><span class="muted">AD</span> ${vectorText(row.analytic)}<br><span class="muted">FD</span> ${vectorText(row.finite_difference)}</td>
+          <td>${meaning}</td>
+        </tr>`;
+      }
+
+      document.getElementById("solver-body").innerHTML = [
+        solverRow("hinge_q_out", "one-link zero-g hinge", "joint_q", "Newton/MJWarp q bridge is correct in the trivial case."),
+        solverRow("pendulum_qd_out", "one-link gravity pendulum", "joint_q", "Gravity q derivative is accurate for a single DOF."),
+        solverRow("two_link_gravity_static_qd_out", "two-link gravity, qd=0", "joint_q", "Multi-body q derivative fails even without contacts or velocity coupling."),
+        solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_q", "Isolates the missing q sensitivity of M(q)^-1 f."),
+        solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_force", "Force/action derivative through the same solve is accurate."),
+        solverRow("free_quaternion_out_normalized_fd", "free body quaternion", "root_quat_q_normalized", "Free-body quaternion bridge matches normalized finite differences."),
+        solverRow("free_velocity_out", "free body force", "root_force", "Separate gap: direct free-joint force lacks a velocity-output gradient.")
+      ].join("");
     }
 
     load().catch((error) => {
