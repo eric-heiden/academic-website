@@ -87,16 +87,17 @@
 
     <section>
       <h2>Isaac Lab Newton PR 3187 startup</h2>
-      <p>Newton PR <a href="https://github.com/newton-physics/newton/pull/3187">#3187</a> was benchmarked against Newton <code>origin/main</code> in an Isaac Lab worktree using <code>presets=newton_mjwarp</code>, the summary benchmark backend, and editable Newton installs verified before launch.</p>
+      <p>Newton PR <a href="https://github.com/newton-physics/newton/pull/3187">#3187</a> was benchmarked against Newton <code>origin/main</code> in an Isaac Lab worktree using <code>presets=newton_mjwarp</code>, the summary benchmark backend, and editable Newton installs verified before launch. Every sample in this section was rerun at <code>1024</code> envs under a 2-logical-CPU affinity cap with <code>taskset -c 0,1</code>.</p>
       <div class="meta">
-        <span class="pill">Generated: <code>2026-06-16T04:47:56+00:00</code></span>
+        <span class="pill">Generated: <code>2026-06-16T05:53:38+00:00</code></span>
         <span class="pill">Newton main: <code>2c24200200b1</code></span>
         <span class="pill">PR 3187: <code>172dbda45f6a</code></span>
         <span class="pill">Isaac Lab: <code>a59603d2eaf2</code></span>
         <span class="pill">Preset: <code>newton_mjwarp</code></span>
+        <span class="pill">CPU cap: <code>taskset -c 0,1</code></span>
       </div>
       <div class="callout">
-        <p><strong>Headline:</strong> PR 3187 improved reported env-creation wall time in every completed matched sample: Ant 128 by 3.02x, Cartpole 4096 by 1.50x, and Humanoid 128 by 1.31x.</p>
+        <p><strong>Headline:</strong> At 1024 envs under the CPU cap, PR 3187 is near parity on Cartpole, Ant, and Humanoid, improves G1 env creation by 1.32x, and improves Franka Reach env creation by 7.14x.</p>
       </div>
       <div class="table-scroll">
         <table>
@@ -104,9 +105,11 @@
             <tr><th>Task</th><th>Envs</th><th>Main env creation s</th><th>PR env creation s</th><th>Env speedup</th><th>Scene speedup</th><th>Simulation-start speedup</th><th>First-step delta</th></tr>
           </thead>
           <tbody>
-            <tr><td>Ant</td><td>128</td><td>124.715</td><td>41.304</td><td class="good">3.02x</td><td>3.28x</td><td>1.31x</td><td class="good">-33.6%</td></tr>
-            <tr><td>Cartpole</td><td>4096</td><td>2,641.830</td><td>1,766.782</td><td class="good">1.50x</td><td>1.46x</td><td>22.42x</td><td class="bad">+34.0%</td></tr>
-            <tr><td>Humanoid</td><td>128</td><td>305.397</td><td>232.673</td><td class="good">1.31x</td><td>1.20x</td><td>14.30x</td><td class="good">-7.8%</td></tr>
+            <tr><td>Cartpole</td><td>1024</td><td>6.584</td><td>6.803</td><td class="bad">0.97x</td><td>0.90x</td><td>0.99x</td><td class="bad">+0.1%</td></tr>
+            <tr><td>Ant</td><td>1024</td><td>7.833</td><td>7.968</td><td class="bad">0.98x</td><td>0.93x</td><td>1.02x</td><td class="good">-32.1%</td></tr>
+            <tr><td>Humanoid</td><td>1024</td><td>9.208</td><td>9.288</td><td class="bad">0.99x</td><td>0.92x</td><td>1.06x</td><td class="good">-15.4%</td></tr>
+            <tr><td>G1</td><td>1024</td><td>16.072</td><td>12.203</td><td class="good">1.32x</td><td>1.01x</td><td>2.10x</td><td class="bad">+8.3%</td></tr>
+            <tr><td>Franka Reach</td><td>1024</td><td>61.988</td><td>8.677</td><td class="good">7.14x</td><td>7.38x</td><td>12.12x</td><td class="good">-16.1%</td></tr>
           </tbody>
         </table>
       </div>
@@ -116,7 +119,7 @@
         <div id="isaaclab-phase-plot" class="inline-plot"></div>
         <div id="isaaclab-wrapper-plot" class="inline-plot"></div>
       </div>
-      <p>Cartpole uses 4096 envs to match the requested launch shape. Ant and Humanoid use 128 envs after a 1024-env Ant attempt hit a CUDA 13 NVRTC loader-path issue before JSON emission. Normalized data and raw reports are kept with this published page.</p>
+      <p>All five task/revision pairs use 1024 envs. The Franka row uses <code>Isaac-Reach-Franka</code>; <code>Isaac-Lift-Cube-Franka</code> does not expose the <code>newton_mjwarp</code> preset in this Isaac Lab checkout. Normalized data and raw reports are kept with this published page.</p>
       <div class="links">
         <a href="data/isaaclab_pr3187_startup_summary.json">Isaac Lab startup summary JSON</a>
         <a href="data/isaaclab_pr3187_raw/index.json">raw startup JSON manifest</a>
