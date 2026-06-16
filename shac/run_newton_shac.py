@@ -58,6 +58,19 @@ class AntRewardWeights:
 
 
 @dataclass
+class HopperRewardWeights:
+    progress: float = 1.0
+    height: float = 1.0
+    angle: float = 1.0
+    action: float = -0.1
+
+
+@dataclass
+class CheetahRewardWeights:
+    action: float = -0.1
+
+
+@dataclass
 class AcrobotRewardWeights:
     target: float = 8.0
     velocity: float = 0.05
@@ -83,11 +96,24 @@ ANT_ACTION_PENALTY = 0.0
 ANT_DEFAULT_TERMINATION_PENALTY = 20.0
 ANT_DEFAULT_SELECTION_FALL_PENALTY = 500.0
 ANT_DEFAULT_SELECTION_INVALID_PENALTY = 500.0
+HOPPER_TERMINATION_HEIGHT = -0.45
+HOPPER_TERMINATION_ANGLE = math.pi / 6.0
+HOPPER_TERMINATION_HEIGHT_TOLERANCE = 0.15
+HOPPER_START_HEIGHT = 0.0
+CHEETAH_START_HEIGHT = -0.2
 DEFAULT_GRAD_CHECK_EPS = (1.0e-1, 3.0e-2, 1.0e-2, 3.0e-3, 1.0e-3, 3.0e-4, 1.0e-4)
 
 
 def is_contact_target_env(env_name: str) -> bool:
     return env_name in {"contact_sphere", "contact_capsule"}
+
+
+def is_planar_locomotion_env(env_name: str) -> bool:
+    return env_name in {"hopper", "cheetah"}
+
+
+def is_locomotion_env(env_name: str) -> bool:
+    return env_name == "ant" or is_planar_locomotion_env(env_name)
 
 
 def normalize_vec(x: torch.Tensor, eps: float = 1.0e-9) -> torch.Tensor:
@@ -218,7 +244,7 @@ def assign_flat_parameters(parameters: list[torch.nn.Parameter], values: torch.T
             offset += count
 
 
-def finalize_ant_reward(
+def finalize_terminal_reward(
     reward: torch.Tensor,
     *,
     invalid: torch.Tensor,
@@ -322,6 +348,8 @@ class NewtonMuJoCoTorchEnv:
         contact_backend: str,
         cartpole_reward: CartpoleRewardWeights | None = None,
         ant_reward: AntRewardWeights | None = None,
+        hopper_reward: HopperRewardWeights | None = None,
+        cheetah_reward: CheetahRewardWeights | None = None,
         acrobot_reward: AcrobotRewardWeights | None = None,
         contact_reward: ContactTargetRewardWeights | None = None,
         acrobot_actuation: str = "elbow",
@@ -329,6 +357,7 @@ class NewtonMuJoCoTorchEnv:
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
         ant_min_up: float | None = None,
+        locomotion_disable_joint_limits: bool = False,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -339,6 +368,8 @@ class NewtonMuJoCoTorchEnv:
         self.contact_backend = contact_backend
         self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
         self.ant_reward = ant_reward or AntRewardWeights()
+        self.hopper_reward = hopper_reward or HopperRewardWeights()
+        self.cheetah_reward = cheetah_reward or CheetahRewardWeights()
         self.acrobot_reward = acrobot_reward or AcrobotRewardWeights()
         self.contact_reward = contact_reward or ContactTargetRewardWeights()
         self.acrobot_actuation = acrobot_actuation
@@ -346,6 +377,7 @@ class NewtonMuJoCoTorchEnv:
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
         self.ant_min_up = ant_min_up
+        self.locomotion_disable_joint_limits = locomotion_disable_joint_limits
         self.acrobot_link_length = 1.0
         self.contact_body_radius = 0.22
         self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
@@ -358,6 +390,10 @@ class NewtonMuJoCoTorchEnv:
             self._build_contact_target(capsule=env_name == "contact_capsule")
         elif env_name == "ant":
             self._build_ant()
+        elif env_name == "hopper":
+            self._build_hopper()
+        elif env_name == "cheetah":
+            self._build_cheetah()
         else:
             raise ValueError(f"unknown env_name: {env_name}")
 
@@ -554,6 +590,77 @@ class NewtonMuJoCoTorchEnv:
         self.model = builder.finalize(device=self.wp_device, requires_grad=True)
         self.num_actions = 8
 
+    def _build_planar_locomotion(
+        self,
+        *,
+        asset_name: str,
+        num_actions: int,
+        start_height: float,
+        contact_mu: float,
+        joint_damping: float,
+        armature: float,
+        ignore_inertial_definitions: bool = False,
+    ) -> None:
+        source = newton.ModelBuilder(up_axis="Y")
+        SolverMuJoCo.register_custom_attributes(source)
+        source.default_shape_cfg.ke = 2.0e4
+        source.default_shape_cfg.kd = 1.0e3
+        source.default_shape_cfg.kf = 1.0e3
+        source.default_shape_cfg.mu = contact_mu
+        source.default_joint_cfg.armature = armature
+        source.default_joint_cfg.damping = joint_damping
+        source.default_joint_cfg.limit_ke = 1.0e3
+        source.default_joint_cfg.limit_kd = 1.0e1
+        source.add_mjcf(
+            str(DIFFRL_ROOT / "envs" / "assets" / asset_name),
+            up_axis="Z",
+            ignore_inertial_definitions=ignore_inertial_definitions,
+        )
+        source.joint_q[1] = start_height
+        source.joint_target_q[1] = start_height
+        for dof_id in range(3, len(source.joint_limit_lower)):
+            if self.locomotion_disable_joint_limits:
+                source.joint_limit_lower[dof_id] = -1.0e10
+                source.joint_limit_upper[dof_id] = 1.0e10
+                source.joint_limit_ke[dof_id] = 0.0
+                source.joint_limit_kd[dof_id] = 0.0
+            else:
+                source.joint_limit_ke[dof_id] = 1.0e3
+                source.joint_limit_kd[dof_id] = 1.0e1
+        source.shape_material_ke = [2.0e4] * len(source.shape_material_ke)
+        source.shape_material_kd = [1.0e3] * len(source.shape_material_kd)
+        source.shape_material_kf = [1.0e3] * len(source.shape_material_kf)
+        source.shape_material_mu = [contact_mu] * len(source.shape_material_mu)
+
+        builder = newton.ModelBuilder(up_axis="Y")
+        SolverMuJoCo.register_custom_attributes(builder)
+        builder.replicate(source, self.num_envs, spacing=(0.0, 0.0, 0.0))
+        ground_cfg = newton.ModelBuilder.ShapeConfig(ke=2.0e4, kd=1.0e3, kf=1.0e3, mu=contact_mu)
+        builder.add_ground_plane(cfg=ground_cfg)
+        self.model = builder.finalize(device=self.wp_device, requires_grad=True)
+        self.num_actions = num_actions
+
+    def _build_hopper(self) -> None:
+        self._build_planar_locomotion(
+            asset_name="hopper.xml",
+            num_actions=3,
+            start_height=HOPPER_START_HEIGHT,
+            contact_mu=0.9,
+            joint_damping=2.0,
+            armature=1.0,
+        )
+
+    def _build_cheetah(self) -> None:
+        self._build_planar_locomotion(
+            asset_name="half_cheetah.xml",
+            num_actions=6,
+            start_height=CHEETAH_START_HEIGHT,
+            contact_mu=1.0,
+            joint_damping=1.0,
+            armature=0.1,
+            ignore_inertial_definitions=True,
+        )
+
     def zero_solver_buffers(self) -> None:
         data = self.solver.mjw_data
         data.qacc_warmstart.zero_()
@@ -620,6 +727,10 @@ class NewtonMuJoCoTorchEnv:
         qd = self.start_qd.clone()
         if self.env_name == "ant" and stochastic_init:
             q, qd = self._randomize_ant_reset(q, qd)
+        elif self.env_name == "hopper" and stochastic_init:
+            q, qd = self._randomize_planar_reset(q, qd, position_scale=0.05, angle_scale=0.1, joint_scale=0.05, velocity_scale=0.05)
+        elif self.env_name == "cheetah" and stochastic_init:
+            q, qd = self._randomize_planar_reset(q, qd, position_scale=0.1, angle_scale=0.2, joint_scale=0.1, velocity_scale=0.5)
         elif is_contact_target_env(self.env_name) and stochastic_init:
             q[:, [0, 2]] = q[:, [0, 2]] + 0.15 * (torch.rand((q.shape[0], 2), device=self.torch_device) - 0.5)
             qd[:] = 0.2 * (torch.rand_like(qd) - 0.5)
@@ -647,6 +758,22 @@ class NewtonMuJoCoTorchEnv:
         qd[:] = 0.5 * (torch.rand_like(qd) - 0.5)
         return q, qd
 
+    def _randomize_planar_reset(
+        self,
+        q: torch.Tensor,
+        qd: torch.Tensor,
+        *,
+        position_scale: float,
+        angle_scale: float,
+        joint_scale: float,
+        velocity_scale: float,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        q[:, 0:2] = q[:, 0:2] + position_scale * (torch.rand((q.shape[0], 2), device=self.torch_device) - 0.5) * 2.0
+        q[:, 2] = q[:, 2] + angle_scale * (torch.rand(q.shape[0], device=self.torch_device) - 0.5)
+        q[:, 3:] = q[:, 3:] + joint_scale * (torch.rand_like(q[:, 3:]) - 0.5) * 2.0
+        qd[:] = velocity_scale * (torch.rand_like(qd) - 0.5) * 2.0
+        return q, qd
+
     def reset_done(
         self,
         q: torch.Tensor,
@@ -661,6 +788,24 @@ class NewtonMuJoCoTorchEnv:
         reset_qd = self.start_qd[env_ids].clone()
         if self.env_name == "ant" and stochastic_init:
             reset_q, reset_qd = self._randomize_ant_reset(reset_q, reset_qd)
+        elif self.env_name == "hopper" and stochastic_init:
+            reset_q, reset_qd = self._randomize_planar_reset(
+                reset_q,
+                reset_qd,
+                position_scale=0.05,
+                angle_scale=0.1,
+                joint_scale=0.05,
+                velocity_scale=0.05,
+            )
+        elif self.env_name == "cheetah" and stochastic_init:
+            reset_q, reset_qd = self._randomize_planar_reset(
+                reset_q,
+                reset_qd,
+                position_scale=0.1,
+                angle_scale=0.2,
+                joint_scale=0.1,
+                velocity_scale=0.5,
+            )
         elif is_contact_target_env(self.env_name) and stochastic_init:
             reset_q[:, [0, 2]] = reset_q[:, [0, 2]] + 0.15 * (
                 torch.rand((reset_q.shape[0], 2), device=self.torch_device) - 0.5
@@ -719,6 +864,12 @@ class NewtonMuJoCoTorchEnv:
             target_error = pos - self.contact_target(q.shape[0])
             return torch.cat([pos[:, 1:2], rot, qd_scaled, target_error, prev_action.clone()], dim=-1)
 
+        if is_planar_locomotion_env(self.env_name):
+            return torch.cat([q[:, 1:], qd], dim=-1)
+
+        if self.env_name != "ant":
+            raise ValueError(f"unknown env_name: {self.env_name}")
+
         if prev_action is None:
             prev_action = torch.zeros((q.shape[0], self.num_actions), dtype=torch.float32, device=self.torch_device)
 
@@ -761,8 +912,12 @@ class NewtonMuJoCoTorchEnv:
         elif is_contact_target_env(self.env_name):
             joint_f[:, 0] = action[:, 0] * self.force_scale
             joint_f[:, 2] = action[:, 1] * self.force_scale
-        else:
+        elif is_planar_locomotion_env(self.env_name):
+            joint_f[:, 3 : 3 + self.num_actions] = action[:, : self.num_actions] * self.force_scale
+        elif self.env_name == "ant":
             joint_f[:, 6 : 6 + self.num_actions] = action[:, : self.num_actions] * self.force_scale
+        else:
+            raise ValueError(f"unknown env_name: {self.env_name}")
         return joint_f
 
     def acrobot_target(self, count: int) -> torch.Tensor:
@@ -824,6 +979,30 @@ class NewtonMuJoCoTorchEnv:
                 + weights.action * action.square().sum(dim=-1)
             )
 
+        if self.env_name == "hopper":
+            if obs is None:
+                obs = self.observe(q, qd, action)
+            height_diff = obs[:, 0] - (HOPPER_TERMINATION_HEIGHT + HOPPER_TERMINATION_HEIGHT_TOLERANCE)
+            height_reward = torch.clamp(height_diff, -1.0, 0.3)
+            height_reward = torch.where(height_reward < 0.0, -200.0 * height_reward.square(), height_reward)
+            weights = self.hopper_reward
+            progress_reward = weights.progress * obs[:, 5]
+            angle_reward = weights.angle * (1.0 - obs[:, 1].square() / (HOPPER_TERMINATION_ANGLE**2))
+            return (
+                progress_reward
+                + weights.height * height_reward
+                + angle_reward
+                + weights.action * action.square().sum(dim=-1)
+            )
+
+        if self.env_name == "cheetah":
+            if obs is None:
+                obs = self.observe(q, qd, action)
+            return obs[:, 8] + self.cheetah_reward.action * action.square().sum(dim=-1)
+
+        if self.env_name != "ant":
+            raise ValueError(f"unknown env_name: {self.env_name}")
+
         if obs is None:
             obs = self.observe(q, qd, action)
         progress_reward = obs[:, 5]
@@ -840,11 +1019,14 @@ class NewtonMuJoCoTorchEnv:
 
     def done(self, q: torch.Tensor, progress: torch.Tensor, episode_length: int) -> torch.Tensor:
         done = progress >= episode_length
-        if self.env_name == "ant":
+        if self.env_name in {"ant", "hopper"}:
             done = torch.logical_or(done, self.fallen_state(q))
         return done
 
     def fallen_state(self, q: torch.Tensor) -> torch.Tensor:
+        if self.env_name == "hopper":
+            finite = torch.isfinite(q).all(dim=-1)
+            return torch.logical_and(finite, q[:, 1] < HOPPER_TERMINATION_HEIGHT)
         if self.env_name != "ant":
             return torch.zeros(q.shape[0], dtype=torch.bool, device=q.device)
         finite = torch.isfinite(q).all(dim=-1)
@@ -862,6 +1044,10 @@ class NewtonMuJoCoTorchEnv:
             invalid = torch.logical_or(invalid, q[:, 1] > ANT_MAX_HEALTHY_HEIGHT)
             invalid = torch.logical_or(invalid, q[:, 0].abs() > 100.0)
             invalid = torch.logical_or(invalid, q[:, 2].abs() > 100.0)
+            invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
+        elif is_planar_locomotion_env(self.env_name):
+            invalid = torch.logical_or(invalid, q[:, 0].abs() > 100.0)
+            invalid = torch.logical_or(invalid, q[:, 1].abs() > 10.0)
             invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
         elif is_contact_target_env(self.env_name):
             invalid = torch.logical_or(invalid, q[:, 1] < 0.02)
@@ -901,7 +1087,7 @@ class NewtonMuJoCoTorchEnv:
 
 def make_actor(env: NewtonMuJoCoTorchEnv, stochastic: bool = False) -> torch.nn.Module:
     cfg = {
-        "actor_mlp": {"units": [128, 64, 32] if env.env_name == "ant" else [64, 64], "activation": "elu"},
+        "actor_mlp": {"units": [128, 64, 32] if is_locomotion_env(env.env_name) else [64, 64], "activation": "elu"},
         "actor_logstd_init": -1.0,
     }
     if stochastic:
@@ -1001,7 +1187,7 @@ def shac_rollout_loss(
         fell = torch.logical_and(env.fallen_state(q), ~invalid)
         next_obs = env.observe(q, qd, action)
         rew = env.reward(q, qd, action, obs=next_obs)
-        rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
+        rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.detach().mean())
         loss = loss - (gamma_vec * rew * rew_scale).sum()
         done = torch.logical_or(invalid, fell)
@@ -1030,7 +1216,7 @@ def one_step_action_loss(
     fell = torch.logical_and(env.fallen_state(q), ~invalid)
     obs = env.observe(q, qd, action)
     rew = env.reward(q, qd, action, obs=obs)
-    rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
+    rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
     return -rew.mean(), {
         "mean_reward": float(rew.detach().mean().cpu()),
         "invalid_count": int(invalid.detach().sum().cpu()),
@@ -1115,21 +1301,21 @@ def masked_random_directions(
 
 def run_gradient_check(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
-        args.contact_backend = "newton" if args.env == "ant" else ("mujoco" if is_contact_target_env(args.env) else "none")
+        args.contact_backend = "newton" if args.env == "ant" else ("mujoco" if is_planar_locomotion_env(args.env) or is_contact_target_env(args.env) else "none")
     if args.horizon is None:
         args.horizon = args.grad_check_horizon
     if args.eval_horizon is None:
         args.eval_horizon = args.horizon
     if args.episode_length is None:
-        args.episode_length = 1000 if args.env == "ant" else 240
+        args.episode_length = 1000 if is_locomotion_env(args.env) else 240
     if args.force_scale is None:
-        args.force_scale = 100.0 if args.env == "ant" else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
+        args.force_scale = 100.0 if args.env == "ant" else (200.0 if is_planar_locomotion_env(args.env) else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0)))
     if args.reset_noise is None:
         args.reset_noise = 0.0
     if args.termination_penalty is None:
-        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY
+        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env in {"ant", "hopper"} else 0.0
     if args.stochastic_actor is None:
-        args.stochastic_actor = args.env == "ant"
+        args.stochastic_actor = is_locomotion_env(args.env)
     if args.obs_rms is None:
         args.obs_rms = args.obs_rms_path is not None
 
@@ -1149,6 +1335,14 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
+        hopper_reward=HopperRewardWeights(
+            progress=args.hopper_progress_weight,
+            height=args.hopper_height_weight,
+            angle=args.hopper_angle_weight,
+            action=args.hopper_action_penalty,
+        ),
+        cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
         acrobot_reward=AcrobotRewardWeights(
             target=args.acrobot_target_weight,
             velocity=args.acrobot_velocity_weight,
@@ -1333,7 +1527,9 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         assign=assign_state,
     )
     state_width = state_base.numel()
-    if env.q_dim == 7 and env.qd_dim == 6:
+    if is_planar_locomotion_env(env.env_name):
+        component_names = ["root_planar_q", "joint_q", "root_planar_qd", "joint_qd", "action"]
+    elif env.q_dim == 7 and env.qd_dim == 6:
         component_names = ["root_pos_q", "root_quat_q", "root_qd", "action"]
     elif env.q_dim >= 7 and env.qd_dim >= 6:
         component_names = ["root_pos_q", "root_quat_q", "joint_q", "root_qd", "joint_qd", "action"]
@@ -1355,6 +1551,11 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
             component_masks["root_qd"][qd_offset : qd_offset + 6] = 1.0
             if "joint_qd" in component_masks:
                 component_masks["joint_qd"][qd_offset + 6 : qd_offset + env.qd_dim] = 1.0
+        elif "root_planar_q" in component_masks:
+            component_masks["root_planar_q"][q_offset : q_offset + 3] = 1.0
+            component_masks["joint_q"][q_offset + 3 : q_offset + env.q_dim] = 1.0
+            component_masks["root_planar_qd"][qd_offset : qd_offset + 3] = 1.0
+            component_masks["joint_qd"][qd_offset + 3 : qd_offset + env.qd_dim] = 1.0
         else:
             component_masks["joint_q"][q_offset : q_offset + env.q_dim] = 1.0
             component_masks["joint_qd"][qd_offset : qd_offset + env.qd_dim] = 1.0
@@ -1393,6 +1594,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
+        "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
+        "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "epsilon_values": epsilons,
@@ -1400,6 +1603,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "policy": {
             "loss": float(policy_loss.detach().cpu()),
             "analytic_grad_norm": finite_float(policy_grad_norm),
@@ -1424,7 +1628,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / args.grad_check_file
+    grad_check_file = args.grad_check_file or f"{args.env}_gradient_check.json"
+    out_path = out_dir / grad_check_file
     write_json(out_path, result)
     print(f"wrote gradient check to {out_path}")
     return result
@@ -1432,43 +1637,43 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
 
 def run_training(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
-        args.contact_backend = "mujoco" if args.env == "ant" or is_contact_target_env(args.env) else "none"
+        args.contact_backend = "mujoco" if is_locomotion_env(args.env) or is_contact_target_env(args.env) else "none"
     if args.horizon is None:
-        args.horizon = 32 if args.env == "ant" else (48 if is_contact_target_env(args.env) else (64 if args.env == "acrobot" else 48))
+        args.horizon = 32 if is_locomotion_env(args.env) else (48 if is_contact_target_env(args.env) else (64 if args.env == "acrobot" else 48))
     if args.eval_horizon is None:
         args.eval_horizon = (
-            480 if args.env == "ant" else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
+            480 if is_locomotion_env(args.env) else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
         )
     if args.episode_length is None:
-        args.episode_length = 1000 if args.env == "ant" else 240
+        args.episode_length = 1000 if is_locomotion_env(args.env) else 240
     if args.force_scale is None:
-        args.force_scale = 200.0 if args.env == "ant" else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
+        args.force_scale = 200.0 if is_locomotion_env(args.env) else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
     if args.grad_clip is None:
-        args.grad_clip = 1.0 if args.env == "ant" else (10.0 if args.env == "acrobot" or is_contact_target_env(args.env) else 100.0)
+        args.grad_clip = 1.0 if is_locomotion_env(args.env) else (10.0 if args.env == "acrobot" or is_contact_target_env(args.env) else 100.0)
     if args.reset_noise is None:
-        args.reset_noise = 0.0 if args.env == "ant" or is_contact_target_env(args.env) else 0.05
+        args.reset_noise = 0.0 if is_locomotion_env(args.env) or is_contact_target_env(args.env) else 0.05
     if args.termination_penalty is None:
-        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env == "ant" else 0.0
+        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env in {"ant", "hopper"} else 0.0
     if args.lr_schedule is None:
-        args.lr_schedule = "linear" if args.env == "ant" else "constant"
+        args.lr_schedule = "linear" if is_locomotion_env(args.env) else "constant"
     if args.adam_beta1 is None:
-        args.adam_beta1 = 0.7 if args.env == "ant" else 0.9
+        args.adam_beta1 = 0.7 if is_locomotion_env(args.env) else 0.9
     if args.adam_beta2 is None:
-        args.adam_beta2 = 0.95 if args.env == "ant" else 0.999
+        args.adam_beta2 = 0.95 if is_locomotion_env(args.env) else 0.999
     if args.critic_lr is None:
-        args.critic_lr = 2.0e-3 if args.env == "ant" else 1.0e-3
+        args.critic_lr = 2.0e-4 if args.env == "hopper" else (2.0e-3 if args.env in {"ant", "cheetah"} else 1.0e-3)
     if args.critic_iterations is None:
-        args.critic_iterations = 16 if args.env == "ant" else 8
+        args.critic_iterations = 16 if is_locomotion_env(args.env) else 8
     if args.critic_method is None:
-        args.critic_method = "td-lambda" if args.env == "ant" else "one-step"
+        args.critic_method = "td-lambda" if is_locomotion_env(args.env) else "one-step"
     if args.stochastic_actor is None:
-        args.stochastic_actor = args.env == "ant"
+        args.stochastic_actor = is_locomotion_env(args.env)
     if args.stochastic_init is None:
-        args.stochastic_init = args.env == "ant"
+        args.stochastic_init = is_locomotion_env(args.env)
     if args.use_critic is None:
-        args.use_critic = args.env == "ant"
+        args.use_critic = is_locomotion_env(args.env)
     if args.obs_rms is None:
-        args.obs_rms = args.env == "ant"
+        args.obs_rms = is_locomotion_env(args.env)
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -1486,6 +1691,7 @@ def run_training(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
         ant_reward=AntRewardWeights(
             progress=args.ant_progress_weight,
             heading=args.ant_heading_weight,
@@ -1493,6 +1699,13 @@ def run_training(args: argparse.Namespace) -> dict:
             height=args.ant_height_weight,
             action=args.ant_action_penalty,
         ),
+        hopper_reward=HopperRewardWeights(
+            progress=args.hopper_progress_weight,
+            height=args.hopper_height_weight,
+            angle=args.hopper_angle_weight,
+            action=args.hopper_action_penalty,
+        ),
+        cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
         acrobot_reward=AcrobotRewardWeights(
             target=args.acrobot_target_weight,
             velocity=args.acrobot_velocity_weight,
@@ -1601,7 +1814,7 @@ def run_training(args: argparse.Namespace) -> dict:
             )
             next_obs_raw = env.observe(q_next, qd_next, action)
             rew = env.reward(q_next, qd_next, action, obs=next_obs_raw)
-            rew = finalize_ant_reward(
+            rew = finalize_terminal_reward(
                 rew,
                 invalid=invalid,
                 fell=fell,
@@ -1801,8 +2014,11 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
                 cartpole_reward=env.cartpole_reward,
                 ant_reward=env.ant_reward,
+                hopper_reward=env.hopper_reward,
+                cheetah_reward=env.cheetah_reward,
                 acrobot_reward=env.acrobot_reward,
                 contact_reward=env.contact_reward,
             )
@@ -1852,10 +2068,13 @@ def run_training(args: argparse.Namespace) -> dict:
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "ant_reward": env.ant_reward.__dict__,
+        "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
+        "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "total_seconds": total_s,
         "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
         "mean_fps": float(np.mean([h["fps"] for h in history])),
@@ -1927,7 +2146,7 @@ def evaluate_policy(
             up_samples.append(final_obs[:, 27].detach().mean())
             heading_samples.append(final_obs[:, 28].detach().mean())
         rew = env.reward(q, qd, action, obs=final_obs)
-        rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
+        rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
         episode_returns = episode_returns + rew
         episode_lengths = episode_lengths + 1
@@ -2007,6 +2226,16 @@ def render_rollout(
         viewer.camera.look_at((0.75, 0.25, 0.0))
         if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
             viewer.camera.fov = 45.0
+    elif env_name == "hopper":
+        viewer.set_camera(pos=wp.vec3(-2.6, 1.4, 4.0), pitch=-15.0, yaw=-120.0)
+        viewer.camera.look_at((0.0, 0.25, 0.0))
+        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
+            viewer.camera.fov = 45.0
+    elif env_name == "cheetah":
+        viewer.set_camera(pos=wp.vec3(-3.6, 1.1, 5.5), pitch=-12.0, yaw=-115.0)
+        viewer.camera.look_at((0.0, -0.05, 0.0))
+        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
+            viewer.camera.fov = 45.0
     else:
         viewer.set_camera(pos=wp.vec3(-3.0, 2.8, 5.0), pitch=-20.0, yaw=-140.0)
         viewer.camera.look_at((0.0, 0.7, 0.0))
@@ -2028,6 +2257,16 @@ def render_rollout(
                     target_z = float(q[0, 2].detach().cpu())
                     viewer.set_camera(pos=wp.vec3(target_x - 3.0, target_y + 2.2, target_z + 4.5), pitch=-20.0, yaw=-140.0)
                     viewer.camera.look_at((target_x, target_y, target_z))
+                elif env_name == "hopper":
+                    target_x = float(q[0, 0].detach().cpu())
+                    target_y = float(q[0, 1].detach().cpu())
+                    viewer.set_camera(pos=wp.vec3(target_x - 2.6, target_y + 1.2, 4.0), pitch=-15.0, yaw=-120.0)
+                    viewer.camera.look_at((target_x, target_y + 0.25, 0.0))
+                elif env_name == "cheetah":
+                    target_x = float(q[0, 0].detach().cpu())
+                    target_y = float(q[0, 1].detach().cpu())
+                    viewer.set_camera(pos=wp.vec3(target_x - 3.6, target_y + 1.0, 5.5), pitch=-12.0, yaw=-115.0)
+                    viewer.camera.look_at((target_x, target_y, 0.0))
                 state = env.make_viewer_state(q, qd)
                 viewer.begin_frame(frame_idx * env.dt)
                 viewer.log_state(state)
@@ -2088,7 +2327,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=["train", "gradcheck"], default="train")
     parser.add_argument(
         "--env",
-        choices=["cartpole", "acrobot", "contact_sphere", "contact_capsule", "ant"],
+        choices=["cartpole", "acrobot", "contact_sphere", "contact_capsule", "ant", "hopper", "cheetah"],
         default="cartpole",
     )
     parser.add_argument("--out-dir", default=str(Path(__file__).resolve().parent / "assets"))
@@ -2148,6 +2387,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--hopper-height-weight", type=float, default=1.0)
+    parser.add_argument("--hopper-progress-weight", type=float, default=1.0)
+    parser.add_argument("--hopper-angle-weight", type=float, default=1.0)
+    parser.add_argument("--hopper-action-penalty", type=float, default=-0.1)
+    parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
+    parser.add_argument("--locomotion-disable-joint-limits", action="store_true")
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
@@ -2157,7 +2402,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
-    parser.add_argument("--grad-check-file", default="ant_gradient_check.json")
+    parser.add_argument("--grad-check-file", default=None)
     parser.add_argument("--grad-check-horizon", type=int, default=8)
     parser.add_argument("--grad-check-directions", type=int, default=8)
     parser.add_argument("--grad-check-eps", type=parse_float_list, default=None)

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -109,7 +110,7 @@ class NewtonSolverStep(torch.autograd.Function):
 
 
 class MinimalSolverEnv:
-    def __init__(self, scene: str, device: str, dt: float):
+    def __init__(self, scene: str, device: str, dt: float, *, solver_iterations: int = 4, ls_iterations: int = 4):
         self.scene = scene
         self.torch_device = torch.device(device)
         self.wp_device = wp.device_from_torch(self.torch_device)
@@ -117,12 +118,22 @@ class MinimalSolverEnv:
 
         if scene == "single_hinge_zero_g":
             self.model = self._build_single_hinge()
+        elif scene == "limited_hinge_zero_g":
+            self.model = self._build_limited_hinge()
+        elif scene == "free_limited_hinge_zero_g":
+            self.model = self._build_free_limited_hinge()
         elif scene == "single_hinge_gravity":
             self.model = self._build_single_hinge_gravity()
         elif scene == "double_hinge_gravity":
             self.model = self._build_double_hinge(gravity=-9.81)
         elif scene in {"double_hinge_gravity_static", "double_hinge_zero_g_dynamic", "double_hinge_zero_g_forced"}:
             self.model = self._build_double_hinge(gravity=-9.81 if scene == "double_hinge_gravity_static" else 0.0)
+        elif scene == "double_limited_hinge_zero_g":
+            self.model = self._build_double_limited_hinge()
+        elif scene == "planar_chain_zero_g":
+            self.model = self._build_planar_locomotion_branch(branches=1)
+        elif scene == "planar_branch_zero_g":
+            self.model = self._build_planar_locomotion_branch(branches=2)
         elif scene == "free_body_zero_g":
             self.model = self._build_free_body()
         else:
@@ -134,8 +145,9 @@ class MinimalSolverEnv:
             requires_grad=True,
             integrator="euler",
             solver="newton",
-            iterations=4,
-            ls_iterations=4,
+            jacobian=os.environ.get("NEWTON_SHAC_DIAG_JACOBIAN"),
+            iterations=solver_iterations,
+            ls_iterations=ls_iterations,
             update_data_interval=1,
         )
         self.step_ctx = StepContext(self)
@@ -158,6 +170,76 @@ class MinimalSolverEnv:
             color=wp.vec3(0.17, 0.45, 0.88),
         )
         joint = builder.add_joint_revolute(parent=-1, child=link, axis=wp.vec3(0.0, 0.0, 1.0), armature=0.0)
+        builder.add_articulation([joint])
+        return builder.finalize(device=self.wp_device, requires_grad=True)
+
+    def _build_free_limited_hinge(self) -> newton.Model:
+        builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
+        SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
+        base_inertia = wp.mat33(np.diag([0.12, 0.10, 0.09]).astype(np.float32))
+        base = builder.add_link(mass=2.0, com=wp.vec3(0.0, 0.0, 0.0), inertia=base_inertia)
+        builder.add_shape_box(
+            body=base,
+            xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), wp.quat_identity()),
+            hx=0.16,
+            hy=0.10,
+            hz=0.08,
+            cfg=visual_cfg,
+            color=wp.vec3(0.43, 0.42, 0.85),
+        )
+        free = builder.add_joint_free(parent=-1, child=base)
+        child_inertia = wp.mat33(np.diag([0.05, 0.04, 0.03]).astype(np.float32))
+        child = builder.add_link(mass=0.7, com=wp.vec3(0.28, 0.0, 0.0), inertia=child_inertia)
+        builder.add_shape_box(
+            body=child,
+            xform=wp.transform(wp.vec3(0.28, 0.0, 0.0), wp.quat_identity()),
+            hx=0.28,
+            hy=0.04,
+            hz=0.04,
+            cfg=visual_cfg,
+            color=wp.vec3(0.91, 0.52, 0.17),
+        )
+        hinge = builder.add_joint_revolute(
+            parent=base,
+            child=child,
+            parent_xform=wp.transform(wp.vec3(0.18, 0.0, 0.0), wp.quat_identity()),
+            child_xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), wp.quat_identity()),
+            axis=wp.vec3(0.0, 0.0, 1.0),
+            limit_lower=-0.5,
+            limit_upper=0.5,
+            limit_ke=1.0e3,
+            limit_kd=10.0,
+            armature=0.0,
+        )
+        builder.add_articulation([free, hinge])
+        return builder.finalize(device=self.wp_device, requires_grad=True)
+
+    def _build_limited_hinge(self) -> newton.Model:
+        builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
+        SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
+        inertia = wp.mat33(np.diag([0.08, 0.08, 0.08]).astype(np.float32))
+        link = builder.add_link(mass=1.0, com=wp.vec3(0.35, 0.0, 0.0), inertia=inertia)
+        builder.add_shape_box(
+            body=link,
+            xform=wp.transform(wp.vec3(0.35, 0.0, 0.0), wp.quat_identity()),
+            hx=0.35,
+            hy=0.045,
+            hz=0.045,
+            cfg=visual_cfg,
+            color=wp.vec3(0.9, 0.37, 0.16),
+        )
+        joint = builder.add_joint_revolute(
+            parent=-1,
+            child=link,
+            axis=wp.vec3(0.0, 0.0, 1.0),
+            limit_lower=-0.5,
+            limit_upper=0.5,
+            limit_ke=1.0e3,
+            limit_kd=10.0,
+            armature=0.0,
+        )
         builder.add_articulation([joint])
         return builder.finalize(device=self.wp_device, requires_grad=True)
 
@@ -218,6 +300,130 @@ class MinimalSolverEnv:
         builder.add_articulation([joint0, joint1])
         return builder.finalize(device=self.wp_device, requires_grad=True)
 
+    def _build_double_limited_hinge(self) -> newton.Model:
+        builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
+        SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
+        inertia0 = wp.mat33(np.diag([0.08, 0.08, 0.08]).astype(np.float32))
+        inertia1 = wp.mat33(np.diag([0.05, 0.05, 0.05]).astype(np.float32))
+        link0 = builder.add_link(mass=1.0, com=wp.vec3(0.35, 0.0, 0.0), inertia=inertia0)
+        builder.add_shape_box(
+            body=link0,
+            xform=wp.transform(wp.vec3(0.35, 0.0, 0.0), wp.quat_identity()),
+            hx=0.35,
+            hy=0.04,
+            hz=0.04,
+            cfg=visual_cfg,
+            color=wp.vec3(0.84, 0.27, 0.32),
+        )
+        joint0 = builder.add_joint_revolute(
+            parent=-1,
+            child=link0,
+            axis=wp.vec3(0.0, 0.0, 1.0),
+            limit_lower=-0.5,
+            limit_upper=0.5,
+            limit_ke=1.0e3,
+            limit_kd=10.0,
+            armature=0.0,
+        )
+        link1 = builder.add_link(mass=0.8, com=wp.vec3(0.28, 0.0, 0.0), inertia=inertia1)
+        builder.add_shape_box(
+            body=link1,
+            xform=wp.transform(wp.vec3(0.28, 0.0, 0.0), wp.quat_identity()),
+            hx=0.28,
+            hy=0.038,
+            hz=0.038,
+            cfg=visual_cfg,
+            color=wp.vec3(0.9, 0.56, 0.15),
+        )
+        joint1 = builder.add_joint_revolute(
+            parent=link0,
+            child=link1,
+            parent_xform=wp.transform(wp.vec3(0.7, 0.0, 0.0), wp.quat_identity()),
+            child_xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), wp.quat_identity()),
+            axis=wp.vec3(0.0, 0.0, 1.0),
+            limit_lower=-0.5,
+            limit_upper=0.5,
+            limit_ke=1.0e3,
+            limit_kd=10.0,
+            armature=0.0,
+        )
+        builder.add_articulation([joint0, joint1])
+        return builder.finalize(device=self.wp_device, requires_grad=True)
+
+    def _build_planar_locomotion_branch(self, branches: int) -> newton.Model:
+        builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
+        SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
+
+        def unlimited(axis: wp.vec3, *, armature: float = 0.0) -> newton.ModelBuilder.JointDofConfig:
+            return newton.ModelBuilder.JointDofConfig.create_unlimited(axis)
+
+        torso_inertia = wp.mat33(np.diag([0.18, 0.22, 0.12]).astype(np.float32))
+        torso = builder.add_link(mass=2.0, com=wp.vec3(0.0, 0.0, 0.0), inertia=torso_inertia, label="planar_torso")
+        builder.add_shape_box(
+            body=torso,
+            xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), wp.quat_identity()),
+            hx=0.34,
+            hy=0.075,
+            hz=0.10,
+            cfg=visual_cfg,
+            color=wp.vec3(0.20, 0.43, 0.80),
+        )
+        root = builder.add_joint_d6(
+            parent=-1,
+            child=torso,
+            linear_axes=[unlimited(wp.vec3(1.0, 0.0, 0.0)), unlimited(wp.vec3(0.0, 0.0, 1.0))],
+            angular_axes=[unlimited(wp.vec3(0.0, 1.0, 0.0))],
+            label="planar_root",
+        )
+
+        joints = [root]
+        anchors = [0.32] if branches == 1 else [0.32, -0.32]
+        colors = [
+            (wp.vec3(0.91, 0.45, 0.18), wp.vec3(0.97, 0.70, 0.21), wp.vec3(0.28, 0.67, 0.54)),
+            (wp.vec3(0.77, 0.30, 0.61), wp.vec3(0.46, 0.50, 0.86), wp.vec3(0.22, 0.62, 0.78)),
+        ]
+
+        for branch_id, anchor_x in enumerate(anchors):
+            direction = 1.0 if anchor_x >= 0.0 else -1.0
+            parent = torso
+            parent_anchor = anchor_x
+            for segment_id, length in enumerate((0.30, 0.26, 0.22)):
+                mass = 0.65 - 0.12 * segment_id
+                inertia = wp.mat33(np.diag([0.035, 0.045, 0.025]).astype(np.float32))
+                link = builder.add_link(
+                    mass=mass,
+                    com=wp.vec3(direction * 0.5 * length, 0.0, 0.0),
+                    inertia=inertia,
+                    label=f"branch{branch_id}_segment{segment_id}",
+                )
+                builder.add_shape_box(
+                    body=link,
+                    xform=wp.transform(wp.vec3(direction * 0.5 * length, 0.0, 0.0), wp.quat_identity()),
+                    hx=0.5 * length,
+                    hy=0.045,
+                    hz=0.045,
+                    cfg=visual_cfg,
+                    color=colors[branch_id][segment_id],
+                )
+                joint = builder.add_joint_revolute(
+                    parent=parent,
+                    child=link,
+                    parent_xform=wp.transform(wp.vec3(parent_anchor, 0.0, 0.0), wp.quat_identity()),
+                    child_xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), wp.quat_identity()),
+                    axis=wp.vec3(0.0, 1.0, 0.0),
+                    armature=0.0,
+                    limit_ke=0.0,
+                    limit_kd=0.0,
+                )
+                joints.append(joint)
+                parent = link
+                parent_anchor = direction * length
+
+        builder.add_articulation(joints)
+        return builder.finalize(device=self.wp_device, requires_grad=True)
+
     def _build_free_body(self) -> newton.Model:
         builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
         SolverMuJoCo.register_custom_attributes(builder)
@@ -258,9 +464,25 @@ class MinimalSolverEnv:
             qd = torch.tensor([[0.23]], dtype=torch.float32, device=self.torch_device)
             joint_f = torch.tensor([[0.00]], dtype=torch.float32, device=self.torch_device)
             return q, qd, joint_f
+        if self.scene == "limited_hinge_zero_g":
+            q = torch.tensor([[0.72]], dtype=torch.float32, device=self.torch_device)
+            qd = torch.tensor([[0.18]], dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor([[0.00]], dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
+        if self.scene == "free_limited_hinge_zero_g":
+            q = torch.tensor([[0.05, 0.04, -0.03, 0.02, -0.03, 0.04, 1.0, 0.72]], dtype=torch.float32, device=self.torch_device)
+            q[:, 3:7] = torch.nn.functional.normalize(q[:, 3:7], dim=-1)
+            qd = torch.tensor([[0.08, -0.04, 0.03, 0.02, -0.01, 0.03, 0.18]], dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.zeros((1, 7), dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
         if self.scene == "double_hinge_gravity":
             q = torch.tensor([[0.37, -0.26]], dtype=torch.float32, device=self.torch_device)
             qd = torch.tensor([[0.19, -0.31]], dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor([[0.00, 0.00]], dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
+        if self.scene == "double_limited_hinge_zero_g":
+            q = torch.tensor([[0.72, -0.74]], dtype=torch.float32, device=self.torch_device)
+            qd = torch.tensor([[0.18, -0.16]], dtype=torch.float32, device=self.torch_device)
             joint_f = torch.tensor([[0.00, 0.00]], dtype=torch.float32, device=self.torch_device)
             return q, qd, joint_f
         if self.scene == "double_hinge_gravity_static":
@@ -277,6 +499,24 @@ class MinimalSolverEnv:
             q = torch.tensor([[0.37, -0.26]], dtype=torch.float32, device=self.torch_device)
             qd = torch.tensor([[0.0, 0.0]], dtype=torch.float32, device=self.torch_device)
             joint_f = torch.tensor([[0.25, -0.15]], dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
+        if self.scene == "planar_chain_zero_g":
+            q = torch.tensor([[0.0, 0.0, 0.05, 0.14, -0.18, 0.11]], dtype=torch.float32, device=self.torch_device)
+            qd = torch.zeros((1, 6), dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor([[0.0, 0.0, 0.0, 0.35, -0.22, 0.17]], dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
+        if self.scene == "planar_branch_zero_g":
+            q = torch.tensor(
+                [[0.0, 0.0, 0.0, 0.10, -0.15, 0.08, -0.12, 0.18, -0.06]],
+                dtype=torch.float32,
+                device=self.torch_device,
+            )
+            qd = torch.zeros((1, 9), dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor(
+                [[0.0, 0.0, 0.0, 0.45, -0.30, 0.20, -0.35, 0.25, -0.18]],
+                dtype=torch.float32,
+                device=self.torch_device,
+            )
             return q, qd, joint_f
 
         q = torch.tensor(
@@ -399,6 +639,42 @@ def make_cases(dt: float) -> list[DiagnosticCase]:
             },
         ),
         DiagnosticCase(
+            name="limited_hinge_qd_out",
+            scene="limited_hinge_zero_g",
+            q_weight=[0.0],
+            qd_weight=[1.0],
+            groups={
+                "joint_q": ("q", [0]),
+                "joint_qd": ("qd", [0]),
+                "joint_force": ("joint_f", [0]),
+            },
+        ),
+        DiagnosticCase(
+            name="free_limited_hinge_qd_out",
+            scene="free_limited_hinge_zero_g",
+            q_weight=[0.0] * 8,
+            qd_weight=[0.2, -0.1, 0.15, 0.05, -0.03, 0.04, 1.0],
+            groups={
+                "root_pos_q": ("q", [0, 1, 2]),
+                "root_quat_q_raw": ("q", [3, 4, 5, 6]),
+                "joint_q": ("q", [7]),
+                "root_qd": ("qd", [0, 1, 2, 3, 4, 5]),
+                "joint_qd": ("qd", [6]),
+                "joint_force": ("joint_f", [6]),
+            },
+        ),
+        DiagnosticCase(
+            name="double_limited_hinge_qd_out",
+            scene="double_limited_hinge_zero_g",
+            q_weight=[0.0, 0.0],
+            qd_weight=[0.8, -0.6],
+            groups={
+                "joint_q": ("q", [0, 1]),
+                "joint_qd": ("qd", [0, 1]),
+                "joint_force": ("joint_f", [0, 1]),
+            },
+        ),
+        DiagnosticCase(
             name="two_link_qd_out",
             scene="double_hinge_gravity",
             q_weight=[0.0, 0.0],
@@ -440,6 +716,33 @@ def make_cases(dt: float) -> list[DiagnosticCase]:
                 "joint_q": ("q", [0, 1]),
                 "joint_qd": ("qd", [0, 1]),
                 "joint_force": ("joint_f", [0, 1]),
+            },
+        ),
+        DiagnosticCase(
+            name="planar_chain_forced_qd_out",
+            scene="planar_chain_zero_g",
+            q_weight=[0.0] * 6,
+            qd_weight=[1.0, -0.1, 0.35, 0.5, -0.3, 0.2],
+            groups={
+                "root_planar_q": ("q", [0, 1, 2]),
+                "joint_q": ("q", [3, 4, 5]),
+                "root_planar_qd": ("qd", [0, 1, 2]),
+                "joint_qd": ("qd", [3, 4, 5]),
+                "joint_force": ("joint_f", [3, 4, 5]),
+            },
+        ),
+        DiagnosticCase(
+            name="planar_branch_forced_qd_out",
+            scene="planar_branch_zero_g",
+            q_weight=[0.0] * 9,
+            qd_weight=[1.0, -0.1, 0.35, 0.5, -0.3, 0.2, -0.4, 0.25, -0.15],
+            groups={
+                "root_planar_q": ("q", [0, 1, 2]),
+                "front_joint_q": ("q", [3, 4, 5]),
+                "rear_joint_q": ("q", [6, 7, 8]),
+                "root_planar_qd": ("qd", [0, 1, 2]),
+                "joint_qd": ("qd", [3, 4, 5, 6, 7, 8]),
+                "joint_force": ("joint_f", [3, 4, 5, 6, 7, 8]),
             },
         ),
         DiagnosticCase(
@@ -670,6 +973,9 @@ def render_scene_video(
     if env.scene == "free_body_zero_g":
         viewer.set_camera(pos=wp.vec3(0.1, 1.25, 2.8), pitch=-10.0, yaw=-90.0)
         viewer.camera.look_at((0.05, 0.05, 0.0))
+    elif env.scene.startswith("planar_"):
+        viewer.set_camera(pos=wp.vec3(0.0, 1.05, 2.8), pitch=-8.0, yaw=-90.0)
+        viewer.camera.look_at((0.0, 0.0, 0.0))
     else:
         viewer.set_camera(pos=wp.vec3(0.55, 1.05, 2.65), pitch=-8.0, yaw=-90.0)
         viewer.camera.look_at((0.55, 0.0, 0.0))
@@ -711,6 +1017,8 @@ def render_diagnostic_videos(args: argparse.Namespace) -> list[dict]:
         "single_hinge_gravity",
         "double_hinge_gravity_static",
         "double_hinge_zero_g_forced",
+        "planar_chain_zero_g",
+        "planar_branch_zero_g",
         "free_body_zero_g",
     ]
     out_dir = Path(args.video_dir)
@@ -720,7 +1028,13 @@ def render_diagnostic_videos(args: argparse.Namespace) -> list[dict]:
     viewer.show_collision = True
     try:
         for scene in scenes:
-            env = MinimalSolverEnv(scene, args.device, args.dt)
+            env = MinimalSolverEnv(
+                scene,
+                args.device,
+                args.dt,
+                solver_iterations=args.solver_iterations,
+                ls_iterations=args.ls_iterations,
+            )
             videos.append(
                 render_scene_video(
                     env,
@@ -745,10 +1059,22 @@ def run(args: argparse.Namespace) -> dict:
     epsilons = args.eps or list(DEFAULT_EPS)
     envs: dict[str, MinimalSolverEnv] = {}
     cases = make_cases(args.dt)
+    if args.cases:
+        wanted = set(args.cases)
+        cases = [case for case in cases if case.name in wanted]
+        missing = wanted.difference(case.name for case in cases)
+        if missing:
+            raise ValueError(f"unknown diagnostic case(s): {sorted(missing)}")
     results = []
     for case in cases:
         if case.scene not in envs:
-            envs[case.scene] = MinimalSolverEnv(case.scene, args.device, args.dt)
+            envs[case.scene] = MinimalSolverEnv(
+                case.scene,
+                args.device,
+                args.dt,
+                solver_iterations=args.solver_iterations,
+                ls_iterations=args.ls_iterations,
+            )
         results.append(run_case(envs[case.scene], case, epsilons))
 
     result = {
@@ -757,6 +1083,8 @@ def run(args: argparse.Namespace) -> dict:
         "timestamp_pacific": pacific_now_iso(),
         "device": args.device,
         "dt": args.dt,
+        "solver_iterations": args.solver_iterations,
+        "ls_iterations": args.ls_iterations,
         "epsilon_values": epsilons,
         "cases": results,
         "notes": [
@@ -781,8 +1109,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--dt", type=float, default=0.01)
+    parser.add_argument("--solver-iterations", type=int, default=4)
+    parser.add_argument("--ls-iterations", type=int, default=4)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--eps", type=float, nargs="*")
+    parser.add_argument("--cases", nargs="*", help="Optional subset of diagnostic case names to run.")
     parser.add_argument("--render-videos", action="store_true")
     parser.add_argument(
         "--video-dir",
