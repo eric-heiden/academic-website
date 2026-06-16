@@ -200,6 +200,18 @@
       overflow: hidden;
     }
 
+    .plot-message {
+      display: flex;
+      align-items: center;
+      min-height: 120px;
+      padding: 14px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: #fbfdff;
+      line-height: 1.45;
+    }
+
     video {
       display: block;
       width: 100%;
@@ -758,23 +770,68 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       return run.data?.eval?.[key] ?? null;
     }
 
+    function metricValue(row, preferred = "median_relative_error") {
+      const candidates = [
+        row?.[preferred],
+        row?.median_relative_error,
+        row?.mean_relative_error,
+        row?.relative_error,
+        row?.max_relative_error
+      ];
+      for (const value of candidates) {
+        const number = Number(value);
+        if (Number.isFinite(number)) return number;
+      }
+      return null;
+    }
+
+    function positiveMetric(row, preferred = "median_relative_error") {
+      const value = metricValue(row, preferred);
+      return value !== null && value > 0 ? value : null;
+    }
+
+    function finitePoints(values) {
+      return (values || []).filter((value) => Number.isFinite(Number(value))).length;
+    }
+
+    function plotMessage(id, message) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<div class="plot-message">${message}</div>`;
+    }
+
+    function plotOrMessage(id, traces, layout, config = plotConfig) {
+      const useful = traces.filter((trace) => {
+        return Math.max(finitePoints(trace.x), finitePoints(trace.y)) > 0;
+      });
+      if (!useful.length) {
+        plotMessage(id, "No finite data loaded for this plot. Check the linked JSON artifacts for this report build.");
+        return;
+      }
+      Plotly.newPlot(id, useful, layout, config);
+    }
+
     function bestComponent(diag, section, component) {
-      return diag?.[section]?.components?.[component]?.best?.mean_relative_error ?? null;
+      const componentData = diag?.[section]?.components?.[component];
+      return metricValue(componentData?.best ?? bestSweep(componentData));
     }
 
     function solverBest(diag, caseName, groupName) {
       const item = diag?.cases?.find((entry) => entry.case === caseName);
       const rows = item?.groups?.[groupName]?.epsilon_sweep || [];
       return rows.reduce((best, row) => {
-        if (!best || row.relative_error < best.relative_error) return row;
+        const value = metricValue(row, "relative_error");
+        const bestValue = metricValue(best, "relative_error");
+        if (value !== null && (bestValue === null || value < bestValue)) return row;
         return best;
       }, null);
     }
 
-    function bestSweep(section) {
+    function bestSweep(section, preferred = "median_relative_error") {
       const rows = section?.epsilon_sweep || [];
       return rows.reduce((best, row) => {
-        if (!best || row.median_relative_error < best.median_relative_error) return row;
+        const value = metricValue(row, preferred);
+        const bestValue = metricValue(best, preferred);
+        if (value !== null && (bestValue === null || value < bestValue)) return row;
         return best;
       }, null);
     }
@@ -869,20 +926,20 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       document.getElementById("stable-fps").textContent = fmt(stable?.data?.mean_fps, 0);
 
       if (presentRuns.length) {
-        Plotly.newPlot("ant-reward-chart", presentRuns.map((run) => historyTrace(run, "mean_reward")), {
+        plotOrMessage("ant-reward-chart", presentRuns.map((run) => historyTrace(run, "mean_reward")), {
           ...baseLayout,
           yaxis: { ...baseLayout.yaxis, title: "Mean step reward" }
-        }, plotConfig);
+        });
 
-        Plotly.newPlot("ant-selection-chart", presentRuns.map((run) => {
+        plotOrMessage("ant-selection-chart", presentRuns.map((run) => {
           const key = run.data.history.some((row) => row.selection_score !== undefined) ? "selection_score" : "selection_return";
           return historyTrace(run, key);
         }), {
           ...baseLayout,
           yaxis: { ...baseLayout.yaxis, title: "Selection score" }
-        }, plotConfig);
+        });
 
-        Plotly.newPlot("ant-eval-chart", [
+        plotOrMessage("ant-eval-chart", [
           {
             type: "bar",
             name: "forward displacement (m)",
@@ -903,9 +960,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
           xaxis: { ...baseLayout.xaxis, title: "", tickangle: -18 },
           yaxis: { ...baseLayout.yaxis, title: "Displacement" },
           yaxis2: { title: "Falls", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false }
-        }, plotConfig);
+        });
 
-        Plotly.newPlot("runtime-chart", [
+        plotOrMessage("runtime-chart", [
           {
             type: "bar",
             name: "mean fps",
@@ -927,9 +984,13 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
           xaxis: { ...baseLayout.xaxis, title: "", tickangle: -18 },
           yaxis: { ...baseLayout.yaxis, title: "FPS" },
           yaxis2: { title: "MB", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false }
-        }, plotConfig);
+        });
 
         document.getElementById("run-table").innerHTML = presentRuns.map(runRow).join("");
+      } else {
+        ["ant-reward-chart", "ant-selection-chart", "ant-eval-chart", "runtime-chart"].forEach((id) => {
+          plotMessage(id, "No training history JSON files loaded for this report build.");
+        });
       }
 
       const contactRows = [
@@ -942,36 +1003,39 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["capsule contact action", bestSweep(contactCapsule?.one_step_action)],
         ["capsule contact root qd", bestComponentSweep(contactCapsule, "root_qd")],
         ["capsule contact policy", bestSweep(contactCapsule?.policy)]
-      ].filter(([, row]) => row);
+      ].filter(([, row]) => positiveMetric(row) !== null);
       const antRows = [
         ["Ant H=5 no margin", bestSweep(antH5NoMargin?.policy)],
         ["Ant H=5 margin", bestSweep(antH5Margin?.policy)],
         ["Ant H=8 margin", bestSweep(antH8Margin?.policy)],
         ["Ant H=8 no margin", bestSweep(antH8NoMargin?.policy)]
-      ].filter(([, row]) => row);
+      ].filter(([, row]) => positiveMetric(row) !== null);
 
-      Plotly.newPlot("contact-horizon-chart", [
+      plotOrMessage("contact-horizon-chart", [
         {
-          type: "bar",
+          type: "scatter",
+          mode: "lines+markers",
           name: "staged scenes",
           x: contactRows.map(([name]) => name),
-          y: contactRows.map(([, row]) => row.median_relative_error),
-          marker: { color: colors.blue }
+          y: contactRows.map(([, row]) => positiveMetric(row)),
+          marker: { color: colors.blue, size: 9 },
+          line: { color: colors.blue, width: 2 }
         },
         {
-          type: "bar",
+          type: "scatter",
+          mode: "lines+markers",
           name: "Ant open-loop",
           x: antRows.map(([name]) => name),
-          y: antRows.map(([, row]) => row.median_relative_error),
-          marker: { color: colors.coral }
+          y: antRows.map(([, row]) => positiveMetric(row)),
+          marker: { color: colors.coral, size: 9 },
+          line: { color: colors.coral, width: 2 }
         }
       ], {
         ...baseLayout,
-        barmode: "group",
-        xaxis: { ...baseLayout.xaxis, title: "", tickangle: -25 },
+        xaxis: { ...baseLayout.xaxis, title: "", type: "category", tickangle: -25 },
         yaxis: { ...baseLayout.yaxis, title: "Best median relative error", type: "log" },
         margin: { t: 18, r: 18, b: 112, l: 68 }
-      }, plotConfig);
+      });
 
       const componentNames = ["root_quat_q_normalized", "joint_q", "root_qd", "joint_qd"];
       const componentLabels = ["root quat", "joint q", "root qd", "joint qd"];
@@ -981,18 +1045,19 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["MuJoCo contacts", diagMujoco]
       ].filter(([, diag]) => diag);
 
-      Plotly.newPlot("state-grad-chart", diagnostics.map(([name, diag], idx) => ({
-        type: "bar",
+      plotOrMessage("state-grad-chart", diagnostics.map(([name, diag], idx) => ({
+        type: "scatter",
+        mode: "lines+markers",
         name,
         x: componentLabels,
-        y: componentNames.map((component) => bestComponent(diag, "state1_reward2_fixed_action", component)),
-        marker: { color: [colors.blue, colors.teal, colors.amber][idx] }
+        y: componentNames.map((component) => positiveMetric({ median_relative_error: bestComponent(diag, "state1_reward2_fixed_action", component) })),
+        marker: { color: [colors.blue, colors.teal, colors.amber][idx], size: 9 },
+        line: { color: [colors.blue, colors.teal, colors.amber][idx], width: 2 }
       })), {
         ...baseLayout,
-        barmode: "group",
-        xaxis: { ...baseLayout.xaxis, title: "" },
+        xaxis: { ...baseLayout.xaxis, title: "", type: "category" },
         yaxis: { ...baseLayout.yaxis, title: "Best mean relative error", type: "log" }
-      }, plotConfig);
+      });
 
       const solverCases = [
         ["two_link_zero_g_forced_qd_out", "M(q)^-1 force"],
@@ -1000,30 +1065,29 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["two_link_qd_out", "gravity + velocity"],
         ["pendulum_qd_out", "single pendulum"]
       ];
-      Plotly.newPlot("solver-chart", [
+      plotOrMessage("solver-chart", [
         {
-          type: "bar",
-          orientation: "h",
+          type: "scatter",
+          mode: "markers",
           name: "joint q error",
           y: solverCases.map((item) => item[1]),
-          x: solverCases.map((item) => solverBest(solver, item[0], "joint_q")?.relative_error ?? null),
-          marker: { color: colors.blue }
+          x: solverCases.map((item) => positiveMetric(solverBest(solver, item[0], "joint_q"), "relative_error")),
+          marker: { color: colors.blue, size: 10, symbol: "circle" }
         },
         {
-          type: "bar",
-          orientation: "h",
+          type: "scatter",
+          mode: "markers",
           name: "joint force error",
           y: solverCases.map((item) => item[1]),
-          x: solverCases.map((item) => solverBest(solver, item[0], "joint_force")?.relative_error ?? null),
-          marker: { color: colors.green }
+          x: solverCases.map((item) => positiveMetric(solverBest(solver, item[0], "joint_force"), "relative_error")),
+          marker: { color: colors.green, size: 10, symbol: "diamond" }
         }
       ], {
         ...baseLayout,
-        barmode: "group",
         xaxis: { ...baseLayout.xaxis, title: "Best relative error", type: "log" },
-        yaxis: { ...baseLayout.yaxis, title: "", automargin: true },
+        yaxis: { ...baseLayout.yaxis, title: "", type: "category", automargin: true },
         margin: { t: 18, r: 18, b: 58, l: 126 }
-      }, plotConfig);
+      });
     }
 
     load();
