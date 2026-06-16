@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import torch
 import warp as wp
+import mujoco
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIFFRL_ROOT = REPO_ROOT / "DiffRL"
@@ -47,6 +48,15 @@ class CartpoleRewardWeights:
     action: float = 0.0
 
 
+@dataclass
+class AntRewardWeights:
+    progress: float = 1.0
+    heading: float = 1.0
+    up: float = 0.1
+    height: float = 1.0
+    action: float = 0.0
+
+
 ANT_START_JOINT_Q = (0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0)
 ANT_START_ROT = (math.sin(-0.25 * math.pi), 0.0, 0.0, math.cos(-0.25 * math.pi))
 ANT_TERMINATION_HEIGHT = 0.27
@@ -55,6 +65,9 @@ ANT_HEIGHT_REWARD_CAP = 0.6
 ANT_INVALID_PENALTY = -50.0
 ANT_JOINT_VEL_OBS_SCALING = 0.1
 ANT_ACTION_PENALTY = 0.0
+ANT_DEFAULT_TERMINATION_PENALTY = 20.0
+ANT_DEFAULT_SELECTION_FALL_PENALTY = 500.0
+ANT_DEFAULT_SELECTION_INVALID_PENALTY = 500.0
 DEFAULT_GRAD_CHECK_EPS = (1.0e-1, 3.0e-2, 1.0e-2, 3.0e-3, 1.0e-3, 3.0e-4, 1.0e-4)
 
 
@@ -186,6 +199,31 @@ def assign_flat_parameters(parameters: list[torch.nn.Parameter], values: torch.T
             offset += count
 
 
+def finalize_ant_reward(
+    reward: torch.Tensor,
+    *,
+    invalid: torch.Tensor,
+    fell: torch.Tensor,
+    termination_penalty: float,
+) -> torch.Tensor:
+    reward = torch.where(invalid, torch.full_like(reward, ANT_INVALID_PENALTY), reward)
+    if termination_penalty > 0.0:
+        reward = torch.where(fell, torch.full_like(reward, -termination_penalty), reward)
+    return reward
+
+
+def rollout_selection_score(
+    rollout: dict,
+    *,
+    num_envs: int,
+    fall_penalty: float,
+    invalid_penalty: float,
+) -> float:
+    fall_events = float(rollout.get("fall_count", 0)) / max(1, num_envs)
+    invalid_events = float(rollout.get("invalid_count", 0)) / max(1, num_envs)
+    return float(rollout["return"]) - fall_penalty * fall_events - invalid_penalty * invalid_events
+
+
 def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor, torch.Tensor] | None:
     if path is None:
         return None
@@ -264,6 +302,7 @@ class NewtonMuJoCoTorchEnv:
         force_scale: float,
         contact_backend: str,
         cartpole_reward: CartpoleRewardWeights | None = None,
+        ant_reward: AntRewardWeights | None = None,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -273,6 +312,7 @@ class NewtonMuJoCoTorchEnv:
         self.force_scale = force_scale
         self.contact_backend = contact_backend
         self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
+        self.ant_reward = ant_reward or AntRewardWeights()
 
         if env_name == "cartpole":
             self._build_cartpole()
@@ -295,6 +335,11 @@ class NewtonMuJoCoTorchEnv:
             nconmax=128 if use_contacts else None,
             njmax=512 if use_contacts else None,
         )
+        # MuJoCo's implicit Euler damping path currently goes through a dense
+        # no-grad solve in MJWarp. Keep physical damping forces, but integrate
+        # them explicitly so SHAC receives reliable state gradients.
+        self.solver.mj_model.opt.disableflags |= mujoco.mjtDisableBit.mjDSBL_EULERDAMP
+        self.solver.mjw_model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_EULERDAMP)
         self.contacts = self.model.contacts() if contact_backend == "newton" else None
         self.step_ctx = StepContext(self)
         self.q_dim = self.model.joint_coord_count // self.num_envs
@@ -548,11 +593,15 @@ class NewtonMuJoCoTorchEnv:
         if obs is None:
             obs = self.observe(q, qd, action)
         progress_reward = obs[:, 5]
-        up_reward = 0.1 * obs[:, 27]
-        heading_reward = obs[:, 28]
+        up_reward = self.ant_reward.up * obs[:, 27]
+        heading_reward = self.ant_reward.heading * obs[:, 28]
         height_reward = torch.clamp(obs[:, 0] - ANT_TERMINATION_HEIGHT, max=ANT_HEIGHT_REWARD_CAP)
-        return progress_reward + up_reward + heading_reward + height_reward + ANT_ACTION_PENALTY * action.square().sum(
-            dim=-1
+        return (
+            self.ant_reward.progress * progress_reward
+            + up_reward
+            + heading_reward
+            + self.ant_reward.height * height_reward
+            + self.ant_reward.action * action.square().sum(dim=-1)
         )
 
     def done(self, q: torch.Tensor, progress: torch.Tensor, episode_length: int) -> torch.Tensor:
@@ -706,9 +755,7 @@ def shac_rollout_loss(
         fell = torch.logical_and(env.fallen_state(q), ~invalid)
         next_obs = env.observe(q, qd, action)
         rew = env.reward(q, qd, action, obs=next_obs)
-        rew = torch.where(invalid, torch.full_like(rew, ANT_INVALID_PENALTY), rew)
-        if termination_penalty > 0.0:
-            rew = torch.where(fell, rew - termination_penalty, rew)
+        rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.detach().mean())
         loss = loss - (gamma_vec * rew * rew_scale).sum()
         done = torch.logical_or(invalid, fell)
@@ -737,9 +784,7 @@ def one_step_action_loss(
     fell = torch.logical_and(env.fallen_state(q), ~invalid)
     obs = env.observe(q, qd, action)
     rew = env.reward(q, qd, action, obs=obs)
-    rew = torch.where(invalid, torch.full_like(rew, ANT_INVALID_PENALTY), rew)
-    if termination_penalty > 0.0:
-        rew = torch.where(fell, rew - termination_penalty, rew)
+    rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
     return -rew.mean(), {
         "mean_reward": float(rew.detach().mean().cpu()),
         "invalid_count": int(invalid.detach().sum().cpu()),
@@ -838,7 +883,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
     if args.reset_noise is None:
         args.reset_noise = 0.0
     if args.termination_penalty is None:
-        args.termination_penalty = 10.0
+        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY
     if args.stochastic_actor is None:
         args.stochastic_actor = True
     if args.obs_rms is None:
@@ -1129,7 +1174,7 @@ def run_training(args: argparse.Namespace) -> dict:
     if args.reset_noise is None:
         args.reset_noise = 0.0 if args.env == "ant" else 0.05
     if args.termination_penalty is None:
-        args.termination_penalty = 10.0 if args.env == "ant" else 0.0
+        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env == "ant" else 0.0
     if args.lr_schedule is None:
         args.lr_schedule = "linear" if args.env == "ant" else "constant"
     if args.adam_beta1 is None:
@@ -1162,6 +1207,13 @@ def run_training(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        ant_reward=AntRewardWeights(
+            progress=args.ant_progress_weight,
+            heading=args.ant_heading_weight,
+            up=args.ant_up_weight,
+            height=args.ant_height_weight,
+            action=args.ant_action_penalty,
+        ),
         cartpole_reward=CartpoleRewardWeights(
             pole_angle=args.cartpole_pole_angle_penalty,
             pole_velocity=args.cartpole_pole_velocity_penalty,
@@ -1171,6 +1223,8 @@ def run_training(args: argparse.Namespace) -> dict:
         ),
     )
     actor = make_actor(env, stochastic=args.stochastic_actor)
+    if args.actor_path is not None:
+        actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
     adam_betas = (args.adam_beta1, args.adam_beta2)
     optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
     critic = None
@@ -1183,12 +1237,18 @@ def run_training(args: argparse.Namespace) -> dict:
             param.requires_grad_(False)
         critic_optimizer = torch.optim.Adam(critic.parameters(), lr=args.critic_lr, betas=adam_betas)
     obs_rms = RunningMeanStd(shape=(env.num_obs,), device=env.torch_device) if args.obs_rms else None
+    if obs_rms is not None and args.obs_rms_path is not None:
+        obs_data = torch.load(args.obs_rms_path, map_location=env.torch_device)
+        obs_rms.mean = obs_data["mean"].to(env.torch_device)
+        obs_rms.var = obs_data["var"].to(env.torch_device)
+        obs_rms.count = obs_data["count"]
     history = []
     best_state = None
     best_obs_rms = None
     best_epoch = 0
     best_train_reward = -float("inf")
     best_eval_return = -float("inf")
+    best_eval_score = -float("inf")
     q, qd = env.reset(noise=args.reset_noise, stochastic_init=args.stochastic_init)
     prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
     progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
@@ -1251,9 +1311,12 @@ def run_training(args: argparse.Namespace) -> dict:
             )
             next_obs_raw = env.observe(q_next, qd_next, action)
             rew = env.reward(q_next, qd_next, action, obs=next_obs_raw)
-            rew = torch.where(invalid, torch.full_like(rew, ANT_INVALID_PENALTY), rew)
-            if args.termination_penalty > 0.0:
-                rew = torch.where(fell, rew - args.termination_penalty, rew)
+            rew = finalize_ant_reward(
+                rew,
+                invalid=invalid,
+                fell=fell,
+                termination_penalty=args.termination_penalty,
+            )
             scaled_rew = rew * args.rew_scale
             rewards.append(rew.detach().mean())
             if args.use_critic:
@@ -1269,6 +1332,8 @@ def run_training(args: argparse.Namespace) -> dict:
             if args.use_critic:
                 assert target_critic is not None
                 next_value = target_critic(next_obs).squeeze(-1)
+                early_terminal = torch.logical_or(invalid, fell)
+                next_value = torch.where(early_terminal, torch.zeros_like(next_value), next_value)
                 critic_next_values.append(next_value.detach())
                 if step_idx < args.horizon - 1:
                     critic_done_mask.append(done.detach().to(torch.float32))
@@ -1359,8 +1424,15 @@ def run_training(args: argparse.Namespace) -> dict:
         selection_rollout = evaluate_policy(
             env, actor, selection_horizon, obs_rms=obs_rms, termination_penalty=args.termination_penalty
         )
-        if selection_rollout["return"] > best_eval_return:
+        selection_score = rollout_selection_score(
+            selection_rollout,
+            num_envs=args.num_envs,
+            fall_penalty=args.selection_fall_penalty,
+            invalid_penalty=args.selection_invalid_penalty,
+        )
+        if selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
+            best_eval_score = selection_score
             best_train_reward = mean_reward
             best_epoch = epoch + 1
             best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
@@ -1381,7 +1453,10 @@ def run_training(args: argparse.Namespace) -> dict:
                 "grad_norm": grad_norm,
                 "value_loss": value_loss,
                 "selection_return": selection_rollout["return"],
+                "selection_score": selection_score,
                 "selection_mean_reward": selection_rollout["mean_reward"],
+                "selection_fall_count": selection_rollout["fall_count"],
+                "selection_invalid_count": selection_rollout["invalid_count"],
                 "invalid_resets": invalid_count,
                 "fall_resets": fall_count,
                 "timeout_resets": timeout_count,
@@ -1413,6 +1488,12 @@ def run_training(args: argparse.Namespace) -> dict:
         )
 
     rollout = evaluate_policy(env, actor, args.eval_horizon, obs_rms=obs_rms, termination_penalty=args.termination_penalty)
+    eval_score = rollout_selection_score(
+        rollout,
+        num_envs=args.num_envs,
+        fall_penalty=args.selection_fall_penalty,
+        invalid_penalty=args.selection_invalid_penalty,
+    )
     video_path = None
     poster_path = None
     if args.render_video:
@@ -1426,6 +1507,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 force_scale=args.force_scale,
                 contact_backend=args.contact_backend,
                 cartpole_reward=env.cartpole_reward,
+                ant_reward=env.ant_reward,
             )
         video_path, poster_path = render_rollout(
             render_env,
@@ -1447,27 +1529,37 @@ def run_training(args: argparse.Namespace) -> dict:
         "horizon": args.horizon,
         "epochs": args.epochs,
         "dt": args.dt,
+        "force_scale": args.force_scale,
         "episode_length": args.episode_length,
+        "disable_eulerdamp": True,
         "stochastic_init": args.stochastic_init,
         "stochastic_actor": args.stochastic_actor,
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
+        "actor_path": str(args.actor_path) if args.actor_path is not None else None,
+        "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "critic_method": args.critic_method,
         "td_lambda": args.td_lambda,
         "rew_scale": args.rew_scale,
         "reset_each_epoch": args.reset_each_epoch,
         "termination_penalty": args.termination_penalty,
+        "terminal_fall_reward": -args.termination_penalty if args.termination_penalty > 0.0 else None,
+        "selection_fall_penalty": args.selection_fall_penalty,
+        "selection_invalid_penalty": args.selection_invalid_penalty,
         "ant_max_healthy_height": ANT_MAX_HEALTHY_HEIGHT if args.env == "ant" else None,
         "ant_height_reward_cap": ANT_HEIGHT_REWARD_CAP if args.env == "ant" else None,
         "ant_invalid_penalty": ANT_INVALID_PENALTY if args.env == "ant" else None,
         "lr_schedule": args.lr_schedule,
         "cartpole_reward": env.cartpole_reward.__dict__,
+        "ant_reward": env.ant_reward.__dict__,
         "total_seconds": total_s,
         "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
         "mean_fps": float(np.mean([h["fps"] for h in history])),
         "best_epoch": best_epoch,
         "best_train_reward": best_train_reward,
         "best_eval_return": best_eval_return,
+        "best_eval_score": best_eval_score,
+        "eval_score": eval_score,
         "max_cuda_memory_allocated_mb": (
             float(torch.cuda.max_memory_allocated(env.torch_device) / (1024**2)) if torch.cuda.is_available() else None
         ),
@@ -1503,19 +1595,31 @@ def evaluate_policy(
     invalid_count = 0
     fall_count = 0
     timeout_count = 0
+    episode_returns = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
+    episode_lengths = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
+    forward_displacement = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
+    completed_returns = []
+    completed_lengths = []
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action), obs_rms)
         action = torch.tanh(actor(obs, deterministic=True))
+        root_x_before = q[:, 0].clone()
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
+        root_x_after = q[:, 0].clone()
         invalid = env.invalid_state(q, qd)
         fell = torch.logical_and(env.fallen_state(q), ~invalid)
+        forward_displacement = forward_displacement + torch.where(
+            invalid,
+            torch.zeros_like(root_x_after),
+            root_x_after - root_x_before,
+        )
         q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=False)
         final_obs = env.observe(q, qd, action)
         rew = env.reward(q, qd, action, obs=final_obs)
-        rew = torch.where(invalid, torch.full_like(rew, ANT_INVALID_PENALTY), rew)
-        if termination_penalty > 0.0:
-            rew = torch.where(fell, rew - termination_penalty, rew)
+        rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
+        episode_returns = episode_returns + rew
+        episode_lengths = episode_lengths + 1
         progress = progress + 1
         timeout = progress >= horizon
         done = torch.logical_or(torch.logical_or(timeout, fell), invalid)
@@ -1526,17 +1630,34 @@ def evaluate_policy(
         if done.any():
             done_ids = done.nonzero(as_tuple=False).squeeze(-1)
             reset_count += int(done_ids.numel())
+            completed_returns.extend(float(x) for x in episode_returns[done_ids].detach().cpu().tolist())
+            completed_lengths.extend(int(x) for x in episode_lengths[done_ids].detach().cpu().tolist())
+            episode_returns[done_ids] = 0.0
+            episode_lengths[done_ids] = 0
+            forward_displacement[done_ids] = torch.where(
+                timeout[done_ids],
+                forward_displacement[done_ids],
+                torch.zeros_like(forward_displacement[done_ids]),
+            )
             q, qd = env.reset_done(q, qd, done_ids, stochastic_init=False)
             action = torch.where(done.unsqueeze(-1), torch.zeros_like(action), action)
             progress = torch.where(done, torch.zeros_like(progress), progress)
         prev_action = action
+    alive_fraction = 1.0 - float(fall_count + invalid_count) / max(1, horizon * env.num_envs)
     return {
         "mean_reward": float(torch.stack(rewards).mean().cpu()),
         "return": float(torch.stack(rewards).sum().cpu()),
+        "alive_fraction": alive_fraction,
         "reset_count": reset_count,
         "invalid_count": invalid_count,
         "fall_count": fall_count,
         "timeout_count": timeout_count,
+        "completed_episodes": len(completed_returns),
+        "mean_completed_return": float(np.mean(completed_returns)) if completed_returns else None,
+        "mean_completed_length": float(np.mean(completed_lengths)) if completed_lengths else None,
+        "mean_forward_displacement": float(forward_displacement.mean().detach().cpu()),
+        "unfinished_mean_return": float(episode_returns.mean().detach().cpu()),
+        "unfinished_mean_length": float(episode_lengths.to(torch.float32).mean().detach().cpu()),
         "final_obs_mean": [float(x) for x in final_obs.mean(dim=0).cpu().tolist()],
         "final_obs_normalized_mean": [float(x) for x in final_obs_normalized.mean(dim=0).cpu().tolist()],
     }
@@ -1682,10 +1803,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cartpole-cart-position-penalty", type=float, default=0.05)
     parser.add_argument("--cartpole-cart-velocity-penalty", type=float, default=0.1)
     parser.add_argument("--cartpole-action-penalty", type=float, default=0.0)
+    parser.add_argument("--ant-progress-weight", type=float, default=1.0)
+    parser.add_argument("--ant-heading-weight", type=float, default=1.0)
+    parser.add_argument("--ant-up-weight", type=float, default=0.1)
+    parser.add_argument("--ant-height-weight", type=float, default=1.0)
+    parser.add_argument("--ant-action-penalty", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
     parser.add_argument("--selection-horizon", type=int, default=None)
+    parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
+    parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
