@@ -3,30 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Newton ModelBuilder Performance</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>ModelBuilder finalize scaling</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root {
       color-scheme: light;
-      --paper: #f6f3ec;
-      --panel: #fffdf8;
-      --ink: #1d2430;
-      --muted: #667085;
-      --line: #d8dee8;
-      --head: #ece7dc;
-      --teal: #0f766e;
-      --blue: #2563eb;
-      --amber: #b45309;
-      --red: #be123c;
-      --green-bg: #dcfce7;
-      --green-ink: #166534;
-      --amber-bg: #fef3c7;
-      --amber-ink: #92400e;
-      --red-bg: #ffe4e6;
-      --red-ink: #9f1239;
-      --slate-bg: #e2e8f0;
-      --slate-ink: #334155;
+      --paper: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #111827;
+      --muted: #5f6b7a;
+      --line: #d9e0ea;
+      --head: #eef2f7;
+      --blue: #4c78a8;
+      --orange: #f58518;
+      --green: #13795b;
     }
     * { box-sizing: border-box; }
     body {
@@ -35,917 +25,104 @@
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    main {
-      width: min(1240px, calc(100% - 36px));
-      margin: 0 auto;
-      padding: 42px 0 76px;
-    }
-    h1 {
-      max-width: 980px;
-      margin: 0 0 12px;
-      font-size: clamp(2.2rem, 5vw, 4.4rem);
-      line-height: 1.02;
-      letter-spacing: 0;
-    }
-    h2 {
-      margin: 44px 0 14px;
-      font-size: 1.65rem;
-      letter-spacing: 0;
-    }
-    h3 {
-      margin: 0 0 12px;
-      font-size: 1.15rem;
-      letter-spacing: 0;
-    }
-    p, li {
-      color: var(--muted);
-      line-height: 1.58;
-      font-size: 1rem;
-    }
-    a { color: var(--teal); }
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.92em;
-    }
-    pre {
-      margin: 14px 0 0;
-      padding: 14px;
-      border-left: 4px solid var(--method-color, var(--teal));
-      border-radius: 0 8px 8px 0;
-      background: #111827;
-      color: #f8fafc;
-      overflow: auto;
-    }
-    pre code { color: inherit; }
-    .lede {
-      max-width: 980px;
-      margin: 0 0 18px;
-      font-size: 1.08rem;
-    }
-    .timestamp {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0 0 24px;
-      padding: 7px 10px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--panel);
-      color: #475569;
-      font-size: 0.9rem;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 16px;
-    }
-    .panel, .method-card {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      padding: 18px;
-    }
-    .panel strong { color: var(--ink); }
-    .small {
-      font-size: 0.92rem;
-      margin-bottom: 0;
-    }
-    .method-card {
-      border-top: 5px solid var(--method-color, var(--teal));
-    }
-    .method-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-    .method-head h3 { margin: 0; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 4px 8px;
-      font-weight: 700;
-      font-size: 0.78rem;
-      white-space: nowrap;
-    }
-    .sev-none { background: var(--slate-bg); color: var(--slate-ink); }
-    .sev-low { background: var(--green-bg); color: var(--green-ink); }
-    .sev-low-med { background: #e0f2fe; color: #075985; }
-    .sev-med { background: var(--amber-bg); color: var(--amber-ink); }
-    .sev-high { background: var(--red-bg); color: var(--red-ink); }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    th, td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      vertical-align: top;
-      font-size: 0.91rem;
-    }
-    th {
-      color: var(--ink);
-      background: var(--head);
-      font-weight: 750;
-    }
-    td { color: #303847; }
+    main { width: min(1180px, calc(100% - 36px)); margin: 0 auto; padding: 42px 0 68px; }
+    h1 { margin: 0 0 10px; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.05; letter-spacing: 0; }
+    h2 { margin: 36px 0 14px; font-size: 1.35rem; letter-spacing: 0; }
+    p { color: var(--muted); line-height: 1.55; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+    .lede { max-width: 900px; margin: 0 0 20px; font-size: 1.04rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 24px; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; background: var(--panel); padding: 7px 10px; color: #435063; font-size: 0.9rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 22px 0; }
+    .card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 16px; }
+    .card strong { display: block; font-size: 1.35rem; margin-bottom: 4px; }
+    .card span { color: var(--muted); font-size: 0.92rem; }
+    .plot-panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 10px; overflow: hidden; }
+    #all-finalize-plot { width: 100%; min-height: 980px; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; font-size: 0.93rem; }
+    th:first-child, td:first-child { text-align: left; }
+    th { background: var(--head); color: var(--ink); }
     tr:last-child td { border-bottom: 0; }
-    .wide:not(.overview) td:nth-child(8), .wide:not(.overview) td:nth-child(9) { min-width: 260px; }
-    .overview-wrap {
-      overflow-x: auto;
-      border-radius: 8px;
-      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
-    }
-    .overview {
-      min-width: 1180px;
-    }
-    .overview th {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      padding: 0;
-    }
-    .sort-button {
-      appearance: none;
-      width: 100%;
-      min-height: 44px;
-      border: 0;
-      padding: 10px 12px;
-      background: transparent;
-      color: var(--ink);
-      font: inherit;
-      font-weight: 800;
-      text-align: left;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .sort-button:hover, .sort-button:focus-visible {
-      background: #e3dccd;
-      outline: none;
-    }
-    .sort-indicator {
-      min-width: 2.5rem;
-      color: #64748b;
-      font-size: 0.72rem;
-      text-align: right;
-      text-transform: uppercase;
-    }
-    .variant-name {
-      font-weight: 800;
-      color: var(--ink);
-      max-width: 300px;
-    }
-    .variant-id {
-      margin-top: 4px;
-      color: #64748b;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.74rem;
-      line-height: 1.35;
-      max-width: 300px;
-      overflow-wrap: anywhere;
-    }
-    .method-chip-set {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      max-width: 230px;
-    }
-    .method-chip, .empty-chip {
-      display: inline-flex;
-      align-items: center;
-      min-height: 24px;
-      padding: 3px 7px;
-      border-radius: 999px;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
-      color: #334155;
-      font-weight: 700;
-      font-size: 0.74rem;
-      line-height: 1.2;
-    }
-    .empty-chip {
-      border-style: dashed;
-      color: #64748b;
-      font-weight: 650;
-    }
-    .metric-cell {
-      min-width: 132px;
-      background: #ffffff;
-    }
-    .metric-top {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 7px;
-    }
-    .metric-top strong {
-      color: var(--ink);
-      font-size: 1.02rem;
-    }
-    .metric-rank {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 34px;
-      padding: 2px 6px;
-      border-radius: 999px;
-      background: var(--slate-bg);
-      color: var(--slate-ink);
-      font-weight: 800;
-      font-size: 0.74rem;
-    }
-    .metric-bar {
-      height: 8px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: #e5e7eb;
-    }
-    .metric-bar span {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-    }
-    .metric-finalize .metric-bar span { background: var(--blue); }
-    .metric-add .metric-bar span { background: #16a34a; }
-    .metric-finalize.rank-one, .metric-add.rank-one { background: #fef9c3; }
-    .rank-one .metric-rank { background: #facc15; color: #713f12; }
-    .rank-two .metric-rank { background: #dbeafe; color: #1d4ed8; }
-    .rank-three .metric-rank { background: #dcfce7; color: #166534; }
-    .metric-empty {
-      color: #94a3b8;
-      text-align: center;
-    }
-    .overview-remark {
-      min-width: 260px;
-      color: #475569;
-      line-height: 1.45;
-    }
-    .ok-cell { color: var(--green-ink); background: var(--green-bg); font-weight: 800; }
-    .warn-cell { color: var(--red-ink); background: var(--red-bg); font-weight: 800; }
-    .branch-table .speedup-cell {
-      font-weight: 900;
-      text-align: right;
-      white-space: nowrap;
-    }
-    .speedup-strong { background: #bbf7d0; color: #14532d; }
-    .speedup-good { background: #dcfce7; color: #166534; }
-    .speedup-mild { background: #fef9c3; color: #854d0e; }
-    .speedup-flat { background: #f1f5f9; color: #475569; }
-    .speedup-regress { background: var(--red-bg); color: var(--red-ink); }
-    .speedup-empty { color: #94a3b8; }
-    .scenario {
-      margin-top: 24px;
-      padding-top: 10px;
-      border-top: 1px solid var(--line);
-    }
-    .plot-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
-      gap: 16px;
-    }
-    .plot {
-      min-height: 420px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      padding: 8px;
-    }
-    .callout {
-      border-left: 5px solid var(--teal);
-      background: var(--panel);
-      border-radius: 0 8px 8px 0;
-      padding: 16px 18px;
-      margin: 18px 0;
-    }
-    .callout.danger {
-      border-left-color: var(--red);
-      background: #fff7ed;
-    }
-    @media (max-width: 760px) {
-      main { width: min(100% - 24px, 1240px); padding-top: 28px; }
-      .plot-grid { grid-template-columns: 1fr; }
-      .plot { min-height: 360px; }
-      th, td { font-size: 0.84rem; padding: 8px; }
-    }
+    .good { color: var(--green); font-weight: 700; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; }
+    figure { margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 10px; }
+    img { display: block; width: 100%; height: auto; border-radius: 4px; }
+    figcaption { margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
+    .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+    .links a { color: #1d4ed8; }
   </style>
 </head>
 <body>
-<main>
-  <h1>Newton ModelBuilder Performance</h1>
-  <p class="lede">Focused results for the fresh <code>eric/modelbuilder-compact-filters</code> branch against public main. The workloads load USD assets, register MuJoCo custom attributes, replicate to RL-scale world counts, and measure the two construction hotspots: <code>ModelBuilder.finalize()</code> and repeated <code>ModelBuilder.add_builder()</code> calls.</p>
-  <div class="timestamp">Generated at <strong>2026-06-10T16:49:17+00:00</strong></div>
-  <p class="small">Public main <code>c0bea0a260c8</code> - device <code>cuda:0</code></p>
+  <main>
+    <h1>ModelBuilder finalize scaling</h1>
+    <p class="lede">Fresh robot-example world-count sweep comparing <code>origin-main</code> with <code>modelbuilder-compact-filters</code>. The compact collision-filter path wins most at high world counts, while keeping the report focused on the shareable finalize results.</p>
 
-  <section class="grid">
-    <div class="panel">
-      <h3>Current branch</h3>
-      <p>Default path includes compact collision-filter storage, <code>wp.full</code> custom-attribute defaults, cached mesh hashing, and geometry identity deduplication.</p>
+    <div class="meta">
+      <span class="pill">Device: <code>cuda:0</code></span>
+      <span class="pill">Baseline commit: <code>2c242002</code></span>
+      <span class="pill">Current commit: <code>ba838612</code></span>
+      <span class="pill">World counts: <code>1, 10, 100, 512, 1024, 2048, 4096, 8192</code></span>
+      <span class="pill">Repeats: <code>1</code> child process per point</span>
+      <span class="pill">Data: 2026-06-15 16:35:16 -0700</span>
     </div>
-    <div class="panel">
-      <h3>Finalize scope</h3>
-      <p>Timing starts after USD load and replication. It measures only <code>builder.finalize(device="cuda:0")</code> plus synchronization and host RSS sampling.</p>
-    </div>
-    <div class="panel">
-      <h3>add_builder scope</h3>
-      <p>Each single <code>builder.add_builder(robot_builder)</code> call is timed while constructing N worlds, matching the IsaacLab-style replication path.</p>
-    </div>
-  </section>
 
+    <section class="cards" aria-label="summary">
+      <div class="card"><strong>7</strong><span>robot scenes completed on both branches</span></div>
+      <div class="card"><strong>56</strong><span>world-count points per branch</span></div>
+      <div class="card"><strong>-71.2%</strong><span>aggregate 8192-world finalize time</span></div>
+      <div class="card"><strong>33.2% to 78.8%</strong><span>8192-world per-scene improvement range</span></div>
+    </section>
 
-  <h2>Latest G1 16k Result</h2>
-  <div class="callout">
-    <p><strong>Current best:</strong> Fresh branch + compact_finalize_storage() finalizes Unitree G1 with hands at 16384 worlds in <code>15.771 s</code>, a <code>6.669x</code> speedup over public main. Branch head for this focused rerun: <code>ac101b97</code>.</p>
-  </div>
-  <table class="branch-table"><thead><tr><th>Run</th><th>Median finalize s</th><th>Speedup</th><th>Repeats</th><th>Peak RSS MB</th><th>Meaning</th></tr></thead><tbody><tr><td>Public main</td><td>105.168</td><td class="speedup-cell speedup-flat" data-sort="1.000000000">1.000x</td><td>3</td><td>9897.2</td><td>Unmodified public main baseline for this workload.</td></tr><tr><td>Fresh branch default</td><td>23.753</td><td class="speedup-cell speedup-strong" data-sort="4.427595505">4.428x</td><td>3</td><td>422.1</td><td>Default branch path: compact filters, wp.full custom-attribute defaults, cached mesh hashing, and identity geometry dedup.</td></tr><tr><td>Fresh branch + compact_finalize_storage()</td><td>15.771</td><td class="speedup-cell speedup-strong" data-sort="6.668531516">6.669x</td><td>3</td><td>128.5</td><td>Opt-in helper called before the measured finalize() timer; useful when finalize-only list conversion dominates.</td></tr></tbody></table>
-  <p class="small">The compact-storage row is opt-in: the helper is called before the measured <code>finalize()</code> timer, so it should be read as a low-friction path to expose the remaining list-conversion win rather than as the default branch number.</p>
+    <section>
+      <h2>Interactive all-in-one plot</h2>
+      <div class="plot-panel"><div id="all-finalize-plot"></div></div>
+    </section>
 
+    <section>
+      <h2>8192-world summary</h2>
+      <table>
+        <thead>
+          <tr><th>Scene</th><th>origin/main ms</th><th>current ms</th><th>Delta</th><th>Speedup</th></tr>
+        </thead>
+        <tbody>
+              <tr><td><code>robot_allegro_hand</code></td><td>10,274.36</td><td>4,450.54</td><td class="good">-56.7%</td><td>2.31x</td></tr>
+              <tr><td><code>robot_anymal_d</code></td><td>23,184.56</td><td>4,922.76</td><td class="good">-78.8%</td><td>4.71x</td></tr>
+              <tr><td><code>robot_cartpole</code></td><td>794.30</td><td>530.74</td><td class="good">-33.2%</td><td>1.50x</td></tr>
+              <tr><td><code>robot_g1</code></td><td>77,283.24</td><td>18,212.30</td><td class="good">-76.4%</td><td>4.24x</td></tr>
+              <tr><td><code>robot_h1</code></td><td>20,631.51</td><td>7,179.53</td><td class="good">-65.2%</td><td>2.87x</td></tr>
+              <tr><td><code>robot_panda_hydro</code></td><td>16,155.23</td><td>6,778.28</td><td class="good">-58.0%</td><td>2.38x</td></tr>
+              <tr><td><code>robot_ur10</code></td><td>9,645.19</td><td>3,430.83</td><td class="good">-64.4%</td><td>2.81x</td></tr>
+        </tbody>
+      </table>
+    </section>
 
-
-  <h2>Fresh Branch vs Public Main</h2>
-  <p>This is the broader branch-vs-main ladder for <code>eric/modelbuilder-compact-filters</code> against <code>origin/main@c0bea0a2</code>, collected at branch head <code>cef7b1c3</code>. The newest focused G1 16k rerun is summarized above; this ladder keeps the cross-asset view for <code>finalize()</code> and <code>add_builder()</code>.</p>
-  <div class="callout">
-    <p><strong>Headline:</strong> on Unitree G1 with hands at 16k worlds, median <code>finalize()</code> improves from <code>105.168 s</code> to <code>24.737 s</code> (4.252x), and median total <code>add_builder()</code> time improves from <code>27.881 s</code> to <code>11.016 s</code> (2.531x).</p>
-  </div>
-  <h3>16k finalize()</h3>
-  <table class="branch-table"><thead><tr><th>Scenario</th><th>Worlds</th><th>Public main s</th><th>Fresh branch s</th><th>Speedup</th><th>Main RSS MB</th><th>Branch RSS MB</th></tr></thead><tbody><tr><td>Unitree G1 with hands</td><td>16384</td><td>105.168</td><td>24.737</td><td class="speedup-cell speedup-strong" data-sort="4.251526406">4.252x</td><td>9897.227</td><td>430.160</td></tr><tr><td>Unitree H1 humanoid</td><td>16384</td><td>38.639</td><td>12.157</td><td class="speedup-cell speedup-strong" data-sort="3.178275478">3.178x</td><td>2666.922</td><td>206.816</td></tr><tr><td>Shadow Hand</td><td>16384</td><td>48.446</td><td>15.884</td><td class="speedup-cell speedup-strong" data-sort="3.049941439">3.050x</td><td>3173.441</td><td>261.902</td></tr><tr><td>UR5e arm</td><td>16384</td><td>13.026</td><td>5.820</td><td class="speedup-cell speedup-good" data-sort="2.238073094">2.238x</td><td>770.102</td><td>106.992</td></tr></tbody></table>
-  <h3>16k add_builder()</h3>
-  <table class="branch-table"><thead><tr><th>Scenario</th><th>Worlds</th><th>Public main total s</th><th>Fresh branch total s</th><th>Speedup</th><th>Main median ms</th><th>Branch median ms</th><th>Main p95 ms</th><th>Branch p95 ms</th></tr></thead><tbody><tr><td>Unitree G1 with hands</td><td>16384</td><td>27.881</td><td>11.016</td><td class="speedup-cell speedup-good" data-sort="2.530915416">2.531x</td><td>1.185</td><td>0.369</td><td>1.711</td><td>0.590</td></tr><tr><td>Unitree H1 humanoid</td><td>16384</td><td>11.382</td><td>6.587</td><td class="speedup-cell speedup-good" data-sort="1.727921807">1.728x</td><td>0.473</td><td>0.242</td><td>0.632</td><td>0.490</td></tr><tr><td>Shadow Hand</td><td>16384</td><td>15.428</td><td>9.394</td><td class="speedup-cell speedup-good" data-sort="1.642336961">1.642x</td><td>0.679</td><td>0.360</td><td>1.100</td><td>0.721</td></tr><tr><td>UR5e arm</td><td>16384</td><td>4.858</td><td>3.466</td><td class="speedup-cell speedup-mild" data-sort="1.401396911">1.401x</td><td>0.236</td><td>0.164</td><td>0.381</td><td>0.268</td></tr></tbody></table>
-  <h3>G1 with hands env-count ladder</h3>
-  <table class="branch-table"><thead><tr><th>Worlds</th><th>Finalize main s</th><th>Finalize branch s</th><th>Finalize speedup</th><th>add_builder main s</th><th>add_builder branch s</th><th>add_builder speedup</th></tr></thead><tbody><tr><td>10</td><td>0.330</td><td>0.285</td><td class="speedup-cell speedup-mild" data-sort="1.158457671">1.158x</td><td>0.014</td><td>0.005</td><td class="speedup-cell speedup-good" data-sort="2.912509851">2.913x</td></tr><tr><td>100</td><td>0.796</td><td>0.665</td><td class="speedup-cell speedup-mild" data-sort="1.196985870">1.197x</td><td>0.131</td><td>0.050</td><td class="speedup-cell speedup-good" data-sort="2.636172162">2.636x</td></tr><tr><td>512</td><td>3.182</td><td>0.933</td><td class="speedup-cell speedup-strong" data-sort="3.412239047">3.412x</td><td>0.659</td><td>0.245</td><td class="speedup-cell speedup-good" data-sort="2.692345537">2.692x</td></tr><tr><td>1024</td><td>7.431</td><td>1.689</td><td class="speedup-cell speedup-strong" data-sort="4.399951587">4.400x</td><td>1.432</td><td>0.470</td><td class="speedup-cell speedup-strong" data-sort="3.045467852">3.045x</td></tr><tr><td>2048</td><td>11.586</td><td>3.090</td><td class="speedup-cell speedup-strong" data-sort="3.749979079">3.750x</td><td>3.167</td><td>1.248</td><td class="speedup-cell speedup-good" data-sort="2.537277005">2.537x</td></tr><tr><td>4096</td><td>25.181</td><td>5.961</td><td class="speedup-cell speedup-strong" data-sort="4.223994168">4.224x</td><td>6.343</td><td>2.382</td><td class="speedup-cell speedup-good" data-sort="2.663235145">2.663x</td></tr><tr><td>8192</td><td>52.171</td><td>12.546</td><td class="speedup-cell speedup-strong" data-sort="4.158508714">4.159x</td><td>14.073</td><td>5.651</td><td class="speedup-cell speedup-good" data-sort="2.490310097">2.490x</td></tr><tr><td>16384</td><td>105.168</td><td>24.737</td><td class="speedup-cell speedup-strong" data-sort="4.251526406">4.252x</td><td>27.881</td><td>11.016</td><td class="speedup-cell speedup-good" data-sort="2.530915416">2.531x</td></tr></tbody></table>
-  <h3>Branch comparison plots</h3>
-
-            <section class="scenario" id="branch-scenario-g1-hands">
-              <h3>Unitree G1 with hands</h3>
-              <div class="plot-grid">
-                <div id="plot-branch-finalize-time-g1-hands" class="plot"></div>
-                <div id="plot-branch-finalize-speedup-g1-hands" class="plot"></div>
-                <div id="plot-branch-add-time-g1-hands" class="plot"></div>
-                <div id="plot-branch-add-speedup-g1-hands" class="plot"></div>
-              </div>
-            </section>
-
-
-            <section class="scenario" id="branch-scenario-h1">
-              <h3>Unitree H1 humanoid</h3>
-              <div class="plot-grid">
-                <div id="plot-branch-finalize-time-h1" class="plot"></div>
-                <div id="plot-branch-finalize-speedup-h1" class="plot"></div>
-                <div id="plot-branch-add-time-h1" class="plot"></div>
-                <div id="plot-branch-add-speedup-h1" class="plot"></div>
-              </div>
-            </section>
-
-
-            <section class="scenario" id="branch-scenario-shadow-hand">
-              <h3>Shadow Hand</h3>
-              <div class="plot-grid">
-                <div id="plot-branch-finalize-time-shadow-hand" class="plot"></div>
-                <div id="plot-branch-finalize-speedup-shadow-hand" class="plot"></div>
-                <div id="plot-branch-add-time-shadow-hand" class="plot"></div>
-                <div id="plot-branch-add-speedup-shadow-hand" class="plot"></div>
-              </div>
-            </section>
-
-
-            <section class="scenario" id="branch-scenario-ur5e">
-              <h3>UR5e arm</h3>
-              <div class="plot-grid">
-                <div id="plot-branch-finalize-time-ur5e" class="plot"></div>
-                <div id="plot-branch-finalize-speedup-ur5e" class="plot"></div>
-                <div id="plot-branch-add-time-ur5e" class="plot"></div>
-                <div id="plot-branch-add-speedup-ur5e" class="plot"></div>
-              </div>
-            </section>
-
-
-
-  <h2>Historical Top Variants</h2>
-  <p>This is a compact snapshot of the earlier exploratory matrix, limited to the strongest rows. It is kept only to explain why the fresh branch now focuses on compact filters, custom-attribute defaults, mesh hashing, geometry deduplication, and optional compact storage.</p>
-  <div class="overview-wrap"><table class="wide overview sortable-table" id="variant-overview"><thead><tr><th><button class="sort-button" type="button" data-column="0" data-type="number" data-initial="desc">Variant <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="1" data-type="text" data-initial="asc">Finalize methods <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="2" data-type="number" data-initial="desc">Finalize avg <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="3" data-type="number" data-initial="desc">Finalize best <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="4" data-type="text" data-initial="asc">add_builder methods <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="5" data-type="number" data-initial="desc">add_builder avg <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="6" data-type="number" data-initial="desc">add_builder best <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="7" data-type="text" data-initial="asc">Intrusiveness <span class="sort-indicator" aria-hidden="true"></span></button></th><th><button class="sort-button" type="button" data-column="8" data-type="text" data-initial="asc">Remarks <span class="sort-indicator" aria-hidden="true"></span></button></th></tr></thead><tbody><tr><td data-sort="8.086581402"><div class="variant-name">Compact filter blocks + Mesh SHA + Geo id + Custom attr wp.full + Compact arrays</div><div class="variant-id">filter_blocks+mesh_sha+geo_id+attr_full+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Mesh SHA, Geo id, Custom attr wp.full, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Mesh SHA</span><span class="method-chip">Geo id</span><span class="method-chip">Custom attr wp.full</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize rank-one" data-sort="5.167352949">
-      <div class="metric-top">
-        <span class="metric-rank">#1</span>
-        <strong>5.167x</strong>
+    <section>
+      <h2>Per-scene static plots</h2>
+      <div class="gallery">
+          <figure><img src="data/plots/finalize_world_counts/robot_allegro_hand_finalize_time.png" alt="robot_allegro_hand finalize scaling plot"><figcaption>robot_allegro_hand</figcaption></figure>
+          <figure><img src="data/plots/finalize_world_counts/robot_anymal_d_finalize_time.png" alt="robot_anymal_d finalize scaling plot"><figcaption>robot_anymal_d</figcaption></figure>
+          <figure><img src="data/plots/finalize_world_counts/robot_cartpole_finalize_time.png" alt="robot_cartpole finalize scaling plot"><figcaption>robot_cartpole</figcaption></figure>
+          <figure><img src="data/plots/finalize_world_counts/robot_g1_finalize_time.png" alt="robot_g1 finalize scaling plot"><figcaption>robot_g1</figcaption></figure>
+          <figure><img src="data/plots/finalize_world_counts/robot_h1_finalize_time.png" alt="robot_h1 finalize scaling plot"><figcaption>robot_h1</figcaption></figure>
+          <figure><img src="data/plots/finalize_world_counts/robot_panda_hydro_finalize_time.png" alt="robot_panda_hydro finalize scaling plot"><figcaption>robot_panda_hydro</figcaption></figure>
+          <figure><img src="data/plots/finalize_world_counts/robot_ur10_finalize_time.png" alt="robot_ur10 finalize scaling plot"><figcaption>robot_ur10</figcaption></figure>
       </div>
-      <div class="metric-bar"><span style="width: 100.0%"></span></div>
-    </td>
+    </section>
 
-    <td class="metric-cell metric-finalize rank-one" data-sort="8.086581402">
-      <div class="metric-top">
-        <span class="metric-rank">#1</span>
-        <strong>8.087x</strong>
+    <section>
+      <h2>Source data</h2>
+      <p>Each point reports the last measured <code>ModelBuilder.finalize()</code> call for that example. For <code>robot_panda_hydro</code>, that is the replicated-scene finalize.</p>
+      <div class="links">
+        <a href="data/finalize_world_counts_origin_main.json">origin/main sweep JSON</a>
+        <a href="data/finalize_world_counts_current.json">current branch sweep JSON</a>
+        <a href="data/plots/finalize_world_counts/all_finalize_time.png">static all-in-one PNG</a>
       </div>
-      <div class="metric-bar"><span style="width: 100.0%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="7.935014479"><div class="variant-name">Compact filter blocks + Geo id + Custom attr wp.full + Compact arrays</div><div class="variant-id">filter_blocks+geo_id+attr_full+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Geo id, Custom attr wp.full, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Geo id</span><span class="method-chip">Custom attr wp.full</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize rank-two" data-sort="5.077360043">
-      <div class="metric-top">
-        <span class="metric-rank">#2</span>
-        <strong>5.077x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 98.3%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize rank-two" data-sort="7.935014479">
-      <div class="metric-top">
-        <span class="metric-rank">#2</span>
-        <strong>7.935x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 98.1%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="7.864030268"><div class="variant-name">Compact filter blocks + Mesh SHA + Custom attr wp.full + Compact arrays</div><div class="variant-id">filter_blocks+mesh_sha+attr_full+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Mesh SHA, Custom attr wp.full, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Mesh SHA</span><span class="method-chip">Custom attr wp.full</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize rank-three" data-sort="5.026188378">
-      <div class="metric-top">
-        <span class="metric-rank">#3</span>
-        <strong>5.026x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 97.3%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize rank-three" data-sort="7.864030268">
-      <div class="metric-top">
-        <span class="metric-rank">#3</span>
-        <strong>7.864x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 97.2%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="7.329855914"><div class="variant-name">Compact filter blocks + Custom attr wp.full + Compact arrays</div><div class="variant-id">filter_blocks+attr_full+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Custom attr wp.full, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Custom attr wp.full</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="4.977486941">
-      <div class="metric-top">
-        <span class="metric-rank">#4</span>
-        <strong>4.977x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 96.3%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="7.329855914">
-      <div class="metric-top">
-        <span class="metric-rank">#4</span>
-        <strong>7.330x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 90.6%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="6.482691354"><div class="variant-name">Compact filter blocks + Mesh SHA + Custom attr wp.full</div><div class="variant-id">filter_blocks+mesh_sha+attr_full</div></td><td data-sort="Compact filter blocks, Mesh SHA, Custom attr wp.full"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Mesh SHA</span><span class="method-chip">Custom attr wp.full</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="4.135230363">
-      <div class="metric-top">
-        <span class="metric-rank">#7</span>
-        <strong>4.135x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 80.0%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="6.482691354">
-      <div class="metric-top">
-        <span class="metric-rank">#5</span>
-        <strong>6.483x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 80.2%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="6.277140188"><div class="variant-name">Compact filter blocks + Geo id + Compact arrays</div><div class="variant-id">filter_blocks+geo_id+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Geo id, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Geo id</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="4.266594216">
-      <div class="metric-top">
-        <span class="metric-rank">#6</span>
-        <strong>4.267x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 82.6%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="6.277140188">
-      <div class="metric-top">
-        <span class="metric-rank">#6</span>
-        <strong>6.277x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 77.6%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="6.175355919"><div class="variant-name">Compact filter blocks + Mesh SHA + Compact arrays</div><div class="variant-id">filter_blocks+mesh_sha+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Mesh SHA, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Mesh SHA</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="4.476929949">
-      <div class="metric-top">
-        <span class="metric-rank">#5</span>
-        <strong>4.477x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 86.6%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="6.175355919">
-      <div class="metric-top">
-        <span class="metric-rank">#7</span>
-        <strong>6.175x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 76.4%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="5.950822813"><div class="variant-name">Compact filter blocks + Mesh SHA + Geo id + Compact arrays</div><div class="variant-id">filter_blocks+mesh_sha+geo_id+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Mesh SHA, Geo id, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Mesh SHA</span><span class="method-chip">Geo id</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="4.038035144">
-      <div class="metric-top">
-        <span class="metric-rank">#9</span>
-        <strong>4.038x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 78.1%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="5.950822813">
-      <div class="metric-top">
-        <span class="metric-rank">#8</span>
-        <strong>5.951x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 73.6%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="5.832844628"><div class="variant-name">Compact filter blocks + Compact arrays</div><div class="variant-id">filter_blocks+prefinalize_arrays</div></td><td data-sort="Compact filter blocks, Compact arrays"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Compact arrays</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="4.117519387">
-      <div class="metric-top">
-        <span class="metric-rank">#8</span>
-        <strong>4.118x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 79.7%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="5.832844628">
-      <div class="metric-top">
-        <span class="metric-rank">#9</span>
-        <strong>5.833x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 72.1%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr><tr><td data-sort="5.127021610"><div class="variant-name">Compact filter blocks + Mesh SHA + Geo id + Custom attr wp.full</div><div class="variant-id">filter_blocks+mesh_sha+geo_id+attr_full</div></td><td data-sort="Compact filter blocks, Mesh SHA, Geo id, Custom attr wp.full"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span><span class="method-chip">Mesh SHA</span><span class="method-chip">Geo id</span><span class="method-chip">Custom attr wp.full</span></div></td>
-    <td class="metric-cell metric-finalize " data-sort="3.502133209">
-      <div class="metric-top">
-        <span class="metric-rank">#12</span>
-        <strong>3.502x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 67.8%"></span></div>
-    </td>
-
-    <td class="metric-cell metric-finalize " data-sort="5.127021610">
-      <div class="metric-top">
-        <span class="metric-rank">#10</span>
-        <strong>5.127x</strong>
-      </div>
-      <div class="metric-bar"><span style="width: 63.4%"></span></div>
-    </td>
-    <td data-sort="Compact filter blocks"><div class="method-chip-set"><span class="method-chip">Compact filter blocks</span></div></td><td class="metric-empty" data-sort="0">-</td><td class="metric-empty" data-sort="0">-</td><td data-sort="High"><span class="badge sev-high">High</span></td><td data-sort="Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction." class="overview-remark">Largest measured improvement for the G1 16k bottleneck; intrusive because it changes collision-filter storage and contact-pair construction.</td></tr></tbody></table></div>
-
-  <h2>What The Current Methods Mean</h2>
-  <div class="grid">
-
-            <article class="method-card" style="--method-color: #dc2626">
-              <div class="method-head">
-                <h3>Compact collision-filter blocks</h3>
-                <span class="badge sev-high">High</span>
-              </div>
-              <p>Store replicated shape-collision filter pairs as one local template plus one shape offset per copied world, and use that compact metadata to build contact pairs. This avoids creating and then canonicalizing tens of millions of Python tuples for large replicated robots.</p>
-              <p class="small"><strong>Implementation surface:</strong> newton/_src/sim/builder.py and ModelBuilder.shape_collision_filter_pairs API behavior</p>
-              <p class="small"><strong>add_builder():</strong> Direct add_builder()/replicate() optimization for filtered USD robots, and a direct finalize() optimization because the giant filter set is no longer materialized.</p>
-              <pre><code>local_filter_pairs = tuple(source.shape_collision_filter_pairs)
-builder.shape_collision_filter_pairs.extend_offset(local_filter_pairs, start_shape_idx)
-
-if filter_blocks_cover_all_pairs:
-    model.shape_collision_filter_pairs = LazyFilterView(builder.shape_collision_filter_pairs)
-    find_shape_contact_pairs_from_filter_blocks(model)</code></pre>
-            </article>
-
-
-            <article class="method-card" style="--method-color: #9a3412">
-              <div class="method-head">
-                <h3>Custom attr wp.full</h3>
-                <span class="badge sev-low-med">Low-Medium</span>
-              </div>
-              <p>When a custom attribute has no explicit values, allocate the Warp array directly with wp.full(count, default). This avoids building a huge Python list of repeated defaults before converting it.</p>
-              <p class="small"><strong>Implementation surface:</strong> newton/_src/sim/builder.py</p>
-              <p class="small"><strong>add_builder():</strong> No direct effect on add_builder(); it changes how finalize() materializes Model/State/Control custom attributes.</p>
-              <pre><code>if self.values is None or len(self.values) == 0:
-    if self.dtype is str:
-        return [self.default] * count
-    return wp.full(
-        count,
-        self.default,
-        dtype=self.dtype,
-        requires_grad=requires_grad,
-        device=device,
-    )</code></pre>
-            </article>
-
-
-            <article class="method-card" style="--method-color: #2563eb">
-              <div class="method-head">
-                <h3>Mesh SHA hash</h3>
-                <span class="badge sev-low">Low</span>
-              </div>
-              <p>Changes the first-time mesh hash from Python tuple hashing of every vertex/index to a SHA-256 hash over the mesh buffers. This targets large mesh hashing overhead.</p>
-              <p class="small"><strong>Implementation surface:</strong> newton/_src/geometry/types.py</p>
-              <p class="small"><strong>add_builder():</strong> No direct effect on add_builder(); it only changes hash calls made later by finalize().</p>
-              <pre><code>def __hash__(self):
-    cached = getattr(self, &quot;_cached_hash&quot;, None)
-    if cached is None:
-        h = hashlib.sha256(self._vertices.tobytes())
-        h.update(self._indices.tobytes())
-        cached = int.from_bytes(h.digest()[:8], &quot;big&quot;)
-        self._cached_hash = cached
-    return cached</code></pre>
-            </article>
-
-
-            <article class="method-card" style="--method-color: #0f766e">
-              <div class="method-head">
-                <h3>Geometry id dedup</h3>
-                <span class="badge sev-low">Low</span>
-              </div>
-              <p>Inside finalize(), use the geometry object&#x27;s identity as the deduplication key. Replicated worlds reuse the same mesh objects, so identity avoids repeatedly hashing equivalent geometry.</p>
-              <p class="small"><strong>Implementation surface:</strong> newton/_src/sim/builder.py</p>
-              <p class="small"><strong>add_builder():</strong> No direct effect on add_builder(); it changes finalize()&#x27;s geometry dedup lookup.</p>
-              <pre><code>for geo in self.shape_source:
-    geo_hash = id(geo)
-    if geo_hash not in finalized_geos:
-        finalized_geos[geo_hash] = finalize_geometry(geo)</code></pre>
-            </article>
-
-
-            <article class="method-card" style="--method-color: #be123c">
-              <div class="method-head">
-                <h3>Array proxy / compact_finalize_storage()</h3>
-                <span class="badge sev-med">Medium</span>
-              </div>
-              <p>Opt-in pre-finalize compaction for selected builder fields. The helper converts list-heavy finalize inputs to array.array or NumPy storage before the measured finalize() call, while leaving add_builder() semantics unchanged.</p>
-              <p class="small"><strong>Implementation surface:</strong> newton/_src/sim/builder.py</p>
-              <p class="small"><strong>add_builder():</strong> No direct effect on add_builder(); it is called after replication and before finalize().</p>
-              <pre><code>builder.compact_finalize_storage()
-model = builder.finalize(device=device)</code></pre>
-            </article>
-
-  </div>
-
-  <h2>Recommendation</h2>
-  <div class="callout">
-    <p><strong>Land first:</strong> the default branch changes are now the best low-risk bundle: compact filter blocks drive the <code>add_builder()</code> win, while <code>wp.full</code>, cached mesh hashing, and identity geometry dedup reduce <code>finalize()</code> overhead without broad API changes.</p>
-    <p><strong>Next decision:</strong> the optional <code>compact_finalize_storage()</code> path is the clearest remaining finalize win. It should stay opt-in until mutable-builder semantics and downstream extension points are reviewed, but the G1 16k focused rerun shows it is worth productionizing carefully.</p>
-  </div>
-
-  <h2>Failures</h2>
-  <p>No failed benchmark cases were recorded.</p>
-
-  <h2>Data</h2>
-  <p>Raw JSONL files: <a href="data/finalize_explore_20260605_cp_template_matrix.jsonl">finalize_explore_20260605_cp_template_matrix.jsonl</a> <a href="data/finalize_filter_blocks_20260605_matrix_clean.jsonl">finalize_filter_blocks_20260605_matrix_clean.jsonl</a> <a href="data/add_builder_explore_20260605_combo_matrix_clean.jsonl">add_builder_explore_20260605_combo_matrix_clean.jsonl</a> <a href="data/add_builder_filter_blocks_20260605_matrix_clean.jsonl">add_builder_filter_blocks_20260605_matrix_clean.jsonl</a> <a href="data/branch_compare_public_main_finalize_20260608.jsonl">branch_compare_public_main_finalize_20260608.jsonl</a> <a href="data/branch_compare_compact_filters_wpfull_finalize_20260608.jsonl">branch_compare_compact_filters_wpfull_finalize_20260608.jsonl</a> <a href="data/branch_compare_public_main_add_builder_20260608.jsonl">branch_compare_public_main_add_builder_20260608.jsonl</a> <a href="data/branch_compare_compact_filters_wpfull_add_builder_20260608.jsonl">branch_compare_compact_filters_wpfull_add_builder_20260608.jsonl</a> <a href="data/branch_compare_compact_filters_wpfull_meshgeo_finalize_g1_16384_20260609.jsonl">branch_compare_compact_filters_wpfull_meshgeo_finalize_g1_16384_20260609.jsonl</a> <a href="data/branch_compare_compact_filters_wpfull_meshgeo_prefinalize_arrays_g1_16384_20260609.jsonl">branch_compare_compact_filters_wpfull_meshgeo_prefinalize_arrays_g1_16384_20260609.jsonl</a></p>
-  <p>Normalized summaries: <a href="data/latest_finalize_focus.json">latest_finalize_focus.json</a>, <a href="data/branch_comparison.json">branch_comparison.json</a>, <a href="data/overview.json">overview.json</a>, <a href="data/finalize_summary.json">finalize_summary.json</a>, <a href="data/add_builder_summary.json">add_builder_summary.json</a>.</p>
-</main>
-
-<script>
-const REPORT = {"assetLabels": {"apptronik_apollo": "Apptronik Apollo", "booster_t1": "Booster T1", "g1_hands": "Unitree G1 with hands", "h1": "Unitree H1 humanoid", "shadow_hand": "Shadow Hand", "ur5e": "UR5e arm"}, "branchAssets": ["g1_hands", "h1", "shadow_hand", "ur5e"], "branchCompare": {"addBuilder": [{"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 440, "branch_median_call_ms": 0.4047672264277935, "branch_p95_call_ms": 0.7738396059721703, "branch_rss_peak_delta_mb": 0.01953125, "branch_total_s": 0.004689306020736694, "custom_attr_value_slots": 11771, "env_count": 10, "joint_count": 440, "main_median_call_ms": 1.3732332736253738, "main_p95_call_ms": 1.533501222729683, "main_rss_peak_delta_mb": 5.9453125, "main_total_s": 0.013657649978995323, "shape_count": 1041, "speedup": 2.912509850839228}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 4400, "branch_median_call_ms": 0.46653905883431435, "branch_p95_call_ms": 0.6843286100775002, "branch_rss_peak_delta_mb": 3.109375, "branch_total_s": 0.04955758061259985, "custom_attr_value_slots": 117701, "env_count": 100, "joint_count": 4400, "main_median_call_ms": 1.2399009428918362, "main_p95_call_ms": 1.5077709686011076, "main_rss_peak_delta_mb": 74.01171875, "main_total_s": 0.1306423144415021, "shape_count": 10401, "speedup": 2.6361721622924974}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 22528, "branch_median_call_ms": 0.4005259834229946, "branch_p95_call_ms": 0.7914355490356684, "branch_rss_peak_delta_mb": 42.8125, "branch_total_s": 0.2447315752506256, "custom_attr_value_slots": 602625, "env_count": 512, "joint_count": 22528, "main_median_call_ms": 1.216475386172533, "main_p95_call_ms": 1.515738386660814, "main_rss_peak_delta_mb": 408.984375, "main_total_s": 0.6589019643142819, "shape_count": 53249, "speedup": 2.692345536694688}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 45056, "branch_median_call_ms": 0.3779814578592777, "branch_p95_call_ms": 0.7125734817236655, "branch_rss_peak_delta_mb": 97.7265625, "branch_total_s": 0.47019347734749317, "custom_attr_value_slots": 1205249, "env_count": 1024, "joint_count": 45056, "main_median_call_ms": 1.2829643674194813, "main_p95_call_ms": 1.6679879277944556, "main_rss_peak_delta_mb": 832.24609375, "main_total_s": 1.4319591196253896, "shape_count": 106497, "speedup": 3.0454678523052126}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 90112, "branch_median_call_ms": 0.35954033955931664, "branch_p95_call_ms": 0.6315058562904594, "branch_rss_peak_delta_mb": 209.87890625, "branch_total_s": 1.2483106115832925, "custom_attr_value_slots": 2410497, "env_count": 2048, "joint_count": 90112, "main_median_call_ms": 1.214794348925352, "main_p95_call_ms": 2.0914676133543253, "main_rss_peak_delta_mb": 1682.77734375, "main_total_s": 3.167309809476137, "shape_count": 212993, "speedup": 2.537277004686266}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 180224, "branch_median_call_ms": 0.36510080099105835, "branch_p95_call_ms": 0.5799771752208471, "branch_rss_peak_delta_mb": 427.93359375, "branch_total_s": 2.3816081350669265, "custom_attr_value_slots": 4820993, "env_count": 4096, "joint_count": 180224, "main_median_call_ms": 1.2130150571465492, "main_p95_call_ms": 1.7051475588232279, "main_rss_peak_delta_mb": 3374.0625, "main_total_s": 6.34278248809278, "shape_count": 425985, "speedup": 2.6632351454890117}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 360448, "branch_median_call_ms": 0.36924146115779877, "branch_p95_call_ms": 0.6287995260208844, "branch_rss_peak_delta_mb": 849.8828125, "branch_total_s": 5.651211499236524, "custom_attr_value_slots": 9641985, "env_count": 8192, "joint_count": 360448, "main_median_call_ms": 1.2033930979669094, "main_p95_call_ms": 1.8041430972516534, "main_rss_peak_delta_mb": 6726.7421875, "main_total_s": 14.0732690570876, "shape_count": 851969, "speedup": 2.4903100970453664}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 720896, "branch_median_call_ms": 0.36925869062542915, "branch_p95_call_ms": 0.5899702198803423, "branch_rss_peak_delta_mb": 1692.9375, "branch_total_s": 11.016072748228908, "custom_attr_value_slots": 19283969, "env_count": 16384, "joint_count": 720896, "main_median_call_ms": 1.184529159218073, "main_p95_call_ms": 1.7114139627665246, "main_rss_peak_delta_mb": 13456.05078125, "main_total_s": 27.88074833713472, "shape_count": 1703937, "speedup": 2.5309154155338347}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 200, "branch_median_call_ms": 0.24990923702716827, "branch_p95_call_ms": 0.46572876162826987, "branch_rss_peak_delta_mb": 0.01953125, "branch_total_s": 0.002928351052105427, "custom_attr_value_slots": 5450, "env_count": 10, "joint_count": 200, "main_median_call_ms": 0.4603932611644268, "main_p95_call_ms": 0.6560631096363064, "main_rss_peak_delta_mb": 1.3046875, "main_total_s": 0.004855412989854813, "shape_count": 541, "speedup": 1.65807066962271}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 2000, "branch_median_call_ms": 0.2545183524489403, "branch_p95_call_ms": 0.34287753514945496, "branch_rss_peak_delta_mb": 1.5625, "branch_total_s": 0.027133661322295666, "custom_attr_value_slots": 54500, "env_count": 100, "joint_count": 2000, "main_median_call_ms": 0.5022562108933926, "main_p95_call_ms": 0.6503838114440439, "main_rss_peak_delta_mb": 20.8984375, "main_total_s": 0.052400922402739525, "shape_count": 5401, "speedup": 1.931214581781553}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 10240, "branch_median_call_ms": 0.25425152853131294, "branch_p95_call_ms": 0.5168573465198277, "branch_rss_peak_delta_mb": 22.96484375, "branch_total_s": 0.15150608122348785, "custom_attr_value_slots": 279040, "env_count": 512, "joint_count": 10240, "main_median_call_ms": 0.48803025856614113, "main_p95_call_ms": 0.6709808949381113, "main_rss_peak_delta_mb": 123.83984375, "main_total_s": 0.27257842104882, "shape_count": 27649, "speedup": 1.7991252816231011}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 20480, "branch_median_call_ms": 0.23630959913134575, "branch_p95_call_ms": 0.4681792575865982, "branch_rss_peak_delta_mb": 47.96875, "branch_total_s": 0.2875185487791896, "custom_attr_value_slots": 558080, "env_count": 1024, "joint_count": 20480, "main_median_call_ms": 0.5043782293796539, "main_p95_call_ms": 0.6942080333828919, "main_rss_peak_delta_mb": 250.4296875, "main_total_s": 0.5657924609258771, "shape_count": 55297, "speedup": 1.9678468165905991}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 40960, "branch_median_call_ms": 0.2369987778365612, "branch_p95_call_ms": 0.44253789819776984, "branch_rss_peak_delta_mb": 100.56640625, "branch_total_s": 0.5973935285583138, "custom_attr_value_slots": 1116160, "env_count": 2048, "joint_count": 40960, "main_median_call_ms": 0.46998588368296623, "main_p95_call_ms": 0.6515946239233017, "main_rss_peak_delta_mb": 506.15234375, "main_total_s": 1.058463086374104, "shape_count": 110593, "speedup": 1.7718020630864324}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 81920, "branch_median_call_ms": 0.24244794622063637, "branch_p95_call_ms": 0.5152774974703789, "branch_rss_peak_delta_mb": 205.5234375, "branch_total_s": 1.5397325549274683, "custom_attr_value_slots": 2232320, "env_count": 4096, "joint_count": 81920, "main_median_call_ms": 0.4919408820569515, "main_p95_call_ms": 0.7949613500386477, "main_rss_peak_delta_mb": 1016.4140625, "main_total_s": 2.6944710593670607, "shape_count": 221185, "speedup": 1.7499604400414774}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 163840, "branch_median_call_ms": 0.24945195764303207, "branch_p95_call_ms": 0.47205435112118693, "branch_rss_peak_delta_mb": 409.45703125, "branch_total_s": 3.44717185664922, "custom_attr_value_slots": 4464640, "env_count": 8192, "joint_count": 163840, "main_median_call_ms": 0.4687807522714138, "main_p95_call_ms": 0.8081793319433928, "main_rss_peak_delta_mb": 2036.48046875, "main_total_s": 5.280697123147547, "shape_count": 442369, "speedup": 1.531892618861359}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 327680, "branch_median_call_ms": 0.24162186309695244, "branch_p95_call_ms": 0.4899756982922553, "branch_rss_peak_delta_mb": 827.06640625, "branch_total_s": 6.587181866168976, "custom_attr_value_slots": 8929280, "env_count": 16384, "joint_count": 327680, "main_median_call_ms": 0.472980085760355, "main_p95_call_ms": 0.6319007370620953, "main_rss_peak_delta_mb": 4066.29296875, "main_total_s": 11.382135190069675, "shape_count": 884737, "speedup": 1.7279218065204849}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 250, "branch_median_call_ms": 0.3706584684550762, "branch_p95_call_ms": 0.5896552000194786, "branch_rss_peak_delta_mb": 0.01953125, "branch_total_s": 0.004165232181549072, "custom_attr_value_slots": 7631, "env_count": 10, "joint_count": 250, "main_median_call_ms": 0.7026456296443939, "main_p95_call_ms": 0.9772111661732192, "main_rss_peak_delta_mb": 2.078125, "main_total_s": 0.007321772165596485, "shape_count": 621, "speedup": 1.7578304993488931}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 2500, "branch_median_call_ms": 0.37374207749962807, "branch_p95_call_ms": 0.6204478442668915, "branch_rss_peak_delta_mb": 4.9140625, "branch_total_s": 0.040192595683038235, "custom_attr_value_slots": 76301, "env_count": 100, "joint_count": 2500, "main_median_call_ms": 0.73263980448246, "main_p95_call_ms": 0.9030203334987162, "main_rss_peak_delta_mb": 32.2421875, "main_total_s": 0.07623957749456167, "shape_count": 6201, "speedup": 1.8968562790965924}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 12800, "branch_median_call_ms": 0.35596033558249474, "branch_p95_call_ms": 0.6161090917885301, "branch_rss_peak_delta_mb": 33.7890625, "branch_total_s": 0.20611668564379215, "custom_attr_value_slots": 390657, "env_count": 512, "joint_count": 12800, "main_median_call_ms": 0.7202848792076111, "main_p95_call_ms": 2.0662715192884202, "main_rss_peak_delta_mb": 172.6015625, "main_total_s": 0.467017225921154, "shape_count": 31745, "speedup": 2.2657904888313913}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 25600, "branch_median_call_ms": 0.41039707139134407, "branch_p95_call_ms": 0.9178509470075368, "branch_rss_peak_delta_mb": 67.0546875, "branch_total_s": 0.5173716312274337, "custom_attr_value_slots": 781313, "env_count": 1024, "joint_count": 25600, "main_median_call_ms": 0.7330807857215405, "main_p95_call_ms": 1.452851854264733, "main_rss_peak_delta_mb": 345.765625, "main_total_s": 0.8681330652907491, "shape_count": 63489, "speedup": 1.6779680463560682}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 51200, "branch_median_call_ms": 0.3619561903178692, "branch_p95_call_ms": 0.804528873413801, "branch_rss_peak_delta_mb": 136.1640625, "branch_total_s": 0.9377862680703402, "custom_attr_value_slots": 1562625, "env_count": 2048, "joint_count": 51200, "main_median_call_ms": 0.6863521412014961, "main_p95_call_ms": 1.5154033899307195, "main_rss_peak_delta_mb": 694.74609375, "main_total_s": 1.6361743984743953, "shape_count": 126977, "speedup": 1.7447199369224198}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 102400, "branch_median_call_ms": 0.36187656223773956, "branch_p95_call_ms": 0.6116449367254972, "branch_rss_peak_delta_mb": 274.859375, "branch_total_s": 2.104902122169733, "custom_attr_value_slots": 3125249, "env_count": 4096, "joint_count": 102400, "main_median_call_ms": 0.6786268204450607, "main_p95_call_ms": 1.1815328616648912, "main_rss_peak_delta_mb": 1387.78515625, "main_total_s": 3.5895576579496264, "shape_count": 253953, "speedup": 1.7053323383272143}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 204800, "branch_median_call_ms": 0.35335076972842216, "branch_p95_call_ms": 0.6702065002173184, "branch_rss_peak_delta_mb": 550.171875, "branch_total_s": 4.2231273809447885, "custom_attr_value_slots": 6250497, "env_count": 8192, "joint_count": 204800, "main_median_call_ms": 0.6987643428146839, "main_p95_call_ms": 1.048646913841366, "main_rss_peak_delta_mb": 2783.48046875, "main_total_s": 8.190481497906148, "shape_count": 507905, "speedup": 1.939435105571879}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 409600, "branch_median_call_ms": 0.35992125049233437, "branch_p95_call_ms": 0.720673333853482, "branch_rss_peak_delta_mb": 1103.33984375, "branch_total_s": 9.393795906566083, "custom_attr_value_slots": 12500993, "env_count": 16384, "joint_count": 409600, "main_median_call_ms": 0.6794193759560585, "main_p95_call_ms": 1.1002440936863411, "main_rss_peak_delta_mb": 5564.83984375, "main_total_s": 15.427778218872845, "shape_count": 1015809, "speedup": 1.6423369607262943}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 70, "branch_median_call_ms": 0.17645768821239471, "branch_p95_call_ms": 0.32132458873093106, "branch_rss_peak_delta_mb": 0.01953125, "branch_total_s": 0.002029026858508587, "custom_attr_value_slots": 1651, "env_count": 10, "joint_count": 70, "main_median_call_ms": 0.32067717984318733, "main_p95_call_ms": 0.6393199786543842, "main_rss_peak_delta_mb": 0.2734375, "main_total_s": 0.0033678878098726273, "shape_count": 301, "speedup": 1.6598537351783282}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 700, "branch_median_call_ms": 0.1653614453971386, "branch_p95_call_ms": 0.24666381068527693, "branch_rss_peak_delta_mb": 0.53125, "branch_total_s": 0.0179173918440938, "custom_attr_value_slots": 16501, "env_count": 100, "joint_count": 700, "main_median_call_ms": 0.2490566112101078, "main_p95_call_ms": 0.40964703075587744, "main_rss_peak_delta_mb": 5.9453125, "main_total_s": 0.028217068873345852, "shape_count": 3001, "speedup": 1.5748424278976287}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 3584, "branch_median_call_ms": 0.17325952649116516, "branch_p95_call_ms": 0.3142495639622211, "branch_rss_peak_delta_mb": 6.4609375, "branch_total_s": 0.09867666754871607, "custom_attr_value_slots": 84481, "env_count": 512, "joint_count": 3584, "main_median_call_ms": 0.23425137624144554, "main_p95_call_ms": 0.36320220679044724, "main_rss_peak_delta_mb": 39.4609375, "main_total_s": 0.12955225817859173, "shape_count": 15361, "speedup": 1.312896568123691}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 7168, "branch_median_call_ms": 0.1603439450263977, "branch_p95_call_ms": 0.26985825970768906, "branch_rss_peak_delta_mb": 16.265625, "branch_total_s": 0.18753473926335573, "custom_attr_value_slots": 168961, "env_count": 1024, "joint_count": 7168, "main_median_call_ms": 0.24627335369586945, "main_p95_call_ms": 0.35752668045461167, "main_rss_peak_delta_mb": 79.9453125, "main_total_s": 0.27714411448687315, "shape_count": 30721, "speedup": 1.477828137738676}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 14336, "branch_median_call_ms": 0.16066525131464005, "branch_p95_call_ms": 0.2703637816011905, "branch_rss_peak_delta_mb": 37.91796875, "branch_total_s": 0.3812130084261298, "custom_attr_value_slots": 337921, "env_count": 2048, "joint_count": 14336, "main_median_call_ms": 0.2406807616353035, "main_p95_call_ms": 0.6303646601736546, "main_rss_peak_delta_mb": 165.15234375, "main_total_s": 0.6085762018337846, "shape_count": 61441, "speedup": 1.5964203434356634}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 28672, "branch_median_call_ms": 0.16341963782906532, "branch_p95_call_ms": 0.30309357680380344, "branch_rss_peak_delta_mb": 83.55859375, "branch_total_s": 0.8008070904761553, "custom_attr_value_slots": 675841, "env_count": 4096, "joint_count": 28672, "main_median_call_ms": 0.23695360869169235, "main_p95_call_ms": 0.3720743115991354, "main_rss_peak_delta_mb": 337.2421875, "main_total_s": 1.0840966766700149, "shape_count": 122881, "speedup": 1.3537550922849813}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 57344, "branch_median_call_ms": 0.16139447689056396, "branch_p95_call_ms": 0.2598016057163477, "branch_rss_peak_delta_mb": 172.00390625, "branch_total_s": 1.8039954639971256, "custom_attr_value_slots": 1351681, "env_count": 8192, "joint_count": 57344, "main_median_call_ms": 0.23848144337534904, "main_p95_call_ms": 0.3996375016868114, "main_rss_peak_delta_mb": 680.76953125, "main_total_s": 2.6498499531298876, "shape_count": 245761, "speedup": 1.4688783902253257}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 114688, "branch_median_call_ms": 0.1643626019358635, "branch_p95_call_ms": 0.2679409459233284, "branch_rss_peak_delta_mb": 331.7421875, "branch_total_s": 3.466228721663356, "custom_attr_value_slots": 2703361, "env_count": 16384, "joint_count": 114688, "main_median_call_ms": 0.23575033992528915, "main_p95_call_ms": 0.3812773618847132, "main_rss_peak_delta_mb": 1363.0, "main_total_s": 4.857562224380672, "shape_count": 491521, "speedup": 1.401396911294893}], "finalize": [{"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 440, "branch_rss_peak_delta_mb": 10.078125, "branch_s": 0.284847698174417, "custom_attr_value_slots": 11771, "env_count": 10, "joint_count": 440, "main_rss_peak_delta_mb": 8.55078125, "main_s": 0.3299840008839965, "model_shape_contact_pair_count": 510, "shape_count": 1041, "speedup": 1.1584576705336118}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 4400, "branch_rss_peak_delta_mb": 91.484375, "branch_s": 0.6653687115758657, "custom_attr_value_slots": 117701, "env_count": 100, "joint_count": 4400, "main_rss_peak_delta_mb": 58.390625, "main_s": 0.7964369459077716, "model_shape_contact_pair_count": 5100, "shape_count": 10401, "speedup": 1.1969858697164804}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 22528, "branch_rss_peak_delta_mb": 16.74609375, "branch_s": 0.9325953191146255, "custom_attr_value_slots": 602625, "env_count": 512, "joint_count": 22528, "main_rss_peak_delta_mb": 313.39453125, "main_s": 3.182238162495196, "model_shape_contact_pair_count": 26112, "shape_count": 53249, "speedup": 3.4122390465312495}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 45056, "branch_rss_peak_delta_mb": 27.31640625, "branch_s": 1.6888455161824822, "custom_attr_value_slots": 1205249, "env_count": 1024, "joint_count": 45056, "main_rss_peak_delta_mb": 620.9140625, "main_s": 7.430838508531451, "model_shape_contact_pair_count": 52224, "shape_count": 106497, "speedup": 4.399951586648579}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 90112, "branch_rss_peak_delta_mb": 50.609375, "branch_s": 3.089650709182024, "custom_attr_value_slots": 2410497, "env_count": 2048, "joint_count": 90112, "main_rss_peak_delta_mb": 1233.375, "main_s": 11.586125520989299, "model_shape_contact_pair_count": 104448, "shape_count": 212993, "speedup": 3.749979079045052}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 180224, "branch_rss_peak_delta_mb": 100.40625, "branch_s": 5.961367051117122, "custom_attr_value_slots": 4820993, "env_count": 4096, "joint_count": 180224, "main_rss_peak_delta_mb": 2472.44921875, "main_s": 25.18077965825796, "model_shape_contact_pair_count": 208896, "shape_count": 425985, "speedup": 4.223994168173094}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 360448, "branch_rss_peak_delta_mb": 208.78125, "branch_s": 12.545720874331892, "custom_attr_value_slots": 9641985, "env_count": 8192, "joint_count": 360448, "main_rss_peak_delta_mb": 4950.484375, "main_s": 52.17148957774043, "model_shape_contact_pair_count": 417792, "shape_count": 851969, "speedup": 4.158508713874026}, {"asset": "g1_hands", "asset_label": "Unitree G1 with hands", "body_count": 720896, "branch_rss_peak_delta_mb": 430.16015625, "branch_s": 24.7366069117561, "custom_attr_value_slots": 19283969, "env_count": 16384, "joint_count": 720896, "main_rss_peak_delta_mb": 9897.2265625, "main_s": 105.16833748668432, "model_shape_contact_pair_count": 835584, "shape_count": 1703937, "speedup": 4.25152640626322}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 200, "branch_rss_peak_delta_mb": 5.73828125, "branch_s": 0.1945679346099496, "custom_attr_value_slots": 5450, "env_count": 10, "joint_count": 200, "main_rss_peak_delta_mb": 5.85546875, "main_s": 0.18220259435474873, "model_shape_contact_pair_count": 320, "shape_count": 541, "speedup": 0.9364471834478293}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 2000, "branch_rss_peak_delta_mb": 26.58984375, "branch_s": 0.27272791415452957, "custom_attr_value_slots": 54500, "env_count": 100, "joint_count": 2000, "main_rss_peak_delta_mb": 19.26953125, "main_s": 0.4009501077234745, "model_shape_contact_pair_count": 3200, "shape_count": 5401, "speedup": 1.4701469373475768}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 10240, "branch_rss_peak_delta_mb": 134.58203125, "branch_s": 0.9233552841469646, "custom_attr_value_slots": 279040, "env_count": 512, "joint_count": 10240, "main_rss_peak_delta_mb": 91.08203125, "main_s": 1.371082586236298, "model_shape_contact_pair_count": 16384, "shape_count": 27649, "speedup": 1.4848916877136447}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 20480, "branch_rss_peak_delta_mb": 14.7890625, "branch_s": 0.858485828153789, "custom_attr_value_slots": 558080, "env_count": 1024, "joint_count": 20480, "main_rss_peak_delta_mb": 171.22265625, "main_s": 2.066427206620574, "model_shape_contact_pair_count": 32768, "shape_count": 55297, "speedup": 2.4070603600580283}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 40960, "branch_rss_peak_delta_mb": 28.73046875, "branch_s": 1.6232834830880165, "custom_attr_value_slots": 1116160, "env_count": 2048, "joint_count": 40960, "main_rss_peak_delta_mb": 336.796875, "main_s": 4.50320783816278, "model_shape_contact_pair_count": 65536, "shape_count": 110593, "speedup": 2.7741351926998017}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 81920, "branch_rss_peak_delta_mb": 56.0546875, "branch_s": 2.857450888492167, "custom_attr_value_slots": 2232320, "env_count": 4096, "joint_count": 81920, "main_rss_peak_delta_mb": 672.32421875, "main_s": 8.40438339393586, "model_shape_contact_pair_count": 131072, "shape_count": 221185, "speedup": 2.9412170924031957}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 163840, "branch_rss_peak_delta_mb": 102.6796875, "branch_s": 6.181081637740135, "custom_attr_value_slots": 4464640, "env_count": 8192, "joint_count": 163840, "main_rss_peak_delta_mb": 1340.47265625, "main_s": 18.0506214145571, "model_shape_contact_pair_count": 262144, "shape_count": 442369, "speedup": 2.9203014087930064}, {"asset": "h1", "asset_label": "Unitree H1 humanoid", "body_count": 327680, "branch_rss_peak_delta_mb": 206.81640625, "branch_s": 12.157118879258633, "custom_attr_value_slots": 8929280, "env_count": 16384, "joint_count": 327680, "main_rss_peak_delta_mb": 2666.921875, "main_s": 38.63867281191051, "model_shape_contact_pair_count": 524288, "shape_count": 884737, "speedup": 3.1782754775748954}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 250, "branch_rss_peak_delta_mb": 4.484375, "branch_s": 0.12120694480836391, "custom_attr_value_slots": 7631, "env_count": 10, "joint_count": 250, "main_rss_peak_delta_mb": 3.890625, "main_s": 0.12165153212845325, "model_shape_contact_pair_count": 380, "shape_count": 621, "speedup": 1.003668002033978}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 2500, "branch_rss_peak_delta_mb": 41.40234375, "branch_s": 0.2779029915109277, "custom_attr_value_slots": 76301, "env_count": 100, "joint_count": 2500, "main_rss_peak_delta_mb": 30.0703125, "main_s": 0.3172896010801196, "model_shape_contact_pair_count": 3800, "shape_count": 6201, "speedup": 1.1417279078395353}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 12800, "branch_rss_peak_delta_mb": 11.40234375, "branch_s": 0.5796884465962648, "custom_attr_value_slots": 390657, "env_count": 512, "joint_count": 12800, "main_rss_peak_delta_mb": 106.90234375, "main_s": 1.2773701371625066, "model_shape_contact_pair_count": 19456, "shape_count": 31745, "speedup": 2.2035459644966076}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 25600, "branch_rss_peak_delta_mb": 20.98046875, "branch_s": 0.9821641054004431, "custom_attr_value_slots": 781313, "env_count": 1024, "joint_count": 25600, "main_rss_peak_delta_mb": 202.1875, "main_s": 2.7373835910111666, "model_shape_contact_pair_count": 38912, "shape_count": 63489, "speedup": 2.7870939041241933}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 51200, "branch_rss_peak_delta_mb": 37.12890625, "branch_s": 1.8817874873057008, "custom_attr_value_slots": 1562625, "env_count": 2048, "joint_count": 51200, "main_rss_peak_delta_mb": 402.51953125, "main_s": 5.373447791673243, "model_shape_contact_pair_count": 77824, "shape_count": 126977, "speedup": 2.8555019245912936}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 102400, "branch_rss_peak_delta_mb": 69.96484375, "branch_s": 3.826574569568038, "custom_attr_value_slots": 3125249, "env_count": 4096, "joint_count": 102400, "main_rss_peak_delta_mb": 801.8984375, "main_s": 10.8067372655496, "model_shape_contact_pair_count": 155648, "shape_count": 253953, "speedup": 2.82412822985167}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 204800, "branch_rss_peak_delta_mb": 127.93359375, "branch_s": 7.594926910474896, "custom_attr_value_slots": 6250497, "env_count": 8192, "joint_count": 204800, "main_rss_peak_delta_mb": 1587.9140625, "main_s": 21.598834852688015, "model_shape_contact_pair_count": 311296, "shape_count": 507905, "speedup": 2.84385025784764}, {"asset": "shadow_hand", "asset_label": "Shadow Hand", "body_count": 409600, "branch_rss_peak_delta_mb": 261.90234375, "branch_s": 15.88432242628187, "custom_attr_value_slots": 12500993, "env_count": 16384, "joint_count": 409600, "main_rss_peak_delta_mb": 3173.44140625, "main_s": 48.44625319726765, "model_shape_contact_pair_count": 622592, "shape_count": 1015809, "speedup": 3.0499414389316026}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 70, "branch_rss_peak_delta_mb": 9.36328125, "branch_s": 0.21862851548939943, "custom_attr_value_slots": 1651, "env_count": 10, "joint_count": 70, "main_rss_peak_delta_mb": 6.6015625, "main_s": 0.2287494195625186, "model_shape_contact_pair_count": 90, "shape_count": 301, "speedup": 1.0462926990583252}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 700, "branch_rss_peak_delta_mb": 9.4609375, "branch_s": 0.2703105090186, "custom_attr_value_slots": 16501, "env_count": 100, "joint_count": 700, "main_rss_peak_delta_mb": 9.46875, "main_s": 0.27760032657533884, "model_shape_contact_pair_count": 900, "shape_count": 3001, "speedup": 1.0269683098271154}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 3584, "branch_rss_peak_delta_mb": 44.93359375, "branch_s": 0.4476646985858679, "custom_attr_value_slots": 84481, "env_count": 512, "joint_count": 3584, "main_rss_peak_delta_mb": 32.99609375, "main_s": 0.4662390034645796, "model_shape_contact_pair_count": 4608, "shape_count": 15361, "speedup": 1.0414915559287705}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 7168, "branch_rss_peak_delta_mb": 77.34375, "branch_s": 0.7147211385890841, "custom_attr_value_slots": 168961, "env_count": 1024, "joint_count": 7168, "main_rss_peak_delta_mb": 55.50390625, "main_s": 0.868055684491992, "model_shape_contact_pair_count": 9216, "shape_count": 30721, "speedup": 1.2145375834351315}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 14336, "branch_rss_peak_delta_mb": 152.83984375, "branch_s": 1.330774619244039, "custom_attr_value_slots": 337921, "env_count": 2048, "joint_count": 14336, "main_rss_peak_delta_mb": 101.62109375, "main_s": 1.3514917595312, "model_shape_contact_pair_count": 18432, "shape_count": 61441, "speedup": 1.0155677302434047}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 28672, "branch_rss_peak_delta_mb": 25.3515625, "branch_s": 1.2722021052613854, "custom_attr_value_slots": 675841, "env_count": 4096, "joint_count": 28672, "main_rss_peak_delta_mb": 194.41015625, "main_s": 2.658263513818383, "model_shape_contact_pair_count": 36864, "shape_count": 122881, "speedup": 2.089497810783939}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 57344, "branch_rss_peak_delta_mb": 47.90234375, "branch_s": 2.5105985552072525, "custom_attr_value_slots": 1351681, "env_count": 8192, "joint_count": 57344, "main_rss_peak_delta_mb": 386.62890625, "main_s": 5.7583942245692015, "model_shape_contact_pair_count": 73728, "shape_count": 245761, "speedup": 2.2936340071676016}, {"asset": "ur5e", "asset_label": "UR5e arm", "body_count": 114688, "branch_rss_peak_delta_mb": 106.9921875, "branch_s": 5.8201581528410316, "custom_attr_value_slots": 2703361, "env_count": 16384, "joint_count": 114688, "main_rss_peak_delta_mb": 770.1015625, "main_s": 13.025939365848899, "model_shape_contact_pair_count": 147456, "shape_count": 491521, "speedup": 2.2380730941977003}]}, "envOrder": [10, 100, 512, 1024, 2048, 4096, 8192, 16384]};
-const variantOrder = REPORT.variantOrder;
-const labels = REPORT.variantLabels;
-const assetLabels = REPORT.assetLabels;
-const envTicks = REPORT.envOrder;
-const palette = [
-  "#1d2430", "#2563eb", "#0f766e", "#9a3412",
-  "#be123c", "#4f46e5", "#0891b2", "#b45309",
-  "#db2777", "#65a30d", "#9333ea", "#0284c7",
-  "#ca8a04", "#e11d48", "#14b8a6", "#7c3aed"
-];
-const dashes = ["solid", "solid", "solid", "solid", "solid", "dash", "dash", "dash", "dash", "dot", "dot", "dot", "dot", "dashdot", "dashdot", "dashdot"];
-
-function sortableValue(cell, type) {
-  const raw = cell.dataset.sort ?? cell.textContent.trim();
-  if (type === "number") {
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
-  }
-  return raw.toLowerCase();
-}
-
-function updateSortIndicators(table, activeColumn, direction) {
-  for (const button of table.querySelectorAll(".sort-button")) {
-    const column = Number(button.dataset.column);
-    const indicator = button.querySelector(".sort-indicator");
-    if (!indicator) continue;
-    indicator.textContent = column === activeColumn ? direction : "sort";
-    button.parentElement.classList.toggle("is-sorted", column === activeColumn);
-  }
-}
-
-function sortTable(table, column, type, direction) {
-  if (!table) return;
-  const tbody = table.tBodies[0];
-  const rows = Array.from(tbody.rows);
-  const multiplier = direction === "asc" ? 1 : -1;
-  rows.sort((a, b) => {
-    const left = sortableValue(a.cells[column], type);
-    const right = sortableValue(b.cells[column], type);
-    if (type === "number") return (left - right) * multiplier;
-    return String(left).localeCompare(String(right)) * multiplier;
-  });
-  for (const row of rows) tbody.appendChild(row);
-  table.dataset.sortColumn = String(column);
-  table.dataset.sortDir = direction;
-  updateSortIndicators(table, column, direction);
-}
-
-function initSortableTables() {
-  for (const table of document.querySelectorAll(".sortable-table")) {
-    for (const button of table.querySelectorAll(".sort-button")) {
-      button.addEventListener("click", () => {
-        const column = Number(button.dataset.column);
-        const type = button.dataset.type || "text";
-        const currentColumn = table.dataset.sortColumn;
-        const currentDir = table.dataset.sortDir;
-        const direction = currentColumn === String(column) && currentDir === "desc"
-          ? "asc"
-          : currentColumn === String(column) && currentDir === "asc"
-            ? "desc"
-            : button.dataset.initial || "asc";
-        sortTable(table, column, type, direction);
-      });
-    }
-    sortTable(table, 0, "number", "desc");
-  }
-}
-
-initSortableTables();
-
-function rowsFor(dataset, asset, variant) {
-  return dataset
-    .filter(row => row.asset === asset && row.variant === variant)
-    .sort((a, b) => a.env_count - b.env_count);
-}
-
-function finiteMetric(row, metric) {
-  return row[metric] !== null && row[metric] !== undefined && Number.isFinite(Number(row[metric]));
-}
-
-function makeTraces(dataset, asset, metric, suffix, scale = 1) {
-  const traces = [];
-  for (const [index, variant] of variantOrder.entries()) {
-    const rows = rowsFor(dataset, asset, variant).filter(row => finiteMetric(row, metric));
-    if (!rows.length) continue;
-    traces.push({
-      x: rows.map(row => row.env_count),
-      y: rows.map(row => Number(row[metric]) * scale),
-      mode: "lines+markers",
-      name: labels[variant] || variant,
-      legendgroup: variant,
-      line: {
-        color: palette[index % palette.length],
-        width: variant === "baseline" ? 3 : 2,
-        dash: dashes[index % dashes.length]
-      },
-      marker: { size: variant === "baseline" ? 8 : 6 },
-      hovertemplate: `%{x} worlds<br>%{y:.3f} ${suffix}<extra>%{fullData.name}</extra>`
-    });
-  }
-  return traces;
-}
-
-function branchRows(kind, asset) {
-  const rows = (REPORT.branchCompare && REPORT.branchCompare[kind]) || [];
-  return rows
-    .filter(row => row.asset === asset)
-    .sort((a, b) => a.env_count - b.env_count);
-}
-
-function makeBranchTimeTraces(kind, asset, mainMetric, branchMetric, suffix) {
-  const rows = branchRows(kind, asset);
-  if (!rows.length) return [];
-  return [
-    {
-      x: rows.map(row => row.env_count),
-      y: rows.map(row => Number(row[mainMetric])),
-      mode: "lines+markers",
-      name: "Public main",
-      line: { color: "#1d2430", width: 3 },
-      marker: { size: 8 },
-      hovertemplate: `%{x} worlds<br>%{y:.3f} ${suffix}<extra>Public main</extra>`
-    },
-    {
-      x: rows.map(row => row.env_count),
-      y: rows.map(row => Number(row[branchMetric])),
-      mode: "lines+markers",
-      name: "Fresh branch",
-      line: { color: "#dc2626", width: 3 },
-      marker: { size: 8 },
-      hovertemplate: `%{x} worlds<br>%{y:.3f} ${suffix}<extra>Fresh branch</extra>`
-    }
-  ];
-}
-
-function makeBranchSpeedupTrace(kind, asset) {
-  const rows = branchRows(kind, asset).filter(row => finiteMetric(row, "speedup"));
-  if (!rows.length) return [];
-  return [{
-    x: rows.map(row => row.env_count),
-    y: rows.map(row => Number(row.speedup)),
-    mode: "lines+markers",
-    name: "Fresh branch speedup",
-    line: { color: "#16a34a", width: 3 },
-    marker: { size: 8 },
-    hovertemplate: "%{x} worlds<br>%{y:.3f}x<extra>Fresh branch speedup</extra>"
-  }];
-}
-
-function layout(title, ytitle, logY = false) {
-  return {
-    title: { text: title, font: { size: 16 } },
-    xaxis: { title: "Worlds", type: "log", tickvals: envTicks },
-    yaxis: { title: ytitle, type: logY ? "log" : "linear", rangemode: logY ? undefined : "tozero" },
-    legend: { orientation: "h", y: -0.36, font: { size: 10 } },
-    margin: { l: 68, r: 20, t: 52, b: 128 },
-    paper_bgcolor: "#fffdf8",
-    plot_bgcolor: "#fffdf8",
-    hovermode: "closest"
-  };
-}
-
-function plot(div, traces, title, ytitle, logY = false) {
-  const element = document.getElementById(div);
-  if (!element || !traces || traces.length === 0) return;
-  Plotly.newPlot(element, traces, layout(title, ytitle, logY), { responsive: true, displaylogo: false });
-}
-
-for (const asset of REPORT.assets || []) {
-  const slug = asset.replaceAll("_", "-");
-  const label = assetLabels[asset] || asset;
-  plot(
-    `plot-finalize-time-${slug}`,
-    makeTraces(REPORT.finalize, asset, "finalize_s", "s"),
-    `${label}: finalize() time`,
-    "Seconds",
-    true
-  );
-  plot(
-    `plot-finalize-speedup-${slug}`,
-    makeTraces(REPORT.finalize, asset, "speedup_vs_baseline", "x"),
-    `${label}: finalize() speedup vs current main`,
-    "Speedup x",
-    false
-  );
-  plot(
-    `plot-finalize-rss-${slug}`,
-    makeTraces(REPORT.finalize, asset, "rss_peak_delta_mb", "MB"),
-    `${label}: finalize() peak host RSS delta`,
-    "Peak RSS delta MB",
-    true
-  );
-  plot(
-    `plot-add-total-${slug}`,
-    makeTraces(REPORT.addBuilder, asset, "add_builder_total_s", "s"),
-    `${label}: add_builder() total call time`,
-    "Seconds",
-    true
-  );
-  plot(
-    `plot-add-median-${slug}`,
-    makeTraces(REPORT.addBuilder, asset, "add_builder_median_s", "ms", 1000),
-    `${label}: add_builder() median single-call time`,
-    "Milliseconds",
-    true
-  );
-  plot(
-    `plot-add-rss-${slug}`,
-    makeTraces(REPORT.addBuilder, asset, "rss_peak_delta_mb", "MB"),
-    `${label}: add_builder() loop peak host RSS delta`,
-    "Peak RSS delta MB",
-    true
-  );
-}
-
-for (const asset of REPORT.branchAssets || []) {
-  const slug = asset.replaceAll("_", "-");
-  const label = assetLabels[asset] || asset;
-  plot(
-    `plot-branch-finalize-time-${slug}`,
-    makeBranchTimeTraces("finalize", asset, "main_s", "branch_s", "s"),
-    `${label}: fresh branch vs public main finalize()`,
-    "Seconds",
-    true
-  );
-  plot(
-    `plot-branch-finalize-speedup-${slug}`,
-    makeBranchSpeedupTrace("finalize", asset),
-    `${label}: fresh branch finalize() speedup`,
-    "Speedup x",
-    false
-  );
-  plot(
-    `plot-branch-add-time-${slug}`,
-    makeBranchTimeTraces("addBuilder", asset, "main_total_s", "branch_total_s", "s"),
-    `${label}: fresh branch vs public main add_builder()`,
-    "Seconds",
-    true
-  );
-  plot(
-    `plot-branch-add-speedup-${slug}`,
-    makeBranchSpeedupTrace("addBuilder", asset),
-    `${label}: fresh branch add_builder() speedup`,
-    "Speedup x",
-    false
-  );
-}
-</script>
+    </section>
+  </main>
+  <script>
+    const payload = {"traces":[{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[99.714,108.93,159.102,535.292,1209.832,2432.948,4856.377,10274.361],"xaxis":"x","yaxis":"y","legendgroup":"origin-main","showlegend":true,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_allegro_hand<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[88.393,105.524,148.603,482.548,955.165,1061.178,2134.636,4450.542],"xaxis":"x","yaxis":"y","legendgroup":"modelbuilder-compact-filters","showlegend":true,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_allegro_hand<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[54.351,62.851,173.261,727.903,1428.144,3060.157,7757.664,23184.559],"xaxis":"x2","yaxis":"y2","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_anymal_d<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[52.218,61.933,156.723,687.427,527.633,1070.257,2523.433,4922.763],"xaxis":"x2","yaxis":"y2","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_anymal_d<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[62.577,62.334,33.977,62.272,114.357,191.18,345.553,794.301],"xaxis":"x3","yaxis":"y3","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_cartpole<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[30.61,35.869,35.506,55.591,88.244,151.389,293.832,530.738],"xaxis":"x3","yaxis":"y3","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_cartpole<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[326.399,364.098,860.125,3258.278,6368.571,15595.504,44044.359,77283.239],"xaxis":"x4","yaxis":"y4","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_g1<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[218.34,238.592,637.854,1040.71,1909.146,4639.049,8886.235,18212.304],"xaxis":"x4","yaxis":"y4","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_g1<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[141.661,160.149,288.762,1020.784,2236.382,4299.213,8686.038,20631.509],"xaxis":"x5","yaxis":"y5","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_h1<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[59.229,67.103,187.689,760.194,821.089,1585.942,3257.652,7179.534],"xaxis":"x5","yaxis":"y5","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_h1<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[116.506,115.438,260.838,929.722,1804.213,3663.212,8169.345,16155.232],"xaxis":"x6","yaxis":"y6","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_panda_hydro<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[132.648,116.305,215.051,701.015,1311.97,1616.567,3599.9,6778.283],"xaxis":"x6","yaxis":"y6","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_panda_hydro<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[168.415,176.86,235.994,540.984,998.086,1906.489,4385.473,9645.192],"xaxis":"x7","yaxis":"y7","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_ur10<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[60.355,66.886,121.279,432.546,802.931,658.502,1414.864,3430.831],"xaxis":"x7","yaxis":"y7","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_ur10<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"}],"layout":{"height":1180,"margin":{"l":64,"r":28,"t":94,"b":58},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","legend":{"orientation":"h","x":0.5,"xanchor":"center","y":1.07,"yanchor":"bottom"},"hovermode":"closest","annotations":[{"text":"robot_allegro_hand","xref":"paper","yref":"paper","x":0.23,"y":1.0,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_anymal_d","xref":"paper","yref":"paper","x":0.77,"y":1.0,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_cartpole","xref":"paper","yref":"paper","x":0.23,"y":0.75475,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_g1","xref":"paper","yref":"paper","x":0.77,"y":0.75475,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_h1","xref":"paper","yref":"paper","x":0.23,"y":0.48350000000000004,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_panda_hydro","xref":"paper","yref":"paper","x":0.77,"y":0.48350000000000004,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_ur10","xref":"paper","yref":"paper","x":0.23,"y":0.21225000000000002,"showarrow":false,"font":{"size":14,"color":"#111827"}}],"xaxis":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis":{"domain":[0.81375,1.0],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis2":{"domain":[0.54,1.0],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis2":{"domain":[0.81375,1.0],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis3":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis3":{"domain":[0.5425,0.72875],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis4":{"domain":[0.54,1.0],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis4":{"domain":[0.5425,0.72875],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis5":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis5":{"domain":[0.27125,0.4575],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis6":{"domain":[0.54,1.0],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis6":{"domain":[0.27125,0.4575],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis7":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis7":{"domain":[2.7755575615628914e-17,0.18625000000000003],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false}}};
+    Plotly.newPlot("all-finalize-plot", payload.traces, payload.layout, {responsive: true, displaylogo: false});
+  </script>
 </body>
 </html>
