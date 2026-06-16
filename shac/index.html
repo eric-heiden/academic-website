@@ -252,8 +252,8 @@
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
           Newton differentiable MuJoCo Warp experiments using a SHAC-style actor/critic loop. This update keeps the corrected
-          cartpole result, grounded ant locomotion runs, finite-difference gradient checks, and minimal solver scenes that isolate
-          the ant gradient failure to q-dependent multi-body gravity/RNE dynamics after fixing the dense mass-solve path.
+          cartpole result, grounded ant runs, finite-difference gradient checks, and minimal solver scenes. The RNE gravity path is
+          now patched, but Ant still does not train reliably because multi-step state Jacobians remain wrong even with contacts off.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -277,7 +277,7 @@
       <div class="panel metric">
         <div class="label">Ant 240-step return</div>
         <div class="value" id="ant-return">...</div>
-        <p class="note">Newton contacts, force scale 100 rendered checkpoint.</p>
+        <p class="note">Latest Newton-contact force-scale-100 rendered checkpoint.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant mean training FPS</div>
@@ -300,9 +300,10 @@
         <p>
           The ant MJCF import was missing an explicit ground plane, so both contact backends initially let the ant fall through the
           world. The ant builder now uses DiffRL's Y-up transform, rest pose, contact material, previous-action observation, early
-          termination, and a Y-up ground plane. The remaining bad-looking gait is consistent with a state-gradient problem rather
-          than a contact-backend choice. The new minimal scenes narrow this further: one-link and free-body state bridges pass, but
-          two-link gravity q-position derivatives still fail through MJWarp's <code>cinert</code>/<code>cfrc_int</code> path.
+          termination, and a Y-up ground plane. The <code>qfrc_bias</code>/<code>cfrc_int</code> RNE gradient path is now fixed for
+          the reduced two-link gravity scene. The remaining Ant failure is not a contact-backend choice: Newton, MuJoCo, and
+          no-contact checks all show accurate one-step action gradients but bad multi-step state gradients, especially root
+          quaternion and root velocity sensitivities.
         </p>
       </article>
     </section>
@@ -362,6 +363,11 @@
 
     <section class="panel">
       <h2>Finite-Difference Check</h2>
+      <p style="margin-bottom: 12px;">
+        Horizon-1 Ant policy gradients now match finite differences because they mostly use the action-to-force path. Horizon-8
+        gradients still fail because they reuse state Jacobians across steps; the same state-gradient error appears with Newton,
+        MuJoCo, and no contacts.
+      </p>
       <table>
         <thead>
           <tr>
@@ -391,10 +397,10 @@
       <h2>Root Cause Drilldown</h2>
       <p>
         The isolated zero-gravity, zero-velocity, forced two-link scene has no contacts, no gravity, and no Coriolis term. Its
-        only q sensitivity is the mass-matrix solve <code>qacc = M(q)^-1 f</code>. That path now matches finite differences after
-        adding the dense mass-solve VJP and rewriting dense off-diagonal <code>M</code> assembly. The remaining gravity-only
-        two-link error is below SHAC and below Newton's q/qd bridge: the intermediate probes point at MJWarp's
-        <code>cinert</code>/<code>cfrc_int</code> adjoint path.
+        only q sensitivity is the mass-matrix solve <code>qacc = M(q)^-1 f</code>. That path matches finite differences after
+        adding the dense mass-solve VJP and rewriting dense off-diagonal <code>M</code> assembly. The gravity-only two-link error
+        is also fixed after adding a custom RNE VJP for <code>qfrc_bias</code>/<code>cfrc_int</code>. The raw direct
+        <code>vec10</code> probe still produces zero gradients, so solver paths that read <code>cinert</code> need explicit VJPs.
       </p>
       <table style="margin-top: 12px;">
         <thead>
@@ -416,9 +422,10 @@
         The first fix was straightforward: <code>fwd_acceleration</code> propagated <code>qacc_smooth.grad</code> to
         <code>qfrc_smooth.grad</code> but did not propagate the solve VJP into <code>M.grad</code>. Adding that exposed a second
         bug in dense <code>_M_dense</code>: off-diagonal entries were numerically correct forward but their generated adjoints were
-        zero. A pairwise dense kernel fixes the zero-gravity forced two-link case. The deeper remaining bug is separate: fixed-weight
-        probes show accurate <code>cdof(q)</code> gradients but missing <code>cinert(q)</code>/<code>cfrc_int(q)</code> gradients,
-        which explains why gravity-driven ant gradients remain unreliable.
+        zero. A pairwise dense kernel fixes the zero-gravity forced two-link case. The next bug was the raw <code>vec10</code>
+        inertia path: fixed-weight <code>cinert</code> reads still have zero adjoints. The RNE path now bypasses that with a custom
+        <code>qfrc_bias.grad -> cfrc_int.grad -> cinert VJP -> xipos/ximat/subtree_com</code> callback. An experimental dense
+        mass/crb VJP overcorrected the reduced mass probe and was backed out; that is the next code path to derive carefully.
       </p>
       <table style="margin-top: 12px;">
         <thead>
@@ -470,13 +477,12 @@
     <section class="panel">
       <h2>Ant Rollout</h2>
       <figure>
-        <video controls preload="metadata" poster="assets/ant_newton_ground_force100_run1/ant_poster.png">
-          <source src="assets/ant_newton_ground_force100_run1/ant_rollout.mp4" type="video/mp4">
+        <video controls preload="metadata" poster="assets/ant_newton_rne_vjp_run1/ant_poster.png">
+          <source src="assets/ant_newton_rne_vjp_run1/ant_rollout.mp4" type="video/mp4">
         </video>
         <figcaption>
-          Raw <code>ViewerGL.get_frame()</code> frames from the Newton-contact force-scale-100 checkpoint. The video is the first
-          150 simulation steps so it shows the learned motion before the high-height guard reset that occurs later in the 240-step
-          evaluation.
+          Raw <code>ViewerGL.get_frame()</code> frames from the latest Newton-contact force-scale-100 checkpoint after the RNE VJP
+          fix. The policy still collapses, matching the remaining multi-step state-gradient failure.
         </figcaption>
       </figure>
     </section>
@@ -512,11 +518,10 @@
       <article class="panel">
         <h2>Status</h2>
         <p>
-          Cartpole is physically plausible and stabilizes. Ant now has correct ground contact and trains with both MuJoCo contacts
-          and Newton differentiable contacts. The finite-difference checks show that the remaining failure is not specific to
-          MuJoCo contacts versus Newton contacts. Minimal two-link scenes show that the failing term is q-position sensitivity of
-          multi-body gravity/RNE forces through <code>cinert</code>/<code>cfrc_int</code>. The dense mass-solve q-gradient bug is
-          fixed; immediate hinge action gradients remain accurate.
+          Cartpole is physically plausible and stabilizes. Ant now has correct ground contact and accurate one-step action
+          gradients. The reduced RNE gravity scenes are fixed by a custom <code>qfrc_bias</code>/<code>cfrc_int</code> VJP that
+          bypasses raw <code>vec10</code> autodiff. Full SHAC Ant remains blocked by state Jacobian errors that persist with
+          contacts disabled, pointing next at free-body quaternion/velocity and composite-inertia mass-matrix derivatives.
         </p>
       </article>
     </section>
@@ -544,16 +549,16 @@
   python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
   --mode gradcheck --env ant --contact-backend newton --force-scale 100 \
   --num-envs 4 --horizon 8 --grad-check-directions 8 \
-  --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_actor.pt \
-  --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_obs_rms.pt</code></pre>
+  --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_rne_vjp_run1/ant_actor.pt \
+  --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_rne_vjp_run1/ant_obs_rms.pt</code></pre>
       <pre><code>uv run --no-sync --project /home/horde/repos/newton-shac \
   --with imageio --with imageio-ffmpeg \
   python /home/horde/repos/academic-website-reports/shac/run_solver_gradient_diagnostics.py \
-  --out /home/horde/repos/academic-website-reports/shac/assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_fixes.json \
+  --out /home/horde/repos/academic-website-reports/shac/assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_qfrc_bias_vjp.json \
   --render-videos</code></pre>
       <pre><code>uv run --no-sync --project /home/horde/repos/newton-shac \
   python /home/horde/repos/academic-website-reports/shac/run_solver_gradient_bug_drilldown.py \
-  --out /home/horde/repos/academic-website-reports/shac/assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_after_cinert_fix.json</code></pre>
+  --out /home/horde/repos/academic-website-reports/shac/assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_final_rne_vjp.json</code></pre>
     </section>
   </main>
 
@@ -712,15 +717,15 @@
         bugDiag
       ] = await Promise.all([
         fetch("assets/cartpole_results.json").then((res) => res.json()),
-        fetch("assets/ant_newton_ground_force100_run1/ant_results.json").then((res) => res.json()),
+        fetch("assets/ant_newton_rne_vjp_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_mujoco_ground_run1/ant_results.json").then((res) => res.json()),
-        fetch("assets/ant_gradcheck_newton_force100/ant_gradient_check.json").then((res) => res.json()),
-        fetch("assets/ant_gradcheck_mujoco_force100/ant_gradient_check.json").then((res) => res.json()),
-        fetch("assets/ant_gradcheck_nocontact_force100/ant_gradient_check.json").then((res) => res.json()),
+        fetch("assets/ant_gradcheck_newton_after_qfrc_bias_vjp_force100/ant_gradient_check.json").then((res) => res.json()),
+        fetch("assets/ant_gradcheck_mujoco_after_qfrc_bias_vjp_force100/ant_gradient_check.json").then((res) => res.json()),
+        fetch("assets/ant_gradcheck_none_after_qfrc_bias_vjp_force100/ant_gradient_check.json").then((res) => res.json()),
         fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics.json").then((res) => res.json()),
-        fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_fixes.json").then((res) => res.json()),
-        fetch("assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_after_cinert_fix.json").then((res) => res.json())
+        fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_qfrc_bias_vjp.json").then((res) => res.json()),
+        fetch("assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_final_rne_vjp.json").then((res) => res.json())
       ]);
       const finalObs = result.eval.final_obs_mean;
 
@@ -770,7 +775,7 @@
       }, plotConfig);
 
       Plotly.newPlot("ant-selection-chart", [
-        resultLine(antNewton, "selection_return", "Newton contacts, force 100", colors.blue),
+        resultLine(antNewton, "selection_return", "Newton contacts, force 100, RNE VJP", colors.blue),
         resultLine(antFast, "selection_return", "Newton contacts, force 200", colors.violet),
         resultLine(antMujoco, "selection_return", "MuJoCo contacts, force 200", colors.teal)
       ], {
@@ -779,8 +784,8 @@
       }, plotConfig);
 
       Plotly.newPlot("ant-reset-chart", [
-        resultLine(antNewton, "invalid_resets", "Invalid guard, force 100", colors.coral),
-        resultLine(antNewton, "fall_resets", "Fall resets, force 100", colors.amber),
+        resultLine(antNewton, "invalid_resets", "Invalid guard, force 100, RNE VJP", colors.coral),
+        resultLine(antNewton, "fall_resets", "Fall resets, force 100, RNE VJP", colors.amber),
         resultLine(antFast, "invalid_resets", "Invalid guard, force 200", colors.violet),
         resultLine(antMujoco, "invalid_resets", "MuJoCo invalid guard", colors.teal)
       ], {
@@ -1000,11 +1005,11 @@
       document.getElementById("solver-body").innerHTML = [
         solverRow("hinge_q_out", "one-link zero-g hinge", "joint_q", "Newton/MJWarp q bridge is correct in the trivial case."),
         solverRow("pendulum_qd_out", "one-link gravity pendulum", "joint_q", "Gravity q derivative is accurate for a single DOF."),
-        solverRow("two_link_gravity_static_qd_out", "two-link gravity, qd=0", "joint_q", "Remaining failure: q-gradient still misses cinert/cfrc_int sensitivity."),
+        solverRow("two_link_gravity_static_qd_out", "two-link gravity, qd=0", "joint_q", "Fixed: RNE q-gradient now matches finite differences after the qfrc_bias/cfrc VJP."),
         solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_q", "Fixed: dense mass-solve q sensitivity now matches finite differences."),
         solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_force", "Force/action derivative through the same solve is accurate."),
         solverRow("free_quaternion_out_normalized_fd", "free body quaternion", "root_quat_q_normalized", "Free-body quaternion bridge matches normalized finite differences."),
-        solverRow("free_velocity_out", "free body force", "root_force", "Separate gap: direct free-joint force lacks a velocity-output gradient.")
+        solverRow("free_velocity_out", "free body force", "root_force", "Separate gap: direct free-joint force-to-velocity gradient is still absent in this diagnostic.")
       ].join("");
 
       function bugCheck(name) {
@@ -1023,11 +1028,11 @@
       }
 
       document.getElementById("bug-body").innerHTML = [
-        bugRow("dense_mass_offdiag", "Dense M off-diagonal", "Now accurate after replacing the off-diagonal dense mass assembly path."),
+        bugRow("dense_mass_offdiag", "Dense M off-diagonal", "Accurate after replacing the off-diagonal dense mass assembly path."),
         bugRow("gravity_cdof_fixed_cfrc", "Gravity cdof term", "Accurate: kinematic dof gradients are not the remaining blocker."),
-        bugRow("gravity_cfrc_fixed_cdof", "Gravity cfrc_int term", "Broken: accumulated body-force gradients are nearly absent."),
-        bugRow("gravity_cinert_probe", "Gravity cinert term", "Broken: direct cinert(q) adjoints remain zero in this vec10 path."),
-        bugRow("gravity_bias_force", "Gravity qfrc_bias", "Composite bias force remains wrong because cfrc_int/cinert is wrong.")
+        bugRow("gravity_cfrc_fixed_cdof", "Gravity cfrc_int term", "Fixed for the solver path by the custom cfrc/qfrc_bias VJP."),
+        bugRow("gravity_cinert_probe", "Gravity cinert term", "Still broken as a raw vec10 read; direct cinert(q) adjoints remain zero."),
+        bugRow("gravity_bias_force", "Gravity qfrc_bias", "Fixed for RNE: composite bias-force q-gradient now matches finite differences.")
       ].join("");
     }
 
