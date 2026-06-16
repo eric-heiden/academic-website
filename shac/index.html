@@ -253,7 +253,7 @@
         <p class="lede">
           Newton differentiable MuJoCo Warp experiments using a SHAC-style actor/critic loop. This update keeps the corrected
           cartpole result, grounded ant locomotion runs, finite-difference gradient checks, and minimal solver scenes that isolate
-          the ant gradient failure to q-dependent multi-body dynamics.
+          the ant gradient failure to q-dependent multi-body gravity/RNE dynamics after fixing the dense mass-solve path.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -302,7 +302,7 @@
           world. The ant builder now uses DiffRL's Y-up transform, rest pose, contact material, previous-action observation, early
           termination, and a Y-up ground plane. The remaining bad-looking gait is consistent with a state-gradient problem rather
           than a contact-backend choice. The new minimal scenes narrow this further: one-link and free-body state bridges pass, but
-          two-link q-position derivatives fail when acceleration depends on the q-dependent mass matrix.
+          two-link gravity q-position derivatives still fail through MJWarp's <code>cinert</code>/<code>cfrc_int</code> path.
         </p>
       </article>
     </section>
@@ -390,10 +390,11 @@
     <section class="panel">
       <h2>Root Cause Drilldown</h2>
       <p>
-        The isolated zero-gravity, zero-velocity, forced two-link scene has no contacts, no gravity, and no Coriolis term. The
-        only q sensitivity is the mass-matrix solve <code>qacc = M(q)^-1 f</code>. Its force gradient matches finite differences,
-        but its q-position gradient is nearly absent in the analytic path. This points to the MJWarp smooth-acceleration adjoint
-        through <code>M</code>/<code>qLD</code>/<code>qLDiagInv</code>, not to SHAC, contacts, rendering, or Newton's q/qd bridge.
+        The isolated zero-gravity, zero-velocity, forced two-link scene has no contacts, no gravity, and no Coriolis term. Its
+        only q sensitivity is the mass-matrix solve <code>qacc = M(q)^-1 f</code>. That path now matches finite differences after
+        adding the dense mass-solve VJP and rewriting dense off-diagonal <code>M</code> assembly. The remaining gravity-only
+        two-link error is below SHAC and below Newton's q/qd bridge: the intermediate probes point at MJWarp's
+        <code>cinert</code>/<code>cfrc_int</code> adjoint path.
       </p>
       <table style="margin-top: 12px;">
         <thead>
@@ -407,6 +408,63 @@
         </thead>
         <tbody id="solver-body"></tbody>
       </table>
+    </section>
+
+    <section class="panel">
+      <h2>MJWarp Code Findings</h2>
+      <p>
+        The first fix was straightforward: <code>fwd_acceleration</code> propagated <code>qacc_smooth.grad</code> to
+        <code>qfrc_smooth.grad</code> but did not propagate the solve VJP into <code>M.grad</code>. Adding that exposed a second
+        bug in dense <code>_M_dense</code>: off-diagonal entries were numerically correct forward but their generated adjoints were
+        zero. A pairwise dense kernel fixes the zero-gravity forced two-link case. The deeper remaining bug is separate: fixed-weight
+        probes show accurate <code>cdof(q)</code> gradients but missing <code>cinert(q)</code>/<code>cfrc_int(q)</code> gradients,
+        which explains why gravity-driven ant gradients remain unreliable.
+      </p>
+      <table style="margin-top: 12px;">
+        <thead>
+          <tr>
+            <th>Intermediate</th>
+            <th>Best relative error</th>
+            <th>Analytic vs finite difference</th>
+            <th>Finding</th>
+          </tr>
+        </thead>
+        <tbody id="bug-body"></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Rendered Debug Scenes</h2>
+      <p>
+        These are 4-second videos generated from the minimal diagnostic scenes. Each frame is the raw return from
+        <code>ViewerGL.get_frame()</code>; there are no overlays, labels, or composited traces.
+      </p>
+      <div class="grid two" style="margin-top: 14px;">
+        <figure>
+          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/single_hinge_gravity_poster.png">
+            <source src="assets/solver_gradient_diagnostics/videos/single_hinge_gravity.mp4" type="video/mp4">
+          </video>
+          <figcaption>Single-DOF gravity pendulum. This is the control case: q-gradient error stays near finite-difference noise.</figcaption>
+        </figure>
+        <figure>
+          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/double_hinge_gravity_static_poster.png">
+            <source src="assets/solver_gradient_diagnostics/videos/double_hinge_gravity_static.mp4" type="video/mp4">
+          </video>
+          <figcaption>Two-link gravity scene. This isolates the remaining <code>cinert</code>/<code>cfrc_int</code> q-gradient gap.</figcaption>
+        </figure>
+        <figure>
+          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/double_hinge_zero_g_forced_poster.png">
+            <source src="assets/solver_gradient_diagnostics/videos/double_hinge_zero_g_forced.mp4" type="video/mp4">
+          </video>
+          <figcaption>Zero-gravity forced two-link scene. This isolates the now-fixed dense mass-solve path.</figcaption>
+        </figure>
+        <figure>
+          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/free_body_zero_g_poster.png">
+            <source src="assets/solver_gradient_diagnostics/videos/free_body_zero_g.mp4" type="video/mp4">
+          </video>
+          <figcaption>Zero-gravity free body. This checks the free-joint state bridge separately from articulated dynamics.</figcaption>
+        </figure>
+      </div>
     </section>
 
     <section class="panel">
@@ -457,7 +515,8 @@
           Cartpole is physically plausible and stabilizes. Ant now has correct ground contact and trains with both MuJoCo contacts
           and Newton differentiable contacts. The finite-difference checks show that the remaining failure is not specific to
           MuJoCo contacts versus Newton contacts. Minimal two-link scenes show that the failing term is q-position sensitivity of
-          multi-body acceleration through the q-dependent mass matrix. Immediate hinge action gradients are accurate.
+          multi-body gravity/RNE forces through <code>cinert</code>/<code>cfrc_int</code>. The dense mass-solve q-gradient bug is
+          fixed; immediate hinge action gradients remain accurate.
         </p>
       </article>
     </section>
@@ -487,8 +546,14 @@
   --num-envs 4 --horizon 8 --grad-check-directions 8 \
   --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_actor.pt \
   --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_ground_force100_run1/ant_obs_rms.pt</code></pre>
-      <pre><code>uv run --project /home/horde/repos/newton-shac --extra dev --extra torch-cu12 \
-  python /home/horde/repos/academic-website-reports/shac/run_solver_gradient_diagnostics.py</code></pre>
+      <pre><code>uv run --no-sync --project /home/horde/repos/newton-shac \
+  --with imageio --with imageio-ffmpeg \
+  python /home/horde/repos/academic-website-reports/shac/run_solver_gradient_diagnostics.py \
+  --out /home/horde/repos/academic-website-reports/shac/assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_fixes.json \
+  --render-videos</code></pre>
+      <pre><code>uv run --no-sync --project /home/horde/repos/newton-shac \
+  python /home/horde/repos/academic-website-reports/shac/run_solver_gradient_bug_drilldown.py \
+  --out /home/horde/repos/academic-website-reports/shac/assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_after_cinert_fix.json</code></pre>
     </section>
   </main>
 
@@ -634,7 +699,18 @@
     }
 
     async function load() {
-      const [result, antNewton, antFast, antMujoco, gradNewton, gradMujoco, gradNone, solverDiag] = await Promise.all([
+      const [
+        result,
+        antNewton,
+        antFast,
+        antMujoco,
+        gradNewton,
+        gradMujoco,
+        gradNone,
+        solverDiag,
+        solverAfter,
+        bugDiag
+      ] = await Promise.all([
         fetch("assets/cartpole_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_force100_run1/ant_results.json").then((res) => res.json()),
         fetch("assets/ant_newton_ground_run1/ant_results.json").then((res) => res.json()),
@@ -642,11 +718,13 @@
         fetch("assets/ant_gradcheck_newton_force100/ant_gradient_check.json").then((res) => res.json()),
         fetch("assets/ant_gradcheck_mujoco_force100/ant_gradient_check.json").then((res) => res.json()),
         fetch("assets/ant_gradcheck_nocontact_force100/ant_gradient_check.json").then((res) => res.json()),
-        fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics.json").then((res) => res.json())
+        fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics.json").then((res) => res.json()),
+        fetch("assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_fixes.json").then((res) => res.json()),
+        fetch("assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_after_cinert_fix.json").then((res) => res.json())
       ]);
       const finalObs = result.eval.final_obs_mean;
 
-      document.getElementById("report-stamp").textContent = pacificStamp(solverDiag.timestamp_pacific || antNewton.timestamp_pacific || result.timestamp_pacific);
+      document.getElementById("report-stamp").textContent = pacificStamp(solverAfter.timestamp_pacific || bugDiag.timestamp_pacific || antNewton.timestamp_pacific || result.timestamp_pacific);
       document.getElementById("eval-return").textContent = fmt(result.eval.return, 1);
       document.getElementById("ant-return").textContent = fmt(antNewton.eval.return, 1);
       document.getElementById("memory").textContent = fmt(antNewton.mean_fps, 0);
@@ -844,7 +922,7 @@
         {
           type: "bar",
           orientation: "h",
-          name: "joint q",
+          name: "joint q before",
           y: twoLinkCases.map((item) => item[1]),
           x: twoLinkCases.map((item) => solverBest(solverDiag, item[0], "joint_q").relative_error),
           marker: { color: colors.coral }
@@ -852,17 +930,17 @@
         {
           type: "bar",
           orientation: "h",
-          name: "joint qd",
+          name: "joint q after fixes",
           y: twoLinkCases.map((item) => item[1]),
-          x: twoLinkCases.map((item) => solverBest(solverDiag, item[0], "joint_qd").relative_error),
+          x: twoLinkCases.map((item) => solverBest(solverAfter, item[0], "joint_q").relative_error),
           marker: { color: colors.blue }
         },
         {
           type: "bar",
           orientation: "h",
-          name: "joint force",
+          name: "joint force after fixes",
           y: twoLinkCases.map((item) => item[1]),
-          x: twoLinkCases.map((item) => solverBest(solverDiag, item[0], "joint_force").relative_error),
+          x: twoLinkCases.map((item) => solverBest(solverAfter, item[0], "joint_force").relative_error),
           marker: { color: colors.green }
         }
       ], {
@@ -875,7 +953,7 @@
       }, plotConfig);
 
       function solverSweep(caseName, groupName, name, color) {
-        const rows = solverGroup(solverDiag, caseName, groupName).epsilon_sweep;
+        const rows = solverGroup(solverAfter, caseName, groupName).epsilon_sweep;
         return {
           type: "scatter",
           mode: "lines+markers",
@@ -888,9 +966,18 @@
       }
 
       Plotly.newPlot("solver-sweep-chart", [
+        {
+          type: "scatter",
+          mode: "lines+markers",
+          name: "two-link M(q)^-1 force q before",
+          x: solverGroup(solverDiag, "two_link_zero_g_forced_qd_out", "joint_q").epsilon_sweep.map((row) => row.epsilon),
+          y: solverGroup(solverDiag, "two_link_zero_g_forced_qd_out", "joint_q").epsilon_sweep.map((row) => row.relative_error),
+          line: { color: colors.slate, width: 3, dash: "dot" },
+          marker: { size: 7 }
+        },
         solverSweep("pendulum_qd_out", "joint_q", "one-link q", colors.teal),
         solverSweep("two_link_gravity_static_qd_out", "joint_q", "two-link gravity q", colors.coral),
-        solverSweep("two_link_zero_g_forced_qd_out", "joint_q", "two-link M(q)^-1 force q", colors.violet),
+        solverSweep("two_link_zero_g_forced_qd_out", "joint_q", "two-link M(q)^-1 force q after", colors.violet),
         solverSweep("two_link_zero_g_forced_qd_out", "joint_force", "two-link force", colors.green)
       ], {
         ...baseLayout,
@@ -900,7 +987,7 @@
       }, plotConfig);
 
       function solverRow(caseName, label, groupName, meaning) {
-        const row = solverBest(solverDiag, caseName, groupName);
+        const row = solverBest(solverAfter, caseName, groupName);
         return `<tr>
           <td>${label}</td>
           <td>${groupName.replaceAll("_", " ")}</td>
@@ -913,11 +1000,34 @@
       document.getElementById("solver-body").innerHTML = [
         solverRow("hinge_q_out", "one-link zero-g hinge", "joint_q", "Newton/MJWarp q bridge is correct in the trivial case."),
         solverRow("pendulum_qd_out", "one-link gravity pendulum", "joint_q", "Gravity q derivative is accurate for a single DOF."),
-        solverRow("two_link_gravity_static_qd_out", "two-link gravity, qd=0", "joint_q", "Multi-body q derivative fails even without contacts or velocity coupling."),
-        solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_q", "Isolates the missing q sensitivity of M(q)^-1 f."),
+        solverRow("two_link_gravity_static_qd_out", "two-link gravity, qd=0", "joint_q", "Remaining failure: q-gradient still misses cinert/cfrc_int sensitivity."),
+        solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_q", "Fixed: dense mass-solve q sensitivity now matches finite differences."),
         solverRow("two_link_zero_g_forced_qd_out", "two-link zero-g forced", "joint_force", "Force/action derivative through the same solve is accurate."),
         solverRow("free_quaternion_out_normalized_fd", "free body quaternion", "root_quat_q_normalized", "Free-body quaternion bridge matches normalized finite differences."),
         solverRow("free_velocity_out", "free body force", "root_force", "Separate gap: direct free-joint force lacks a velocity-output gradient.")
+      ].join("");
+
+      function bugCheck(name) {
+        return bugDiag.checks.find((entry) => entry.check === name);
+      }
+
+      function bugRow(name, label, finding) {
+        const check = bugCheck(name);
+        const row = bestSolverRow(check.epsilon_sweep);
+        return `<tr>
+          <td>${label}<br><span class="muted">${check.target}</span></td>
+          <td>eps ${row.epsilon}<br><span class="muted">rel ${fmt(row.relative_error, 4)}</span></td>
+          <td><span class="muted">AD</span> ${vectorText(row.analytic)}<br><span class="muted">FD</span> ${vectorText(row.finite_difference)}</td>
+          <td>${finding}</td>
+        </tr>`;
+      }
+
+      document.getElementById("bug-body").innerHTML = [
+        bugRow("dense_mass_offdiag", "Dense M off-diagonal", "Now accurate after replacing the off-diagonal dense mass assembly path."),
+        bugRow("gravity_cdof_fixed_cfrc", "Gravity cdof term", "Accurate: kinematic dof gradients are not the remaining blocker."),
+        bugRow("gravity_cfrc_fixed_cdof", "Gravity cfrc_int term", "Broken: accumulated body-force gradients are nearly absent."),
+        bugRow("gravity_cinert_probe", "Gravity cinert term", "Broken: direct cinert(q) adjoints remain zero in this vec10 path."),
+        bugRow("gravity_bias_force", "Gravity qfrc_bias", "Composite bias force remains wrong because cfrc_int/cinert is wrong.")
       ].join("");
     }
 

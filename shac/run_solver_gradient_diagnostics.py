@@ -145,8 +145,18 @@ class MinimalSolverEnv:
     def _build_single_hinge(self) -> newton.Model:
         builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
         SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
         inertia = wp.mat33(np.eye(3, dtype=np.float32))
         link = builder.add_link(mass=1.0, com=wp.vec3(0.0, 0.0, 0.0), inertia=inertia)
+        builder.add_shape_box(
+            body=link,
+            xform=wp.transform(wp.vec3(0.45, 0.0, 0.0), wp.quat_identity()),
+            hx=0.45,
+            hy=0.045,
+            hz=0.045,
+            cfg=visual_cfg,
+            color=wp.vec3(0.17, 0.45, 0.88),
+        )
         joint = builder.add_joint_revolute(parent=-1, child=link, axis=wp.vec3(0.0, 0.0, 1.0), armature=0.0)
         builder.add_articulation([joint])
         return builder.finalize(device=self.wp_device, requires_grad=True)
@@ -154,8 +164,18 @@ class MinimalSolverEnv:
     def _build_single_hinge_gravity(self) -> newton.Model:
         builder = newton.ModelBuilder(up_axis="Y", gravity=-9.81)
         SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
         inertia = wp.mat33(np.diag([0.08, 0.08, 0.08]).astype(np.float32))
         link = builder.add_link(mass=1.0, com=wp.vec3(0.45, 0.0, 0.0), inertia=inertia)
+        builder.add_shape_box(
+            body=link,
+            xform=wp.transform(wp.vec3(0.45, 0.0, 0.0), wp.quat_identity()),
+            hx=0.45,
+            hy=0.045,
+            hz=0.045,
+            cfg=visual_cfg,
+            color=wp.vec3(0.08, 0.57, 0.49),
+        )
         joint = builder.add_joint_revolute(parent=-1, child=link, axis=wp.vec3(0.0, 0.0, 1.0), armature=0.0)
         builder.add_articulation([joint])
         return builder.finalize(device=self.wp_device, requires_grad=True)
@@ -163,11 +183,30 @@ class MinimalSolverEnv:
     def _build_double_hinge(self, gravity: float) -> newton.Model:
         builder = newton.ModelBuilder(up_axis="Y", gravity=gravity)
         SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
         inertia0 = wp.mat33(np.diag([0.08, 0.08, 0.08]).astype(np.float32))
         inertia1 = wp.mat33(np.diag([0.05, 0.05, 0.05]).astype(np.float32))
         link0 = builder.add_link(mass=1.0, com=wp.vec3(0.35, 0.0, 0.0), inertia=inertia0)
+        builder.add_shape_box(
+            body=link0,
+            xform=wp.transform(wp.vec3(0.35, 0.0, 0.0), wp.quat_identity()),
+            hx=0.35,
+            hy=0.04,
+            hz=0.04,
+            cfg=visual_cfg,
+            color=wp.vec3(0.86, 0.29, 0.31),
+        )
         joint0 = builder.add_joint_revolute(parent=-1, child=link0, axis=wp.vec3(0.0, 0.0, 1.0), armature=0.0)
         link1 = builder.add_link(mass=0.8, com=wp.vec3(0.28, 0.0, 0.0), inertia=inertia1)
+        builder.add_shape_box(
+            body=link1,
+            xform=wp.transform(wp.vec3(0.28, 0.0, 0.0), wp.quat_identity()),
+            hx=0.28,
+            hy=0.038,
+            hz=0.038,
+            cfg=visual_cfg,
+            color=wp.vec3(0.89, 0.55, 0.14),
+        )
         joint1 = builder.add_joint_revolute(
             parent=link0,
             child=link1,
@@ -182,11 +221,31 @@ class MinimalSolverEnv:
     def _build_free_body(self) -> newton.Model:
         builder = newton.ModelBuilder(up_axis="Y", gravity=0.0)
         SolverMuJoCo.register_custom_attributes(builder)
+        visual_cfg = self._visual_shape_cfg()
         inertia = wp.mat33(np.eye(3, dtype=np.float32))
         body = builder.add_link(mass=1.0, com=wp.vec3(0.0, 0.0, 0.0), inertia=inertia)
+        builder.add_shape_box(
+            body=body,
+            xform=wp.transform(wp.vec3(0.0, 0.0, 0.0), wp.quat_identity()),
+            hx=0.18,
+            hy=0.13,
+            hz=0.09,
+            cfg=visual_cfg,
+            color=wp.vec3(0.48, 0.32, 0.82),
+        )
         joint = builder.add_joint_free(parent=-1, child=body)
         builder.add_articulation([joint])
         return builder.finalize(device=self.wp_device, requires_grad=True)
+
+    @staticmethod
+    def _visual_shape_cfg() -> newton.ModelBuilder.ShapeConfig:
+        return newton.ModelBuilder.ShapeConfig(
+            density=0.0,
+            collision_group=0,
+            has_shape_collision=False,
+            has_particle_collision=False,
+            is_visible=True,
+        )
 
     def base_state(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if self.scene == "single_hinge_zero_g":
@@ -284,6 +343,14 @@ class MinimalSolverEnv:
 
     def step(self, q: torch.Tensor, qd: torch.Tensor, joint_f: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return NewtonSolverStep.apply(q, qd, joint_f, self.step_ctx)
+
+    def make_viewer_state(self, q: torch.Tensor, qd: torch.Tensor) -> newton.State:
+        state = self.model.state(requires_grad=False)
+        state.joint_q = wp.from_torch(q.detach().contiguous().view(-1), dtype=wp.float32, requires_grad=False)
+        state.joint_qd = wp.from_torch(qd.detach().contiguous().view(-1), dtype=wp.float32, requires_grad=False)
+        newton.eval_fk(self.model, state.joint_q, state.joint_qd, state)
+        wp.synchronize()
+        return state
 
 
 @dataclass
@@ -582,6 +649,94 @@ def run_case(env: MinimalSolverEnv, case: DiagnosticCase, epsilons: list[float])
     }
 
 
+def render_scene_video(
+    env: MinimalSolverEnv,
+    viewer: newton.viewer.ViewerGL,
+    out_dir: Path,
+    *,
+    seconds: float,
+    fps: int,
+    width: int,
+    height: int,
+) -> dict:
+    import imageio.v2 as imageio
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    video_path = out_dir / f"{env.scene}.mp4"
+    poster_path = out_dir / f"{env.scene}_poster.png"
+    frame_count = max(1, int(round(seconds * fps)))
+
+    viewer.set_model(env.model)
+    if env.scene == "free_body_zero_g":
+        viewer.set_camera(pos=wp.vec3(0.1, 1.25, 2.8), pitch=-10.0, yaw=-90.0)
+        viewer.camera.look_at((0.05, 0.05, 0.0))
+    else:
+        viewer.set_camera(pos=wp.vec3(0.55, 1.05, 2.65), pitch=-8.0, yaw=-90.0)
+        viewer.camera.look_at((0.55, 0.0, 0.0))
+    if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
+        viewer.camera.fov = 42.0
+
+    q, qd, joint_f = env.base_state()
+    frames = []
+    with imageio.get_writer(video_path, fps=fps, codec="libx264", quality=8) as writer:
+        with torch.no_grad():
+            for frame_idx in range(frame_count):
+                state = env.make_viewer_state(q, qd)
+                viewer.begin_frame(frame_idx / float(fps))
+                viewer.log_state(state)
+                viewer.end_frame()
+                frame = viewer.get_frame().numpy()
+                frames.append(frame)
+                writer.append_data(frame)
+
+                q_next = torch.empty_like(q)
+                qd_next = torch.empty_like(qd)
+                env.step_warp(q, qd, joint_f, q_next, qd_next, requires_grad=False)
+                q, qd = q_next, qd_next
+    imageio.imwrite(poster_path, frames[len(frames) // 2])
+    return {
+        "scene": env.scene,
+        "video": str(video_path.relative_to(Path(__file__).resolve().parent)),
+        "poster": str(poster_path.relative_to(Path(__file__).resolve().parent)),
+        "seconds": seconds,
+        "fps": fps,
+        "frames": frame_count,
+        "source": "ViewerGL.get_frame()",
+        "overlays": False,
+    }
+
+
+def render_diagnostic_videos(args: argparse.Namespace) -> list[dict]:
+    scenes = [
+        "single_hinge_gravity",
+        "double_hinge_gravity_static",
+        "double_hinge_zero_g_forced",
+        "free_body_zero_g",
+    ]
+    out_dir = Path(args.video_dir)
+    videos = []
+    viewer = newton.viewer.ViewerGL(width=args.video_width, height=args.video_height, headless=True)
+    viewer.show_static = True
+    viewer.show_collision = True
+    try:
+        for scene in scenes:
+            env = MinimalSolverEnv(scene, args.device, args.dt)
+            videos.append(
+                render_scene_video(
+                    env,
+                    viewer,
+                    out_dir,
+                    seconds=args.video_seconds,
+                    fps=args.video_fps,
+                    width=args.video_width,
+                    height=args.video_height,
+                )
+            )
+    finally:
+        viewer.close()
+    return videos
+
+
 def run(args: argparse.Namespace) -> dict:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -605,10 +760,12 @@ def run(args: argparse.Namespace) -> dict:
         "epsilon_values": epsilons,
         "cases": results,
         "notes": [
-            "All scenes run with SolverMuJoCo, MJWarp backend, contacts disabled, zero gravity, Euler integration.",
+            "All scenes run with SolverMuJoCo, MJWarp backend, contacts disabled, and Euler integration.",
             "Finite differences perturb each input component independently; the normalized quaternion case re-normalizes q[3:7] before each evaluation.",
         ],
     }
+    if args.render_videos:
+        result["videos"] = render_diagnostic_videos(args)
 
     out_path = Path(args.out)
     write_json(out_path, result)
@@ -626,6 +783,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--eps", type=float, nargs="*")
+    parser.add_argument("--render-videos", action="store_true")
+    parser.add_argument(
+        "--video-dir",
+        default=str(Path(__file__).resolve().parent / "assets" / "solver_gradient_diagnostics" / "videos"),
+    )
+    parser.add_argument("--video-seconds", type=float, default=4.0)
+    parser.add_argument("--video-fps", type=int, default=60)
+    parser.add_argument("--video-width", type=int, default=960)
+    parser.add_argument("--video-height", type=int, default=544)
     return parser.parse_args()
 
 
