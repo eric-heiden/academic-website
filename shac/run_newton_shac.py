@@ -57,6 +57,21 @@ class AntRewardWeights:
     action: float = 0.0
 
 
+@dataclass
+class AcrobotRewardWeights:
+    target: float = 8.0
+    velocity: float = 0.05
+    action: float = 0.002
+
+
+@dataclass
+class ContactTargetRewardWeights:
+    target: float = 8.0
+    velocity: float = 0.05
+    height: float = 1.0
+    action: float = 0.002
+
+
 ANT_START_JOINT_Q = (0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0)
 ANT_START_ROT = (math.sin(-0.25 * math.pi), 0.0, 0.0, math.cos(-0.25 * math.pi))
 ANT_TERMINATION_HEIGHT = 0.27
@@ -69,6 +84,10 @@ ANT_DEFAULT_TERMINATION_PENALTY = 20.0
 ANT_DEFAULT_SELECTION_FALL_PENALTY = 500.0
 ANT_DEFAULT_SELECTION_INVALID_PENALTY = 500.0
 DEFAULT_GRAD_CHECK_EPS = (1.0e-1, 3.0e-2, 1.0e-2, 3.0e-3, 1.0e-3, 3.0e-4, 1.0e-4)
+
+
+def is_contact_target_env(env_name: str) -> bool:
+    return env_name in {"contact_sphere", "contact_capsule"}
 
 
 def normalize_vec(x: torch.Tensor, eps: float = 1.0e-9) -> torch.Tensor:
@@ -303,6 +322,10 @@ class NewtonMuJoCoTorchEnv:
         contact_backend: str,
         cartpole_reward: CartpoleRewardWeights | None = None,
         ant_reward: AntRewardWeights | None = None,
+        acrobot_reward: AcrobotRewardWeights | None = None,
+        contact_reward: ContactTargetRewardWeights | None = None,
+        acrobot_actuation: str = "elbow",
+        ant_disable_joint_limits: bool = False,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -313,9 +336,20 @@ class NewtonMuJoCoTorchEnv:
         self.contact_backend = contact_backend
         self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
         self.ant_reward = ant_reward or AntRewardWeights()
+        self.acrobot_reward = acrobot_reward or AcrobotRewardWeights()
+        self.contact_reward = contact_reward or ContactTargetRewardWeights()
+        self.acrobot_actuation = acrobot_actuation
+        self.ant_disable_joint_limits = ant_disable_joint_limits
+        self.acrobot_link_length = 1.0
+        self.contact_body_radius = 0.22
+        self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
 
         if env_name == "cartpole":
             self._build_cartpole()
+        elif env_name == "acrobot":
+            self._build_acrobot()
+        elif is_contact_target_env(env_name):
+            self._build_contact_target(capsule=env_name == "contact_capsule")
         elif env_name == "ant":
             self._build_ant()
         else:
@@ -367,6 +401,88 @@ class NewtonMuJoCoTorchEnv:
         )
         self.num_obs = int(self.observe(self.start_q, self.start_qd).shape[-1])
 
+    def _build_contact_target(self, *, capsule: bool) -> None:
+        source = newton.ModelBuilder(up_axis="Y")
+        SolverMuJoCo.register_custom_attributes(source)
+        source.default_shape_cfg.ke = 4.0e4
+        source.default_shape_cfg.kd = 1.0e4
+        source.default_shape_cfg.kf = 3.0e3
+        source.default_shape_cfg.mu = 0.75
+
+        radius = self.contact_body_radius
+        body = source.add_link(
+            xform=wp.transform([0.0, radius * 0.98, 0.0], wp.quat_identity()),
+            mass=1.0,
+            label="contact_body",
+        )
+        if capsule:
+            source.add_shape_capsule(
+                body,
+                radius=radius,
+                half_height=0.34,
+                color=(0.15, 0.55, 0.95),
+                label="target_capsule",
+            )
+        else:
+            source.add_shape_sphere(
+                body,
+                radius=radius,
+                color=(0.15, 0.65, 0.45),
+                label="target_sphere",
+            )
+        source.add_articulation([source.add_joint_free(body)], label="contact_target")
+
+        builder = newton.ModelBuilder(up_axis="Y")
+        SolverMuJoCo.register_custom_attributes(builder)
+        builder.replicate(source, self.num_envs, spacing=(3.0, 0.0, 0.0))
+        ground_cfg = newton.ModelBuilder.ShapeConfig(ke=4.0e4, kd=1.0e4, kf=3.0e3, mu=0.75)
+        builder.add_ground_plane(cfg=ground_cfg)
+        self.model = builder.finalize(device=self.wp_device, requires_grad=True)
+        self.num_actions = 2
+
+    def _build_acrobot(self) -> None:
+        source = newton.ModelBuilder(up_axis="Y")
+        SolverMuJoCo.register_custom_attributes(source)
+        source.default_joint_cfg.armature = 0.01
+        source.default_joint_cfg.damping = 0.05
+        source.default_joint_cfg.limit_lower = -1.0e10
+        source.default_joint_cfg.limit_upper = 1.0e10
+        source.default_shape_cfg.density = 500.0
+
+        hx = 0.5 * self.acrobot_link_length
+        hy = 0.045
+        hz = 0.045
+        link1 = source.add_link(xform=wp.transform([hx, 0.0, 0.0], wp.quat_identity()), mass=1.0)
+        source.add_shape_box(link1, hx=hx, hy=hy, hz=hz, color=(0.1, 0.55, 0.95), label="upper_link")
+        link2 = source.add_link(xform=wp.transform([3.0 * hx, 0.0, 0.0], wp.quat_identity()), mass=1.0)
+        source.add_shape_box(link2, hx=hx, hy=hy, hz=hz, color=(0.95, 0.35, 0.15), label="lower_link")
+
+        j0 = source.add_joint_revolute(
+            parent=-1,
+            child=link1,
+            parent_xform=wp.transform([0.0, 0.0, 0.0], wp.quat_identity()),
+            child_xform=wp.transform([-hx, 0.0, 0.0], wp.quat_identity()),
+            axis=[0.0, 0.0, 1.0],
+            effort_limit=1.0e6,
+        )
+        j1 = source.add_joint_revolute(
+            parent=link1,
+            child=link2,
+            parent_xform=wp.transform([hx, 0.0, 0.0], wp.quat_identity()),
+            child_xform=wp.transform([-hx, 0.0, 0.0], wp.quat_identity()),
+            axis=[0.0, 0.0, 1.0],
+            effort_limit=1.0e6,
+        )
+        source.add_articulation([j0, j1], label="acrobot")
+        source.joint_q[0] = -0.5 * math.pi
+        source.joint_q[1] = 0.0
+
+        builder = newton.ModelBuilder(up_axis="Y")
+        SolverMuJoCo.register_custom_attributes(builder)
+        builder.replicate(source, self.num_envs, spacing=(3.0, 0.0, 0.0))
+        self.model = builder.finalize(device=self.wp_device, requires_grad=True)
+        self.num_actions = 2 if self.acrobot_actuation == "both" else 1
+
     def _build_cartpole(self) -> None:
         source = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(source)
@@ -398,6 +514,12 @@ class NewtonMuJoCoTorchEnv:
         source.default_joint_cfg.limit_ke = 1.0e3
         source.default_joint_cfg.limit_kd = 1.0e1
         source.add_mjcf(str(DIFFRL_ROOT / "envs" / "assets" / "ant.xml"), up_axis="Z", armature_scale=50.0)
+        if self.ant_disable_joint_limits:
+            for dof_id in range(6, len(source.joint_limit_lower)):
+                source.joint_limit_lower[dof_id] = -1.0e10
+                source.joint_limit_upper[dof_id] = 1.0e10
+                source.joint_limit_ke[dof_id] = 0.0
+                source.joint_limit_kd[dof_id] = 0.0
         source.joint_q[7:15] = ANT_START_JOINT_Q
         source.joint_target_q[7:15] = ANT_START_JOINT_Q
         source.shape_material_ke = [4.0e4] * len(source.shape_material_ke)
@@ -479,13 +601,21 @@ class NewtonMuJoCoTorchEnv:
         qd = self.start_qd.clone()
         if self.env_name == "ant" and stochastic_init:
             q, qd = self._randomize_ant_reset(q, qd)
+        elif is_contact_target_env(self.env_name) and stochastic_init:
+            q[:, [0, 2]] = q[:, [0, 2]] + 0.15 * (torch.rand((q.shape[0], 2), device=self.torch_device) - 0.5)
+            qd[:] = 0.2 * (torch.rand_like(qd) - 0.5)
         elif stochastic_init:
             q = q + math.pi * (torch.rand_like(q) - 0.5)
             qd = qd + 0.5 * (torch.rand_like(qd) - 0.5)
         elif noise > 0.0:
-            q = q + noise * torch.randn_like(q)
+            if is_contact_target_env(self.env_name):
+                q[:, [0, 2]] = q[:, [0, 2]] + noise * torch.randn((q.shape[0], 2), device=self.torch_device)
+            else:
+                q = q + noise * torch.randn_like(q)
             qd = qd + 0.25 * noise * torch.randn_like(qd)
             if self.env_name == "ant":
+                q[:, 3:7] = normalize_vec(q[:, 3:7])
+            elif is_contact_target_env(self.env_name):
                 q[:, 3:7] = normalize_vec(q[:, 3:7])
         return q, qd
 
@@ -512,6 +642,11 @@ class NewtonMuJoCoTorchEnv:
         reset_qd = self.start_qd[env_ids].clone()
         if self.env_name == "ant" and stochastic_init:
             reset_q, reset_qd = self._randomize_ant_reset(reset_q, reset_qd)
+        elif is_contact_target_env(self.env_name) and stochastic_init:
+            reset_q[:, [0, 2]] = reset_q[:, [0, 2]] + 0.15 * (
+                torch.rand((reset_q.shape[0], 2), device=self.torch_device) - 0.5
+            )
+            reset_qd[:] = 0.2 * (torch.rand_like(reset_qd) - 0.5)
         elif stochastic_init:
             reset_q = reset_q + math.pi * (torch.rand_like(reset_q) - 0.5)
             reset_qd = reset_qd + 0.5 * (torch.rand_like(reset_qd) - 0.5)
@@ -534,6 +669,36 @@ class NewtonMuJoCoTorchEnv:
             xdot = qd[:, 0:1]
             theta_dot = qd[:, 1:2]
             return torch.cat([x, xdot, torch.sin(theta), torch.cos(theta), theta_dot], dim=-1)
+
+        if self.env_name == "acrobot":
+            theta1 = q[:, 0:1]
+            theta2 = q[:, 1:2]
+            theta12 = theta1 + theta2
+            end = self.acrobot_end_effector(q)
+            target = self.acrobot_target(q.shape[0])
+            return torch.cat(
+                [
+                    torch.sin(theta1),
+                    torch.cos(theta1),
+                    torch.sin(theta2),
+                    torch.cos(theta2),
+                    torch.sin(theta12),
+                    torch.cos(theta12),
+                    0.2 * qd,
+                    end - target,
+                    prev_action if prev_action is not None else torch.zeros((q.shape[0], self.num_actions), dtype=q.dtype, device=q.device),
+                ],
+                dim=-1,
+            )
+
+        if is_contact_target_env(self.env_name):
+            if prev_action is None:
+                prev_action = torch.zeros((q.shape[0], self.num_actions), dtype=torch.float32, device=self.torch_device)
+            pos = q[:, 0:3]
+            rot = normalize_vec(q[:, 3:7])
+            qd_scaled = 0.2 * qd
+            target_error = pos - self.contact_target(q.shape[0])
+            return torch.cat([pos[:, 1:2], rot, qd_scaled, target_error, prev_action.clone()], dim=-1)
 
         if prev_action is None:
             prev_action = torch.zeros((q.shape[0], self.num_actions), dtype=torch.float32, device=self.torch_device)
@@ -569,9 +734,35 @@ class NewtonMuJoCoTorchEnv:
         joint_f = torch.zeros((self.num_envs, self.qd_dim), dtype=torch.float32, device=self.torch_device)
         if self.env_name == "cartpole":
             joint_f[:, 0] = action[:, 0] * self.force_scale
+        elif self.env_name == "acrobot":
+            if self.acrobot_actuation == "both":
+                joint_f[:, 0:2] = action[:, 0:2] * self.force_scale
+            else:
+                joint_f[:, 1] = action[:, 0] * self.force_scale
+        elif is_contact_target_env(self.env_name):
+            joint_f[:, 0] = action[:, 0] * self.force_scale
+            joint_f[:, 2] = action[:, 1] * self.force_scale
         else:
             joint_f[:, 6 : 6 + self.num_actions] = action[:, : self.num_actions] * self.force_scale
         return joint_f
+
+    def acrobot_target(self, count: int) -> torch.Tensor:
+        return torch.tensor([0.0, 1.65], dtype=torch.float32, device=self.torch_device).view(1, 2).repeat(count, 1)
+
+    def acrobot_end_effector(self, q: torch.Tensor) -> torch.Tensor:
+        theta1 = q[:, 0]
+        theta2 = q[:, 1]
+        theta12 = theta1 + theta2
+        length = self.acrobot_link_length
+        x = length * torch.cos(theta1) + length * torch.cos(theta12)
+        y = length * torch.sin(theta1) + length * torch.sin(theta12)
+        return torch.stack([x, y], dim=-1)
+
+    def contact_target(self, count: int) -> torch.Tensor:
+        target = self.start_q[:count, 0:3] + self.contact_target_offset.view(1, 3)
+        target = target.clone()
+        target[:, 1] = self.contact_body_radius
+        return target
 
     def reward(
         self, q: torch.Tensor, qd: torch.Tensor, action: torch.Tensor, obs: torch.Tensor | None = None
@@ -588,6 +779,30 @@ class NewtonMuJoCoTorchEnv:
                 + weights.cart_position * x.square()
                 + weights.cart_velocity * xdot.square()
                 + weights.action * action[:, 0].square()
+            )
+
+        if self.env_name == "acrobot":
+            end = self.acrobot_end_effector(q)
+            target = self.acrobot_target(q.shape[0])
+            target_error = (end - target).square().sum(dim=-1)
+            weights = self.acrobot_reward
+            return -(
+                weights.target * target_error
+                + weights.velocity * qd.square().sum(dim=-1)
+                + weights.action * action.square().sum(dim=-1)
+            )
+
+        if is_contact_target_env(self.env_name):
+            target = self.contact_target(q.shape[0])
+            pos = q[:, 0:3]
+            target_error = (pos[:, [0, 2]] - target[:, [0, 2]]).square().sum(dim=-1)
+            height_error = (pos[:, 1] - target[:, 1]).square()
+            weights = self.contact_reward
+            return -(
+                weights.target * target_error
+                + weights.height * height_error
+                + weights.velocity * qd.square().sum(dim=-1)
+                + weights.action * action.square().sum(dim=-1)
             )
 
         if obs is None:
@@ -622,6 +837,12 @@ class NewtonMuJoCoTorchEnv:
             invalid = torch.logical_or(invalid, q[:, 1] > ANT_MAX_HEALTHY_HEIGHT)
             invalid = torch.logical_or(invalid, q[:, 0].abs() > 100.0)
             invalid = torch.logical_or(invalid, q[:, 2].abs() > 100.0)
+            invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
+        elif is_contact_target_env(self.env_name):
+            invalid = torch.logical_or(invalid, q[:, 1] < 0.02)
+            invalid = torch.logical_or(invalid, q[:, 1] > 3.0)
+            invalid = torch.logical_or(invalid, q[:, 0].abs() > 20.0)
+            invalid = torch.logical_or(invalid, q[:, 2].abs() > 20.0)
             invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
         else:
             invalid = torch.logical_or(invalid, q.abs().amax(dim=-1) > 1000.0)
@@ -663,7 +884,7 @@ def make_actor(env: NewtonMuJoCoTorchEnv, stochastic: bool = False) -> torch.nn.
     else:
         actor = ActorDeterministicMLP(env.num_obs, env.num_actions, cfg, device=str(env.torch_device))
         final = actor.actor[-1]
-        if isinstance(final, torch.nn.Linear):
+        if env.env_name == "cartpole" and isinstance(final, torch.nn.Linear):
             torch.nn.init.zeros_(final.weight)
             torch.nn.init.zeros_(final.bias)
     return actor
@@ -868,24 +1089,22 @@ def masked_random_directions(
 
 
 def run_gradient_check(args: argparse.Namespace) -> dict:
-    if args.env != "ant":
-        raise ValueError("gradient checks are currently configured for the ant environment")
     if args.contact_backend is None:
-        args.contact_backend = "newton"
+        args.contact_backend = "newton" if args.env == "ant" else ("mujoco" if is_contact_target_env(args.env) else "none")
     if args.horizon is None:
         args.horizon = args.grad_check_horizon
     if args.eval_horizon is None:
         args.eval_horizon = args.horizon
     if args.episode_length is None:
-        args.episode_length = 1000
+        args.episode_length = 1000 if args.env == "ant" else 240
     if args.force_scale is None:
-        args.force_scale = 100.0
+        args.force_scale = 100.0 if args.env == "ant" else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
     if args.reset_noise is None:
         args.reset_noise = 0.0
     if args.termination_penalty is None:
         args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY
     if args.stochastic_actor is None:
-        args.stochastic_actor = True
+        args.stochastic_actor = args.env == "ant"
     if args.obs_rms is None:
         args.obs_rms = args.obs_rms_path is not None
 
@@ -900,6 +1119,19 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        acrobot_actuation=args.acrobot_actuation,
+        ant_disable_joint_limits=args.ant_disable_joint_limits,
+        acrobot_reward=AcrobotRewardWeights(
+            target=args.acrobot_target_weight,
+            velocity=args.acrobot_velocity_weight,
+            action=args.acrobot_action_weight,
+        ),
+        contact_reward=ContactTargetRewardWeights(
+            target=args.contact_target_weight,
+            velocity=args.contact_velocity_weight,
+            height=args.contact_height_weight,
+            action=args.contact_action_weight,
+        ),
     )
     actor = make_actor(env, stochastic=args.stochastic_actor)
     if args.actor_path is not None:
@@ -1072,26 +1304,32 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         evaluate=eval_state_action_loss,
         assign=assign_state,
     )
-    component_masks: dict[str, torch.Tensor] = {}
     state_width = state_base.numel()
-    for component in [
-        "root_pos_q",
-        "root_quat_q",
-        "joint_q",
-        "root_qd",
-        "joint_qd",
-        "action",
-    ]:
-        component_masks[component] = torch.zeros(state_width, dtype=torch.float32, device=env.torch_device)
+    if env.q_dim == 7 and env.qd_dim == 6:
+        component_names = ["root_pos_q", "root_quat_q", "root_qd", "action"]
+    elif env.q_dim >= 7 and env.qd_dim >= 6:
+        component_names = ["root_pos_q", "root_quat_q", "joint_q", "root_qd", "joint_qd", "action"]
+    else:
+        component_names = ["joint_q", "joint_qd", "action"]
+    component_masks: dict[str, torch.Tensor] = {
+        component: torch.zeros(state_width, dtype=torch.float32, device=env.torch_device)
+        for component in component_names
+    }
     for env_id in range(env.num_envs):
         q_offset = env_id * env.q_dim
         qd_offset = q_count + env_id * env.qd_dim
         action_offset = q_count + qd_count + env_id * env.num_actions
-        component_masks["root_pos_q"][q_offset : q_offset + 3] = 1.0
-        component_masks["root_quat_q"][q_offset + 3 : q_offset + 7] = 1.0
-        component_masks["joint_q"][q_offset + 7 : q_offset + env.q_dim] = 1.0
-        component_masks["root_qd"][qd_offset : qd_offset + 6] = 1.0
-        component_masks["joint_qd"][qd_offset + 6 : qd_offset + env.qd_dim] = 1.0
+        if "root_pos_q" in component_masks:
+            component_masks["root_pos_q"][q_offset : q_offset + 3] = 1.0
+            component_masks["root_quat_q"][q_offset + 3 : q_offset + 7] = 1.0
+            if "joint_q" in component_masks:
+                component_masks["joint_q"][q_offset + 7 : q_offset + env.q_dim] = 1.0
+            component_masks["root_qd"][qd_offset : qd_offset + 6] = 1.0
+            if "joint_qd" in component_masks:
+                component_masks["joint_qd"][qd_offset + 6 : qd_offset + env.qd_dim] = 1.0
+        else:
+            component_masks["joint_q"][q_offset : q_offset + env.q_dim] = 1.0
+            component_masks["joint_qd"][qd_offset : qd_offset + env.qd_dim] = 1.0
         component_masks["action"][action_offset : action_offset + env.num_actions] = 1.0
 
     component_rows = {}
@@ -1124,6 +1362,9 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "force_scale": args.force_scale,
         "stochastic_actor": args.stochastic_actor,
+        "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
+        "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
+        "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "epsilon_values": epsilons,
@@ -1160,19 +1401,21 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
 
 def run_training(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
-        args.contact_backend = "mujoco" if args.env == "ant" else "none"
+        args.contact_backend = "mujoco" if args.env == "ant" or is_contact_target_env(args.env) else "none"
     if args.horizon is None:
-        args.horizon = 32 if args.env == "ant" else 48
+        args.horizon = 32 if args.env == "ant" else (48 if is_contact_target_env(args.env) else (64 if args.env == "acrobot" else 48))
     if args.eval_horizon is None:
-        args.eval_horizon = 480 if args.env == "ant" else 180
+        args.eval_horizon = (
+            480 if args.env == "ant" else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
+        )
     if args.episode_length is None:
         args.episode_length = 1000 if args.env == "ant" else 240
     if args.force_scale is None:
-        args.force_scale = 200.0 if args.env == "ant" else 1000.0
+        args.force_scale = 200.0 if args.env == "ant" else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
     if args.grad_clip is None:
-        args.grad_clip = 1.0 if args.env == "ant" else 100.0
+        args.grad_clip = 1.0 if args.env == "ant" else (10.0 if args.env == "acrobot" or is_contact_target_env(args.env) else 100.0)
     if args.reset_noise is None:
-        args.reset_noise = 0.0 if args.env == "ant" else 0.05
+        args.reset_noise = 0.0 if args.env == "ant" or is_contact_target_env(args.env) else 0.05
     if args.termination_penalty is None:
         args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env == "ant" else 0.0
     if args.lr_schedule is None:
@@ -1207,12 +1450,25 @@ def run_training(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        acrobot_actuation=args.acrobot_actuation,
+        ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_reward=AntRewardWeights(
             progress=args.ant_progress_weight,
             heading=args.ant_heading_weight,
             up=args.ant_up_weight,
             height=args.ant_height_weight,
             action=args.ant_action_penalty,
+        ),
+        acrobot_reward=AcrobotRewardWeights(
+            target=args.acrobot_target_weight,
+            velocity=args.acrobot_velocity_weight,
+            action=args.acrobot_action_weight,
+        ),
+        contact_reward=ContactTargetRewardWeights(
+            target=args.contact_target_weight,
+            velocity=args.contact_velocity_weight,
+            height=args.contact_height_weight,
+            action=args.contact_action_weight,
         ),
         cartpole_reward=CartpoleRewardWeights(
             pole_angle=args.cartpole_pole_angle_penalty,
@@ -1272,8 +1528,8 @@ def run_training(args: argparse.Namespace) -> dict:
 
         if args.reset_each_epoch:
             q, qd = env.reset(noise=args.reset_noise, stochastic_init=args.stochastic_init)
-            prev_action.zero_()
-            progress.zero_()
+            prev_action = torch.zeros_like(prev_action)
+            progress = torch.zeros_like(progress)
         else:
             q = q.detach().clone()
             qd = qd.detach().clone()
@@ -1506,8 +1762,12 @@ def run_training(args: argparse.Namespace) -> dict:
                 dt=args.dt,
                 force_scale=args.force_scale,
                 contact_backend=args.contact_backend,
+                acrobot_actuation=args.acrobot_actuation,
+                ant_disable_joint_limits=args.ant_disable_joint_limits,
                 cartpole_reward=env.cartpole_reward,
                 ant_reward=env.ant_reward,
+                acrobot_reward=env.acrobot_reward,
+                contact_reward=env.contact_reward,
             )
         video_path, poster_path = render_rollout(
             render_env,
@@ -1551,7 +1811,11 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_invalid_penalty": ANT_INVALID_PENALTY if args.env == "ant" else None,
         "lr_schedule": args.lr_schedule,
         "cartpole_reward": env.cartpole_reward.__dict__,
+        "acrobot_reward": env.acrobot_reward.__dict__,
+        "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
+        "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "ant_reward": env.ant_reward.__dict__,
+        "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "total_seconds": total_s,
         "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
         "mean_fps": float(np.mean([h["fps"] for h in history])),
@@ -1676,11 +1940,21 @@ def render_rollout(
 
     viewer = newton.viewer.ViewerGL(width=960, height=544, headless=True)
     viewer.show_static = True
-    viewer.show_collision = True
+    viewer.show_collision = False
     viewer.set_model(env.model)
     if env_name == "cartpole":
         viewer.set_camera(pos=wp.vec3(0.0, 2.0, 7.0), pitch=0.0, yaw=-90.0)
         viewer.camera.look_at((0.0, 0.0, 0.0))
+        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
+            viewer.camera.fov = 45.0
+    elif env_name == "acrobot":
+        viewer.set_camera(pos=wp.vec3(0.0, 0.0, 5.0), pitch=-90.0, yaw=-90.0)
+        viewer.camera.look_at((0.0, 0.0, 0.0))
+        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
+            viewer.camera.fov = 42.0
+    elif is_contact_target_env(env_name):
+        viewer.set_camera(pos=wp.vec3(-2.0, 1.35, 3.4), pitch=-18.0, yaw=-145.0)
+        viewer.camera.look_at((0.75, 0.25, 0.0))
         if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
             viewer.camera.fov = 45.0
     else:
@@ -1762,7 +2036,11 @@ def parse_float_list(value: str) -> list[float]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["train", "gradcheck"], default="train")
-    parser.add_argument("--env", choices=["cartpole", "ant"], default="cartpole")
+    parser.add_argument(
+        "--env",
+        choices=["cartpole", "acrobot", "contact_sphere", "contact_capsule", "ant"],
+        default="cartpole",
+    )
     parser.add_argument("--out-dir", default=str(Path(__file__).resolve().parent / "assets"))
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--num-envs", type=int, default=32)
@@ -1803,11 +2081,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cartpole-cart-position-penalty", type=float, default=0.05)
     parser.add_argument("--cartpole-cart-velocity-penalty", type=float, default=0.1)
     parser.add_argument("--cartpole-action-penalty", type=float, default=0.0)
+    parser.add_argument("--acrobot-target-weight", type=float, default=8.0)
+    parser.add_argument("--acrobot-velocity-weight", type=float, default=0.05)
+    parser.add_argument("--acrobot-action-weight", type=float, default=0.002)
+    parser.add_argument("--acrobot-actuation", choices=["elbow", "both"], default="elbow")
+    parser.add_argument("--contact-target-weight", type=float, default=8.0)
+    parser.add_argument("--contact-velocity-weight", type=float, default=0.05)
+    parser.add_argument("--contact-height-weight", type=float, default=1.0)
+    parser.add_argument("--contact-action-weight", type=float, default=0.002)
     parser.add_argument("--ant-progress-weight", type=float, default=1.0)
     parser.add_argument("--ant-heading-weight", type=float, default=1.0)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
+    parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
