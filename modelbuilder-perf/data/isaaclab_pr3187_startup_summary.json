@@ -1,0 +1,4451 @@
+{
+  "metadata": {
+    "benchmark_backend": "summary",
+    "generated_at_utc": "2026-06-16T04:47:56+00:00",
+    "isaaclab_commit": "a59603d2eaf2",
+    "isaaclab_worktree": "/home/horde/repos/IsaacLab-newton-bench",
+    "newton_revisions": {
+      "main": {
+        "commit": "2c24200200b1",
+        "label": "Newton main",
+        "ref": "origin/main",
+        "worktree": "/home/horde/repos/newton-bench-main"
+      },
+      "pr3187": {
+        "commit": "172dbda45f6a",
+        "label": "PR 3187",
+        "ref": "origin/pr/3187",
+        "url": "https://github.com/newton-physics/newton/pull/3187",
+        "worktree": "/home/horde/repos/newton-bench-pr3187"
+      }
+    },
+    "notes": [
+      "Single raw sample per task/revision; no repeat medians because 4096-env Cartpole took tens of minutes per sample in this Isaac Sim 6 pip environment.",
+      "Cartpole uses 4096 envs to match the provided launch shape. Ant and Humanoid use 128 envs after a 1024-env Ant attempt exposed a CUDA 13 NVRTC loader-path issue before JSON emission.",
+      "Remaining Ant/Humanoid runs include LD_LIBRARY_PATH=.venv/lib/python3.12/site-packages/nvidia/cu13/lib so PyTorch/Triton can find libnvrtc-builtins.so.13.0.",
+      "Task IDs are the names registered by this Isaac Lab checkout: without the older -v0 suffix."
+    ],
+    "physics_preset": "presets=newton_mjwarp",
+    "title": "Newton PR 3187 Isaac Lab Startup Benchmark"
+  },
+  "pairs": [
+    {
+      "metrics": {
+        "env_creation_wall_s": {
+          "delta_pct": -66.88116463545417,
+          "label": "Env creation wall",
+          "main_s": 124.714573062,
+          "pr_s": 41.304014128000006,
+          "speedup": 3.019429847072804
+        },
+        "first_step_s": {
+          "delta_pct": -33.56036988891615,
+          "label": "First step",
+          "main_s": 0.264318815,
+          "pr_s": 0.175612443,
+          "speedup": 1.5051257785873406
+        },
+        "scene_creation_s": {
+          "delta_pct": -69.52983401591058,
+          "label": "Scene creation timer",
+          "main_s": 119.12999872700311,
+          "pr_s": 36.299108348961454,
+          "speedup": 3.2818987613069432
+        },
+        "simulation_start_s": {
+          "delta_pct": -23.545107712342446,
+          "label": "Simulation start timer",
+          "main_s": 2.416141046967823,
+          "pr_s": 1.8472580349771306,
+          "speedup": 1.3079607727881586
+        },
+        "total_reported_s": {
+          "delta_pct": -66.61533557902828,
+          "label": "Total reported",
+          "main_s": 125.341998959,
+          "pr_s": 41.84500573100001,
+          "speedup": 2.995387305351543
+        }
+      },
+      "num_envs": 128,
+      "task": "Isaac-Ant-Direct",
+      "task_short": "Ant"
+    },
+    {
+      "metrics": {
+        "env_creation_wall_s": {
+          "delta_pct": -33.12279303295772,
+          "label": "Env creation wall",
+          "main_s": 2641.8295992470003,
+          "pr_s": 1766.781848805,
+          "speedup": 1.4952777565797708
+        },
+        "first_step_s": {
+          "delta_pct": 33.96745085871566,
+          "label": "First step",
+          "main_s": 0.041727491,
+          "pr_s": 0.055901255999999996,
+          "speedup": 0.7464499724299576
+        },
+        "scene_creation_s": {
+          "delta_pct": -31.528948089149484,
+          "label": "Scene creation timer",
+          "main_s": 2571.690110775002,
+          "pr_s": 1760.8632707349607,
+          "speedup": 1.4604712095003338
+        },
+        "simulation_start_s": {
+          "delta_pct": -95.54027517161532,
+          "label": "Simulation start timer",
+          "main_s": 63.65498976298841,
+          "pr_s": 2.838837382965721,
+          "speedup": 22.422908104897616
+        },
+        "total_reported_s": {
+          "delta_pct": -33.11707172924696,
+          "label": "Total reported",
+          "main_s": 2642.2295904720004,
+          "pr_s": 1767.2005217439998,
+          "speedup": 1.4951498474346643
+        }
+      },
+      "num_envs": 4096,
+      "task": "Isaac-Cartpole-Direct",
+      "task_short": "Cartpole"
+    },
+    {
+      "metrics": {
+        "env_creation_wall_s": {
+          "delta_pct": -23.812948247739975,
+          "label": "Env creation wall",
+          "main_s": 305.39747257,
+          "pr_s": 232.673330477,
+          "speedup": 1.3125589939504856
+        },
+        "first_step_s": {
+          "delta_pct": -7.804992819557263,
+          "label": "First step",
+          "main_s": 0.20636680100000002,
+          "pr_s": 0.190259887,
+          "speedup": 1.0846574349116482
+        },
+        "scene_creation_s": {
+          "delta_pct": -16.874705509830065,
+          "label": "Scene creation timer",
+          "main_s": 273.64857991802273,
+          "pr_s": 227.47118792502442,
+          "speedup": 1.2030032568705737
+        },
+        "simulation_start_s": {
+          "delta_pct": -93.00682595419504,
+          "label": "Simulation start timer",
+          "main_s": 28.601489893975668,
+          "pr_s": 2.0001519679790363,
+          "speedup": 14.299658401893712
+        },
+        "total_reported_s": {
+          "delta_pct": -23.771497679144137,
+          "label": "Total reported",
+          "main_s": 305.96326984399997,
+          "pr_s": 233.231218254,
+          "speedup": 1.3118452672608831
+        }
+      },
+      "num_envs": 128,
+      "task": "Isaac-Humanoid-Direct",
+      "task_short": "Humanoid"
+    }
+  ],
+  "runs": [
+    {
+      "hardware": {
+        "cpu_name": "AMD EPYC 9B45",
+        "cuda_version": "13.0",
+        "gpu_current_device": 0,
+        "gpu_device_count": 1,
+        "gpu_devices": {
+          "0": {
+            "compute_capability": "12.0",
+            "multi_processor_count": 46,
+            "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+            "total_memory_gb": 23.62
+          }
+        },
+        "phase": "hardware_info",
+        "physical_cores": 192,
+        "total_ram_gb": 708.2,
+        "workflow_name": "benchmark_startup"
+      },
+      "newton_commit": "2c24200200b1",
+      "num_envs": 128,
+      "phases": {
+        "app_launch": {
+          "measurements_ms": {
+            "<built-in method builtins.any>": 0.0,
+            "<built-in method builtins.any> (cumtime)": 0.0,
+            "<built-in method builtins.getattr>": 0.01,
+            "<built-in method builtins.getattr> (cumtime)": 0.01,
+            "<built-in method builtins.id>": 0.01,
+            "<built-in method builtins.id> (cumtime)": 0.01,
+            "<built-in method builtins.isinstance>": 0.04,
+            "<built-in method builtins.isinstance> (cumtime)": 0.05,
+            "<built-in method builtins.len>": 0.0,
+            "<built-in method builtins.len> (cumtime)": 0.0,
+            "<built-in method builtins.setattr>": 0.0,
+            "<built-in method builtins.setattr> (cumtime)": 0.0,
+            "<built-in method builtins.vars>": 0.02,
+            "<built-in method builtins.vars> (cumtime)": 0.02,
+            "<method 'add' of 'set' objects>": 0.01,
+            "<method 'add' of 'set' objects> (cumtime)": 0.01,
+            "<method 'append' of 'list' objects>": 0.0,
+            "<method 'append' of 'list' objects> (cumtime)": 0.0,
+            "<method 'items' of 'dict' objects>": 0.0,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.0,
+            "<method 'items' of 'mappingproxy' objects>": 0.0,
+            "<method 'items' of 'mappingproxy' objects> (cumtime)": 0.0,
+            "Wall Clock Time": 95.390748,
+            "__init__": 0.0,
+            "__init__ (cumtime)": 0.0,
+            "get": 0.0,
+            "get (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:<genexpr>": 0.0,
+            "isaaclab.app.sim_launcher:<genexpr> (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg": 0.0,
+            "isaaclab.app.sim_launcher:_get_arg (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode": 0.0,
+            "isaaclab.app.sim_launcher:_get_livestream_mode (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_types": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_types (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_is_kit_camera": 0.01,
+            "isaaclab.app.sim_launcher:_is_kit_camera (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device": 0.0,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:launch_simulation": 0.02,
+            "isaaclab.app.sim_launcher:launch_simulation (cumtime)": 0.31,
+            "isaaclab.app.sim_launcher:scan": 0.02,
+            "isaaclab.app.sim_launcher:scan (cumtime)": 0.26,
+            "isaaclab.app.sim_launcher:visit": 0.13,
+            "isaaclab.app.sim_launcher:visit (cumtime)": 0.24,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.095390748
+        },
+        "env_creation": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 7.49,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 15.26,
+            "<built-in method builtins.__build_class__>": 14.3,
+            "<built-in method builtins.__build_class__> (cumtime)": 460.26,
+            "<built-in method builtins.getattr>": 117.7,
+            "<built-in method builtins.getattr> (cumtime)": 333.96,
+            "<built-in method builtins.hasattr>": 22.27,
+            "<built-in method builtins.hasattr> (cumtime)": 876.2,
+            "<built-in method builtins.isinstance>": 201.85,
+            "<built-in method builtins.isinstance> (cumtime)": 219.02,
+            "<built-in method builtins.len>": 30.16,
+            "<built-in method builtins.len> (cumtime)": 30.54,
+            "<built-in method builtins.max>": 11.79,
+            "<built-in method builtins.max> (cumtime)": 32.98,
+            "<built-in method builtins.min>": 8.36,
+            "<built-in method builtins.min> (cumtime)": 8.37,
+            "<built-in method torch.allclose>": 20.62,
+            "<built-in method torch.allclose> (cumtime)": 20.62,
+            "<method 'append' of 'list' objects>": 28.44,
+            "<method 'append' of 'list' objects> (cumtime)": 28.44,
+            "<method 'get' of 'dict' objects>": 27.89,
+            "<method 'get' of 'dict' objects> (cumtime)": 27.89,
+            "<method 'join' of 'str' objects>": 10.58,
+            "<method 'join' of 'str' objects> (cumtime)": 15.18,
+            "<method 'startswith' of 'str' objects>": 21.72,
+            "<method 'startswith' of 'str' objects> (cumtime)": 21.72,
+            "<method 'strip' of 'str' objects>": 9.26,
+            "<method 'strip' of 'str' objects> (cumtime)": 9.26,
+            "Scene Creation Time": 119129.99872700311,
+            "Simulation Start Time": 2416.141046967823,
+            "Wall Clock Time": 124714.573062,
+            "_src.sim.builder:add_builder": 36.37,
+            "_src.sim.builder:add_builder (cumtime)": 50.74,
+            "_src.sim.builder:finalize": 15.7,
+            "_src.sim.builder:finalize (cumtime)": 71.6,
+            "isaaclab.cloner.cloner_utils:grid_transforms": 17.17,
+            "isaaclab.cloner.cloner_utils:grid_transforms (cumtime)": 30.25,
+            "isaaclab.cloner.replicate_session:replicate": 68.76,
+            "isaaclab.cloner.replicate_session:replicate (cumtime)": 804.84,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene": 51.25,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene (cumtime)": 78.03,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key": 12.42,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key (cumtime)": 12.42,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors": 12.78,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors (cumtime)": 27.86,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim": 108.12,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim (cumtime)": 108.12,
+            "isaaclab.sim.utils.prims:wrapper": 117498.0,
+            "isaaclab.sim.utils.prims:wrapper (cumtime)": 117907.5,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 73.47,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 74.05,
+            "lib.python3.12.ast:parse": 976.76,
+            "lib.python3.12.ast:parse (cumtime)": 1209.51,
+            "lib.python3.12.copy:deepcopy": 15.04,
+            "lib.python3.12.copy:deepcopy (cumtime)": 31.76,
+            "lib.python3.12.functools:update_wrapper": 8.15,
+            "lib.python3.12.functools:update_wrapper (cumtime)": 15.27,
+            "omni.client.__init__:copy": 43.33,
+            "omni.client.__init__:copy (cumtime)": 294.17,
+            "omni.client.__init__:stat": 552.62,
+            "omni.client.__init__:stat (cumtime)": 563.09,
+            "warp._src.types:__init__": 18.13,
+            "warp._src.types:__init__ (cumtime)": 20.56
+          },
+          "scene_creation_s": 119.12999872700311,
+          "simulation_start_s": 2.416141046967823,
+          "wall_s": 124.714573062
+        },
+        "first_step": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 0.02,
+            "<built-in method builtins.getattr> (cumtime)": 0.02,
+            "<built-in method builtins.hasattr>": 0.03,
+            "<built-in method builtins.hasattr> (cumtime)": 0.03,
+            "<built-in method builtins.isinstance>": 0.73,
+            "<built-in method builtins.isinstance> (cumtime)": 0.73,
+            "<built-in method builtins.len>": 0.18,
+            "<built-in method builtins.len> (cumtime)": 0.2,
+            "<built-in method torch.atan2>": 0.02,
+            "<built-in method torch.atan2> (cumtime)": 0.02,
+            "<built-in method torch.cat>": 0.02,
+            "<built-in method torch.cat> (cumtime)": 0.02,
+            "<built-in method torch.clamp>": 0.04,
+            "<built-in method torch.clamp> (cumtime)": 0.04,
+            "<built-in method torch.clip>": 0.02,
+            "<built-in method torch.clip> (cumtime)": 0.02,
+            "<built-in method torch.cos>": 0.02,
+            "<built-in method torch.cos> (cumtime)": 0.02,
+            "<built-in method torch.sin>": 0.02,
+            "<built-in method torch.sin> (cumtime)": 0.02,
+            "<method 'get' of 'dict' objects>": 0.16,
+            "<method 'get' of 'dict' objects> (cumtime)": 0.16,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects>": 0.1,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects> (cumtime)": 0.1,
+            "Wall Clock Time": 264.318815,
+            "isaaclab.actuators.actuator_base:_clip_effort": 0.02,
+            "isaaclab.actuators.actuator_base:_clip_effort (cumtime)": 0.03,
+            "isaaclab.actuators.actuator_pd:compute": 0.08,
+            "isaaclab.actuators.actuator_pd:compute (cumtime)": 0.12,
+            "isaaclab.envs.direct_rl_env:step": 0.14,
+            "isaaclab.envs.direct_rl_env:step (cumtime)": 264.14,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model": 0.07,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model (cumtime)": 0.66,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index (cumtime)": 0.45,
+            "isaaclab_newton.physics.newton_manager:step": 0.04,
+            "isaaclab_newton.physics.newton_manager:step (cumtime)": 13.02,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action": 0.06,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action (cumtime)": 0.58,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 222.09,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 222.29,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones": 0.17,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones (cumtime)": 222.48,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations": 0.05,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations (cumtime)": 0.16,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards": 26.39,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards (cumtime)": 26.39,
+            "solvers.mujoco.solver_mujoco:notify_model_changed": 0.04,
+            "solvers.mujoco.solver_mujoco:notify_model_changed (cumtime)": 12.2,
+            "warp._src.context:capture_launch": 0.74,
+            "warp._src.context:capture_launch (cumtime)": 0.74,
+            "warp._src.context:launch": 2.69,
+            "warp._src.context:launch (cumtime)": 11.69,
+            "warp._src.types:__del__": 0.02,
+            "warp._src.types:__del__ (cumtime)": 0.1,
+            "warp._src.types:__init__": 0.04,
+            "warp._src.types:__init__ (cumtime)": 0.37,
+            "warp._src.types:zero_": 0.04,
+            "warp._src.types:zero_ (cumtime)": 0.19
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.264318815
+        },
+        "python_imports": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 1.67,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 2.6,
+            "<built-in method _warnings.warn>": 0.31,
+            "<built-in method _warnings.warn> (cumtime)": 0.31,
+            "<built-in method builtins.__build_class__>": 4.78,
+            "<built-in method builtins.__build_class__> (cumtime)": 45.28,
+            "<built-in method builtins.getattr>": 2.55,
+            "<built-in method builtins.getattr> (cumtime)": 3.2,
+            "<built-in method builtins.hasattr>": 1.0,
+            "<built-in method builtins.hasattr> (cumtime)": 22.71,
+            "<built-in method builtins.id>": 0.44,
+            "<built-in method builtins.id> (cumtime)": 0.44,
+            "<built-in method builtins.isinstance>": 5.43,
+            "<built-in method builtins.isinstance> (cumtime)": 6.51,
+            "<built-in method builtins.len>": 2.25,
+            "<built-in method builtins.len> (cumtime)": 2.31,
+            "<built-in method builtins.setattr>": 0.64,
+            "<built-in method builtins.setattr> (cumtime)": 0.73,
+            "<method '__exit__' of '_io._IOBase' objects>": 0.32,
+            "<method '__exit__' of '_io._IOBase' objects> (cumtime)": 0.32,
+            "<method 'append' of 'list' objects>": 1.43,
+            "<method 'append' of 'list' objects> (cumtime)": 1.43,
+            "<method 'get' of 'dict' objects>": 1.83,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.83,
+            "<method 'get' of 'mappingproxy' objects>": 0.24,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.24,
+            "<method 'join' of 'str' objects>": 1.0,
+            "<method 'join' of 'str' objects> (cumtime)": 1.19,
+            "<method 'match' of 're.Pattern' objects>": 0.58,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.58,
+            "<method 'startswith' of 'str' objects>": 1.36,
+            "<method 'startswith' of 'str' objects> (cumtime)": 1.36,
+            "Wall Clock Time": 236.689817,
+            "_find_and_load": 0.71,
+            "_find_and_load (cumtime)": 23.2,
+            "_handle_fromlist": 0.55,
+            "_handle_fromlist (cumtime)": 8.44,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.35,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 1.04,
+            "isaaclab.utils.configclass:_custom_post_init": 0.74,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 3.69,
+            "isaaclab.utils.configclass:_field_module_dir": 0.26,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 0.43,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.94,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 2.62,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.48,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 1.47,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 0.53,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 1.0,
+            "isaaclab.utils.configclass:configclass": 0.38,
+            "isaaclab.utils.configclass:configclass (cumtime)": 22.3,
+            "lib.python3.12.copy:deepcopy": 3.62,
+            "lib.python3.12.copy:deepcopy (cumtime)": 9.67,
+            "lib.python3.12.dataclasses:field": 0.25,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.33,
+            "lib.python3.12.enum:__setitem__": 0.43,
+            "lib.python3.12.enum:__setitem__ (cumtime)": 0.9,
+            "lib.python3.12.typing:inner": 0.62,
+            "lib.python3.12.typing:inner (cumtime)": 7.88,
+            "parent": 0.3,
+            "parent (cumtime)": 0.49
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.236689817
+        },
+        "task_config": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 0.1,
+            "<built-in method builtins.__build_class__> (cumtime)": 10.75,
+            "<built-in method builtins.all>": 0.1,
+            "<built-in method builtins.all> (cumtime)": 0.17,
+            "<built-in method builtins.callable>": 0.1,
+            "<built-in method builtins.callable> (cumtime)": 0.1,
+            "<built-in method builtins.dir>": 0.47,
+            "<built-in method builtins.dir> (cumtime)": 0.47,
+            "<built-in method builtins.getattr>": 0.97,
+            "<built-in method builtins.getattr> (cumtime)": 2.76,
+            "<built-in method builtins.hasattr>": 0.33,
+            "<built-in method builtins.hasattr> (cumtime)": 6.55,
+            "<built-in method builtins.id>": 0.55,
+            "<built-in method builtins.id> (cumtime)": 0.55,
+            "<built-in method builtins.isinstance>": 1.45,
+            "<built-in method builtins.isinstance> (cumtime)": 2.29,
+            "<built-in method builtins.setattr>": 0.36,
+            "<built-in method builtins.setattr> (cumtime)": 0.36,
+            "<method 'append' of 'list' objects>": 0.09,
+            "<method 'append' of 'list' objects> (cumtime)": 0.09,
+            "<method 'get' of 'dict' objects>": 1.34,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.34,
+            "<method 'get' of 'mappingproxy' objects>": 0.16,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.16,
+            "<method 'items' of 'dict' objects>": 0.07,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.07,
+            "<method 'match' of 're.Pattern' objects>": 0.34,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.34,
+            "<method 'rsplit' of 'str' objects>": 0.36,
+            "<method 'rsplit' of 'str' objects> (cumtime)": 0.36,
+            "<method 'startswith' of 'str' objects>": 0.57,
+            "<method 'startswith' of 'str' objects> (cumtime)": 0.57,
+            "Wall Clock Time": 31.026517,
+            "isaaclab.utils.configclass:<genexpr>": 0.08,
+            "isaaclab.utils.configclass:<genexpr> (cumtime)": 0.48,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.1,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 0.31,
+            "isaaclab.utils.configclass:_custom_post_init": 1.49,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 17.32,
+            "isaaclab.utils.configclass:_field_module_dir": 1.4,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 2.24,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.31,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 0.71,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.15,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 0.3,
+            "isaaclab.utils.configclass:_wrap": 0.1,
+            "isaaclab.utils.configclass:_wrap (cumtime)": 2.13,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 3.4,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 7.01,
+            "isaaclab.utils.configclass:configclass": 0.1,
+            "isaaclab.utils.configclass:configclass (cumtime)": 7.03,
+            "isaaclab.utils.string:__getattribute__": 0.07,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.07,
+            "isaaclab_tasks.utils.hydra:<genexpr>": 0.18,
+            "isaaclab_tasks.utils.hydra:<genexpr> (cumtime)": 0.35,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg": 0.08,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg (cumtime)": 0.56,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets": 0.18,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets (cumtime)": 1.84,
+            "lib.python3.12.copy:deepcopy": 4.77,
+            "lib.python3.12.copy:deepcopy (cumtime)": 8.92
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.031026517
+        }
+      },
+      "raw_report_file": "data/isaaclab_pr3187_raw/main_Isaac-Ant-Direct_128.json",
+      "revision": "main",
+      "revision_label": "Newton main",
+      "source_file": "/tmp/isaaclab_startup_newton_bench/main_ant_128/benchmark_startup_Isaac-Ant-Direct_2026-06-16_02-42-42.json",
+      "task": "Isaac-Ant-Direct",
+      "task_short": "Ant",
+      "timestamp": "2026-06-16T02:42:42.661397",
+      "top_functions": {
+        "app_launch": [
+          {
+            "cum_ms": 0.24,
+            "name": "isaaclab.app.sim_launcher:visit",
+            "own_ms": 0.13
+          },
+          {
+            "cum_ms": 0.05,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.04
+          },
+          {
+            "cum_ms": 0.02,
+            "name": "<built-in method builtins.vars>",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.31,
+            "name": "isaaclab.app.sim_launcher:launch_simulation",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.26,
+            "name": "isaaclab.app.sim_launcher:scan",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_kit_camera",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_ovrtx_renderer",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.utils.string:__getattribute__",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<method 'add' of 'set' objects>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_get_arg",
+            "own_ms": 0.0
+          }
+        ],
+        "env_creation": [
+          {
+            "cum_ms": 117907.5,
+            "name": "isaaclab.sim.utils.prims:wrapper",
+            "own_ms": 117498.0
+          },
+          {
+            "cum_ms": 1209.51,
+            "name": "lib.python3.12.ast:parse",
+            "own_ms": 976.76
+          },
+          {
+            "cum_ms": 563.09,
+            "name": "omni.client.__init__:stat",
+            "own_ms": 552.62
+          },
+          {
+            "cum_ms": 219.02,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 201.85
+          },
+          {
+            "cum_ms": 333.96,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 117.7
+          },
+          {
+            "cum_ms": 108.12,
+            "name": "isaaclab.sim.utils.prims:_add_reference_to_prim",
+            "own_ms": 108.12
+          },
+          {
+            "cum_ms": 74.05,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 73.47
+          },
+          {
+            "cum_ms": 804.84,
+            "name": "isaaclab.cloner.replicate_session:replicate",
+            "own_ms": 68.76
+          },
+          {
+            "cum_ms": 78.03,
+            "name": "isaaclab.sim.simulation_context:_init_usd_physics_scene",
+            "own_ms": 51.25
+          },
+          {
+            "cum_ms": 294.17,
+            "name": "omni.client.__init__:copy",
+            "own_ms": 43.33
+          },
+          {
+            "cum_ms": 50.74,
+            "name": "_src.sim.builder:add_builder",
+            "own_ms": 36.37
+          },
+          {
+            "cum_ms": 30.54,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 30.16
+          }
+        ],
+        "first_step": [
+          {
+            "cum_ms": 222.29,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 222.09
+          },
+          {
+            "cum_ms": 26.39,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards",
+            "own_ms": 26.39
+          },
+          {
+            "cum_ms": 11.69,
+            "name": "warp._src.context:launch",
+            "own_ms": 2.69
+          },
+          {
+            "cum_ms": 0.74,
+            "name": "warp._src.context:capture_launch",
+            "own_ms": 0.74
+          },
+          {
+            "cum_ms": 0.73,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.73
+          },
+          {
+            "cum_ms": 0.2,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 0.18
+          },
+          {
+            "cum_ms": 222.48,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones",
+            "own_ms": 0.17
+          },
+          {
+            "cum_ms": 0.16,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 0.16
+          },
+          {
+            "cum_ms": 264.14,
+            "name": "isaaclab.envs.direct_rl_env:step",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.1,
+            "name": "<method 'nonzero' of 'torch._C.TensorBase' objects>",
+            "own_ms": 0.1
+          },
+          {
+            "cum_ms": 0.12,
+            "name": "isaaclab.actuators.actuator_pd:compute",
+            "own_ms": 0.08
+          },
+          {
+            "cum_ms": 0.66,
+            "name": "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model",
+            "own_ms": 0.07
+          }
+        ],
+        "python_imports": [
+          {
+            "cum_ms": 6.51,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 5.43
+          },
+          {
+            "cum_ms": 45.28,
+            "name": "<built-in method builtins.__build_class__>",
+            "own_ms": 4.78
+          },
+          {
+            "cum_ms": 9.67,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.62
+          },
+          {
+            "cum_ms": 3.2,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 2.55
+          },
+          {
+            "cum_ms": 2.31,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 2.25
+          },
+          {
+            "cum_ms": 1.83,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.83
+          },
+          {
+            "cum_ms": 2.6,
+            "name": "<built-in method __new__ of type object at 0x14424b0>",
+            "own_ms": 1.67
+          },
+          {
+            "cum_ms": 1.43,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 1.43
+          },
+          {
+            "cum_ms": 1.36,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 1.36
+          },
+          {
+            "cum_ms": 22.71,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 1.0
+          },
+          {
+            "cum_ms": 1.19,
+            "name": "<method 'join' of 'str' objects>",
+            "own_ms": 1.0
+          },
+          {
+            "cum_ms": 2.62,
+            "name": "isaaclab.utils.configclass:_process_mutable_types",
+            "own_ms": 0.94
+          }
+        ],
+        "task_config": [
+          {
+            "cum_ms": 8.92,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 4.77
+          },
+          {
+            "cum_ms": 7.01,
+            "name": "isaaclab.utils.configclass:_wrap_resolvable_strings",
+            "own_ms": 3.4
+          },
+          {
+            "cum_ms": 17.32,
+            "name": "isaaclab.utils.configclass:_custom_post_init",
+            "own_ms": 1.49
+          },
+          {
+            "cum_ms": 2.29,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.45
+          },
+          {
+            "cum_ms": 2.24,
+            "name": "isaaclab.utils.configclass:_field_module_dir",
+            "own_ms": 1.4
+          },
+          {
+            "cum_ms": 1.34,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.34
+          },
+          {
+            "cum_ms": 2.76,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.97
+          },
+          {
+            "cum_ms": 0.57,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 0.57
+          },
+          {
+            "cum_ms": 0.55,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.55
+          },
+          {
+            "cum_ms": 0.47,
+            "name": "<built-in method builtins.dir>",
+            "own_ms": 0.47
+          },
+          {
+            "cum_ms": 0.36,
+            "name": "<method 'rsplit' of 'str' objects>",
+            "own_ms": 0.36
+          },
+          {
+            "cum_ms": 0.36,
+            "name": "<built-in method builtins.setattr>",
+            "own_ms": 0.36
+          }
+        ]
+      },
+      "total_reported_s": 125.341998959,
+      "versions": {
+        "cuda_bindings_version": "13.3.1",
+        "dev": {
+          "branch": "HEAD",
+          "commit_date": "2026-06-11 08:44:20 -0700",
+          "commit_hash": "a59603d2eaf2f1ac62de595e5d1cc219d2d25cbe",
+          "commit_hash_short": "a59603d2",
+          "dirty": true
+        },
+        "gymnasium_version": "1.3.0",
+        "isaaclab_newton_version": "0.15.6",
+        "isaaclab_ov_version": "0.4.4",
+        "isaaclab_physx_version": "1.1.5",
+        "isaaclab_release_version": "3.0.0",
+        "isaaclab_rl_version": "0.6.1",
+        "isaaclab_tasks_version": "6.0.0",
+        "isaaclab_version": "6.7.0",
+        "mujoco_version": "3.8.0",
+        "mujoco_warp_version": "3.8.0.3",
+        "newton_version": "1.4.0.dev0",
+        "numpy_version": "2.5.0rc1",
+        "phase": "version_info",
+        "rsl_rl_version": "5.0.1",
+        "torch_version": "2.11.0+cu130",
+        "usd_core_version": "25.11",
+        "warp_version": "1.15.0.dev20260615",
+        "workflow_name": "benchmark_startup"
+      }
+    },
+    {
+      "hardware": {
+        "cpu_name": "AMD EPYC 9B45",
+        "cuda_version": "13.0",
+        "gpu_current_device": 0,
+        "gpu_device_count": 1,
+        "gpu_devices": {
+          "0": {
+            "compute_capability": "12.0",
+            "multi_processor_count": 46,
+            "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+            "total_memory_gb": 23.62
+          }
+        },
+        "phase": "hardware_info",
+        "physical_cores": 192,
+        "total_ram_gb": 708.2,
+        "workflow_name": "benchmark_startup"
+      },
+      "newton_commit": "172dbda45f6a",
+      "num_envs": 128,
+      "phases": {
+        "app_launch": {
+          "measurements_ms": {
+            "<built-in method builtins.any>": 0.0,
+            "<built-in method builtins.any> (cumtime)": 0.0,
+            "<built-in method builtins.getattr>": 0.0,
+            "<built-in method builtins.getattr> (cumtime)": 0.0,
+            "<built-in method builtins.id>": 0.01,
+            "<built-in method builtins.id> (cumtime)": 0.01,
+            "<built-in method builtins.isinstance>": 0.04,
+            "<built-in method builtins.isinstance> (cumtime)": 0.05,
+            "<built-in method builtins.len>": 0.0,
+            "<built-in method builtins.len> (cumtime)": 0.0,
+            "<built-in method builtins.setattr>": 0.0,
+            "<built-in method builtins.setattr> (cumtime)": 0.0,
+            "<built-in method builtins.vars>": 0.02,
+            "<built-in method builtins.vars> (cumtime)": 0.02,
+            "<method 'add' of 'set' objects>": 0.01,
+            "<method 'add' of 'set' objects> (cumtime)": 0.01,
+            "<method 'append' of 'list' objects>": 0.0,
+            "<method 'append' of 'list' objects> (cumtime)": 0.0,
+            "<method 'items' of 'dict' objects>": 0.0,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.0,
+            "<method 'items' of 'mappingproxy' objects>": 0.0,
+            "<method 'items' of 'mappingproxy' objects> (cumtime)": 0.0,
+            "Wall Clock Time": 95.097658,
+            "__init__": 0.0,
+            "__init__ (cumtime)": 0.0,
+            "get": 0.0,
+            "get (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:<genexpr>": 0.0,
+            "isaaclab.app.sim_launcher:<genexpr> (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode": 0.0,
+            "isaaclab.app.sim_launcher:_get_livestream_mode (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_types": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_types (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_is_kit_camera": 0.01,
+            "isaaclab.app.sim_launcher:_is_kit_camera (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device": 0.0,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:launch_simulation": 0.02,
+            "isaaclab.app.sim_launcher:launch_simulation (cumtime)": 0.3,
+            "isaaclab.app.sim_launcher:scan": 0.02,
+            "isaaclab.app.sim_launcher:scan (cumtime)": 0.26,
+            "isaaclab.app.sim_launcher:visit": 0.13,
+            "isaaclab.app.sim_launcher:visit (cumtime)": 0.24,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.095097658
+        },
+        "env_creation": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 14.55,
+            "<built-in method builtins.__build_class__> (cumtime)": 459.83,
+            "<built-in method builtins.getattr>": 90.9,
+            "<built-in method builtins.getattr> (cumtime)": 306.87,
+            "<built-in method builtins.hasattr>": 21.16,
+            "<built-in method builtins.hasattr> (cumtime)": 875.96,
+            "<built-in method builtins.isinstance>": 178.42,
+            "<built-in method builtins.isinstance> (cumtime)": 187.08,
+            "<built-in method builtins.len>": 29.01,
+            "<built-in method builtins.len> (cumtime)": 29.39,
+            "<built-in method builtins.max>": 11.45,
+            "<built-in method builtins.max> (cumtime)": 32.38,
+            "<built-in method builtins.min>": 7.89,
+            "<built-in method builtins.min> (cumtime)": 7.89,
+            "<built-in method torch.allclose>": 21.33,
+            "<built-in method torch.allclose> (cumtime)": 21.33,
+            "<method 'append' of 'list' objects>": 26.13,
+            "<method 'append' of 'list' objects> (cumtime)": 26.13,
+            "<method 'get' of 'dict' objects>": 26.53,
+            "<method 'get' of 'dict' objects> (cumtime)": 26.53,
+            "<method 'join' of 'str' objects>": 9.67,
+            "<method 'join' of 'str' objects> (cumtime)": 11.55,
+            "<method 'startswith' of 'str' objects>": 62.62,
+            "<method 'startswith' of 'str' objects> (cumtime)": 62.62,
+            "<method 'strip' of 'str' objects>": 9.17,
+            "<method 'strip' of 'str' objects> (cumtime)": 9.17,
+            "<method 'tolist' of 'torch._C.TensorBase' objects>": 14.03,
+            "<method 'tolist' of 'torch._C.TensorBase' objects> (cumtime)": 14.03,
+            "Scene Creation Time": 36299.108348961454,
+            "Simulation Start Time": 1847.2580349771306,
+            "Wall Clock Time": 41304.014128,
+            "_src.sim.builder:add_builder": 11.72,
+            "_src.sim.builder:add_builder (cumtime)": 26.47,
+            "_src.sim.builder:finalize": 19.87,
+            "_src.sim.builder:finalize (cumtime)": 70.1,
+            "isaaclab.cloner.cloner_utils:grid_transforms": 17.07,
+            "isaaclab.cloner.cloner_utils:grid_transforms (cumtime)": 30.26,
+            "isaaclab.cloner.replicate_session:replicate": 13.53,
+            "isaaclab.cloner.replicate_session:replicate (cumtime)": 658.02,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene": 16.34,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene (cumtime)": 43.77,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key": 12.16,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key (cumtime)": 12.16,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors": 12.72,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors (cumtime)": 27.43,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim": 165.32,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim (cumtime)": 165.32,
+            "isaaclab.sim.utils.prims:safe_set_attribute_on_usd_prim": 30.63,
+            "isaaclab.sim.utils.prims:safe_set_attribute_on_usd_prim (cumtime)": 31.57,
+            "isaaclab.sim.utils.prims:wrapper": 34789.64,
+            "isaaclab.sim.utils.prims:wrapper (cumtime)": 35287.54,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 74.74,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 75.31,
+            "lib.python3.12.ast:parse": 809.45,
+            "lib.python3.12.ast:parse (cumtime)": 1042.86,
+            "lib.python3.12.copy:deepcopy": 15.06,
+            "lib.python3.12.copy:deepcopy (cumtime)": 31.84,
+            "lib.python3.12.functools:update_wrapper": 8.15,
+            "lib.python3.12.functools:update_wrapper (cumtime)": 15.26,
+            "omni.client.__init__:stat": 486.87,
+            "omni.client.__init__:stat (cumtime)": 497.04,
+            "warp._src.types:__init__": 34.37,
+            "warp._src.types:__init__ (cumtime)": 65.23
+          },
+          "scene_creation_s": 36.299108348961454,
+          "simulation_start_s": 1.8472580349771306,
+          "wall_s": 41.304014128000006
+        },
+        "first_step": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 0.02,
+            "<built-in method builtins.getattr> (cumtime)": 0.02,
+            "<built-in method builtins.hasattr>": 0.03,
+            "<built-in method builtins.hasattr> (cumtime)": 0.03,
+            "<built-in method builtins.isinstance>": 0.73,
+            "<built-in method builtins.isinstance> (cumtime)": 0.73,
+            "<built-in method builtins.len>": 0.19,
+            "<built-in method builtins.len> (cumtime)": 0.21,
+            "<built-in method torch.atan2>": 0.02,
+            "<built-in method torch.atan2> (cumtime)": 0.02,
+            "<built-in method torch.cat>": 0.03,
+            "<built-in method torch.cat> (cumtime)": 0.03,
+            "<built-in method torch.clamp>": 0.04,
+            "<built-in method torch.clamp> (cumtime)": 0.04,
+            "<built-in method torch.clip>": 0.02,
+            "<built-in method torch.clip> (cumtime)": 0.02,
+            "<built-in method torch.cos>": 0.02,
+            "<built-in method torch.cos> (cumtime)": 0.02,
+            "<built-in method torch.sin>": 0.02,
+            "<built-in method torch.sin> (cumtime)": 0.02,
+            "<method 'get' of 'dict' objects>": 0.15,
+            "<method 'get' of 'dict' objects> (cumtime)": 0.15,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects>": 0.1,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects> (cumtime)": 0.1,
+            "Wall Clock Time": 175.612443,
+            "isaaclab.actuators.actuator_base:_clip_effort": 0.02,
+            "isaaclab.actuators.actuator_base:_clip_effort (cumtime)": 0.04,
+            "isaaclab.actuators.actuator_pd:compute": 0.08,
+            "isaaclab.actuators.actuator_pd:compute (cumtime)": 0.12,
+            "isaaclab.envs.direct_rl_env:step": 0.14,
+            "isaaclab.envs.direct_rl_env:step (cumtime)": 175.42,
+            "isaaclab.scene.interactive_scene:update": 0.03,
+            "isaaclab.scene.interactive_scene:update (cumtime)": 0.26,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model": 0.07,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model (cumtime)": 0.66,
+            "isaaclab_newton.physics.newton_manager:step": 0.04,
+            "isaaclab_newton.physics.newton_manager:step (cumtime)": 12.98,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action": 0.07,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action (cumtime)": 0.56,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 132.21,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 132.41,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones": 0.14,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones (cumtime)": 132.56,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations": 0.06,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations (cumtime)": 0.17,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards": 27.63,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards (cumtime)": 27.63,
+            "solvers.mujoco.solver_mujoco:notify_model_changed": 0.02,
+            "solvers.mujoco.solver_mujoco:notify_model_changed (cumtime)": 12.16,
+            "warp._src.context:capture_launch": 0.74,
+            "warp._src.context:capture_launch (cumtime)": 0.74,
+            "warp._src.context:launch": 2.68,
+            "warp._src.context:launch (cumtime)": 11.63,
+            "warp._src.types:__del__": 0.02,
+            "warp._src.types:__del__ (cumtime)": 0.1,
+            "warp._src.types:__init__": 0.04,
+            "warp._src.types:__init__ (cumtime)": 0.38,
+            "warp._src.types:assign": 0.02,
+            "warp._src.types:assign (cumtime)": 0.12,
+            "warp._src.types:zero_": 0.04,
+            "warp._src.types:zero_ (cumtime)": 0.17
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.175612443
+        },
+        "python_imports": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 1.72,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 2.65,
+            "<built-in method _warnings.warn>": 0.31,
+            "<built-in method _warnings.warn> (cumtime)": 0.31,
+            "<built-in method builtins.__build_class__>": 4.76,
+            "<built-in method builtins.__build_class__> (cumtime)": 45.39,
+            "<built-in method builtins.getattr>": 2.55,
+            "<built-in method builtins.getattr> (cumtime)": 3.22,
+            "<built-in method builtins.hasattr>": 1.0,
+            "<built-in method builtins.hasattr> (cumtime)": 22.69,
+            "<built-in method builtins.id>": 0.44,
+            "<built-in method builtins.id> (cumtime)": 0.44,
+            "<built-in method builtins.isinstance>": 5.44,
+            "<built-in method builtins.isinstance> (cumtime)": 6.51,
+            "<built-in method builtins.len>": 2.27,
+            "<built-in method builtins.len> (cumtime)": 2.33,
+            "<built-in method builtins.setattr>": 0.6,
+            "<built-in method builtins.setattr> (cumtime)": 0.7,
+            "<method '__exit__' of '_io._IOBase' objects>": 0.32,
+            "<method '__exit__' of '_io._IOBase' objects> (cumtime)": 0.32,
+            "<method 'append' of 'list' objects>": 1.43,
+            "<method 'append' of 'list' objects> (cumtime)": 1.43,
+            "<method 'get' of 'dict' objects>": 1.83,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.83,
+            "<method 'get' of 'mappingproxy' objects>": 0.24,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.24,
+            "<method 'join' of 'str' objects>": 1.0,
+            "<method 'join' of 'str' objects> (cumtime)": 1.21,
+            "<method 'match' of 're.Pattern' objects>": 0.59,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.59,
+            "<method 'startswith' of 'str' objects>": 1.39,
+            "<method 'startswith' of 'str' objects> (cumtime)": 1.39,
+            "Wall Clock Time": 239.258205,
+            "_find_and_load": 0.71,
+            "_find_and_load (cumtime)": 23.17,
+            "_handle_fromlist": 0.54,
+            "_handle_fromlist (cumtime)": 8.42,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.36,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 1.06,
+            "isaaclab.utils.configclass:_custom_post_init": 0.77,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 3.72,
+            "isaaclab.utils.configclass:_field_module_dir": 0.27,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 0.42,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.97,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 2.61,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.46,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 1.45,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 0.53,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 1.0,
+            "isaaclab.utils.configclass:configclass": 0.36,
+            "isaaclab.utils.configclass:configclass (cumtime)": 22.29,
+            "lib.python3.12.copy:deepcopy": 3.63,
+            "lib.python3.12.copy:deepcopy (cumtime)": 9.66,
+            "lib.python3.12.dataclasses:field": 0.24,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.33,
+            "lib.python3.12.enum:__setitem__": 0.42,
+            "lib.python3.12.enum:__setitem__ (cumtime)": 0.89,
+            "lib.python3.12.typing:inner": 0.63,
+            "lib.python3.12.typing:inner (cumtime)": 7.87,
+            "parent": 0.31,
+            "parent (cumtime)": 0.48
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.239258205
+        },
+        "task_config": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 0.11,
+            "<built-in method builtins.__build_class__> (cumtime)": 10.76,
+            "<built-in method builtins.all>": 0.1,
+            "<built-in method builtins.all> (cumtime)": 0.17,
+            "<built-in method builtins.callable>": 0.09,
+            "<built-in method builtins.callable> (cumtime)": 0.09,
+            "<built-in method builtins.dir>": 0.47,
+            "<built-in method builtins.dir> (cumtime)": 0.47,
+            "<built-in method builtins.getattr>": 0.96,
+            "<built-in method builtins.getattr> (cumtime)": 2.74,
+            "<built-in method builtins.hasattr>": 0.34,
+            "<built-in method builtins.hasattr> (cumtime)": 6.54,
+            "<built-in method builtins.id>": 0.57,
+            "<built-in method builtins.id> (cumtime)": 0.57,
+            "<built-in method builtins.isinstance>": 1.46,
+            "<built-in method builtins.isinstance> (cumtime)": 2.31,
+            "<built-in method builtins.setattr>": 0.38,
+            "<built-in method builtins.setattr> (cumtime)": 0.38,
+            "<method 'append' of 'list' objects>": 0.09,
+            "<method 'append' of 'list' objects> (cumtime)": 0.09,
+            "<method 'get' of 'dict' objects>": 1.33,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.33,
+            "<method 'get' of 'mappingproxy' objects>": 0.16,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.16,
+            "<method 'items' of 'dict' objects>": 0.06,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.06,
+            "<method 'match' of 're.Pattern' objects>": 0.34,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.34,
+            "<method 'rsplit' of 'str' objects>": 0.35,
+            "<method 'rsplit' of 'str' objects> (cumtime)": 0.35,
+            "<method 'startswith' of 'str' objects>": 0.57,
+            "<method 'startswith' of 'str' objects> (cumtime)": 0.57,
+            "Wall Clock Time": 31.023297,
+            "isaaclab.utils.configclass:<genexpr>": 0.08,
+            "isaaclab.utils.configclass:<genexpr> (cumtime)": 0.5,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.1,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 0.32,
+            "isaaclab.utils.configclass:_custom_post_init": 1.52,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 17.39,
+            "isaaclab.utils.configclass:_field_module_dir": 1.4,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 2.23,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.33,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 0.74,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.15,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 0.3,
+            "isaaclab.utils.configclass:_wrap": 0.1,
+            "isaaclab.utils.configclass:_wrap (cumtime)": 2.12,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 3.4,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 7.01,
+            "isaaclab.utils.configclass:configclass": 0.1,
+            "isaaclab.utils.configclass:configclass (cumtime)": 7.01,
+            "isaaclab.utils.string:__getattribute__": 0.07,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.07,
+            "isaaclab_tasks.utils.hydra:<genexpr>": 0.18,
+            "isaaclab_tasks.utils.hydra:<genexpr> (cumtime)": 0.35,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg": 0.08,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg (cumtime)": 0.55,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets": 0.17,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets (cumtime)": 1.85,
+            "lib.python3.12.copy:deepcopy": 4.82,
+            "lib.python3.12.copy:deepcopy (cumtime)": 8.97
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.031023297
+        }
+      },
+      "raw_report_file": "data/isaaclab_pr3187_raw/pr3187_Isaac-Ant-Direct_128.json",
+      "revision": "pr3187",
+      "revision_label": "PR 3187",
+      "source_file": "/tmp/isaaclab_startup_newton_bench/pr3187_ant_128/benchmark_startup_Isaac-Ant-Direct_2026-06-16_02-50-22.json",
+      "task": "Isaac-Ant-Direct",
+      "task_short": "Ant",
+      "timestamp": "2026-06-16T02:50:22.956316",
+      "top_functions": {
+        "app_launch": [
+          {
+            "cum_ms": 0.24,
+            "name": "isaaclab.app.sim_launcher:visit",
+            "own_ms": 0.13
+          },
+          {
+            "cum_ms": 0.05,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.04
+          },
+          {
+            "cum_ms": 0.02,
+            "name": "<built-in method builtins.vars>",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.3,
+            "name": "isaaclab.app.sim_launcher:launch_simulation",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.26,
+            "name": "isaaclab.app.sim_launcher:scan",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_ovrtx_renderer",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.utils.string:__getattribute__",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<method 'add' of 'set' objects>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_kit_camera",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_get_arg",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.0,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.0
+          }
+        ],
+        "env_creation": [
+          {
+            "cum_ms": 35287.54,
+            "name": "isaaclab.sim.utils.prims:wrapper",
+            "own_ms": 34789.64
+          },
+          {
+            "cum_ms": 1042.86,
+            "name": "lib.python3.12.ast:parse",
+            "own_ms": 809.45
+          },
+          {
+            "cum_ms": 497.04,
+            "name": "omni.client.__init__:stat",
+            "own_ms": 486.87
+          },
+          {
+            "cum_ms": 187.08,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 178.42
+          },
+          {
+            "cum_ms": 165.32,
+            "name": "isaaclab.sim.utils.prims:_add_reference_to_prim",
+            "own_ms": 165.32
+          },
+          {
+            "cum_ms": 306.87,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 90.9
+          },
+          {
+            "cum_ms": 75.31,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 74.74
+          },
+          {
+            "cum_ms": 62.62,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 62.62
+          },
+          {
+            "cum_ms": 65.23,
+            "name": "warp._src.types:__init__",
+            "own_ms": 34.37
+          },
+          {
+            "cum_ms": 31.57,
+            "name": "isaaclab.sim.utils.prims:safe_set_attribute_on_usd_prim",
+            "own_ms": 30.63
+          },
+          {
+            "cum_ms": 29.39,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 29.01
+          },
+          {
+            "cum_ms": 26.53,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 26.53
+          }
+        ],
+        "first_step": [
+          {
+            "cum_ms": 132.41,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 132.21
+          },
+          {
+            "cum_ms": 27.63,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards",
+            "own_ms": 27.63
+          },
+          {
+            "cum_ms": 11.63,
+            "name": "warp._src.context:launch",
+            "own_ms": 2.68
+          },
+          {
+            "cum_ms": 0.74,
+            "name": "warp._src.context:capture_launch",
+            "own_ms": 0.74
+          },
+          {
+            "cum_ms": 0.73,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.73
+          },
+          {
+            "cum_ms": 0.21,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 0.19
+          },
+          {
+            "cum_ms": 0.15,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 0.15
+          },
+          {
+            "cum_ms": 175.42,
+            "name": "isaaclab.envs.direct_rl_env:step",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 132.56,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.1,
+            "name": "<method 'nonzero' of 'torch._C.TensorBase' objects>",
+            "own_ms": 0.1
+          },
+          {
+            "cum_ms": 0.12,
+            "name": "isaaclab.actuators.actuator_pd:compute",
+            "own_ms": 0.08
+          },
+          {
+            "cum_ms": 0.66,
+            "name": "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model",
+            "own_ms": 0.07
+          }
+        ],
+        "python_imports": [
+          {
+            "cum_ms": 6.51,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 5.44
+          },
+          {
+            "cum_ms": 45.39,
+            "name": "<built-in method builtins.__build_class__>",
+            "own_ms": 4.76
+          },
+          {
+            "cum_ms": 9.66,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.63
+          },
+          {
+            "cum_ms": 3.22,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 2.55
+          },
+          {
+            "cum_ms": 2.33,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 2.27
+          },
+          {
+            "cum_ms": 1.83,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.83
+          },
+          {
+            "cum_ms": 2.65,
+            "name": "<built-in method __new__ of type object at 0x14424b0>",
+            "own_ms": 1.72
+          },
+          {
+            "cum_ms": 1.43,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 1.43
+          },
+          {
+            "cum_ms": 1.39,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 1.39
+          },
+          {
+            "cum_ms": 22.69,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 1.0
+          },
+          {
+            "cum_ms": 1.21,
+            "name": "<method 'join' of 'str' objects>",
+            "own_ms": 1.0
+          },
+          {
+            "cum_ms": 2.61,
+            "name": "isaaclab.utils.configclass:_process_mutable_types",
+            "own_ms": 0.97
+          }
+        ],
+        "task_config": [
+          {
+            "cum_ms": 8.97,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 4.82
+          },
+          {
+            "cum_ms": 7.01,
+            "name": "isaaclab.utils.configclass:_wrap_resolvable_strings",
+            "own_ms": 3.4
+          },
+          {
+            "cum_ms": 17.39,
+            "name": "isaaclab.utils.configclass:_custom_post_init",
+            "own_ms": 1.52
+          },
+          {
+            "cum_ms": 2.31,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.46
+          },
+          {
+            "cum_ms": 2.23,
+            "name": "isaaclab.utils.configclass:_field_module_dir",
+            "own_ms": 1.4
+          },
+          {
+            "cum_ms": 1.33,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.33
+          },
+          {
+            "cum_ms": 2.74,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.96
+          },
+          {
+            "cum_ms": 0.57,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.57
+          },
+          {
+            "cum_ms": 0.57,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 0.57
+          },
+          {
+            "cum_ms": 0.47,
+            "name": "<built-in method builtins.dir>",
+            "own_ms": 0.47
+          },
+          {
+            "cum_ms": 0.38,
+            "name": "<built-in method builtins.setattr>",
+            "own_ms": 0.38
+          },
+          {
+            "cum_ms": 0.35,
+            "name": "<method 'rsplit' of 'str' objects>",
+            "own_ms": 0.35
+          }
+        ]
+      },
+      "total_reported_s": 41.84500573100001,
+      "versions": {
+        "cuda_bindings_version": "13.3.1",
+        "dev": {
+          "branch": "HEAD",
+          "commit_date": "2026-06-11 08:44:20 -0700",
+          "commit_hash": "a59603d2eaf2f1ac62de595e5d1cc219d2d25cbe",
+          "commit_hash_short": "a59603d2",
+          "dirty": true
+        },
+        "gymnasium_version": "1.3.0",
+        "isaaclab_newton_version": "0.15.6",
+        "isaaclab_ov_version": "0.4.4",
+        "isaaclab_physx_version": "1.1.5",
+        "isaaclab_release_version": "3.0.0",
+        "isaaclab_rl_version": "0.6.1",
+        "isaaclab_tasks_version": "6.0.0",
+        "isaaclab_version": "6.7.0",
+        "mujoco_version": "3.8.0",
+        "mujoco_warp_version": "3.8.0.3",
+        "newton_version": "1.4.0.dev0",
+        "numpy_version": "2.5.0rc1",
+        "phase": "version_info",
+        "rsl_rl_version": "5.0.1",
+        "torch_version": "2.11.0+cu130",
+        "usd_core_version": "25.11",
+        "warp_version": "1.15.0.dev20260615",
+        "workflow_name": "benchmark_startup"
+      }
+    },
+    {
+      "hardware": {
+        "cpu_name": "AMD EPYC 9B45",
+        "cuda_version": "13.0",
+        "gpu_current_device": 0,
+        "gpu_device_count": 1,
+        "gpu_devices": {
+          "0": {
+            "compute_capability": "12.0",
+            "multi_processor_count": 46,
+            "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+            "total_memory_gb": 23.62
+          }
+        },
+        "phase": "hardware_info",
+        "physical_cores": 192,
+        "total_ram_gb": 708.2,
+        "workflow_name": "benchmark_startup"
+      },
+      "newton_commit": "2c24200200b1",
+      "num_envs": 4096,
+      "phases": {
+        "app_launch": {
+          "measurements_ms": {
+            "<built-in method builtins.any>": 0.0,
+            "<built-in method builtins.any> (cumtime)": 0.0,
+            "<built-in method builtins.getattr>": 0.0,
+            "<built-in method builtins.getattr> (cumtime)": 0.0,
+            "<built-in method builtins.id>": 0.01,
+            "<built-in method builtins.id> (cumtime)": 0.01,
+            "<built-in method builtins.isinstance>": 0.03,
+            "<built-in method builtins.isinstance> (cumtime)": 0.04,
+            "<built-in method builtins.len>": 0.0,
+            "<built-in method builtins.len> (cumtime)": 0.0,
+            "<built-in method builtins.setattr>": 0.0,
+            "<built-in method builtins.setattr> (cumtime)": 0.0,
+            "<built-in method builtins.vars>": 0.01,
+            "<built-in method builtins.vars> (cumtime)": 0.01,
+            "<method 'add' of 'set' objects>": 0.01,
+            "<method 'add' of 'set' objects> (cumtime)": 0.01,
+            "<method 'append' of 'list' objects>": 0.0,
+            "<method 'append' of 'list' objects> (cumtime)": 0.0,
+            "<method 'items' of 'dict' objects>": 0.0,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.0,
+            "<method 'items' of 'mappingproxy' objects>": 0.0,
+            "<method 'items' of 'mappingproxy' objects> (cumtime)": 0.0,
+            "Wall Clock Time": 92.91945,
+            "__init__": 0.0,
+            "__init__ (cumtime)": 0.0,
+            "get": 0.0,
+            "get (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:<genexpr>": 0.0,
+            "isaaclab.app.sim_launcher:<genexpr> (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg": 0.0,
+            "isaaclab.app.sim_launcher:_get_arg (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode": 0.0,
+            "isaaclab.app.sim_launcher:_get_livestream_mode (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_types": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_types (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_is_kit_camera": 0.01,
+            "isaaclab.app.sim_launcher:_is_kit_camera (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device": 0.0,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:launch_simulation": 0.02,
+            "isaaclab.app.sim_launcher:launch_simulation (cumtime)": 0.26,
+            "isaaclab.app.sim_launcher:scan": 0.01,
+            "isaaclab.app.sim_launcher:scan (cumtime)": 0.22,
+            "isaaclab.app.sim_launcher:visit": 0.11,
+            "isaaclab.app.sim_launcher:visit (cumtime)": 0.19,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.09291945
+        },
+        "env_creation": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 183.86,
+            "<built-in method builtins.getattr> (cumtime)": 450.9,
+            "<built-in method builtins.hasattr>": 64.39,
+            "<built-in method builtins.hasattr> (cumtime)": 6082.11,
+            "<built-in method builtins.isinstance>": 1040.21,
+            "<built-in method builtins.isinstance> (cumtime)": 1341.11,
+            "<built-in method builtins.iter>": 45.56,
+            "<built-in method builtins.iter> (cumtime)": 99.62,
+            "<built-in method builtins.len>": 92.14,
+            "<built-in method builtins.len> (cumtime)": 92.51,
+            "<built-in method builtins.next>": 97.84,
+            "<built-in method builtins.next> (cumtime)": 101.19,
+            "<built-in method torch.nonzero>": 93.77,
+            "<built-in method torch.nonzero> (cumtime)": 93.77,
+            "<method 'append' of 'list' objects>": 168.39,
+            "<method 'append' of 'list' objects> (cumtime)": 168.39,
+            "<method 'extend' of 'list' objects>": 88.45,
+            "<method 'extend' of 'list' objects> (cumtime)": 208.58,
+            "<method 'get' of 'dict' objects>": 82.73,
+            "<method 'get' of 'dict' objects> (cumtime)": 82.73,
+            "<method 'join' of 'str' objects>": 45.55,
+            "<method 'join' of 'str' objects> (cumtime)": 159.23,
+            "<method 'match' of 're.Pattern' objects>": 141.74,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 141.74,
+            "<method 'startswith' of 'str' objects>": 58.65,
+            "<method 'startswith' of 'str' objects> (cumtime)": 58.65,
+            "<method 'tolist' of 'torch._C.TensorBase' objects>": 48.49,
+            "<method 'tolist' of 'torch._C.TensorBase' objects> (cumtime)": 48.49,
+            "Scene Creation Time": 2571690.110775002,
+            "Simulation Start Time": 63654.98976298841,
+            "Wall Clock Time": 2641829.599247,
+            "_src.sim.builder:add_builder": 293.82,
+            "_src.sim.builder:add_builder (cumtime)": 594.93,
+            "_src.sim.builder:finalize": 57.9,
+            "_src.sim.builder:finalize (cumtime)": 1196.8,
+            "isaaclab.cloner.replicate_session:replicate": 71.23,
+            "isaaclab.cloner.replicate_session:replicate (cumtime)": 4100.3,
+            "isaaclab.cloner.usd:_apply_queue": 2187.1,
+            "isaaclab.cloner.usd:_apply_queue (cumtime)": 2188.67,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key": 87.42,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key (cumtime)": 87.42,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors": 97.69,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors (cumtime)": 312.02,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim": 37.92,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim (cumtime)": 37.92,
+            "isaaclab.sim.utils.prims:wrapper": 2564184.52,
+            "isaaclab.sim.utils.prims:wrapper (cumtime)": 2564865.19,
+            "isaaclab.utils.assets:_find_asset_dependencies": 38.7,
+            "isaaclab.utils.assets:_find_asset_dependencies (cumtime)": 38.74,
+            "isaaclab_newton.cloner.replicate:_build_newton_builder_from_mapping": 57.04,
+            "isaaclab_newton.cloner.replicate:_build_newton_builder_from_mapping (cumtime)": 3900.93,
+            "isaaclab_newton.cloner.replicate:_rename_builder_labels": 70.06,
+            "isaaclab_newton.cloner.replicate:_rename_builder_labels (cumtime)": 127.75,
+            "lib.python3.12.ast:parse": 1152.77,
+            "lib.python3.12.ast:parse (cumtime)": 1383.74,
+            "lib.python3.12.inspect:bind": 53.6,
+            "lib.python3.12.inspect:bind (cumtime)": 903.03,
+            "omni.client.__init__:copy": 107.93,
+            "omni.client.__init__:copy (cumtime)": 918.82,
+            "omni.client.__init__:stat": 649.13,
+            "omni.client.__init__:stat (cumtime)": 771.21,
+            "warp._src.types:__init__": 47.33,
+            "warp._src.types:__init__ (cumtime)": 1038.85
+          },
+          "scene_creation_s": 2571.690110775002,
+          "simulation_start_s": 63.65498976298841,
+          "wall_s": 2641.8295992470003
+        },
+        "first_step": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 0.02,
+            "<built-in method builtins.getattr> (cumtime)": 0.02,
+            "<built-in method builtins.hasattr>": 0.03,
+            "<built-in method builtins.hasattr> (cumtime)": 0.03,
+            "<built-in method builtins.isinstance>": 0.33,
+            "<built-in method builtins.isinstance> (cumtime)": 0.33,
+            "<built-in method builtins.len>": 0.09,
+            "<built-in method builtins.len> (cumtime)": 0.1,
+            "<built-in method torch.abs>": 0.03,
+            "<built-in method torch.abs> (cumtime)": 0.03,
+            "<built-in method torch.any>": 0.04,
+            "<built-in method torch.any> (cumtime)": 0.04,
+            "<built-in method torch.cat>": 0.04,
+            "<built-in method torch.cat> (cumtime)": 0.04,
+            "<built-in method torch.clip>": 0.03,
+            "<built-in method torch.clip> (cumtime)": 0.03,
+            "<method 'clone' of 'torch._C.TensorBase' objects>": 0.02,
+            "<method 'clone' of 'torch._C.TensorBase' objects> (cumtime)": 0.02,
+            "<method 'get' of 'dict' objects>": 0.11,
+            "<method 'get' of 'dict' objects> (cumtime)": 0.11,
+            "<method 'int' of 'torch._C.TensorBase' objects>": 0.02,
+            "<method 'int' of 'torch._C.TensorBase' objects> (cumtime)": 0.02,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects>": 0.09,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects> (cumtime)": 0.09,
+            "Wall Clock Time": 41.727491,
+            "isaaclab.actuators.actuator_base:_clip_effort": 0.03,
+            "isaaclab.actuators.actuator_base:_clip_effort (cumtime)": 0.05,
+            "isaaclab.actuators.actuator_pd:compute": 0.13,
+            "isaaclab.actuators.actuator_pd:compute (cumtime)": 0.18,
+            "isaaclab.envs.direct_rl_env:step": 0.12,
+            "isaaclab.envs.direct_rl_env:step (cumtime)": 41.54,
+            "isaaclab.utils.string:__getattribute__": 0.02,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model": 0.5,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model (cumtime)": 1.58,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index": 0.01,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index (cumtime)": 0.41,
+            "isaaclab_newton.assets.articulation.articulation:write_data_to_sim": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:write_data_to_sim (cumtime)": 1.78,
+            "isaaclab_newton.physics.newton_manager:step": 0.04,
+            "isaaclab_newton.physics.newton_manager:step (cumtime)": 6.34,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_dones": 0.26,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_dones (cumtime)": 0.33,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_observations": 0.04,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_observations (cumtime)": 0.09,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_rewards": 31.92,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_rewards (cumtime)": 31.92,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_pre_physics_step": 0.03,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_pre_physics_step (cumtime)": 0.05,
+            "solvers.mujoco.solver_mujoco:notify_model_changed": 0.02,
+            "solvers.mujoco.solver_mujoco:notify_model_changed (cumtime)": 5.61,
+            "warp._src.context:capture_launch": 0.64,
+            "warp._src.context:capture_launch (cumtime)": 0.64,
+            "warp._src.context:launch": 1.4,
+            "warp._src.context:launch (cumtime)": 5.81,
+            "warp._src.types:__del__": 0.03,
+            "warp._src.types:__del__ (cumtime)": 0.1,
+            "warp._src.types:__init__": 0.04,
+            "warp._src.types:__init__ (cumtime)": 0.37,
+            "warp._src.types:zero_": 0.03,
+            "warp._src.types:zero_ (cumtime)": 0.18
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.041727491
+        },
+        "python_imports": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 1.68,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 2.66,
+            "<built-in method _warnings.warn>": 0.33,
+            "<built-in method _warnings.warn> (cumtime)": 0.33,
+            "<built-in method builtins.__build_class__>": 4.7,
+            "<built-in method builtins.__build_class__> (cumtime)": 45.54,
+            "<built-in method builtins.getattr>": 2.54,
+            "<built-in method builtins.getattr> (cumtime)": 3.19,
+            "<built-in method builtins.hasattr>": 1.0,
+            "<built-in method builtins.hasattr> (cumtime)": 22.55,
+            "<built-in method builtins.id>": 0.44,
+            "<built-in method builtins.id> (cumtime)": 0.44,
+            "<built-in method builtins.isinstance>": 5.48,
+            "<built-in method builtins.isinstance> (cumtime)": 6.56,
+            "<built-in method builtins.len>": 2.29,
+            "<built-in method builtins.len> (cumtime)": 2.35,
+            "<built-in method builtins.setattr>": 0.61,
+            "<built-in method builtins.setattr> (cumtime)": 0.71,
+            "<method '__exit__' of '_io._IOBase' objects>": 0.34,
+            "<method '__exit__' of '_io._IOBase' objects> (cumtime)": 0.34,
+            "<method 'append' of 'list' objects>": 1.44,
+            "<method 'append' of 'list' objects> (cumtime)": 1.44,
+            "<method 'get' of 'dict' objects>": 1.84,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.84,
+            "<method 'get' of 'mappingproxy' objects>": 0.25,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.25,
+            "<method 'join' of 'str' objects>": 0.98,
+            "<method 'join' of 'str' objects> (cumtime)": 1.17,
+            "<method 'match' of 're.Pattern' objects>": 0.6,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.6,
+            "<method 'startswith' of 'str' objects>": 1.39,
+            "<method 'startswith' of 'str' objects> (cumtime)": 1.39,
+            "Wall Clock Time": 239.056736,
+            "_find_and_load": 0.71,
+            "_find_and_load (cumtime)": 23.04,
+            "_handle_fromlist": 0.54,
+            "_handle_fromlist (cumtime)": 8.4,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.36,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 1.05,
+            "isaaclab.utils.configclass:_custom_post_init": 0.74,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 3.74,
+            "isaaclab.utils.configclass:_field_module_dir": 0.28,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 0.43,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.96,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 2.64,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.47,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 1.48,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 0.53,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 1.02,
+            "isaaclab.utils.configclass:configclass": 0.37,
+            "isaaclab.utils.configclass:configclass (cumtime)": 22.09,
+            "lib.python3.12.copy:deepcopy": 3.62,
+            "lib.python3.12.copy:deepcopy (cumtime)": 9.64,
+            "lib.python3.12.dataclasses:field": 0.24,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.33,
+            "lib.python3.12.enum:__setitem__": 0.42,
+            "lib.python3.12.enum:__setitem__ (cumtime)": 0.89,
+            "lib.python3.12.typing:inner": 0.63,
+            "lib.python3.12.typing:inner (cumtime)": 7.94,
+            "parent": 0.3,
+            "parent (cumtime)": 0.49
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.239056736
+        },
+        "task_config": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 0.05,
+            "<built-in method builtins.__build_class__> (cumtime)": 7.08,
+            "<built-in method builtins.all>": 0.09,
+            "<built-in method builtins.all> (cumtime)": 0.15,
+            "<built-in method builtins.callable>": 0.08,
+            "<built-in method builtins.callable> (cumtime)": 0.08,
+            "<built-in method builtins.dir>": 0.4,
+            "<built-in method builtins.dir> (cumtime)": 0.4,
+            "<built-in method builtins.getattr>": 0.84,
+            "<built-in method builtins.getattr> (cumtime)": 0.94,
+            "<built-in method builtins.hasattr>": 0.31,
+            "<built-in method builtins.hasattr> (cumtime)": 3.23,
+            "<built-in method builtins.id>": 0.54,
+            "<built-in method builtins.id> (cumtime)": 0.54,
+            "<built-in method builtins.isinstance>": 1.31,
+            "<built-in method builtins.isinstance> (cumtime)": 2.75,
+            "<built-in method builtins.setattr>": 0.3,
+            "<built-in method builtins.setattr> (cumtime)": 0.3,
+            "<method 'get' of 'dict' objects>": 1.23,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.23,
+            "<method 'get' of 'mappingproxy' objects>": 0.13,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.13,
+            "<method 'items' of 'dict' objects>": 0.06,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.06,
+            "<method 'match' of 're.Pattern' objects>": 0.27,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.27,
+            "<method 'rsplit' of 'str' objects>": 0.33,
+            "<method 'rsplit' of 'str' objects> (cumtime)": 0.33,
+            "<method 'startswith' of 'str' objects>": 0.45,
+            "<method 'startswith' of 'str' objects> (cumtime)": 0.45,
+            "<method 'update' of 'dict' objects>": 0.05,
+            "<method 'update' of 'dict' objects> (cumtime)": 0.05,
+            "Wall Clock Time": 26.287548,
+            "isaaclab.utils.configclass:<genexpr>": 0.07,
+            "isaaclab.utils.configclass:<genexpr> (cumtime)": 0.49,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.06,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 0.21,
+            "isaaclab.utils.configclass:_custom_post_init": 1.27,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 15.54,
+            "isaaclab.utils.configclass:_field_module_dir": 1.32,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 2.1,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.22,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 0.49,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.09,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 0.21,
+            "isaaclab.utils.configclass:_wrap": 0.09,
+            "isaaclab.utils.configclass:_wrap (cumtime)": 1.98,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 3.26,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 6.7,
+            "isaaclab.utils.configclass:configclass": 0.05,
+            "isaaclab.utils.configclass:configclass (cumtime)": 4.85,
+            "isaaclab.utils.string:__getattribute__": 0.06,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.06,
+            "isaaclab_tasks.utils.hydra:<genexpr>": 0.17,
+            "isaaclab_tasks.utils.hydra:<genexpr> (cumtime)": 0.32,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg": 0.07,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg (cumtime)": 1.21,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets": 0.18,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets (cumtime)": 2.37,
+            "lib.python3.12.copy:deepcopy": 3.87,
+            "lib.python3.12.copy:deepcopy (cumtime)": 7.86
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.026287548
+        }
+      },
+      "raw_report_file": "data/isaaclab_pr3187_raw/main_Isaac-Cartpole-Direct_4096.json",
+      "revision": "main",
+      "revision_label": "Newton main",
+      "source_file": "/tmp/isaaclab_startup_newton_bench/smoke_main_cartpole/benchmark_startup_Isaac-Cartpole-Direct_2026-06-16_00-59-10.json",
+      "task": "Isaac-Cartpole-Direct",
+      "task_short": "Cartpole",
+      "timestamp": "2026-06-16T00:59:10.449396",
+      "top_functions": {
+        "app_launch": [
+          {
+            "cum_ms": 0.19,
+            "name": "isaaclab.app.sim_launcher:visit",
+            "own_ms": 0.11
+          },
+          {
+            "cum_ms": 0.04,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.03
+          },
+          {
+            "cum_ms": 0.26,
+            "name": "isaaclab.app.sim_launcher:launch_simulation",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.22,
+            "name": "isaaclab.app.sim_launcher:scan",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.vars>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_ovrtx_renderer",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_kit_camera",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<method 'add' of 'set' objects>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.utils.string:__getattribute__",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_get_arg",
+            "own_ms": 0.0
+          },
+          {
+            "cum_ms": 0.0,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.0
+          }
+        ],
+        "env_creation": [
+          {
+            "cum_ms": 2564865.19,
+            "name": "isaaclab.sim.utils.prims:wrapper",
+            "own_ms": 2564184.52
+          },
+          {
+            "cum_ms": 2188.67,
+            "name": "isaaclab.cloner.usd:_apply_queue",
+            "own_ms": 2187.1
+          },
+          {
+            "cum_ms": 1383.74,
+            "name": "lib.python3.12.ast:parse",
+            "own_ms": 1152.77
+          },
+          {
+            "cum_ms": 1341.11,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1040.21
+          },
+          {
+            "cum_ms": 771.21,
+            "name": "omni.client.__init__:stat",
+            "own_ms": 649.13
+          },
+          {
+            "cum_ms": 594.93,
+            "name": "_src.sim.builder:add_builder",
+            "own_ms": 293.82
+          },
+          {
+            "cum_ms": 450.9,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 183.86
+          },
+          {
+            "cum_ms": 168.39,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 168.39
+          },
+          {
+            "cum_ms": 141.74,
+            "name": "<method 'match' of 're.Pattern' objects>",
+            "own_ms": 141.74
+          },
+          {
+            "cum_ms": 918.82,
+            "name": "omni.client.__init__:copy",
+            "own_ms": 107.93
+          },
+          {
+            "cum_ms": 101.19,
+            "name": "<built-in method builtins.next>",
+            "own_ms": 97.84
+          },
+          {
+            "cum_ms": 312.02,
+            "name": "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors",
+            "own_ms": 97.69
+          }
+        ],
+        "first_step": [
+          {
+            "cum_ms": 31.92,
+            "name": "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_rewards",
+            "own_ms": 31.92
+          },
+          {
+            "cum_ms": 5.81,
+            "name": "warp._src.context:launch",
+            "own_ms": 1.4
+          },
+          {
+            "cum_ms": 0.64,
+            "name": "warp._src.context:capture_launch",
+            "own_ms": 0.64
+          },
+          {
+            "cum_ms": 1.58,
+            "name": "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model",
+            "own_ms": 0.5
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.33
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_dones",
+            "own_ms": 0.26
+          },
+          {
+            "cum_ms": 0.18,
+            "name": "isaaclab.actuators.actuator_pd:compute",
+            "own_ms": 0.13
+          },
+          {
+            "cum_ms": 41.54,
+            "name": "isaaclab.envs.direct_rl_env:step",
+            "own_ms": 0.12
+          },
+          {
+            "cum_ms": 0.11,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 0.11
+          },
+          {
+            "cum_ms": 0.09,
+            "name": "<method 'nonzero' of 'torch._C.TensorBase' objects>",
+            "own_ms": 0.09
+          },
+          {
+            "cum_ms": 0.1,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 0.09
+          },
+          {
+            "cum_ms": 0.04,
+            "name": "<built-in method torch.cat>",
+            "own_ms": 0.04
+          }
+        ],
+        "python_imports": [
+          {
+            "cum_ms": 6.56,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 5.48
+          },
+          {
+            "cum_ms": 45.54,
+            "name": "<built-in method builtins.__build_class__>",
+            "own_ms": 4.7
+          },
+          {
+            "cum_ms": 9.64,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.62
+          },
+          {
+            "cum_ms": 3.19,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 2.54
+          },
+          {
+            "cum_ms": 2.35,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 2.29
+          },
+          {
+            "cum_ms": 1.84,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.84
+          },
+          {
+            "cum_ms": 2.66,
+            "name": "<built-in method __new__ of type object at 0x14424b0>",
+            "own_ms": 1.68
+          },
+          {
+            "cum_ms": 1.44,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 1.44
+          },
+          {
+            "cum_ms": 1.39,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 1.39
+          },
+          {
+            "cum_ms": 22.55,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 1.0
+          },
+          {
+            "cum_ms": 1.17,
+            "name": "<method 'join' of 'str' objects>",
+            "own_ms": 0.98
+          },
+          {
+            "cum_ms": 2.64,
+            "name": "isaaclab.utils.configclass:_process_mutable_types",
+            "own_ms": 0.96
+          }
+        ],
+        "task_config": [
+          {
+            "cum_ms": 7.86,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.87
+          },
+          {
+            "cum_ms": 6.7,
+            "name": "isaaclab.utils.configclass:_wrap_resolvable_strings",
+            "own_ms": 3.26
+          },
+          {
+            "cum_ms": 2.1,
+            "name": "isaaclab.utils.configclass:_field_module_dir",
+            "own_ms": 1.32
+          },
+          {
+            "cum_ms": 2.75,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.31
+          },
+          {
+            "cum_ms": 15.54,
+            "name": "isaaclab.utils.configclass:_custom_post_init",
+            "own_ms": 1.27
+          },
+          {
+            "cum_ms": 1.23,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.23
+          },
+          {
+            "cum_ms": 0.94,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.84
+          },
+          {
+            "cum_ms": 0.54,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.54
+          },
+          {
+            "cum_ms": 0.45,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 0.45
+          },
+          {
+            "cum_ms": 0.4,
+            "name": "<built-in method builtins.dir>",
+            "own_ms": 0.4
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "<method 'rsplit' of 'str' objects>",
+            "own_ms": 0.33
+          },
+          {
+            "cum_ms": 3.23,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 0.31
+          }
+        ]
+      },
+      "total_reported_s": 2642.2295904720004,
+      "versions": {
+        "cuda_bindings_version": "13.3.1",
+        "dev": {
+          "branch": "HEAD",
+          "commit_date": "2026-06-11 08:44:20 -0700",
+          "commit_hash": "a59603d2eaf2f1ac62de595e5d1cc219d2d25cbe",
+          "commit_hash_short": "a59603d2",
+          "dirty": true
+        },
+        "gymnasium_version": "1.3.0",
+        "isaaclab_newton_version": "0.15.6",
+        "isaaclab_ov_version": "0.4.4",
+        "isaaclab_physx_version": "1.1.5",
+        "isaaclab_release_version": "3.0.0",
+        "isaaclab_rl_version": "0.6.1",
+        "isaaclab_tasks_version": "6.0.0",
+        "isaaclab_version": "6.7.0",
+        "mujoco_version": "3.8.0",
+        "mujoco_warp_version": "3.8.0.3",
+        "newton_version": "1.4.0.dev0",
+        "numpy_version": "2.5.0rc1",
+        "phase": "version_info",
+        "rsl_rl_version": "5.0.1",
+        "torch_version": "2.11.0+cu130",
+        "usd_core_version": "25.11",
+        "warp_version": "1.15.0.dev20260615",
+        "workflow_name": "benchmark_startup"
+      }
+    },
+    {
+      "hardware": {
+        "cpu_name": "AMD EPYC 9B45",
+        "cuda_version": "13.0",
+        "gpu_current_device": 0,
+        "gpu_device_count": 1,
+        "gpu_devices": {
+          "0": {
+            "compute_capability": "12.0",
+            "multi_processor_count": 46,
+            "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+            "total_memory_gb": 23.62
+          }
+        },
+        "phase": "hardware_info",
+        "physical_cores": 192,
+        "total_ram_gb": 708.2,
+        "workflow_name": "benchmark_startup"
+      },
+      "newton_commit": "172dbda45f6a",
+      "num_envs": 4096,
+      "phases": {
+        "app_launch": {
+          "measurements_ms": {
+            "<built-in method builtins.any>": 0.0,
+            "<built-in method builtins.any> (cumtime)": 0.0,
+            "<built-in method builtins.getattr>": 0.01,
+            "<built-in method builtins.getattr> (cumtime)": 0.01,
+            "<built-in method builtins.id>": 0.01,
+            "<built-in method builtins.id> (cumtime)": 0.01,
+            "<built-in method builtins.isinstance>": 0.04,
+            "<built-in method builtins.isinstance> (cumtime)": 0.05,
+            "<built-in method builtins.len>": 0.0,
+            "<built-in method builtins.len> (cumtime)": 0.0,
+            "<built-in method builtins.setattr>": 0.0,
+            "<built-in method builtins.setattr> (cumtime)": 0.0,
+            "<built-in method builtins.vars>": 0.02,
+            "<built-in method builtins.vars> (cumtime)": 0.02,
+            "<method 'add' of 'set' objects>": 0.01,
+            "<method 'add' of 'set' objects> (cumtime)": 0.01,
+            "<method 'append' of 'list' objects>": 0.0,
+            "<method 'append' of 'list' objects> (cumtime)": 0.0,
+            "<method 'items' of 'dict' objects>": 0.0,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.0,
+            "<method 'items' of 'mappingproxy' objects>": 0.0,
+            "<method 'items' of 'mappingproxy' objects> (cumtime)": 0.0,
+            "Wall Clock Time": 95.313609,
+            "__init__": 0.0,
+            "__init__ (cumtime)": 0.0,
+            "get": 0.0,
+            "get (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:<genexpr>": 0.0,
+            "isaaclab.app.sim_launcher:<genexpr> (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer (cumtime)": 0.02,
+            "isaaclab.app.sim_launcher:_get_arg": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode": 0.0,
+            "isaaclab.app.sim_launcher:_get_livestream_mode (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_types": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_types (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_is_kit_camera": 0.01,
+            "isaaclab.app.sim_launcher:_is_kit_camera (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device": 0.0,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:launch_simulation": 0.02,
+            "isaaclab.app.sim_launcher:launch_simulation (cumtime)": 0.3,
+            "isaaclab.app.sim_launcher:scan": 0.02,
+            "isaaclab.app.sim_launcher:scan (cumtime)": 0.25,
+            "isaaclab.app.sim_launcher:visit": 0.12,
+            "isaaclab.app.sim_launcher:visit (cumtime)": 0.22,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.095313609
+        },
+        "env_creation": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 145.38,
+            "<built-in method builtins.getattr> (cumtime)": 363.64,
+            "<built-in method builtins.hasattr>": 31.75,
+            "<built-in method builtins.hasattr> (cumtime)": 887.25,
+            "<built-in method builtins.isinstance>": 244.84,
+            "<built-in method builtins.isinstance> (cumtime)": 260.22,
+            "<built-in method builtins.len>": 51.48,
+            "<built-in method builtins.len> (cumtime)": 51.86,
+            "<built-in method torch.allclose>": 22.92,
+            "<built-in method torch.allclose> (cumtime)": 22.92,
+            "<built-in method torch.nonzero>": 93.96,
+            "<built-in method torch.nonzero> (cumtime)": 93.96,
+            "<method 'append' of 'list' objects>": 76.08,
+            "<method 'append' of 'list' objects> (cumtime)": 76.08,
+            "<method 'extend' of 'list' objects>": 58.57,
+            "<method 'extend' of 'list' objects> (cumtime)": 59.35,
+            "<method 'get' of 'dict' objects>": 42.19,
+            "<method 'get' of 'dict' objects> (cumtime)": 42.19,
+            "<method 'match' of 're.Pattern' objects>": 30.01,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 30.01,
+            "<method 'startswith' of 'str' objects>": 35.63,
+            "<method 'startswith' of 'str' objects> (cumtime)": 35.63,
+            "<method 'tolist' of 'torch._C.TensorBase' objects>": 47.94,
+            "<method 'tolist' of 'torch._C.TensorBase' objects> (cumtime)": 47.94,
+            "Scene Creation Time": 1760863.2707349607,
+            "Simulation Start Time": 2838.837382965721,
+            "Wall Clock Time": 1766781.848805,
+            "_src.sim.builder:add_builder": 287.04,
+            "_src.sim.builder:add_builder (cumtime)": 594.83,
+            "_src.sim.builder:finalize": 62.47,
+            "_src.sim.builder:finalize (cumtime)": 273.04,
+            "_src.utils.selection:__init__": 24.33,
+            "_src.utils.selection:__init__ (cumtime)": 430.43,
+            "isaaclab.cloner.usd:_apply_queue": 17783.91,
+            "isaaclab.cloner.usd:_apply_queue (cumtime)": 17785.52,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key": 88.34,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key (cumtime)": 88.34,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors": 99.15,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors (cumtime)": 195.09,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim": 59.65,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim (cumtime)": 59.65,
+            "isaaclab.sim.utils.prims:wrapper": 1738567.07,
+            "isaaclab.sim.utils.prims:wrapper (cumtime)": 1739059.23,
+            "isaaclab.sim.utils.queries:find_matching_prims": 25.69,
+            "isaaclab.sim.utils.queries:find_matching_prims (cumtime)": 37.3,
+            "isaaclab_newton.cloner.replicate:_build_newton_builder_from_mapping": 56.97,
+            "isaaclab_newton.cloner.replicate:_build_newton_builder_from_mapping (cumtime)": 3464.9,
+            "isaaclab_newton.cloner.replicate:_rename_builder_labels": 69.43,
+            "isaaclab_newton.cloner.replicate:_rename_builder_labels (cumtime)": 127.7,
+            "isaaclab_newton.cloner.replicate:_rename_pair": 35.57,
+            "isaaclab_newton.cloner.replicate:_rename_pair (cumtime)": 57.13,
+            "lib.python3.12.ast:parse": 1293.79,
+            "lib.python3.12.ast:parse (cumtime)": 1528.36,
+            "omni.client.__init__:copy": 85.4,
+            "omni.client.__init__:copy (cumtime)": 685.5,
+            "omni.client.__init__:stat": 579.55,
+            "omni.client.__init__:stat (cumtime)": 589.72,
+            "torch._tensor:__iter__": 26.7,
+            "torch._tensor:__iter__ (cumtime)": 104.99,
+            "warp._src.types:__init__": 22.85,
+            "warp._src.types:__init__ (cumtime)": 28.12
+          },
+          "scene_creation_s": 1760.8632707349607,
+          "simulation_start_s": 2.838837382965721,
+          "wall_s": 1766.781848805
+        },
+        "first_step": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 0.02,
+            "<built-in method builtins.getattr> (cumtime)": 0.02,
+            "<built-in method builtins.hasattr>": 0.03,
+            "<built-in method builtins.hasattr> (cumtime)": 0.03,
+            "<built-in method builtins.isinstance>": 0.33,
+            "<built-in method builtins.isinstance> (cumtime)": 0.33,
+            "<built-in method builtins.len>": 0.09,
+            "<built-in method builtins.len> (cumtime)": 0.11,
+            "<built-in method torch.abs>": 0.03,
+            "<built-in method torch.abs> (cumtime)": 0.03,
+            "<built-in method torch.any>": 0.04,
+            "<built-in method torch.any> (cumtime)": 0.04,
+            "<built-in method torch.cat>": 0.03,
+            "<built-in method torch.cat> (cumtime)": 0.03,
+            "<built-in method torch.clip>": 0.03,
+            "<built-in method torch.clip> (cumtime)": 0.03,
+            "<method 'clone' of 'torch._C.TensorBase' objects>": 0.02,
+            "<method 'clone' of 'torch._C.TensorBase' objects> (cumtime)": 0.02,
+            "<method 'get' of 'dict' objects>": 0.11,
+            "<method 'get' of 'dict' objects> (cumtime)": 0.11,
+            "<method 'int' of 'torch._C.TensorBase' objects>": 0.02,
+            "<method 'int' of 'torch._C.TensorBase' objects> (cumtime)": 0.02,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects>": 0.1,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects> (cumtime)": 0.1,
+            "Wall Clock Time": 55.901256,
+            "isaaclab.actuators.actuator_base:_clip_effort": 0.03,
+            "isaaclab.actuators.actuator_base:_clip_effort (cumtime)": 0.06,
+            "isaaclab.actuators.actuator_pd:compute": 0.14,
+            "isaaclab.actuators.actuator_pd:compute (cumtime)": 0.2,
+            "isaaclab.envs.direct_rl_env:step": 0.14,
+            "isaaclab.envs.direct_rl_env:step (cumtime)": 55.71,
+            "isaaclab.utils.string:__getattribute__": 0.02,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model": 0.47,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model (cumtime)": 1.63,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index": 0.01,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index (cumtime)": 0.44,
+            "isaaclab_newton.assets.articulation.articulation:write_data_to_sim": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:write_data_to_sim (cumtime)": 1.84,
+            "isaaclab_newton.physics.newton_manager:step": 0.04,
+            "isaaclab_newton.physics.newton_manager:step (cumtime)": 6.13,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_dones": 0.28,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_dones (cumtime)": 0.36,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_observations": 0.04,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_observations (cumtime)": 0.07,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_rewards": 46.19,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_rewards (cumtime)": 46.2,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_pre_physics_step": 0.03,
+            "isaaclab_tasks.core.cartpole.cartpole_direct_env:_pre_physics_step (cumtime)": 0.05,
+            "solvers.mujoco.solver_mujoco:notify_model_changed": 0.02,
+            "solvers.mujoco.solver_mujoco:notify_model_changed (cumtime)": 5.38,
+            "warp._src.context:capture_launch": 0.67,
+            "warp._src.context:capture_launch (cumtime)": 0.67,
+            "warp._src.context:launch": 1.26,
+            "warp._src.context:launch (cumtime)": 5.68,
+            "warp._src.types:__del__": 0.02,
+            "warp._src.types:__del__ (cumtime)": 0.1,
+            "warp._src.types:__init__": 0.04,
+            "warp._src.types:__init__ (cumtime)": 0.37,
+            "warp._src.types:zero_": 0.03,
+            "warp._src.types:zero_ (cumtime)": 0.17
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.055901255999999996
+        },
+        "python_imports": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 1.71,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 2.66,
+            "<built-in method _warnings.warn>": 0.32,
+            "<built-in method _warnings.warn> (cumtime)": 0.32,
+            "<built-in method builtins.__build_class__>": 4.78,
+            "<built-in method builtins.__build_class__> (cumtime)": 45.89,
+            "<built-in method builtins.getattr>": 2.62,
+            "<built-in method builtins.getattr> (cumtime)": 3.28,
+            "<built-in method builtins.hasattr>": 0.99,
+            "<built-in method builtins.hasattr> (cumtime)": 22.93,
+            "<built-in method builtins.id>": 0.44,
+            "<built-in method builtins.id> (cumtime)": 0.44,
+            "<built-in method builtins.isinstance>": 5.51,
+            "<built-in method builtins.isinstance> (cumtime)": 6.61,
+            "<built-in method builtins.len>": 2.26,
+            "<built-in method builtins.len> (cumtime)": 2.33,
+            "<built-in method builtins.setattr>": 0.63,
+            "<built-in method builtins.setattr> (cumtime)": 0.72,
+            "<method '__exit__' of '_io._IOBase' objects>": 0.33,
+            "<method '__exit__' of '_io._IOBase' objects> (cumtime)": 0.33,
+            "<method 'append' of 'list' objects>": 1.44,
+            "<method 'append' of 'list' objects> (cumtime)": 1.44,
+            "<method 'get' of 'dict' objects>": 1.86,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.86,
+            "<method 'get' of 'mappingproxy' objects>": 0.24,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.24,
+            "<method 'join' of 'str' objects>": 1.01,
+            "<method 'join' of 'str' objects> (cumtime)": 1.2,
+            "<method 'match' of 're.Pattern' objects>": 0.59,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.59,
+            "<method 'startswith' of 'str' objects>": 1.39,
+            "<method 'startswith' of 'str' objects> (cumtime)": 1.39,
+            "Wall Clock Time": 241.071705,
+            "_find_and_load": 0.75,
+            "_find_and_load (cumtime)": 23.4,
+            "_handle_fromlist": 0.55,
+            "_handle_fromlist (cumtime)": 8.53,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.35,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 1.06,
+            "isaaclab.utils.configclass:_custom_post_init": 0.76,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 3.73,
+            "isaaclab.utils.configclass:_field_module_dir": 0.26,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 0.41,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.96,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 2.66,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.47,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 1.47,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 0.54,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 1.04,
+            "isaaclab.utils.configclass:configclass": 0.38,
+            "isaaclab.utils.configclass:configclass (cumtime)": 22.5,
+            "lib.python3.12.copy:deepcopy": 3.64,
+            "lib.python3.12.copy:deepcopy (cumtime)": 9.71,
+            "lib.python3.12.dataclasses:field": 0.25,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.34,
+            "lib.python3.12.enum:__setitem__": 0.45,
+            "lib.python3.12.enum:__setitem__ (cumtime)": 0.92,
+            "lib.python3.12.typing:inner": 0.67,
+            "lib.python3.12.typing:inner (cumtime)": 8.09,
+            "parent": 0.31,
+            "parent (cumtime)": 0.49
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.241071705
+        },
+        "task_config": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 0.06,
+            "<built-in method builtins.__build_class__> (cumtime)": 7.13,
+            "<built-in method builtins.all>": 0.09,
+            "<built-in method builtins.all> (cumtime)": 0.15,
+            "<built-in method builtins.callable>": 0.08,
+            "<built-in method builtins.callable> (cumtime)": 0.08,
+            "<built-in method builtins.dir>": 0.4,
+            "<built-in method builtins.dir> (cumtime)": 0.4,
+            "<built-in method builtins.getattr>": 0.85,
+            "<built-in method builtins.getattr> (cumtime)": 0.93,
+            "<built-in method builtins.hasattr>": 0.31,
+            "<built-in method builtins.hasattr> (cumtime)": 3.27,
+            "<built-in method builtins.id>": 0.55,
+            "<built-in method builtins.id> (cumtime)": 0.55,
+            "<built-in method builtins.isinstance>": 1.32,
+            "<built-in method builtins.isinstance> (cumtime)": 2.73,
+            "<built-in method builtins.setattr>": 0.32,
+            "<built-in method builtins.setattr> (cumtime)": 0.32,
+            "<method 'get' of 'dict' objects>": 1.23,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.23,
+            "<method 'get' of 'mappingproxy' objects>": 0.13,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.13,
+            "<method 'items' of 'dict' objects>": 0.06,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.06,
+            "<method 'match' of 're.Pattern' objects>": 0.26,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.26,
+            "<method 'rsplit' of 'str' objects>": 0.33,
+            "<method 'rsplit' of 'str' objects> (cumtime)": 0.33,
+            "<method 'startswith' of 'str' objects>": 0.45,
+            "<method 'startswith' of 'str' objects> (cumtime)": 0.45,
+            "<method 'update' of 'dict' objects>": 0.06,
+            "<method 'update' of 'dict' objects> (cumtime)": 0.06,
+            "Wall Clock Time": 26.386369,
+            "isaaclab.utils.configclass:<genexpr>": 0.07,
+            "isaaclab.utils.configclass:<genexpr> (cumtime)": 0.5,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.06,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 0.22,
+            "isaaclab.utils.configclass:_custom_post_init": 1.31,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 15.67,
+            "isaaclab.utils.configclass:_field_module_dir": 1.33,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 2.12,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.21,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 0.49,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.09,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 0.21,
+            "isaaclab.utils.configclass:_wrap": 0.09,
+            "isaaclab.utils.configclass:_wrap (cumtime)": 1.97,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 3.29,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 6.75,
+            "isaaclab.utils.configclass:configclass": 0.05,
+            "isaaclab.utils.configclass:configclass (cumtime)": 4.86,
+            "isaaclab.utils.string:__getattribute__": 0.06,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.06,
+            "isaaclab_tasks.utils.hydra:<genexpr>": 0.17,
+            "isaaclab_tasks.utils.hydra:<genexpr> (cumtime)": 0.32,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg": 0.07,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg (cumtime)": 1.18,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets": 0.16,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets (cumtime)": 2.33,
+            "lib.python3.12.copy:deepcopy": 3.87,
+            "lib.python3.12.copy:deepcopy (cumtime)": 7.87
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.026386369
+        }
+      },
+      "raw_report_file": "data/isaaclab_pr3187_raw/pr3187_Isaac-Cartpole-Direct_4096.json",
+      "revision": "pr3187",
+      "revision_label": "PR 3187",
+      "source_file": "/tmp/isaaclab_startup_newton_bench/pr3187_cartpole/benchmark_startup_Isaac-Cartpole-Direct_2026-06-16_01-44-40.json",
+      "task": "Isaac-Cartpole-Direct",
+      "task_short": "Cartpole",
+      "timestamp": "2026-06-16T01:44:40.431466",
+      "top_functions": {
+        "app_launch": [
+          {
+            "cum_ms": 0.22,
+            "name": "isaaclab.app.sim_launcher:visit",
+            "own_ms": 0.12
+          },
+          {
+            "cum_ms": 0.05,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.04
+          },
+          {
+            "cum_ms": 0.02,
+            "name": "<built-in method builtins.vars>",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.25,
+            "name": "isaaclab.app.sim_launcher:scan",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.3,
+            "name": "isaaclab.app.sim_launcher:launch_simulation",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.utils.string:__getattribute__",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<method 'add' of 'set' objects>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_ovrtx_renderer",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_kit_camera",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_get_arg",
+            "own_ms": 0.01
+          }
+        ],
+        "env_creation": [
+          {
+            "cum_ms": 1739059.23,
+            "name": "isaaclab.sim.utils.prims:wrapper",
+            "own_ms": 1738567.07
+          },
+          {
+            "cum_ms": 17785.52,
+            "name": "isaaclab.cloner.usd:_apply_queue",
+            "own_ms": 17783.91
+          },
+          {
+            "cum_ms": 1528.36,
+            "name": "lib.python3.12.ast:parse",
+            "own_ms": 1293.79
+          },
+          {
+            "cum_ms": 589.72,
+            "name": "omni.client.__init__:stat",
+            "own_ms": 579.55
+          },
+          {
+            "cum_ms": 594.83,
+            "name": "_src.sim.builder:add_builder",
+            "own_ms": 287.04
+          },
+          {
+            "cum_ms": 260.22,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 244.84
+          },
+          {
+            "cum_ms": 363.64,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 145.38
+          },
+          {
+            "cum_ms": 195.09,
+            "name": "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors",
+            "own_ms": 99.15
+          },
+          {
+            "cum_ms": 93.96,
+            "name": "<built-in method torch.nonzero>",
+            "own_ms": 93.96
+          },
+          {
+            "cum_ms": 88.34,
+            "name": "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key",
+            "own_ms": 88.34
+          },
+          {
+            "cum_ms": 685.5,
+            "name": "omni.client.__init__:copy",
+            "own_ms": 85.4
+          },
+          {
+            "cum_ms": 76.08,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 76.08
+          }
+        ],
+        "first_step": [
+          {
+            "cum_ms": 46.2,
+            "name": "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_rewards",
+            "own_ms": 46.19
+          },
+          {
+            "cum_ms": 5.68,
+            "name": "warp._src.context:launch",
+            "own_ms": 1.26
+          },
+          {
+            "cum_ms": 0.67,
+            "name": "warp._src.context:capture_launch",
+            "own_ms": 0.67
+          },
+          {
+            "cum_ms": 1.63,
+            "name": "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model",
+            "own_ms": 0.47
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.33
+          },
+          {
+            "cum_ms": 0.36,
+            "name": "isaaclab_tasks.core.cartpole.cartpole_direct_env:_get_dones",
+            "own_ms": 0.28
+          },
+          {
+            "cum_ms": 0.2,
+            "name": "isaaclab.actuators.actuator_pd:compute",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 55.71,
+            "name": "isaaclab.envs.direct_rl_env:step",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.11,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 0.11
+          },
+          {
+            "cum_ms": 0.1,
+            "name": "<method 'nonzero' of 'torch._C.TensorBase' objects>",
+            "own_ms": 0.1
+          },
+          {
+            "cum_ms": 0.11,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 0.09
+          },
+          {
+            "cum_ms": 0.04,
+            "name": "<built-in method torch.any>",
+            "own_ms": 0.04
+          }
+        ],
+        "python_imports": [
+          {
+            "cum_ms": 6.61,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 5.51
+          },
+          {
+            "cum_ms": 45.89,
+            "name": "<built-in method builtins.__build_class__>",
+            "own_ms": 4.78
+          },
+          {
+            "cum_ms": 9.71,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.64
+          },
+          {
+            "cum_ms": 3.28,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 2.62
+          },
+          {
+            "cum_ms": 2.33,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 2.26
+          },
+          {
+            "cum_ms": 1.86,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.86
+          },
+          {
+            "cum_ms": 2.66,
+            "name": "<built-in method __new__ of type object at 0x14424b0>",
+            "own_ms": 1.71
+          },
+          {
+            "cum_ms": 1.44,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 1.44
+          },
+          {
+            "cum_ms": 1.39,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 1.39
+          },
+          {
+            "cum_ms": 1.2,
+            "name": "<method 'join' of 'str' objects>",
+            "own_ms": 1.01
+          },
+          {
+            "cum_ms": 22.93,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 0.99
+          },
+          {
+            "cum_ms": 2.66,
+            "name": "isaaclab.utils.configclass:_process_mutable_types",
+            "own_ms": 0.96
+          }
+        ],
+        "task_config": [
+          {
+            "cum_ms": 7.87,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.87
+          },
+          {
+            "cum_ms": 6.75,
+            "name": "isaaclab.utils.configclass:_wrap_resolvable_strings",
+            "own_ms": 3.29
+          },
+          {
+            "cum_ms": 2.12,
+            "name": "isaaclab.utils.configclass:_field_module_dir",
+            "own_ms": 1.33
+          },
+          {
+            "cum_ms": 2.73,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.32
+          },
+          {
+            "cum_ms": 15.67,
+            "name": "isaaclab.utils.configclass:_custom_post_init",
+            "own_ms": 1.31
+          },
+          {
+            "cum_ms": 1.23,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.23
+          },
+          {
+            "cum_ms": 0.93,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.85
+          },
+          {
+            "cum_ms": 0.55,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.55
+          },
+          {
+            "cum_ms": 0.45,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 0.45
+          },
+          {
+            "cum_ms": 0.4,
+            "name": "<built-in method builtins.dir>",
+            "own_ms": 0.4
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "<method 'rsplit' of 'str' objects>",
+            "own_ms": 0.33
+          },
+          {
+            "cum_ms": 0.32,
+            "name": "<built-in method builtins.setattr>",
+            "own_ms": 0.32
+          }
+        ]
+      },
+      "total_reported_s": 1767.2005217439998,
+      "versions": {
+        "cuda_bindings_version": "13.3.1",
+        "dev": {
+          "branch": "HEAD",
+          "commit_date": "2026-06-11 08:44:20 -0700",
+          "commit_hash": "a59603d2eaf2f1ac62de595e5d1cc219d2d25cbe",
+          "commit_hash_short": "a59603d2",
+          "dirty": true
+        },
+        "gymnasium_version": "1.3.0",
+        "isaaclab_newton_version": "0.15.6",
+        "isaaclab_ov_version": "0.4.4",
+        "isaaclab_physx_version": "1.1.5",
+        "isaaclab_release_version": "3.0.0",
+        "isaaclab_rl_version": "0.6.1",
+        "isaaclab_tasks_version": "6.0.0",
+        "isaaclab_version": "6.7.0",
+        "mujoco_version": "3.8.0",
+        "mujoco_warp_version": "3.8.0.3",
+        "newton_version": "1.4.0.dev0",
+        "numpy_version": "2.5.0rc1",
+        "phase": "version_info",
+        "rsl_rl_version": "5.0.1",
+        "torch_version": "2.11.0+cu130",
+        "usd_core_version": "25.11",
+        "warp_version": "1.15.0.dev20260615",
+        "workflow_name": "benchmark_startup"
+      }
+    },
+    {
+      "hardware": {
+        "cpu_name": "AMD EPYC 9B45",
+        "cuda_version": "13.0",
+        "gpu_current_device": 0,
+        "gpu_device_count": 1,
+        "gpu_devices": {
+          "0": {
+            "compute_capability": "12.0",
+            "multi_processor_count": 46,
+            "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+            "total_memory_gb": 23.62
+          }
+        },
+        "phase": "hardware_info",
+        "physical_cores": 192,
+        "total_ram_gb": 708.2,
+        "workflow_name": "benchmark_startup"
+      },
+      "newton_commit": "2c24200200b1",
+      "num_envs": 128,
+      "phases": {
+        "app_launch": {
+          "measurements_ms": {
+            "<built-in method builtins.any>": 0.0,
+            "<built-in method builtins.any> (cumtime)": 0.0,
+            "<built-in method builtins.getattr>": 0.01,
+            "<built-in method builtins.getattr> (cumtime)": 0.01,
+            "<built-in method builtins.id>": 0.01,
+            "<built-in method builtins.id> (cumtime)": 0.01,
+            "<built-in method builtins.isinstance>": 0.04,
+            "<built-in method builtins.isinstance> (cumtime)": 0.05,
+            "<built-in method builtins.len>": 0.0,
+            "<built-in method builtins.len> (cumtime)": 0.0,
+            "<built-in method builtins.setattr>": 0.0,
+            "<built-in method builtins.setattr> (cumtime)": 0.0,
+            "<built-in method builtins.vars>": 0.02,
+            "<built-in method builtins.vars> (cumtime)": 0.02,
+            "<method 'add' of 'set' objects>": 0.01,
+            "<method 'add' of 'set' objects> (cumtime)": 0.01,
+            "<method 'append' of 'list' objects>": 0.0,
+            "<method 'append' of 'list' objects> (cumtime)": 0.0,
+            "<method 'items' of 'dict' objects>": 0.0,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.0,
+            "<method 'items' of 'mappingproxy' objects>": 0.0,
+            "<method 'items' of 'mappingproxy' objects> (cumtime)": 0.0,
+            "Wall Clock Time": 92.10443,
+            "__init__": 0.0,
+            "__init__ (cumtime)": 0.0,
+            "get": 0.0,
+            "get (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:<genexpr>": 0.0,
+            "isaaclab.app.sim_launcher:<genexpr> (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer (cumtime)": 0.02,
+            "isaaclab.app.sim_launcher:_get_arg": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode": 0.0,
+            "isaaclab.app.sim_launcher:_get_livestream_mode (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_types": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_types (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_is_kit_camera": 0.01,
+            "isaaclab.app.sim_launcher:_is_kit_camera (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device": 0.0,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:launch_simulation": 0.02,
+            "isaaclab.app.sim_launcher:launch_simulation (cumtime)": 0.33,
+            "isaaclab.app.sim_launcher:scan": 0.02,
+            "isaaclab.app.sim_launcher:scan (cumtime)": 0.28,
+            "isaaclab.app.sim_launcher:visit": 0.14,
+            "isaaclab.app.sim_launcher:visit (cumtime)": 0.25,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.09210442999999999
+        },
+        "env_creation": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 14.2,
+            "<built-in method builtins.__build_class__> (cumtime)": 465.43,
+            "<built-in method builtins.getattr>": 96.28,
+            "<built-in method builtins.getattr> (cumtime)": 311.7,
+            "<built-in method builtins.hasattr>": 35.27,
+            "<built-in method builtins.hasattr> (cumtime)": 888.6,
+            "<built-in method builtins.isinstance>": 374.05,
+            "<built-in method builtins.isinstance> (cumtime)": 502.01,
+            "<built-in method builtins.len>": 57.62,
+            "<built-in method builtins.len> (cumtime)": 58.03,
+            "<built-in method builtins.max>": 19.92,
+            "<built-in method builtins.max> (cumtime)": 41.05,
+            "<built-in method builtins.next>": 42.72,
+            "<built-in method builtins.next> (cumtime)": 45.81,
+            "<built-in method torch.allclose>": 21.64,
+            "<built-in method torch.allclose> (cumtime)": 21.64,
+            "<method 'append' of 'list' objects>": 39.76,
+            "<method 'append' of 'list' objects> (cumtime)": 39.76,
+            "<method 'get' of 'dict' objects>": 32.49,
+            "<method 'get' of 'dict' objects> (cumtime)": 32.49,
+            "<method 'join' of 'str' objects>": 12.97,
+            "<method 'join' of 'str' objects> (cumtime)": 23.9,
+            "<method 'startswith' of 'str' objects>": 24.3,
+            "<method 'startswith' of 'str' objects> (cumtime)": 24.3,
+            "<method 'strip' of 'str' objects>": 9.52,
+            "<method 'strip' of 'str' objects> (cumtime)": 9.52,
+            "Scene Creation Time": 273648.57991802273,
+            "Simulation Start Time": 28601.489893975668,
+            "Wall Clock Time": 305397.47257,
+            "_src.sim.builder:add_builder": 15.02,
+            "_src.sim.builder:add_builder (cumtime)": 52.08,
+            "_src.sim.builder:finalize": 10.29,
+            "_src.sim.builder:finalize (cumtime)": 83.24,
+            "isaaclab.cloner.cloner_utils:grid_transforms": 17.15,
+            "isaaclab.cloner.cloner_utils:grid_transforms (cumtime)": 30.31,
+            "isaaclab.cloner.replicate_session:replicate": 13.56,
+            "isaaclab.cloner.replicate_session:replicate (cumtime)": 1123.2,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene": 66.36,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene (cumtime)": 92.99,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key": 17.24,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key (cumtime)": 17.24,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors": 19.08,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors (cumtime)": 39.44,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim": 211.17,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim (cumtime)": 211.17,
+            "isaaclab.sim.utils.prims:wrapper": 270703.66,
+            "isaaclab.sim.utils.prims:wrapper (cumtime)": 272154.73,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 42.57,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 43.15,
+            "lib.python3.12.ast:parse": 716.22,
+            "lib.python3.12.ast:parse (cumtime)": 948.3,
+            "lib.python3.12.copy:deepcopy": 15.2,
+            "lib.python3.12.copy:deepcopy (cumtime)": 31.91,
+            "lib.python3.12.inspect:parameters": 44.49,
+            "lib.python3.12.inspect:parameters (cumtime)": 44.49,
+            "omni.client.__init__:copy": 994.07,
+            "omni.client.__init__:copy (cumtime)": 4041.24,
+            "omni.client.__init__:stat": 490.91,
+            "omni.client.__init__:stat (cumtime)": 501.29,
+            "warp._src.context:__call__": 33.77,
+            "warp._src.context:__call__ (cumtime)": 397.71,
+            "warp._src.context:launch": 13.03,
+            "warp._src.context:launch (cumtime)": 26833.88
+          },
+          "scene_creation_s": 273.64857991802273,
+          "simulation_start_s": 28.601489893975668,
+          "wall_s": 305.39747257
+        },
+        "first_step": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 0.02,
+            "<built-in method builtins.getattr> (cumtime)": 0.02,
+            "<built-in method builtins.hasattr>": 0.04,
+            "<built-in method builtins.hasattr> (cumtime)": 0.04,
+            "<built-in method builtins.isinstance>": 1.39,
+            "<built-in method builtins.isinstance> (cumtime)": 1.39,
+            "<built-in method builtins.len>": 0.34,
+            "<built-in method builtins.len> (cumtime)": 0.35,
+            "<built-in method torch.atan2>": 0.02,
+            "<built-in method torch.atan2> (cumtime)": 0.02,
+            "<built-in method torch.cat>": 0.02,
+            "<built-in method torch.cat> (cumtime)": 0.02,
+            "<built-in method torch.clamp>": 0.05,
+            "<built-in method torch.clamp> (cumtime)": 0.05,
+            "<built-in method torch.clip>": 0.02,
+            "<built-in method torch.clip> (cumtime)": 0.02,
+            "<built-in method torch.cos>": 0.02,
+            "<built-in method torch.cos> (cumtime)": 0.02,
+            "<built-in method torch.sin>": 0.02,
+            "<built-in method torch.sin> (cumtime)": 0.02,
+            "<method 'clone' of 'torch._C.TensorBase' objects>": 0.02,
+            "<method 'clone' of 'torch._C.TensorBase' objects> (cumtime)": 0.02,
+            "<method 'get' of 'dict' objects>": 0.28,
+            "<method 'get' of 'dict' objects> (cumtime)": 0.28,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects>": 0.09,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects> (cumtime)": 0.09,
+            "Wall Clock Time": 206.366801,
+            "isaaclab.actuators.actuator_base:_clip_effort": 0.02,
+            "isaaclab.actuators.actuator_base:_clip_effort (cumtime)": 0.04,
+            "isaaclab.actuators.actuator_pd:compute": 0.09,
+            "isaaclab.actuators.actuator_pd:compute (cumtime)": 0.13,
+            "isaaclab.envs.direct_rl_env:step": 0.14,
+            "isaaclab.envs.direct_rl_env:step (cumtime)": 206.18,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model": 0.07,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model (cumtime)": 0.66,
+            "isaaclab_newton.assets.articulation.articulation:write_data_to_sim": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:write_data_to_sim (cumtime)": 0.9,
+            "isaaclab_newton.physics.newton_manager:step": 0.04,
+            "isaaclab_newton.physics.newton_manager:step (cumtime)": 23.7,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action": 0.07,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action (cumtime)": 0.58,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 165.17,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 165.37,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones": 0.15,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones (cumtime)": 165.54,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations": 0.06,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations (cumtime)": 0.17,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards": 14.67,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards (cumtime)": 14.68,
+            "solvers.mujoco.solver_mujoco:notify_model_changed": 0.03,
+            "solvers.mujoco.solver_mujoco:notify_model_changed (cumtime)": 22.81,
+            "warp._src.context:capture_launch": 0.81,
+            "warp._src.context:capture_launch (cumtime)": 0.81,
+            "warp._src.context:launch": 4.87,
+            "warp._src.context:launch (cumtime)": 21.5,
+            "warp._src.types:__del__": 0.03,
+            "warp._src.types:__del__ (cumtime)": 0.12,
+            "warp._src.types:__init__": 0.05,
+            "warp._src.types:__init__ (cumtime)": 0.43,
+            "warp._src.types:zero_": 0.04,
+            "warp._src.types:zero_ (cumtime)": 0.19
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.20636680100000002
+        },
+        "python_imports": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 1.68,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 2.62,
+            "<built-in method _warnings.warn>": 0.32,
+            "<built-in method _warnings.warn> (cumtime)": 0.32,
+            "<built-in method builtins.__build_class__>": 4.64,
+            "<built-in method builtins.__build_class__> (cumtime)": 45.3,
+            "<built-in method builtins.getattr>": 2.59,
+            "<built-in method builtins.getattr> (cumtime)": 3.23,
+            "<built-in method builtins.hasattr>": 1.01,
+            "<built-in method builtins.hasattr> (cumtime)": 22.67,
+            "<built-in method builtins.id>": 0.43,
+            "<built-in method builtins.id> (cumtime)": 0.43,
+            "<built-in method builtins.isinstance>": 5.51,
+            "<built-in method builtins.isinstance> (cumtime)": 6.58,
+            "<built-in method builtins.len>": 2.28,
+            "<built-in method builtins.len> (cumtime)": 2.34,
+            "<built-in method builtins.setattr>": 0.63,
+            "<built-in method builtins.setattr> (cumtime)": 0.73,
+            "<method '__exit__' of '_io._IOBase' objects>": 0.33,
+            "<method '__exit__' of '_io._IOBase' objects> (cumtime)": 0.33,
+            "<method 'append' of 'list' objects>": 1.44,
+            "<method 'append' of 'list' objects> (cumtime)": 1.44,
+            "<method 'get' of 'dict' objects>": 1.84,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.84,
+            "<method 'get' of 'mappingproxy' objects>": 0.24,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.24,
+            "<method 'join' of 'str' objects>": 0.99,
+            "<method 'join' of 'str' objects> (cumtime)": 1.17,
+            "<method 'match' of 're.Pattern' objects>": 0.59,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.59,
+            "<method 'startswith' of 'str' objects>": 1.36,
+            "<method 'startswith' of 'str' objects> (cumtime)": 1.36,
+            "Wall Clock Time": 238.466256,
+            "_find_and_load": 0.72,
+            "_find_and_load (cumtime)": 23.13,
+            "_handle_fromlist": 0.54,
+            "_handle_fromlist (cumtime)": 8.39,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.36,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 1.05,
+            "isaaclab.utils.configclass:_custom_post_init": 0.74,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 3.72,
+            "isaaclab.utils.configclass:_field_module_dir": 0.26,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 0.41,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.97,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 2.64,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.47,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 1.44,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 0.53,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 1.02,
+            "isaaclab.utils.configclass:configclass": 0.37,
+            "isaaclab.utils.configclass:configclass (cumtime)": 22.19,
+            "lib.python3.12.copy:deepcopy": 3.63,
+            "lib.python3.12.copy:deepcopy (cumtime)": 9.7,
+            "lib.python3.12.dataclasses:field": 0.24,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.33,
+            "lib.python3.12.enum:__setitem__": 0.44,
+            "lib.python3.12.enum:__setitem__ (cumtime)": 0.92,
+            "lib.python3.12.typing:inner": 0.63,
+            "lib.python3.12.typing:inner (cumtime)": 7.93,
+            "parent": 0.3,
+            "parent (cumtime)": 0.5
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.238466256
+        },
+        "task_config": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 0.09,
+            "<built-in method builtins.__build_class__> (cumtime)": 8.82,
+            "<built-in method builtins.all>": 0.14,
+            "<built-in method builtins.all> (cumtime)": 0.24,
+            "<built-in method builtins.callable>": 0.09,
+            "<built-in method builtins.callable> (cumtime)": 0.09,
+            "<built-in method builtins.dir>": 0.46,
+            "<built-in method builtins.dir> (cumtime)": 0.46,
+            "<built-in method builtins.getattr>": 0.88,
+            "<built-in method builtins.getattr> (cumtime)": 7.55,
+            "<built-in method builtins.hasattr>": 0.34,
+            "<built-in method builtins.hasattr> (cumtime)": 10.08,
+            "<built-in method builtins.id>": 0.55,
+            "<built-in method builtins.id> (cumtime)": 0.55,
+            "<built-in method builtins.isinstance>": 1.42,
+            "<built-in method builtins.isinstance> (cumtime)": 2.26,
+            "<built-in method builtins.setattr>": 0.32,
+            "<built-in method builtins.setattr> (cumtime)": 0.32,
+            "<method 'append' of 'list' objects>": 0.1,
+            "<method 'append' of 'list' objects> (cumtime)": 0.1,
+            "<method 'get' of 'dict' objects>": 1.25,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.25,
+            "<method 'get' of 'mappingproxy' objects>": 0.14,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.14,
+            "<method 'items' of 'dict' objects>": 0.07,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.07,
+            "<method 'match' of 're.Pattern' objects>": 0.28,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.28,
+            "<method 'rsplit' of 'str' objects>": 0.31,
+            "<method 'rsplit' of 'str' objects> (cumtime)": 0.31,
+            "<method 'startswith' of 'str' objects>": 0.53,
+            "<method 'startswith' of 'str' objects> (cumtime)": 0.53,
+            "Wall Clock Time": 28.859787,
+            "isaaclab.utils.configclass:<genexpr>": 0.08,
+            "isaaclab.utils.configclass:<genexpr> (cumtime)": 0.48,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.09,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 0.23,
+            "isaaclab.utils.configclass:_custom_post_init": 1.44,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 16.7,
+            "isaaclab.utils.configclass:_field_module_dir": 1.26,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 2.01,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.27,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 0.57,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.12,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 0.19,
+            "isaaclab.utils.configclass:_wrap": 0.09,
+            "isaaclab.utils.configclass:_wrap (cumtime)": 1.99,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 3.36,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 6.78,
+            "isaaclab.utils.configclass:configclass": 0.08,
+            "isaaclab.utils.configclass:configclass (cumtime)": 5.8,
+            "isaaclab.utils.string:__getattribute__": 0.06,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.06,
+            "isaaclab_tasks.utils.hydra:<genexpr>": 0.18,
+            "isaaclab_tasks.utils.hydra:<genexpr> (cumtime)": 0.35,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg": 0.12,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg (cumtime)": 0.63,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets": 0.22,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets (cumtime)": 1.97,
+            "lib.python3.12.copy:deepcopy": 3.92,
+            "lib.python3.12.copy:deepcopy (cumtime)": 8.6
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.028859787
+        }
+      },
+      "raw_report_file": "data/isaaclab_pr3187_raw/main_Isaac-Humanoid-Direct_128.json",
+      "revision": "main",
+      "revision_label": "Newton main",
+      "source_file": "/tmp/isaaclab_startup_newton_bench/main_humanoid_128/benchmark_startup_Isaac-Humanoid-Direct_2026-06-16_02-44-59.json",
+      "task": "Isaac-Humanoid-Direct",
+      "task_short": "Humanoid",
+      "timestamp": "2026-06-16T02:44:59.550702",
+      "top_functions": {
+        "app_launch": [
+          {
+            "cum_ms": 0.25,
+            "name": "isaaclab.app.sim_launcher:visit",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.05,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.04
+          },
+          {
+            "cum_ms": 0.02,
+            "name": "<built-in method builtins.vars>",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "isaaclab.app.sim_launcher:launch_simulation",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.28,
+            "name": "isaaclab.app.sim_launcher:scan",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.utils.string:__getattribute__",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<method 'add' of 'set' objects>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_ovrtx_renderer",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_kit_camera",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_get_arg",
+            "own_ms": 0.01
+          }
+        ],
+        "env_creation": [
+          {
+            "cum_ms": 272154.73,
+            "name": "isaaclab.sim.utils.prims:wrapper",
+            "own_ms": 270703.66
+          },
+          {
+            "cum_ms": 4041.24,
+            "name": "omni.client.__init__:copy",
+            "own_ms": 994.07
+          },
+          {
+            "cum_ms": 948.3,
+            "name": "lib.python3.12.ast:parse",
+            "own_ms": 716.22
+          },
+          {
+            "cum_ms": 501.29,
+            "name": "omni.client.__init__:stat",
+            "own_ms": 490.91
+          },
+          {
+            "cum_ms": 502.01,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 374.05
+          },
+          {
+            "cum_ms": 211.17,
+            "name": "isaaclab.sim.utils.prims:_add_reference_to_prim",
+            "own_ms": 211.17
+          },
+          {
+            "cum_ms": 311.7,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 96.28
+          },
+          {
+            "cum_ms": 92.99,
+            "name": "isaaclab.sim.simulation_context:_init_usd_physics_scene",
+            "own_ms": 66.36
+          },
+          {
+            "cum_ms": 58.03,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 57.62
+          },
+          {
+            "cum_ms": 44.49,
+            "name": "lib.python3.12.inspect:parameters",
+            "own_ms": 44.49
+          },
+          {
+            "cum_ms": 45.81,
+            "name": "<built-in method builtins.next>",
+            "own_ms": 42.72
+          },
+          {
+            "cum_ms": 43.15,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 42.57
+          }
+        ],
+        "first_step": [
+          {
+            "cum_ms": 165.37,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 165.17
+          },
+          {
+            "cum_ms": 14.68,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards",
+            "own_ms": 14.67
+          },
+          {
+            "cum_ms": 21.5,
+            "name": "warp._src.context:launch",
+            "own_ms": 4.87
+          },
+          {
+            "cum_ms": 1.39,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.39
+          },
+          {
+            "cum_ms": 0.81,
+            "name": "warp._src.context:capture_launch",
+            "own_ms": 0.81
+          },
+          {
+            "cum_ms": 0.35,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 0.34
+          },
+          {
+            "cum_ms": 0.28,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 0.28
+          },
+          {
+            "cum_ms": 165.54,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones",
+            "own_ms": 0.15
+          },
+          {
+            "cum_ms": 206.18,
+            "name": "isaaclab.envs.direct_rl_env:step",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.09,
+            "name": "<method 'nonzero' of 'torch._C.TensorBase' objects>",
+            "own_ms": 0.09
+          },
+          {
+            "cum_ms": 0.13,
+            "name": "isaaclab.actuators.actuator_pd:compute",
+            "own_ms": 0.09
+          },
+          {
+            "cum_ms": 0.66,
+            "name": "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model",
+            "own_ms": 0.07
+          }
+        ],
+        "python_imports": [
+          {
+            "cum_ms": 6.58,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 5.51
+          },
+          {
+            "cum_ms": 45.3,
+            "name": "<built-in method builtins.__build_class__>",
+            "own_ms": 4.64
+          },
+          {
+            "cum_ms": 9.7,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.63
+          },
+          {
+            "cum_ms": 3.23,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 2.59
+          },
+          {
+            "cum_ms": 2.34,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 2.28
+          },
+          {
+            "cum_ms": 1.84,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.84
+          },
+          {
+            "cum_ms": 2.62,
+            "name": "<built-in method __new__ of type object at 0x14424b0>",
+            "own_ms": 1.68
+          },
+          {
+            "cum_ms": 1.44,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 1.44
+          },
+          {
+            "cum_ms": 1.36,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 1.36
+          },
+          {
+            "cum_ms": 22.67,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 1.01
+          },
+          {
+            "cum_ms": 1.17,
+            "name": "<method 'join' of 'str' objects>",
+            "own_ms": 0.99
+          },
+          {
+            "cum_ms": 2.64,
+            "name": "isaaclab.utils.configclass:_process_mutable_types",
+            "own_ms": 0.97
+          }
+        ],
+        "task_config": [
+          {
+            "cum_ms": 8.6,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.92
+          },
+          {
+            "cum_ms": 6.78,
+            "name": "isaaclab.utils.configclass:_wrap_resolvable_strings",
+            "own_ms": 3.36
+          },
+          {
+            "cum_ms": 16.7,
+            "name": "isaaclab.utils.configclass:_custom_post_init",
+            "own_ms": 1.44
+          },
+          {
+            "cum_ms": 2.26,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.42
+          },
+          {
+            "cum_ms": 2.01,
+            "name": "isaaclab.utils.configclass:_field_module_dir",
+            "own_ms": 1.26
+          },
+          {
+            "cum_ms": 1.25,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.25
+          },
+          {
+            "cum_ms": 7.55,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.88
+          },
+          {
+            "cum_ms": 0.55,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.55
+          },
+          {
+            "cum_ms": 0.53,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 0.53
+          },
+          {
+            "cum_ms": 0.46,
+            "name": "<built-in method builtins.dir>",
+            "own_ms": 0.46
+          },
+          {
+            "cum_ms": 10.08,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 0.34
+          },
+          {
+            "cum_ms": 0.32,
+            "name": "<built-in method builtins.setattr>",
+            "own_ms": 0.32
+          }
+        ]
+      },
+      "total_reported_s": 305.96326984399997,
+      "versions": {
+        "cuda_bindings_version": "13.3.1",
+        "dev": {
+          "branch": "HEAD",
+          "commit_date": "2026-06-11 08:44:20 -0700",
+          "commit_hash": "a59603d2eaf2f1ac62de595e5d1cc219d2d25cbe",
+          "commit_hash_short": "a59603d2",
+          "dirty": true
+        },
+        "gymnasium_version": "1.3.0",
+        "isaaclab_newton_version": "0.15.6",
+        "isaaclab_ov_version": "0.4.4",
+        "isaaclab_physx_version": "1.1.5",
+        "isaaclab_release_version": "3.0.0",
+        "isaaclab_rl_version": "0.6.1",
+        "isaaclab_tasks_version": "6.0.0",
+        "isaaclab_version": "6.7.0",
+        "mujoco_version": "3.8.0",
+        "mujoco_warp_version": "3.8.0.3",
+        "newton_version": "1.4.0.dev0",
+        "numpy_version": "2.5.0rc1",
+        "phase": "version_info",
+        "rsl_rl_version": "5.0.1",
+        "torch_version": "2.11.0+cu130",
+        "usd_core_version": "25.11",
+        "warp_version": "1.15.0.dev20260615",
+        "workflow_name": "benchmark_startup"
+      }
+    },
+    {
+      "hardware": {
+        "cpu_name": "AMD EPYC 9B45",
+        "cuda_version": "13.0",
+        "gpu_current_device": 0,
+        "gpu_device_count": 1,
+        "gpu_devices": {
+          "0": {
+            "compute_capability": "12.0",
+            "multi_processor_count": 46,
+            "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+            "total_memory_gb": 23.62
+          }
+        },
+        "phase": "hardware_info",
+        "physical_cores": 192,
+        "total_ram_gb": 708.2,
+        "workflow_name": "benchmark_startup"
+      },
+      "newton_commit": "172dbda45f6a",
+      "num_envs": 128,
+      "phases": {
+        "app_launch": {
+          "measurements_ms": {
+            "<built-in method builtins.any>": 0.0,
+            "<built-in method builtins.any> (cumtime)": 0.0,
+            "<built-in method builtins.getattr>": 0.01,
+            "<built-in method builtins.getattr> (cumtime)": 0.01,
+            "<built-in method builtins.id>": 0.01,
+            "<built-in method builtins.id> (cumtime)": 0.01,
+            "<built-in method builtins.isinstance>": 0.04,
+            "<built-in method builtins.isinstance> (cumtime)": 0.05,
+            "<built-in method builtins.len>": 0.0,
+            "<built-in method builtins.len> (cumtime)": 0.0,
+            "<built-in method builtins.setattr>": 0.0,
+            "<built-in method builtins.setattr> (cumtime)": 0.0,
+            "<built-in method builtins.vars>": 0.02,
+            "<built-in method builtins.vars> (cumtime)": 0.02,
+            "<method 'add' of 'set' objects>": 0.01,
+            "<method 'add' of 'set' objects> (cumtime)": 0.01,
+            "<method 'append' of 'list' objects>": 0.0,
+            "<method 'append' of 'list' objects> (cumtime)": 0.0,
+            "<method 'items' of 'dict' objects>": 0.0,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.0,
+            "<method 'items' of 'mappingproxy' objects>": 0.0,
+            "<method 'items' of 'mappingproxy' objects> (cumtime)": 0.0,
+            "Wall Clock Time": 95.264589,
+            "__init__": 0.0,
+            "__init__ (cumtime)": 0.0,
+            "get": 0.0,
+            "get (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:<genexpr>": 0.0,
+            "isaaclab.app.sim_launcher:<genexpr> (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer": 0.0,
+            "isaaclab.app.sim_launcher:_ensure_livestream_kit_visualizer (cumtime)": 0.02,
+            "isaaclab.app.sim_launcher:_get_arg": 0.01,
+            "isaaclab.app.sim_launcher:_get_arg (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode": 0.01,
+            "isaaclab.app.sim_launcher:_get_livestream_mode (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_intent (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_get_visualizer_types": 0.0,
+            "isaaclab.app.sim_launcher:_get_visualizer_types (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_is_kit_camera": 0.01,
+            "isaaclab.app.sim_launcher:_is_kit_camera (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer": 0.01,
+            "isaaclab.app.sim_launcher:_is_ovrtx_renderer (cumtime)": 0.01,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device": 0.0,
+            "isaaclab.app.sim_launcher:_resolve_distributed_device (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg": 0.0,
+            "isaaclab.app.sim_launcher:_set_arg (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime": 0.0,
+            "isaaclab.app.sim_launcher:_validate_runtime (cumtime)": 0.0,
+            "isaaclab.app.sim_launcher:launch_simulation": 0.02,
+            "isaaclab.app.sim_launcher:launch_simulation (cumtime)": 0.33,
+            "isaaclab.app.sim_launcher:scan": 0.02,
+            "isaaclab.app.sim_launcher:scan (cumtime)": 0.28,
+            "isaaclab.app.sim_launcher:visit": 0.14,
+            "isaaclab.app.sim_launcher:visit (cumtime)": 0.25,
+            "isaaclab.utils.string:__getattribute__": 0.01,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.01
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.095264589
+        },
+        "env_creation": {
+          "measurements_ms": {
+            "<built-in method _io.open>": 23.35,
+            "<built-in method _io.open> (cumtime)": 32.22,
+            "<built-in method builtins.__build_class__>": 14.64,
+            "<built-in method builtins.__build_class__> (cumtime)": 467.11,
+            "<built-in method builtins.getattr>": 93.06,
+            "<built-in method builtins.getattr> (cumtime)": 309.62,
+            "<built-in method builtins.hasattr>": 83.54,
+            "<built-in method builtins.hasattr> (cumtime)": 940.16,
+            "<built-in method builtins.isinstance>": 195.38,
+            "<built-in method builtins.isinstance> (cumtime)": 208.76,
+            "<built-in method builtins.len>": 30.76,
+            "<built-in method builtins.len> (cumtime)": 31.16,
+            "<built-in method torch.allclose>": 21.43,
+            "<built-in method torch.allclose> (cumtime)": 21.43,
+            "<method 'append' of 'list' objects>": 30.25,
+            "<method 'append' of 'list' objects> (cumtime)": 30.25,
+            "<method 'get' of 'dict' objects>": 28.61,
+            "<method 'get' of 'dict' objects> (cumtime)": 28.61,
+            "<method 'join' of 'str' objects>": 9.83,
+            "<method 'join' of 'str' objects> (cumtime)": 11.78,
+            "<method 'startswith' of 'str' objects>": 22.48,
+            "<method 'startswith' of 'str' objects> (cumtime)": 22.48,
+            "Scene Creation Time": 227471.18792502442,
+            "Simulation Start Time": 2000.1519679790363,
+            "Wall Clock Time": 232673.330477,
+            "_src.sim.builder:add_builder": 13.87,
+            "_src.sim.builder:add_builder (cumtime)": 32.14,
+            "_src.sim.builder:finalize": 11.01,
+            "_src.sim.builder:finalize (cumtime)": 65.15,
+            "isaaclab.cloner.cloner_utils:grid_transforms": 17.05,
+            "isaaclab.cloner.cloner_utils:grid_transforms (cumtime)": 30.29,
+            "isaaclab.cloner.replicate_session:replicate": 69.89,
+            "isaaclab.cloner.replicate_session:replicate (cumtime)": 1059.05,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene": 96.48,
+            "isaaclab.sim.simulation_context:_init_usd_physics_scene (cumtime)": 125.17,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key": 17.37,
+            "isaaclab.sim.utils.newton_model_utils:_canonical_prim_lookup_key (cumtime)": 17.37,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors": 19.14,
+            "isaaclab.sim.utils.newton_model_utils:replace_newton_shape_colors (cumtime)": 39.59,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim": 207.28,
+            "isaaclab.sim.utils.prims:_add_reference_to_prim (cumtime)": 207.28,
+            "isaaclab.sim.utils.prims:create_prim": 31.75,
+            "isaaclab.sim.utils.prims:create_prim (cumtime)": 539.84,
+            "isaaclab.sim.utils.prims:wrapper": 225268.54,
+            "isaaclab.sim.utils.prims:wrapper (cumtime)": 226000.67,
+            "isaaclab.utils.assets:_find_asset_dependencies": 88.94,
+            "isaaclab.utils.assets:_find_asset_dependencies (cumtime)": 88.98,
+            "isaaclab.utils.assets:retrieve_file_path": 65.24,
+            "isaaclab.utils.assets:retrieve_file_path (cumtime)": 779.49,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 73.76,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 74.34,
+            "lib.python3.12.ast:parse": 817.86,
+            "lib.python3.12.ast:parse (cumtime)": 1050.91,
+            "lib.python3.12.copy:deepcopy": 15.06,
+            "lib.python3.12.copy:deepcopy (cumtime)": 31.83,
+            "omni.client.__init__:copy": 52.52,
+            "omni.client.__init__:copy (cumtime)": 298.97,
+            "omni.client.__init__:stat": 561.34,
+            "omni.client.__init__:stat (cumtime)": 571.68,
+            "python3.12.re.__init__:match": 13.65,
+            "python3.12.re.__init__:match (cumtime)": 19.58,
+            "warp._src.context:launch": 11.04,
+            "warp._src.context:launch (cumtime)": 561.05
+          },
+          "scene_creation_s": 227.47118792502442,
+          "simulation_start_s": 2.0001519679790363,
+          "wall_s": 232.673330477
+        },
+        "first_step": {
+          "measurements_ms": {
+            "<built-in method builtins.getattr>": 0.02,
+            "<built-in method builtins.getattr> (cumtime)": 0.02,
+            "<built-in method builtins.hasattr>": 0.04,
+            "<built-in method builtins.hasattr> (cumtime)": 0.04,
+            "<built-in method builtins.isinstance>": 1.37,
+            "<built-in method builtins.isinstance> (cumtime)": 1.37,
+            "<built-in method builtins.len>": 0.34,
+            "<built-in method builtins.len> (cumtime)": 0.36,
+            "<built-in method torch.atan2>": 0.02,
+            "<built-in method torch.atan2> (cumtime)": 0.02,
+            "<built-in method torch.cat>": 0.02,
+            "<built-in method torch.cat> (cumtime)": 0.02,
+            "<built-in method torch.clamp>": 0.04,
+            "<built-in method torch.clamp> (cumtime)": 0.04,
+            "<built-in method torch.clip>": 0.02,
+            "<built-in method torch.clip> (cumtime)": 0.02,
+            "<built-in method torch.cos>": 0.02,
+            "<built-in method torch.cos> (cumtime)": 0.02,
+            "<built-in method torch.sin>": 0.02,
+            "<built-in method torch.sin> (cumtime)": 0.02,
+            "<method 'get' of 'dict' objects>": 0.25,
+            "<method 'get' of 'dict' objects> (cumtime)": 0.25,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects>": 0.09,
+            "<method 'nonzero' of 'torch._C.TensorBase' objects> (cumtime)": 0.09,
+            "Wall Clock Time": 190.259887,
+            "isaaclab.actuators.actuator_base:_clip_effort": 0.02,
+            "isaaclab.actuators.actuator_base:_clip_effort (cumtime)": 0.04,
+            "isaaclab.actuators.actuator_pd:compute": 0.1,
+            "isaaclab.actuators.actuator_pd:compute (cumtime)": 0.14,
+            "isaaclab.envs.direct_rl_env:step": 0.14,
+            "isaaclab.envs.direct_rl_env:step (cumtime)": 190.08,
+            "isaaclab.utils.string:__getattribute__": 0.02,
+            "isaaclab.utils.string:__getattribute__ (cumtime)": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model": 0.07,
+            "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model (cumtime)": 0.66,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index": 0.02,
+            "isaaclab_newton.assets.articulation.articulation:set_joint_effort_target_index (cumtime)": 0.47,
+            "isaaclab_newton.physics.newton_manager:step": 0.04,
+            "isaaclab_newton.physics.newton_manager:step (cumtime)": 24.32,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action": 0.07,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_apply_action (cumtime)": 0.6,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values": 136.2,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values (cumtime)": 136.37,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones": 0.16,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones (cumtime)": 136.55,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations": 0.06,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_observations (cumtime)": 0.16,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards": 26.94,
+            "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards (cumtime)": 26.94,
+            "solvers.mujoco.solver_mujoco:notify_model_changed": 0.03,
+            "solvers.mujoco.solver_mujoco:notify_model_changed (cumtime)": 23.02,
+            "warp._src.context:capture_launch": 1.22,
+            "warp._src.context:capture_launch (cumtime)": 1.22,
+            "warp._src.context:launch": 4.98,
+            "warp._src.context:launch (cumtime)": 21.66,
+            "warp._src.types:__del__": 0.03,
+            "warp._src.types:__del__ (cumtime)": 0.11,
+            "warp._src.types:__init__": 0.05,
+            "warp._src.types:__init__ (cumtime)": 0.43,
+            "warp._src.types:zero_": 0.04,
+            "warp._src.types:zero_ (cumtime)": 0.19
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.190259887
+        },
+        "python_imports": {
+          "measurements_ms": {
+            "<built-in method __new__ of type object at 0x14424b0>": 1.72,
+            "<built-in method __new__ of type object at 0x14424b0> (cumtime)": 2.68,
+            "<built-in method _warnings.warn>": 0.33,
+            "<built-in method _warnings.warn> (cumtime)": 0.33,
+            "<built-in method builtins.__build_class__>": 4.99,
+            "<built-in method builtins.__build_class__> (cumtime)": 45.97,
+            "<built-in method builtins.getattr>": 2.62,
+            "<built-in method builtins.getattr> (cumtime)": 3.28,
+            "<built-in method builtins.hasattr>": 0.99,
+            "<built-in method builtins.hasattr> (cumtime)": 23.01,
+            "<built-in method builtins.id>": 0.44,
+            "<built-in method builtins.id> (cumtime)": 0.44,
+            "<built-in method builtins.isinstance>": 5.54,
+            "<built-in method builtins.isinstance> (cumtime)": 6.61,
+            "<built-in method builtins.len>": 2.34,
+            "<built-in method builtins.len> (cumtime)": 2.4,
+            "<built-in method builtins.setattr>": 0.63,
+            "<built-in method builtins.setattr> (cumtime)": 0.72,
+            "<method '__exit__' of '_io._IOBase' objects>": 0.32,
+            "<method '__exit__' of '_io._IOBase' objects> (cumtime)": 0.32,
+            "<method 'append' of 'list' objects>": 1.43,
+            "<method 'append' of 'list' objects> (cumtime)": 1.43,
+            "<method 'get' of 'dict' objects>": 1.85,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.85,
+            "<method 'get' of 'mappingproxy' objects>": 0.24,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.24,
+            "<method 'join' of 'str' objects>": 1.01,
+            "<method 'join' of 'str' objects> (cumtime)": 1.19,
+            "<method 'match' of 're.Pattern' objects>": 0.6,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.6,
+            "<method 'startswith' of 'str' objects>": 1.36,
+            "<method 'startswith' of 'str' objects> (cumtime)": 1.36,
+            "Wall Clock Time": 243.337394,
+            "_find_and_load": 0.74,
+            "_find_and_load (cumtime)": 23.48,
+            "_handle_fromlist": 0.56,
+            "_handle_fromlist (cumtime)": 8.55,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.36,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 1.06,
+            "isaaclab.utils.configclass:_custom_post_init": 0.73,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 3.74,
+            "isaaclab.utils.configclass:_field_module_dir": 0.27,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 0.43,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.97,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 2.65,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.48,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 1.46,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 0.53,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 1.02,
+            "isaaclab.utils.configclass:configclass": 0.39,
+            "isaaclab.utils.configclass:configclass (cumtime)": 22.47,
+            "lib.python3.12.copy:deepcopy": 3.68,
+            "lib.python3.12.copy:deepcopy (cumtime)": 9.77,
+            "lib.python3.12.dataclasses:field": 0.25,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.34,
+            "lib.python3.12.enum:__setitem__": 0.45,
+            "lib.python3.12.enum:__setitem__ (cumtime)": 0.92,
+            "lib.python3.12.typing:inner": 0.65,
+            "lib.python3.12.typing:inner (cumtime)": 8.06,
+            "parent": 0.32,
+            "parent (cumtime)": 0.5
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.24333739399999998
+        },
+        "task_config": {
+          "measurements_ms": {
+            "<built-in method builtins.__build_class__>": 0.09,
+            "<built-in method builtins.__build_class__> (cumtime)": 8.86,
+            "<built-in method builtins.all>": 0.13,
+            "<built-in method builtins.all> (cumtime)": 0.23,
+            "<built-in method builtins.callable>": 0.09,
+            "<built-in method builtins.callable> (cumtime)": 0.09,
+            "<built-in method builtins.dir>": 0.46,
+            "<built-in method builtins.dir> (cumtime)": 0.46,
+            "<built-in method builtins.getattr>": 0.88,
+            "<built-in method builtins.getattr> (cumtime)": 7.65,
+            "<built-in method builtins.hasattr>": 0.33,
+            "<built-in method builtins.hasattr> (cumtime)": 10.14,
+            "<built-in method builtins.id>": 0.55,
+            "<built-in method builtins.id> (cumtime)": 0.55,
+            "<built-in method builtins.isinstance>": 1.43,
+            "<built-in method builtins.isinstance> (cumtime)": 2.28,
+            "<built-in method builtins.setattr>": 0.32,
+            "<built-in method builtins.setattr> (cumtime)": 0.32,
+            "<method 'append' of 'list' objects>": 0.1,
+            "<method 'append' of 'list' objects> (cumtime)": 0.1,
+            "<method 'get' of 'dict' objects>": 1.25,
+            "<method 'get' of 'dict' objects> (cumtime)": 1.25,
+            "<method 'get' of 'mappingproxy' objects>": 0.15,
+            "<method 'get' of 'mappingproxy' objects> (cumtime)": 0.15,
+            "<method 'items' of 'dict' objects>": 0.07,
+            "<method 'items' of 'dict' objects> (cumtime)": 0.07,
+            "<method 'match' of 're.Pattern' objects>": 0.28,
+            "<method 'match' of 're.Pattern' objects> (cumtime)": 0.28,
+            "<method 'rsplit' of 'str' objects>": 0.31,
+            "<method 'rsplit' of 'str' objects> (cumtime)": 0.31,
+            "<method 'startswith' of 'str' objects>": 0.52,
+            "<method 'startswith' of 'str' objects> (cumtime)": 0.52,
+            "Wall Clock Time": 29.025907,
+            "isaaclab.utils.configclass:<genexpr>": 0.08,
+            "isaaclab.utils.configclass:<genexpr> (cumtime)": 0.49,
+            "isaaclab.utils.configclass:_add_annotation_types": 0.09,
+            "isaaclab.utils.configclass:_add_annotation_types (cumtime)": 0.23,
+            "isaaclab.utils.configclass:_custom_post_init": 1.42,
+            "isaaclab.utils.configclass:_custom_post_init (cumtime)": 16.77,
+            "isaaclab.utils.configclass:_field_module_dir": 1.26,
+            "isaaclab.utils.configclass:_field_module_dir (cumtime)": 2.02,
+            "isaaclab.utils.configclass:_process_mutable_types": 0.3,
+            "isaaclab.utils.configclass:_process_mutable_types (cumtime)": 0.67,
+            "isaaclab.utils.configclass:_skippable_class_member": 0.12,
+            "isaaclab.utils.configclass:_skippable_class_member (cumtime)": 0.19,
+            "isaaclab.utils.configclass:_wrap": 0.1,
+            "isaaclab.utils.configclass:_wrap (cumtime)": 2.01,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings": 3.37,
+            "isaaclab.utils.configclass:_wrap_resolvable_strings (cumtime)": 6.8,
+            "isaaclab.utils.configclass:configclass": 0.08,
+            "isaaclab.utils.configclass:configclass (cumtime)": 5.85,
+            "isaaclab_tasks.utils.hydra:<genexpr>": 0.19,
+            "isaaclab_tasks.utils.hydra:<genexpr> (cumtime)": 0.36,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg": 0.11,
+            "isaaclab_tasks.utils.hydra:_is_walkable_cfg (cumtime)": 0.64,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets": 0.22,
+            "isaaclab_tasks.utils.hydra:_resolve_active_presets (cumtime)": 1.98,
+            "lib.python3.12.copy:deepcopy": 3.97,
+            "lib.python3.12.copy:deepcopy (cumtime)": 8.66,
+            "lib.python3.12.dataclasses:field": 0.1,
+            "lib.python3.12.dataclasses:field (cumtime)": 0.12
+          },
+          "scene_creation_s": null,
+          "simulation_start_s": null,
+          "wall_s": 0.029025907
+        }
+      },
+      "raw_report_file": "data/isaaclab_pr3187_raw/pr3187_Isaac-Humanoid-Direct_128.json",
+      "revision": "pr3187",
+      "revision_label": "PR 3187",
+      "source_file": "/tmp/isaaclab_startup_newton_bench/pr3187_humanoid_128/benchmark_startup_Isaac-Humanoid-Direct_2026-06-16_02-51-15.json",
+      "task": "Isaac-Humanoid-Direct",
+      "task_short": "Humanoid",
+      "timestamp": "2026-06-16T02:51:15.942382",
+      "top_functions": {
+        "app_launch": [
+          {
+            "cum_ms": 0.25,
+            "name": "isaaclab.app.sim_launcher:visit",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.05,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 0.04
+          },
+          {
+            "cum_ms": 0.02,
+            "name": "<built-in method builtins.vars>",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.33,
+            "name": "isaaclab.app.sim_launcher:launch_simulation",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.28,
+            "name": "isaaclab.app.sim_launcher:scan",
+            "own_ms": 0.02
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.utils.string:__getattribute__",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<method 'add' of 'set' objects>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_kit_camera",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_is_ovrtx_renderer",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.01
+          },
+          {
+            "cum_ms": 0.01,
+            "name": "isaaclab.app.sim_launcher:_get_arg",
+            "own_ms": 0.01
+          }
+        ],
+        "env_creation": [
+          {
+            "cum_ms": 226000.67,
+            "name": "isaaclab.sim.utils.prims:wrapper",
+            "own_ms": 225268.54
+          },
+          {
+            "cum_ms": 1050.91,
+            "name": "lib.python3.12.ast:parse",
+            "own_ms": 817.86
+          },
+          {
+            "cum_ms": 571.68,
+            "name": "omni.client.__init__:stat",
+            "own_ms": 561.34
+          },
+          {
+            "cum_ms": 207.28,
+            "name": "isaaclab.sim.utils.prims:_add_reference_to_prim",
+            "own_ms": 207.28
+          },
+          {
+            "cum_ms": 208.76,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 195.38
+          },
+          {
+            "cum_ms": 125.17,
+            "name": "isaaclab.sim.simulation_context:_init_usd_physics_scene",
+            "own_ms": 96.48
+          },
+          {
+            "cum_ms": 309.62,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 93.06
+          },
+          {
+            "cum_ms": 88.98,
+            "name": "isaaclab.utils.assets:_find_asset_dependencies",
+            "own_ms": 88.94
+          },
+          {
+            "cum_ms": 940.16,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 83.54
+          },
+          {
+            "cum_ms": 74.34,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 73.76
+          },
+          {
+            "cum_ms": 1059.05,
+            "name": "isaaclab.cloner.replicate_session:replicate",
+            "own_ms": 69.89
+          },
+          {
+            "cum_ms": 779.49,
+            "name": "isaaclab.utils.assets:retrieve_file_path",
+            "own_ms": 65.24
+          }
+        ],
+        "first_step": [
+          {
+            "cum_ms": 136.37,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_compute_intermediate_values",
+            "own_ms": 136.2
+          },
+          {
+            "cum_ms": 26.94,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_rewards",
+            "own_ms": 26.94
+          },
+          {
+            "cum_ms": 21.66,
+            "name": "warp._src.context:launch",
+            "own_ms": 4.98
+          },
+          {
+            "cum_ms": 1.37,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.37
+          },
+          {
+            "cum_ms": 1.22,
+            "name": "warp._src.context:capture_launch",
+            "own_ms": 1.22
+          },
+          {
+            "cum_ms": 0.36,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 0.34
+          },
+          {
+            "cum_ms": 0.25,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 0.25
+          },
+          {
+            "cum_ms": 136.55,
+            "name": "isaaclab_tasks.core.locomotion.locomotion_direct_env:_get_dones",
+            "own_ms": 0.16
+          },
+          {
+            "cum_ms": 190.08,
+            "name": "isaaclab.envs.direct_rl_env:step",
+            "own_ms": 0.14
+          },
+          {
+            "cum_ms": 0.14,
+            "name": "isaaclab.actuators.actuator_pd:compute",
+            "own_ms": 0.1
+          },
+          {
+            "cum_ms": 0.09,
+            "name": "<method 'nonzero' of 'torch._C.TensorBase' objects>",
+            "own_ms": 0.09
+          },
+          {
+            "cum_ms": 0.66,
+            "name": "isaaclab_newton.assets.articulation.articulation:_apply_actuator_model",
+            "own_ms": 0.07
+          }
+        ],
+        "python_imports": [
+          {
+            "cum_ms": 6.61,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 5.54
+          },
+          {
+            "cum_ms": 45.97,
+            "name": "<built-in method builtins.__build_class__>",
+            "own_ms": 4.99
+          },
+          {
+            "cum_ms": 9.77,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.68
+          },
+          {
+            "cum_ms": 3.28,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 2.62
+          },
+          {
+            "cum_ms": 2.4,
+            "name": "<built-in method builtins.len>",
+            "own_ms": 2.34
+          },
+          {
+            "cum_ms": 1.85,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.85
+          },
+          {
+            "cum_ms": 2.68,
+            "name": "<built-in method __new__ of type object at 0x14424b0>",
+            "own_ms": 1.72
+          },
+          {
+            "cum_ms": 1.43,
+            "name": "<method 'append' of 'list' objects>",
+            "own_ms": 1.43
+          },
+          {
+            "cum_ms": 1.36,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 1.36
+          },
+          {
+            "cum_ms": 1.19,
+            "name": "<method 'join' of 'str' objects>",
+            "own_ms": 1.01
+          },
+          {
+            "cum_ms": 23.01,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 0.99
+          },
+          {
+            "cum_ms": 2.65,
+            "name": "isaaclab.utils.configclass:_process_mutable_types",
+            "own_ms": 0.97
+          }
+        ],
+        "task_config": [
+          {
+            "cum_ms": 8.66,
+            "name": "lib.python3.12.copy:deepcopy",
+            "own_ms": 3.97
+          },
+          {
+            "cum_ms": 6.8,
+            "name": "isaaclab.utils.configclass:_wrap_resolvable_strings",
+            "own_ms": 3.37
+          },
+          {
+            "cum_ms": 2.28,
+            "name": "<built-in method builtins.isinstance>",
+            "own_ms": 1.43
+          },
+          {
+            "cum_ms": 16.77,
+            "name": "isaaclab.utils.configclass:_custom_post_init",
+            "own_ms": 1.42
+          },
+          {
+            "cum_ms": 2.02,
+            "name": "isaaclab.utils.configclass:_field_module_dir",
+            "own_ms": 1.26
+          },
+          {
+            "cum_ms": 1.25,
+            "name": "<method 'get' of 'dict' objects>",
+            "own_ms": 1.25
+          },
+          {
+            "cum_ms": 7.65,
+            "name": "<built-in method builtins.getattr>",
+            "own_ms": 0.88
+          },
+          {
+            "cum_ms": 0.55,
+            "name": "<built-in method builtins.id>",
+            "own_ms": 0.55
+          },
+          {
+            "cum_ms": 0.52,
+            "name": "<method 'startswith' of 'str' objects>",
+            "own_ms": 0.52
+          },
+          {
+            "cum_ms": 0.46,
+            "name": "<built-in method builtins.dir>",
+            "own_ms": 0.46
+          },
+          {
+            "cum_ms": 10.14,
+            "name": "<built-in method builtins.hasattr>",
+            "own_ms": 0.33
+          },
+          {
+            "cum_ms": 0.32,
+            "name": "<built-in method builtins.setattr>",
+            "own_ms": 0.32
+          }
+        ]
+      },
+      "total_reported_s": 233.231218254,
+      "versions": {
+        "cuda_bindings_version": "13.3.1",
+        "dev": {
+          "branch": "HEAD",
+          "commit_date": "2026-06-11 08:44:20 -0700",
+          "commit_hash": "a59603d2eaf2f1ac62de595e5d1cc219d2d25cbe",
+          "commit_hash_short": "a59603d2",
+          "dirty": true
+        },
+        "gymnasium_version": "1.3.0",
+        "isaaclab_newton_version": "0.15.6",
+        "isaaclab_ov_version": "0.4.4",
+        "isaaclab_physx_version": "1.1.5",
+        "isaaclab_release_version": "3.0.0",
+        "isaaclab_rl_version": "0.6.1",
+        "isaaclab_tasks_version": "6.0.0",
+        "isaaclab_version": "6.7.0",
+        "mujoco_version": "3.8.0",
+        "mujoco_warp_version": "3.8.0.3",
+        "newton_version": "1.4.0.dev0",
+        "numpy_version": "2.5.0rc1",
+        "phase": "version_info",
+        "rsl_rl_version": "5.0.1",
+        "torch_version": "2.11.0+cu130",
+        "usd_core_version": "25.11",
+        "warp_version": "1.15.0.dev20260615",
+        "workflow_name": "benchmark_startup"
+      }
+    }
+  ],
+  "summary_rows": [
+    {
+      "env_main_s": 124.714573062,
+      "env_pr_s": 41.304014128000006,
+      "env_speedup": 3.019429847072804,
+      "first_step_delta_pct": -33.56036988891615,
+      "num_envs": 128,
+      "scene_speedup": 3.2818987613069432,
+      "sim_start_speedup": 1.3079607727881586,
+      "task": "Ant"
+    },
+    {
+      "env_main_s": 2641.8295992470003,
+      "env_pr_s": 1766.781848805,
+      "env_speedup": 1.4952777565797708,
+      "first_step_delta_pct": 33.96745085871566,
+      "num_envs": 4096,
+      "scene_speedup": 1.4604712095003338,
+      "sim_start_speedup": 22.422908104897616,
+      "task": "Cartpole"
+    },
+    {
+      "env_main_s": 305.39747257,
+      "env_pr_s": 232.673330477,
+      "env_speedup": 1.3125589939504856,
+      "first_step_delta_pct": -7.804992819557263,
+      "num_envs": 128,
+      "scene_speedup": 1.2030032568705737,
+      "sim_start_speedup": 14.299658401893712,
+      "task": "Humanoid"
+    }
+  ]
+}
