@@ -319,17 +319,18 @@
           <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, in-place state output isolation in <code>_advance</code>, and
           repeated root writes in <code>com_vel</code>. This update adds active contact-row <code>aref</code>/<code>D</code>
           VJPs, contact-row position gradients for all pyramidal rows, contact buffer isolation, and the missing quadratic-row
-          <code>efc.J</code> force-law term. The newest fix adds a manual <code>support.apply_ft</code> VJP so free-joint forces
-          routed through <code>xfrc_applied</code> now agree with finite differences.
+          <code>efc.J</code> force-law term. The newest stable code fix removes the RNE <code>qfrc_bias</code> double-count path
+          and the <code>cacc</code>/<code>cvel</code> clone aliases; no-limit two-link q-position gradients are back to
+          1.7e-5 relative error.
         </p>
       </article>
       <article class="panel warn">
         <h2>What Is Not Fixed</h2>
         <p>
-          Ant still does not train to a clean walking gait. One-step motor/action derivatives are clean, but contact-rich policy
-          gradients drift once the Ant rollout reaches repeated foot contacts. A contact margin helps H=8 finite differences, and
-          upright termination removes the tumble exploit, but the best reliable policy is still a slow crawl rather than robust
-          locomotion.
+          Ant still does not train to a clean walking gait. The current blocker is no longer the no-contact RNE path: it is the
+          active joint-limit q-position derivative. A two-link active-limit reproducer has 6.7e-3 joint-q relative error while the
+          same no-limit two-link scene is at 1.7e-5. Equation-level finite differences trace the remaining residual to the dense
+          diagonal mass-matrix adjoint used by the solver Hessian correction.
         </p>
       </article>
     </section>
@@ -388,6 +389,18 @@
               <td>2.1e-1</td>
               <td>0.75</td>
               <td>Longer contact-rich BPTT is still not accurate enough for reliable gait learning.</td>
+            </tr>
+            <tr>
+              <td>Two-link no-limit solver q-gradient</td>
+              <td>1.7e-5</td>
+              <td>n/a</td>
+              <td>RNE ordering and clone fixes restore the reduced-coordinate no-limit path.</td>
+            </tr>
+            <tr>
+              <td>Two-link active joint-limit q-gradient</td>
+              <td>6.7e-3</td>
+              <td>n/a</td>
+              <td>Remaining reduced-coordinate blocker; mass-diagonal adjoint is the narrowed fault.</td>
             </tr>
           </tbody>
         </table>
@@ -599,6 +612,8 @@
           <code>_advance</code> had to isolate output <code>qpos</code>/<code>qvel</code> arrays under AD to avoid overwriting
           saved inputs. Fifth, Newton's free-joint force route writes to MJWarp <code>xfrc_applied</code>; the
           <code>support.apply_ft</code> map into <code>qfrc_smooth</code> needed an explicit VJP for free-root force controls.
+          The active-limit drilldown now shows that the solver mass correction's matrix gradient is algebraically right, but the
+          dense diagonal <code>M00</code> adjoint over-injects through the parent <code>cdof</code> path.
         </p>
       </article>
       <article class="panel">
@@ -608,8 +623,9 @@
           zero for early termination. Matching that behavior, and making terminal fall reward a fixed negative value, removes the
           high-speed crash exploit. The new upright gate also rejects the rolled-over progress policy. The remaining failure is
           not a simple one-step gradient sign bug; it appears when the task trades long-horizon progress against repeated Ant
-          contacts. The simple sphere/capsule scenes now check out, but Ant policy gradients degrade over H=8 contact-rich BPTT,
-          and SHAC currently reaches only a stable crawl.
+          contacts and active joint limits. The simple sphere/capsule scenes now check out, and the no-limit Ant decomposition is
+          accurate again after the RNE fixes, but limit-enabled Ant still inherits the dense mass-diagonal residual and SHAC
+          currently reaches only a stable crawl.
         </p>
       </article>
     </section>
@@ -710,8 +726,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       none: "assets/ant_state_jacobian_diagnostics/ant_state_jacobian_none_after_comvel_level.json",
       newton: "assets/ant_state_jacobian_diagnostics/ant_state_jacobian_newton_after_comvel_level.json",
       mujoco: "assets/ant_state_jacobian_diagnostics/ant_state_jacobian_mujoco_after_comvel_level.json",
-      solver: "assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_qfrc_bias_vjp.json",
-      bug: "assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_final_rne_vjp.json",
+      solver: "assets/solver_gradient_diagnostics_mass_diag_current_run1/solver_gradient_diagnostics.json",
+      bug: "assets/solver_gradient_bug_drilldown_current_rne_clone_removed_run1/solver_gradient_bug_drilldown.json",
       cartpole: "assets/cartpole_results.json",
       acrobot: "assets/acrobot_both_gradcheck_current_run1/acrobot_gradient_check.json",
       contactSphereNoContact: "assets/contact_sphere_nocontact_gradcheck_force500_after_applyft_run1/contact_sphere_gradient_check.json",
@@ -1060,10 +1076,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       });
 
       const solverCases = [
-        ["two_link_zero_g_forced_qd_out", "M(q)^-1 force"],
-        ["two_link_gravity_static_qd_out", "gravity bias"],
-        ["two_link_qd_out", "gravity + velocity"],
-        ["pendulum_qd_out", "single pendulum"]
+        ["two_link_zero_g_dynamic_qd_out", "two-link no limit"],
+        ["double_limited_hinge_qd_out", "active joint limit"]
       ];
       plotOrMessage("solver-chart", [
         {
