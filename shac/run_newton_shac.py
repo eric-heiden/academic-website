@@ -326,6 +326,9 @@ class NewtonMuJoCoTorchEnv:
         contact_reward: ContactTargetRewardWeights | None = None,
         acrobot_actuation: str = "elbow",
         ant_disable_joint_limits: bool = False,
+        ant_contact_margin: float = 0.0,
+        ant_contact_gap: float | None = None,
+        ant_min_up: float | None = None,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -340,6 +343,9 @@ class NewtonMuJoCoTorchEnv:
         self.contact_reward = contact_reward or ContactTargetRewardWeights()
         self.acrobot_actuation = acrobot_actuation
         self.ant_disable_joint_limits = ant_disable_joint_limits
+        self.ant_contact_margin = ant_contact_margin
+        self.ant_contact_gap = ant_contact_gap
+        self.ant_min_up = ant_min_up
         self.acrobot_link_length = 1.0
         self.contact_body_radius = 0.22
         self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
@@ -511,9 +517,15 @@ class NewtonMuJoCoTorchEnv:
         source.default_shape_cfg.kd = 1.0e4
         source.default_shape_cfg.kf = 3.0e3
         source.default_shape_cfg.mu = 0.75
+        source.default_shape_cfg.margin = self.ant_contact_margin
+        source.default_shape_cfg.gap = self.ant_contact_gap
         source.default_joint_cfg.limit_ke = 1.0e3
         source.default_joint_cfg.limit_kd = 1.0e1
         source.add_mjcf(str(DIFFRL_ROOT / "envs" / "assets" / "ant.xml"), up_axis="Z", armature_scale=50.0)
+        if self.ant_contact_margin != 0.0:
+            source.shape_margin = [self.ant_contact_margin] * len(source.shape_margin)
+        if self.ant_contact_gap is not None:
+            source.shape_gap = [self.ant_contact_gap] * len(source.shape_gap)
         if self.ant_disable_joint_limits:
             for dof_id in range(6, len(source.joint_limit_lower)):
                 source.joint_limit_lower[dof_id] = -1.0e10
@@ -530,7 +542,14 @@ class NewtonMuJoCoTorchEnv:
         builder = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(builder)
         builder.replicate(source, self.num_envs, spacing=(0.0, 0.0, 0.0))
-        ground_cfg = newton.ModelBuilder.ShapeConfig(ke=4.0e4, kd=1.0e4, kf=3.0e3, mu=0.75)
+        ground_cfg = newton.ModelBuilder.ShapeConfig(
+            ke=4.0e4,
+            kd=1.0e4,
+            kf=3.0e3,
+            mu=0.75,
+            margin=self.ant_contact_margin,
+            gap=self.ant_contact_gap,
+        )
         builder.add_ground_plane(cfg=ground_cfg)
         self.model = builder.finalize(device=self.wp_device, requires_grad=True)
         self.num_actions = 8
@@ -829,7 +848,13 @@ class NewtonMuJoCoTorchEnv:
         if self.env_name != "ant":
             return torch.zeros(q.shape[0], dtype=torch.bool, device=q.device)
         finite = torch.isfinite(q).all(dim=-1)
-        return torch.logical_and(finite, q[:, 1] < ANT_TERMINATION_HEIGHT)
+        fallen = torch.logical_and(finite, q[:, 1] < ANT_TERMINATION_HEIGHT)
+        if self.ant_min_up is not None:
+            torso_rot = normalize_vec(q[:, 3:7])
+            torso_quat = quat_mul(torso_rot, self.ant_inv_start_rotation[: q.shape[0]])
+            up_vec = quat_rotate(torso_quat, self.ant_basis_y[: q.shape[0]])
+            fallen = torch.logical_or(fallen, torch.logical_and(finite, up_vec[:, 1] < self.ant_min_up))
+        return fallen
 
     def invalid_state(self, q: torch.Tensor, qd: torch.Tensor) -> torch.Tensor:
         invalid = torch.logical_or(~torch.isfinite(q).all(dim=-1), ~torch.isfinite(qd).all(dim=-1))
@@ -1121,6 +1146,9 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         contact_backend=args.contact_backend,
         acrobot_actuation=args.acrobot_actuation,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
+        ant_contact_margin=args.ant_contact_margin,
+        ant_contact_gap=args.ant_contact_gap,
+        ant_min_up=args.ant_min_up,
         acrobot_reward=AcrobotRewardWeights(
             target=args.acrobot_target_weight,
             velocity=args.acrobot_velocity_weight,
@@ -1369,6 +1397,9 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "epsilon_values": epsilons,
         "directions": args.grad_check_directions,
+        "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
+        "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
+        "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "policy": {
             "loss": float(policy_loss.detach().cpu()),
             "analytic_grad_norm": finite_float(policy_grad_norm),
@@ -1452,6 +1483,9 @@ def run_training(args: argparse.Namespace) -> dict:
         contact_backend=args.contact_backend,
         acrobot_actuation=args.acrobot_actuation,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
+        ant_contact_margin=args.ant_contact_margin,
+        ant_contact_gap=args.ant_contact_gap,
+        ant_min_up=args.ant_min_up,
         ant_reward=AntRewardWeights(
             progress=args.ant_progress_weight,
             heading=args.ant_heading_weight,
@@ -1764,6 +1798,9 @@ def run_training(args: argparse.Namespace) -> dict:
                 contact_backend=args.contact_backend,
                 acrobot_actuation=args.acrobot_actuation,
                 ant_disable_joint_limits=args.ant_disable_joint_limits,
+                ant_contact_margin=args.ant_contact_margin,
+                ant_contact_gap=args.ant_contact_gap,
+                ant_min_up=args.ant_min_up,
                 cartpole_reward=env.cartpole_reward,
                 ant_reward=env.ant_reward,
                 acrobot_reward=env.acrobot_reward,
@@ -1816,6 +1853,9 @@ def run_training(args: argparse.Namespace) -> dict:
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "ant_reward": env.ant_reward.__dict__,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
+        "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
+        "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
+        "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "total_seconds": total_s,
         "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
         "mean_fps": float(np.mean([h["fps"] for h in history])),
@@ -1864,6 +1904,9 @@ def evaluate_policy(
     forward_displacement = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
     completed_returns = []
     completed_lengths = []
+    height_samples = []
+    up_samples = []
+    heading_samples = []
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action), obs_rms)
         action = torch.tanh(actor(obs, deterministic=True))
@@ -1879,6 +1922,10 @@ def evaluate_policy(
         )
         q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=False)
         final_obs = env.observe(q, qd, action)
+        if env.env_name == "ant":
+            height_samples.append(final_obs[:, 0].detach().mean())
+            up_samples.append(final_obs[:, 27].detach().mean())
+            heading_samples.append(final_obs[:, 28].detach().mean())
         rew = env.reward(q, qd, action, obs=final_obs)
         rew = finalize_ant_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
@@ -1920,6 +1967,9 @@ def evaluate_policy(
         "mean_completed_return": float(np.mean(completed_returns)) if completed_returns else None,
         "mean_completed_length": float(np.mean(completed_lengths)) if completed_lengths else None,
         "mean_forward_displacement": float(forward_displacement.mean().detach().cpu()),
+        "mean_height": float(torch.stack(height_samples).mean().cpu()) if height_samples else None,
+        "mean_up": float(torch.stack(up_samples).mean().cpu()) if up_samples else None,
+        "mean_heading": float(torch.stack(heading_samples).mean().cpu()) if heading_samples else None,
         "unfinished_mean_return": float(episode_returns.mean().detach().cpu()),
         "unfinished_mean_length": float(episode_lengths.to(torch.float32).mean().detach().cpu()),
         "final_obs_mean": [float(x) for x in final_obs.mean(dim=0).cpu().tolist()],
@@ -2095,6 +2145,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
+    parser.add_argument("--ant-contact-margin", type=float, default=0.0)
+    parser.add_argument("--ant-contact-gap", type=float, default=None)
+    parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)

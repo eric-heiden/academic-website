@@ -257,10 +257,11 @@
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
           Newton experiments coupling SHAC-style differentiable policy optimization to the MuJoCo Warp differentiability branch.
-          The latest pass adds staged acrobot, free-body, sphere-contact, and capsule-contact probes. Free-root force gradients
-          through <code>xfrc_applied</code> are now fixed, and one-step contact action gradients are accurate. The remaining blocker
-          is contact-state sensitivity: root velocity/orientation gradients still drift over contact-rich horizons, so reliable Ant
-          locomotion with SHAC is still not solved.
+          The latest pass stages the problem through acrobot target control, free-body control, sphere/capsule contact targets,
+          and Ant. Free-root force gradients through <code>xfrc_applied</code> are fixed, isolated contact target gradients now
+          agree with finite differences, and Ant reaches a no-fall/no-invalid upright crawl. Full Ant locomotion is still not
+          solved: contact-rich Ant policy gradients remain inaccurate over longer BPTT windows, and stronger progress rewards
+          still select crawl or spike-prone behaviors instead of a clean gait.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -277,24 +278,24 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Reliable Ant Eval</div>
+        <div class="label">Best Stable Ant Eval</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step Newton-contact eval after terminal/critic fix.</p>
+        <p class="note">480-step MuJoCo-contact eval with upright and invalid gates.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Reliable Ant Falls</div>
+        <div class="label">Stable Ant Falls</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Falls and invalid resets in the selected reliable run.</p>
+        <p class="note">Falls and invalid resets in the best stable crawl run.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Progress-5 Displacement</div>
+        <div class="label">Stable Crawl Distance</div>
         <div class="value" id="p5-displacement">...</div>
-        <p class="note">Forward distance when progress reward is weighted 5x.</p>
+        <p class="note">Forward distance over the 8 second ViewerGL rollout.</p>
       </div>
       <div class="panel metric">
         <div class="label">Mean Training FPS</div>
         <div class="value" id="stable-fps">...</div>
-        <p class="note">64 envs, 32 differentiable steps per epoch.</p>
+        <p class="note">64 envs, 8 differentiable steps per epoch.</p>
       </div>
     </section>
 
@@ -313,9 +314,10 @@
       <article class="panel warn">
         <h2>What Is Not Fixed</h2>
         <p>
-          Ant still does not train to reliable locomotion. One-step motor/action derivatives are clean, but contact-rich
-          root velocity and orientation derivatives remain imperfect over longer horizons. Hard Ant hinge limits create large
-          active-set discontinuities; widening them improves diagnostics but does not by itself produce a walking policy.
+          Ant still does not train to a clean walking gait. One-step motor/action derivatives are clean, but contact-rich policy
+          gradients drift once the Ant rollout reaches repeated foot contacts. A contact margin helps H=8 finite differences, and
+          upright termination removes the tumble exploit, but the best reliable policy is still a slow crawl rather than robust
+          locomotion.
         </p>
       </article>
     </section>
@@ -347,33 +349,33 @@
             </tr>
             <tr>
               <td>Capsule contact, policy H=8</td>
-              <td>3.0e-1</td>
+              <td>5.8e-4</td>
               <td>1.00</td>
-              <td>Policy horizon still overestimates contact response.</td>
+              <td>Isolated capsule-plane target control now matches finite differences.</td>
             </tr>
             <tr>
               <td>Acrobot, no contact, one-step state/action</td>
-              <td>9.7e-4</td>
+              <td>2.3e-3</td>
               <td>1.00</td>
               <td>Reduced-coordinate no-contact path is healthy.</td>
             </tr>
             <tr>
               <td>Ant, MuJoCo contact, one-step state/action</td>
-              <td>6.2e-5</td>
+              <td>5.7e-5</td>
               <td>1.00</td>
               <td>Local reset-state contact derivatives are clean after contact-row VJPs.</td>
             </tr>
             <tr>
-              <td>Ant open-loop H=8, no hinge limits</td>
-              <td>2.6e-2</td>
+              <td>Ant policy H=5, no contact margin</td>
+              <td>1.8e-4</td>
               <td>1.00</td>
-              <td>Short contact horizon is much better after the <code>efc.J</code> force-law term.</td>
+              <td>Short Ant BPTT is accurate before smoothing activates extra contacts.</td>
             </tr>
             <tr>
-              <td>Ant open-loop H=16, no hinge limits</td>
-              <td>2.6e-1</td>
+              <td>Ant policy H=8, margin 0.02</td>
+              <td>2.1e-1</td>
               <td>0.75</td>
-              <td>Longer contact-rich BPTT is still not accurate enough for reliable SHAC.</td>
+              <td>Longer contact-rich BPTT is still not accurate enough for reliable gait learning.</td>
             </tr>
           </tbody>
         </table>
@@ -434,26 +436,26 @@
 
     <section class="grid two">
       <article class="panel">
-        <h2>Reliable Upright Ant</h2>
+        <h2>Best Stable Ant Crawl</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_newton_bootstrap_fixed_force200_run1/ant_poster.png">
-            <source src="assets/ant_newton_bootstrap_fixed_force200_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1/ant_poster.png">
+            <source src="assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Newton contacts, fixed terminal reward, terminal critic bootstrap disabled. The policy survives the full
-            480-frame eval but is essentially a crouched standing policy.
+            MuJoCo contacts with margin 0.02, upright termination, force 150, progress weight 5, and action penalty -0.02.
+            This run has zero falls/invalids and moves 1.01 m in 8 s, but it is still a crawl rather than a clean gait.
           </figcaption>
         </figure>
       </article>
       <article class="panel">
-        <h2>Progress-Weighted Ant</h2>
+        <h2>Rejected Progress Exploit</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_newton_progress5_warmstart_run1/ant_poster.png">
-            <source src="assets/ant_newton_progress5_warmstart_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_mujoco_margin002_h8_limits_progress5_run1/ant_poster.png">
+            <source src="assets/ant_mujoco_margin002_h8_limits_progress5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Progress weight 5x from the stable checkpoint. This policy moves forward, but it is not reliable: the eval still has
-            falls, so this is diagnostic evidence rather than a solved locomotion result.
+            With only height-based termination, progress weight 5x moves farther but selects a tumbling/flailing behavior:
+            4.01 m displacement with falls/invalid resets. This is diagnostic evidence, not solved locomotion.
           </figcaption>
         </figure>
       </article>
@@ -522,7 +524,8 @@
           </video>
           <figcaption>
             Single free sphere on a MuJoCo-contact ground plane. Free-root force gradients are fixed, but the SHAC run remains
-            unstable: best epoch 15, eval return -21,579, 81.5 s runtime, 24.2 MB CUDA allocated.
+            an intentionally small contact target, not a locomotion benchmark. The current gradient check gives H=8 policy
+            median relative error 4.9e-4.
           </figcaption>
         </figure>
       </article>
@@ -534,7 +537,7 @@
           </video>
           <figcaption>
             Horizontal capsule-plane contact probe, closer to Ant foot geometry. One-step action gradients are accurate, but the
-            H=8 policy gradient still has median relative error 0.30; eval return -12,784, 32.9 s runtime.
+            key result is now that isolated H=8 capsule policy gradients match finite differences at 5.8e-4 median relative error.
           </figcaption>
         </figure>
       </article>
@@ -591,10 +594,10 @@
         <p>
           The harness had its own bug: early terminal falls still bootstrapped from the critic. DiffRL sets the terminal value to
           zero for early termination. Matching that behavior, and making terminal fall reward a fixed negative value, removes the
-          high-speed crash exploit. The remaining failure is not a simple one-step gradient sign bug; it appears when the task
-          tries to trade long-horizon progress against contact-rich stability. The simple sphere/capsule scenes now show the
-          same structure in isolation: action gradients are accurate, but contact-state gradients still distort horizon policy
-          updates.
+          high-speed crash exploit. The new upright gate also rejects the rolled-over progress policy. The remaining failure is
+          not a simple one-step gradient sign bug; it appears when the task trades long-horizon progress against repeated Ant
+          contacts. The simple sphere/capsule scenes now check out, but Ant policy gradients degrade over H=8 contact-rich BPTT,
+          and SHAC currently reaches only a stable crawl.
         </p>
       </article>
     </section>
@@ -604,20 +607,23 @@
       <pre><code>PYTHONPATH=/home/horde/repos/academic-website-reports/shac \
 uv run --no-sync --project /home/horde/repos/newton-shac \
   python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
-  --mode train --env ant --contact-backend newton --num-envs 64 \
-  --epochs 220 --horizon 32 --eval-horizon 480 --selection-horizon 240 \
-  --force-scale 200 --termination-penalty 20 --render-video --video-num-envs 1 \
-  --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_newton_bootstrap_fixed_force200_run1</code></pre>
+  --mode gradcheck --env ant --contact-backend mujoco --num-envs 4 \
+  --horizon 8 --grad-check-directions 4 --deterministic-actor --deterministic-init \
+  --force-scale 200 --ant-contact-margin 0.02 \
+  --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_mujoco_gradcheck_h8_margin002_run1 \
+  --grad-check-file ant_gradient_check.json</code></pre>
       <pre style="margin-top: 12px;"><code>PYTHONPATH=/home/horde/repos/academic-website-reports/shac \
 uv run --no-sync --project /home/horde/repos/newton-shac \
   python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
-  --mode train --env ant --contact-backend newton --num-envs 64 \
-  --epochs 180 --horizon 32 --eval-horizon 480 --selection-horizon 240 \
-  --force-scale 200 --termination-penalty 20 --ant-progress-weight 5 \
-  --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_bootstrap_fixed_force200_run1/ant_actor.pt \
-  --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_newton_bootstrap_fixed_force200_run1/ant_obs_rms.pt \
+  --mode train --env ant --contact-backend mujoco --num-envs 64 \
+  --epochs 160 --horizon 8 --eval-horizon 480 --selection-horizon 240 \
+  --force-scale 150 --termination-penalty 20 --selection-fall-penalty 2000 \
+  --selection-invalid-penalty 2000 --ant-progress-weight 5 --ant-up-weight 1 \
+  --ant-action-penalty -0.02 --ant-contact-margin 0.02 --ant-min-up 0.35 \
+  --actor-path /home/horde/repos/academic-website-reports/shac/assets/ant_mujoco_margin002_h8_upright_progress3_action005_force150_run1/ant_actor.pt \
+  --obs-rms-path /home/horde/repos/academic-website-reports/shac/assets/ant_mujoco_margin002_h8_upright_progress3_action005_force150_run1/ant_obs_rms.pt \
   --render-video --video-num-envs 1 \
-  --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_newton_progress5_warmstart_run1</code></pre>
+  --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1</code></pre>
     </section>
   </main>
 
@@ -657,27 +663,33 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.coral
       },
       {
-        id: "stable",
-        label: "fixed stable",
+        id: "newtonStable",
+        label: "Newton upright",
         path: "assets/ant_newton_bootstrap_fixed_force200_run1/ant_results.json",
         color: colors.blue
       },
       {
-        id: "progress5",
-        label: "progress x5",
+        id: "newtonProgress5",
+        label: "Newton progress x5",
         path: "assets/ant_newton_progress5_warmstart_run1/ant_results.json",
         color: colors.violet
       },
       {
-        id: "progress2",
-        label: "progress x2",
-        path: "assets/ant_newton_progress2_warmstart_run1/ant_results.json",
+        id: "mujocoTumble",
+        label: "MuJoCo margin tumble",
+        path: "assets/ant_mujoco_margin002_h8_limits_progress5_run1/ant_results.json",
         color: colors.teal
       },
       {
-        id: "progress3",
-        label: "progress x3 strict",
-        path: "assets/ant_newton_progress3_warmstart_run1/ant_results.json",
+        id: "uprightStable",
+        label: "upright stable crawl",
+        path: "assets/ant_mujoco_margin002_h8_upright_progress3_action005_force150_run1/ant_results.json",
+        color: colors.green
+      },
+      {
+        id: "uprightProgress5",
+        label: "upright progress x5",
+        path: "assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1/ant_results.json",
         color: colors.amber
       }
     ];
@@ -689,10 +701,14 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       solver: "assets/solver_gradient_diagnostics/solver_gradient_diagnostics_after_qfrc_bias_vjp.json",
       bug: "assets/solver_gradient_diagnostics/solver_gradient_bug_drilldown_final_rne_vjp.json",
       cartpole: "assets/cartpole_results.json",
-      antNoLimits: "assets/ant_openloop_horizon_sweep_no_limits_after_jac_plus_run1/openloop_horizon_sweep.json",
+      acrobot: "assets/acrobot_both_gradcheck_current_run1/acrobot_gradient_check.json",
       contactSphereNoContact: "assets/contact_sphere_nocontact_gradcheck_force500_after_applyft_run1/contact_sphere_gradient_check.json",
-      contactSphere: "assets/contact_sphere_gradcheck_force500_after_aref_vel_run1/contact_sphere_gradient_check.json",
-      contactCapsule: "assets/contact_capsule_gradcheck_force500_after_aref_vel_run1/contact_capsule_gradient_check.json",
+      contactSphere: "assets/contact_sphere_gradcheck_after_qvelref_aref_temp_run1/contact_sphere_gradient_check.json",
+      contactCapsule: "assets/contact_capsule_gradcheck_after_qvelref_aref_temp_run1/contact_capsule_gradient_check.json",
+      antH5NoMargin: "assets/ant_mujoco_gradcheck_h5_after_contact_fix_run1/ant_gradient_check.json",
+      antH5Margin: "assets/ant_mujoco_gradcheck_h5_margin002_run1/ant_gradient_check.json",
+      antH8Margin: "assets/ant_mujoco_gradcheck_h8_margin002_run1/ant_gradient_check.json",
+      antH8NoMargin: "assets/ant_mujoco_gradcheck_after_contact_fix_run1/ant_gradient_check.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json"
     };
@@ -783,7 +799,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         <td>${runReward(run)}<br><span class="muted">${d.contact_backend || "n/a"} contacts</span></td>
         <td>${fmt(e.return, 1)}<br><span class="muted">score ${fmt(d.eval_score ?? d.best_eval_score, 1)}</span></td>
         <td>${fmt(e.fall_count, 0)} / ${fmt(e.invalid_count, 0)}<br><span class="muted">alive ${fmt(e.alive_fraction, 3)}</span></td>
-        <td>${fmt(e.mean_forward_displacement, 3)} m</td>
+        <td>${fmt(e.mean_forward_displacement, 3)} m<br><span class="muted">up ${fmt(e.mean_up, 2)}, heading ${fmt(e.mean_heading, 2)}</span></td>
         <td>${fmt(d.total_seconds, 1)} s<br><span class="muted">${fmt(d.mean_fps, 0)} fps</span></td>
         <td>${fmt(d.max_cuda_memory_allocated_mb, 1)} MB<br><span class="muted">${fmt(d.max_cuda_memory_reserved_mb, 1)} MB reserved</span></td>
       </tr>`;
@@ -799,10 +815,14 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         solver,
         bug,
         cartpole,
-        antNoLimits,
+        acrobot,
         contactSphereNoContact,
         contactSphere,
         contactCapsule,
+        antH5NoMargin,
+        antH5Margin,
+        antH8Margin,
+        antH8NoMargin,
         contactSphereTrain,
         contactCapsuleTrain
       ] = await Promise.all([
@@ -812,25 +832,31 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.solver),
         safeJson(diagPaths.bug),
         safeJson(diagPaths.cartpole),
-        safeJson(diagPaths.antNoLimits),
+        safeJson(diagPaths.acrobot),
         safeJson(diagPaths.contactSphereNoContact),
         safeJson(diagPaths.contactSphere),
         safeJson(diagPaths.contactCapsule),
+        safeJson(diagPaths.antH5NoMargin),
+        safeJson(diagPaths.antH5Margin),
+        safeJson(diagPaths.antH8Margin),
+        safeJson(diagPaths.antH8NoMargin),
         safeJson(diagPaths.contactSphereTrain),
         safeJson(diagPaths.contactCapsuleTrain)
       ]);
 
-      const stable = presentRuns.find((run) => run.id === "stable");
-      const progress5 = presentRuns.find((run) => run.id === "progress5");
+      const stable = presentRuns.find((run) => run.id === "uprightProgress5")
+        || presentRuns.find((run) => run.id === "uprightStable")
+        || presentRuns.find((run) => run.id === "newtonStable");
       const latestStamp = [
+        stable?.data?.timestamp_pacific,
+        antH8Margin?.timestamp_pacific,
+        antH5Margin?.timestamp_pacific,
+        acrobot?.timestamp_pacific,
         contactCapsuleTrain?.timestamp_pacific,
         contactSphereTrain?.timestamp_pacific,
         contactCapsule?.timestamp_pacific,
         contactSphere?.timestamp_pacific,
         contactSphereNoContact?.timestamp_pacific,
-        antNoLimits?.timestamp_pacific,
-        progress5?.data?.timestamp_pacific,
-        stable?.data?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -839,7 +865,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       document.getElementById("report-stamp").textContent = stamp(latestStamp);
       document.getElementById("stable-return").textContent = fmt(stable?.data?.eval?.return, 1);
       document.getElementById("stable-falls").textContent = `${fmt(stable?.data?.eval?.fall_count, 0)} / ${fmt(stable?.data?.eval?.invalid_count, 0)}`;
-      document.getElementById("p5-displacement").textContent = `${fmt(progress5?.data?.eval?.mean_forward_displacement, 2)} m`;
+      document.getElementById("p5-displacement").textContent = `${fmt(stable?.data?.eval?.mean_forward_displacement, 2)} m`;
       document.getElementById("stable-fps").textContent = fmt(stable?.data?.mean_fps, 0);
 
       if (presentRuns.length) {
@@ -907,6 +933,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       }
 
       const contactRows = [
+        ["acrobot H=8 policy", bestSweep(acrobot?.policy)],
+        ["acrobot one-step state", bestSweep(acrobot?.one_step_state_action)],
         ["sphere no-contact policy", bestSweep(contactSphereNoContact?.policy)],
         ["sphere contact action", bestSweep(contactSphere?.one_step_action)],
         ["sphere contact root qd", bestComponentSweep(contactSphere, "root_qd")],
@@ -915,10 +943,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["capsule contact root qd", bestComponentSweep(contactCapsule, "root_qd")],
         ["capsule contact policy", bestSweep(contactCapsule?.policy)]
       ].filter(([, row]) => row);
-      const antRows = Object.entries(antNoLimits?.results || {}).map(([horizon, row]) => [
-        `Ant H=${horizon}`,
-        bestSweep(row)
-      ]).filter(([, row]) => row).sort((a, b) => Number(a[0].replace("Ant H=", "")) - Number(b[0].replace("Ant H=", "")));
+      const antRows = [
+        ["Ant H=5 no margin", bestSweep(antH5NoMargin?.policy)],
+        ["Ant H=5 margin", bestSweep(antH5Margin?.policy)],
+        ["Ant H=8 margin", bestSweep(antH8Margin?.policy)],
+        ["Ant H=8 no margin", bestSweep(antH8NoMargin?.policy)]
+      ].filter(([, row]) => row);
 
       Plotly.newPlot("contact-horizon-chart", [
         {
