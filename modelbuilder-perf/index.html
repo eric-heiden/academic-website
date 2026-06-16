@@ -17,6 +17,8 @@
       --blue: #4c78a8;
       --orange: #f58518;
       --green: #13795b;
+      --red: #b91c1c;
+      --teal: #0f766e;
     }
     * { box-sizing: border-box; }
     body {
@@ -39,14 +41,26 @@
     .card span { color: var(--muted); font-size: 0.92rem; }
     .plot-panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 10px; overflow: hidden; }
     #all-finalize-plot { width: 100%; min-height: 980px; }
+    .callout { border-left: 5px solid var(--teal); background: var(--panel); border-radius: 0 8px 8px 0; padding: 14px 16px; margin: 18px 0; }
+    .callout p { margin: 0; }
+    .table-scroll { overflow-x: auto; }
+    .table-scroll table { min-width: 900px; }
+    .plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; margin-top: 14px; }
+    .inline-plot { min-height: 430px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 8px; }
     table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; overflow: hidden; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; font-size: 0.93rem; }
     th:first-child, td:first-child { text-align: left; }
     th { background: var(--head); color: var(--ink); }
     tr:last-child td { border-bottom: 0; }
     .good { color: var(--green); font-weight: 700; }
+    .bad { color: var(--red); font-weight: 700; }
     .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
     .links a { color: #1d4ed8; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 24px, 1180px); }
+      .plot-grid { grid-template-columns: 1fr; }
+      .inline-plot { min-height: 360px; }
+    }
   </style>
 </head>
 <body>
@@ -61,7 +75,7 @@
       <span class="pill">World counts: <code>1, 10, 100, 512, 1024, 2048, 4096, 8192</code></span>
       <span class="pill">Repeats: <code>1</code> child process per point</span>
       <span class="pill">Data: 2026-06-15 16:35:16 -0700</span>
-      <span class="pill"><a href="isaaclab-pr3187.html">Isaac Lab PR 3187 startup report</a></span>
+      <span class="pill">Isaac Lab PR 3187 data included below</span>
     </div>
 
     <section class="cards" aria-label="summary">
@@ -69,6 +83,45 @@
       <div class="card"><strong>56</strong><span>world-count points per branch</span></div>
       <div class="card"><strong>-71.2%</strong><span>aggregate 8192-world finalize time</span></div>
       <div class="card"><strong>33.2% to 78.8%</strong><span>8192-world per-scene improvement range</span></div>
+    </section>
+
+    <section>
+      <h2>Isaac Lab Newton PR 3187 startup</h2>
+      <p>Newton PR <a href="https://github.com/newton-physics/newton/pull/3187">#3187</a> was benchmarked against Newton <code>origin/main</code> in an Isaac Lab worktree using <code>presets=newton_mjwarp</code>, the summary benchmark backend, and editable Newton installs verified before launch.</p>
+      <div class="meta">
+        <span class="pill">Generated: <code>2026-06-16T04:47:56+00:00</code></span>
+        <span class="pill">Newton main: <code>2c24200200b1</code></span>
+        <span class="pill">PR 3187: <code>172dbda45f6a</code></span>
+        <span class="pill">Isaac Lab: <code>a59603d2eaf2</code></span>
+        <span class="pill">Preset: <code>newton_mjwarp</code></span>
+      </div>
+      <div class="callout">
+        <p><strong>Headline:</strong> PR 3187 improved reported env-creation wall time in every completed matched sample: Ant 128 by 3.02x, Cartpole 4096 by 1.50x, and Humanoid 128 by 1.31x.</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Task</th><th>Envs</th><th>Main env creation s</th><th>PR env creation s</th><th>Env speedup</th><th>Scene speedup</th><th>Simulation-start speedup</th><th>First-step delta</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Ant</td><td>128</td><td>124.715</td><td>41.304</td><td class="good">3.02x</td><td>3.28x</td><td>1.31x</td><td class="good">-33.6%</td></tr>
+            <tr><td>Cartpole</td><td>4096</td><td>2,641.830</td><td>1,766.782</td><td class="good">1.50x</td><td>1.46x</td><td>22.42x</td><td class="bad">+34.0%</td></tr>
+            <tr><td>Humanoid</td><td>128</td><td>305.397</td><td>232.673</td><td class="good">1.31x</td><td>1.20x</td><td>14.30x</td><td class="good">-7.8%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="plot-grid" aria-label="Isaac Lab PR 3187 benchmark plots">
+        <div id="isaaclab-env-creation-plot" class="inline-plot"></div>
+        <div id="isaaclab-speedup-plot" class="inline-plot"></div>
+        <div id="isaaclab-phase-plot" class="inline-plot"></div>
+        <div id="isaaclab-wrapper-plot" class="inline-plot"></div>
+      </div>
+      <p>Cartpole uses 4096 envs to match the requested launch shape. Ant and Humanoid use 128 envs after a 1024-env Ant attempt hit a CUDA 13 NVRTC loader-path issue before JSON emission. Normalized data and raw reports are kept with this published page.</p>
+      <div class="links">
+        <a href="data/isaaclab_pr3187_startup_summary.json">Isaac Lab startup summary JSON</a>
+        <a href="data/isaaclab_pr3187_raw/index.json">raw startup JSON manifest</a>
+        <a href="isaaclab-pr3187.html">standalone Isaac Lab view</a>
+      </div>
     </section>
 
     <section>
@@ -107,6 +160,54 @@
   <script>
     const payload = {"traces":[{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[99.714,108.93,159.102,535.292,1209.832,2432.948,4856.377,10274.361],"xaxis":"x","yaxis":"y","legendgroup":"origin-main","showlegend":true,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_allegro_hand<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[88.393,105.524,148.603,482.548,955.165,1061.178,2134.636,4450.542],"xaxis":"x","yaxis":"y","legendgroup":"modelbuilder-compact-filters","showlegend":true,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_allegro_hand<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[54.351,62.851,173.261,727.903,1428.144,3060.157,7757.664,23184.559],"xaxis":"x2","yaxis":"y2","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_anymal_d<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[52.218,61.933,156.723,687.427,527.633,1070.257,2523.433,4922.763],"xaxis":"x2","yaxis":"y2","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_anymal_d<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[62.577,62.334,33.977,62.272,114.357,191.18,345.553,794.301],"xaxis":"x3","yaxis":"y3","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_cartpole<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[30.61,35.869,35.506,55.591,88.244,151.389,293.832,530.738],"xaxis":"x3","yaxis":"y3","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_cartpole<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[326.399,364.098,860.125,3258.278,6368.571,15595.504,44044.359,77283.239],"xaxis":"x4","yaxis":"y4","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_g1<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[218.34,238.592,637.854,1040.71,1909.146,4639.049,8886.235,18212.304],"xaxis":"x4","yaxis":"y4","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_g1<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[141.661,160.149,288.762,1020.784,2236.382,4299.213,8686.038,20631.509],"xaxis":"x5","yaxis":"y5","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_h1<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[59.229,67.103,187.689,760.194,821.089,1585.942,3257.652,7179.534],"xaxis":"x5","yaxis":"y5","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_h1<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[116.506,115.438,260.838,929.722,1804.213,3663.212,8169.345,16155.232],"xaxis":"x6","yaxis":"y6","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_panda_hydro<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[132.648,116.305,215.051,701.015,1311.97,1616.567,3599.9,6778.283],"xaxis":"x6","yaxis":"y6","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_panda_hydro<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"origin-main","x":[1,10,100,512,1024,2048,4096,8192],"y":[168.415,176.86,235.994,540.984,998.086,1906.489,4385.473,9645.192],"xaxis":"x7","yaxis":"y7","legendgroup":"origin-main","showlegend":false,"line":{"width":2.5,"color":"#4c78a8"},"marker":{"size":7,"color":"#4c78a8"},"hovertemplate":"robot_ur10<br>origin-main<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"modelbuilder-compact-filters","x":[1,10,100,512,1024,2048,4096,8192],"y":[60.355,66.886,121.279,432.546,802.931,658.502,1414.864,3430.831],"xaxis":"x7","yaxis":"y7","legendgroup":"modelbuilder-compact-filters","showlegend":false,"line":{"width":2.5,"color":"#f58518"},"marker":{"size":7,"color":"#f58518"},"hovertemplate":"robot_ur10<br>modelbuilder-compact-filters<br>%{x} worlds<br>%{y:.2f} ms<extra></extra>"}],"layout":{"height":1180,"margin":{"l":64,"r":28,"t":94,"b":58},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","legend":{"orientation":"h","x":0.5,"xanchor":"center","y":1.07,"yanchor":"bottom"},"hovermode":"closest","annotations":[{"text":"robot_allegro_hand","xref":"paper","yref":"paper","x":0.23,"y":1.0,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_anymal_d","xref":"paper","yref":"paper","x":0.77,"y":1.0,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_cartpole","xref":"paper","yref":"paper","x":0.23,"y":0.75475,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_g1","xref":"paper","yref":"paper","x":0.77,"y":0.75475,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_h1","xref":"paper","yref":"paper","x":0.23,"y":0.48350000000000004,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_panda_hydro","xref":"paper","yref":"paper","x":0.77,"y":0.48350000000000004,"showarrow":false,"font":{"size":14,"color":"#111827"}},{"text":"robot_ur10","xref":"paper","yref":"paper","x":0.23,"y":0.21225000000000002,"showarrow":false,"font":{"size":14,"color":"#111827"}}],"xaxis":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis":{"domain":[0.81375,1.0],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis2":{"domain":[0.54,1.0],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis2":{"domain":[0.81375,1.0],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis3":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis3":{"domain":[0.5425,0.72875],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis4":{"domain":[0.54,1.0],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis4":{"domain":[0.5425,0.72875],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis5":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis5":{"domain":[0.27125,0.4575],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis6":{"domain":[0.54,1.0],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis6":{"domain":[0.27125,0.4575],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"xaxis7":{"domain":[0.0,0.46],"type":"log","tickvals":[1,10,100,512,1024,2048,4096,8192],"ticktext":["1","10","100","512","1024","2048","4096","8192"],"showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false},"yaxis7":{"domain":[2.7755575615628914e-17,0.18625000000000003],"title":{"text":"ms"},"rangemode":"tozero","showgrid":true,"gridcolor":"rgba(148, 163, 184, 0.24)","zeroline":false}}};
     Plotly.newPlot("all-finalize-plot", payload.traces, payload.layout, {responsive: true, displaylogo: false});
+    async function renderIsaacLabPr3187() {
+      const response = await fetch("data/isaaclab_pr3187_startup_summary.json");
+      const data = await response.json();
+      const colors = {main: "#2563eb", pr3187: "#0f766e"};
+      const pairLabel = (pair) => `${pair.task_short} (${pair.num_envs} envs)`;
+      const runLabel = (run) => `${run.task_short} ${run.num_envs} / ${run.revision_label}`;
+      const labels = data.pairs.map(pairLabel);
+      const layoutBase = {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "#ffffff",
+        margin: {l: 58, r: 24, t: 58, b: 78},
+        font: {family: "Inter, system-ui, sans-serif", color: "#111827"},
+        legend: {orientation: "h", y: -0.24}
+      };
+      Plotly.newPlot("isaaclab-env-creation-plot", [
+        {type: "bar", name: "Newton main", x: labels, y: data.pairs.map((pair) => pair.metrics.env_creation_wall_s.main_s), marker: {color: colors.main}},
+        {type: "bar", name: "PR 3187", x: labels, y: data.pairs.map((pair) => pair.metrics.env_creation_wall_s.pr_s), marker: {color: colors.pr3187}}
+      ], {...layoutBase, title: "Env Creation Wall Time", yaxis: {title: "seconds"}, barmode: "group"}, {responsive: true, displaylogo: false});
+      Plotly.newPlot("isaaclab-speedup-plot", [
+        {type: "bar", name: "Env creation", x: labels, y: data.pairs.map((pair) => pair.metrics.env_creation_wall_s.speedup), marker: {color: "#0f766e"}},
+        {type: "bar", name: "Scene creation", x: labels, y: data.pairs.map((pair) => pair.metrics.scene_creation_s.speedup), marker: {color: "#b45309"}},
+        {type: "bar", name: "Simulation start", x: labels, y: data.pairs.map((pair) => pair.metrics.simulation_start_s.speedup), marker: {color: "#7c3aed"}}
+      ], {...layoutBase, title: "PR Speedup vs Main", yaxis: {title: "main / PR, higher is better", rangemode: "tozero"}, barmode: "group"}, {responsive: true, displaylogo: false});
+      const phaseRuns = data.runs.slice().sort((left, right) => (left.task_short + left.num_envs + left.revision).localeCompare(right.task_short + right.num_envs + right.revision));
+      const phaseX = phaseRuns.map(runLabel);
+      const phaseNames = ["app_launch", "python_imports", "task_config", "env_creation", "first_step"];
+      const phaseDisplay = {app_launch: "App launch", python_imports: "Python imports", task_config: "Task config", env_creation: "Env creation", first_step: "First step"};
+      Plotly.newPlot("isaaclab-phase-plot", phaseNames.map((phase, index) => {
+        const palette = ["#64748b", "#0284c7", "#ca8a04", "#0f766e", "#be123c"];
+        return {type: "bar", name: phaseDisplay[phase], x: phaseX, y: phaseRuns.map((run) => run.phases[phase].wall_s), marker: {color: palette[index]}};
+      }), {...layoutBase, title: "Reported Startup Phase Breakdown", yaxis: {title: "seconds"}, barmode: "stack"}, {responsive: true, displaylogo: false});
+      const wrapperName = "isaaclab.sim.utils.prims:wrapper";
+      Plotly.newPlot("isaaclab-wrapper-plot", [
+        {type: "bar", name: "Newton main", x: labels, y: data.pairs.map((pair) => {
+          const run = data.runs.find((item) => item.task === pair.task && item.num_envs === pair.num_envs && item.revision === "main");
+          return ((run && run.phases.env_creation.measurements_ms[wrapperName]) || 0) / 1000;
+        }), marker: {color: colors.main}},
+        {type: "bar", name: "PR 3187", x: labels, y: data.pairs.map((pair) => {
+          const run = data.runs.find((item) => item.task === pair.task && item.num_envs === pair.num_envs && item.revision === "pr3187");
+          return ((run && run.phases.env_creation.measurements_ms[wrapperName]) || 0) / 1000;
+        }), marker: {color: colors.pr3187}}
+      ], {...layoutBase, title: "Env-Creation Hotspot: isaaclab.sim.utils.prims:wrapper", yaxis: {title: "own time, seconds"}, barmode: "group"}, {responsive: true, displaylogo: false});
+    }
+    renderIsaacLabPr3187().catch((error) => {
+      document.querySelectorAll(".inline-plot").forEach((element) => {
+        element.textContent = `Could not load Isaac Lab benchmark data: ${error.message}`;
+      });
+    });
   </script>
 </body>
 </html>
