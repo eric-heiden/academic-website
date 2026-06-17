@@ -134,6 +134,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        phase_observation=args.phase_observation,
+        phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
         locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
         ant_reward=AntRewardWeights(
@@ -199,7 +201,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
 
         for _ in range(args.rollout_steps):
             with torch.no_grad():
-                obs_raw = env.observe(q, qd, prev_action)
+                obs_raw = env.observe(q, qd, prev_action, phase=progress)
                 if obs_rms is not None:
                     obs_rms.update(obs_raw)
                 obs = normalize_obs(obs_raw, obs_rms_snapshot(obs_rms))
@@ -211,7 +213,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 q_next, qd_next, action = env.sanitize_state(
                     q_next, qd_next, action, invalid, stochastic_init=args.stochastic_init
                 )
-                next_obs = env.observe(q_next, qd_next, action)
+                next_obs = env.observe(q_next, qd_next, action, phase=progress + 1)
                 reward = env.reward(q_next, qd_next, action, obs=next_obs)
                 reward = finalize_terminal_reward(
                     reward,
@@ -243,7 +245,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 q, qd, prev_action = q_next.detach(), qd_next.detach(), action.detach()
 
         with torch.no_grad():
-            last_obs_raw = env.observe(q, qd, prev_action)
+            last_obs_raw = env.observe(q, qd, prev_action, phase=progress)
             last_obs = normalize_obs(last_obs_raw, obs_rms_snapshot(obs_rms))
             last_value = critic(last_obs)
             rewards = torch.stack(reward_buf)
@@ -401,6 +403,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                phase_observation=args.phase_observation,
+                phase_period=args.phase_period,
                 hopper_terminate_angle=args.hopper_terminate_angle,
                 locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
                 ant_reward=env.ant_reward,
@@ -456,6 +460,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "phase_observation": env.phase_observation if args.env == "ant" else None,
+        "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "total_seconds": total_s,
         "mean_update_seconds": float(np.mean([h["update_seconds"] for h in history])),
@@ -520,6 +526,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--phase-observation", action="store_true")
+    parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)
     parser.add_argument("--hopper-progress-weight", type=float, default=1.0)
     parser.add_argument("--hopper-angle-weight", type=float, default=1.0)

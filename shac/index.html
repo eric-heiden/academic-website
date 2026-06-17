@@ -276,7 +276,9 @@
           MuJoCo contacts at substep 1: 10.33 m forward over 480 frames with zero falls/invalids. PPO verifies that the
           16-substep Cheetah task itself is learnable. Hopper and Ant still need training stabilization and reward/curriculum
           work: Hopper requires angle termination to avoid lying-down policies, and Ant's default reward trains standing rather
-          than locomotion.
+          than locomotion. The newest Ant drilldown adds an opt-in phase/clock observation and an open-loop sine diagnostic:
+          a scripted gait can move 6.49 m, but it rolls over, behavior cloning does not preserve it, and the first phase-SHAC
+          probe still fails full-horizon selection.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -340,7 +342,8 @@
           Hopper termination admits lying-down policies, while angle termination yields upright balance and progress-weighted
           reward yields short bursts that still fall over 480 frames. Ant one-step state/action gradients now pass through H=5,
           but PPO with the default reward learns a stable standing pose with 0.005 m displacement; a more locomotion-weighted
-          reward collapses early without a curriculum.
+          reward collapses early without a curriculum. The open-loop sine diagnostic proves the action mapping can generate
+          forward motion, but the motion is not upright or reliable and is not captured by the current memoryless MLP actor.
         </p>
       </article>
     </section>
@@ -629,6 +632,35 @@
           penalty -0.01 was stopped at update 24 because full-horizon selection remained strongly negative from falls/invalids.
           The next Ant step should use a curriculum rather than jumping directly from standing reward to aggressive progress.
         </p>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel bad">
+        <h2>Ant Open-Loop Sine</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_open_loop_sine_probe_run1/ant_open_loop_sine_poster.png">
+            <source src="assets/ant_open_loop_sine_probe_run1/ant_open_loop_sine.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Scripted sinusoidal actions with MuJoCo contacts and 16 substeps move 6.49 m over 480 frames, proving the action
+            map and contacts can produce forward motion. The rollout rolls over once and has mean up -0.51, so this is not a
+            solved policy.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel bad">
+        <h2>Ant SHAC With Phase</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_shac_phase_progress3_sub1_16env_40ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_phase_progress3_sub1_16env_40ep_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Opt-in phase observation, progress weight 3, MuJoCo contacts, and substep 1 still fail under SHAC: eval score
+            -5621.9, displacement -0.30 m, 15 falls, and 3 invalids. The clock helps representation, but not the current
+            optimization/curriculum.
+          </figcaption>
+        </figure>
       </article>
     </section>
 
@@ -1030,6 +1062,16 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
   --termination-penalty 200 --ant-contact-margin 0.002 \
   --render-video --video-num-envs 1 \
   --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1</code></pre>
+      <pre style="margin-top: 12px;"><code>PYTHONPATH=/home/horde/repos/mujoco_warp-differentiability:/home/horde/repos/academic-website-reports/shac \
+uv run --no-sync --project /home/horde/repos/newton-shac \
+  python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
+  --env ant --contact-backend mujoco --num-envs 16 --epochs 40 \
+  --horizon 32 --eval-horizon 480 --selection-horizon 480 --sim-substeps 1 \
+  --termination-penalty 200 --ant-contact-margin 0.002 --phase-observation \
+  --phase-period 60 --ant-progress-weight 3 --ant-heading-weight 0.5 \
+  --ant-up-weight 0.1 --ant-height-weight 0.5 --ant-action-penalty -0.005 \
+  --lr 5e-4 --grad-clip 0.5 --render-video --video-num-envs 1 \
+  --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_shac_phase_progress3_sub1_16env_40ep_run1</code></pre>
     </section>
   </main>
 
@@ -1103,6 +1145,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO default stand",
         path: "assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_results.json",
         color: colors.slate
+      },
+      {
+        id: "antShacPhase",
+        label: "Ant SHAC phase probe",
+        path: "assets/ant_shac_phase_progress3_sub1_16env_40ep_run1/ant_results.json",
+        color: colors.coral
       },
       {
         id: "cheetahNewton",

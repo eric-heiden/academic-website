@@ -360,6 +360,8 @@ class NewtonMuJoCoTorchEnv:
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
         ant_min_up: float | None = None,
+        phase_observation: bool = False,
+        phase_period: int = 60,
         hopper_terminate_angle: bool = False,
         locomotion_disable_joint_limits: bool = False,
     ):
@@ -383,6 +385,8 @@ class NewtonMuJoCoTorchEnv:
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
         self.ant_min_up = ant_min_up
+        self.phase_observation = phase_observation
+        self.phase_period = max(1, int(phase_period))
         self.hopper_terminate_angle = hopper_terminate_angle
         self.locomotion_disable_joint_limits = locomotion_disable_joint_limits
         self.acrobot_link_length = 1.0
@@ -853,7 +857,21 @@ class NewtonMuJoCoTorchEnv:
         qd_next[env_ids] = reset_qd
         return q_next, qd_next
 
-    def observe(self, q: torch.Tensor, qd: torch.Tensor, prev_action: torch.Tensor | None = None) -> torch.Tensor:
+    def phase_features(self, phase: torch.Tensor | None, count: int) -> torch.Tensor:
+        if phase is None:
+            phase = torch.zeros(count, dtype=torch.float32, device=self.torch_device)
+        phase = phase.to(dtype=torch.float32, device=self.torch_device)
+        angle = 2.0 * math.pi * phase / float(self.phase_period)
+        return torch.stack([torch.sin(angle), torch.cos(angle)], dim=-1)
+
+    def observe(
+        self,
+        q: torch.Tensor,
+        qd: torch.Tensor,
+        prev_action: torch.Tensor | None = None,
+        *,
+        phase: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         if self.env_name == "cartpole":
             x = q[:, 0:1]
             theta = q[:, 1:2]
@@ -912,7 +930,7 @@ class NewtonMuJoCoTorchEnv:
         up_vec = quat_rotate(torso_quat, self.ant_basis_y[: q.shape[0]])
         heading_vec = quat_rotate(torso_quat, self.ant_basis_x[: q.shape[0]])
         heading_alignment = (heading_vec * target_dirs).sum(dim=-1, keepdim=True)
-        return torch.cat(
+        obs = torch.cat(
             [
                 torso_pos[:, 1:2],
                 torso_rot,
@@ -926,6 +944,9 @@ class NewtonMuJoCoTorchEnv:
             ],
             dim=-1,
         )
+        if self.phase_observation:
+            obs = torch.cat([obs, self.phase_features(phase, q.shape[0])], dim=-1)
+        return obs
 
     def action_to_joint_f(self, action: torch.Tensor) -> torch.Tensor:
         joint_f = torch.zeros((self.num_envs, self.qd_dim), dtype=torch.float32, device=self.torch_device)
@@ -1209,14 +1230,15 @@ def shac_rollout_loss(
     rewards = []
     invalid_count = 0
     fall_count = 0
+    progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
     for _ in range(horizon):
-        obs = normalize_obs(env.observe(q, qd, prev_action), obs_stats)
+        obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_stats)
         raw_action = actor(obs, deterministic=not stochastic_actor)
         action = torch.tanh(raw_action)
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
         invalid = env.invalid_state(q, qd)
         fell = torch.logical_and(env.fallen_state(q), ~invalid)
-        next_obs = env.observe(q, qd, action)
+        next_obs = env.observe(q, qd, action, phase=progress + 1)
         rew = env.reward(q, qd, action, obs=next_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.detach().mean())
@@ -1226,6 +1248,7 @@ def shac_rollout_loss(
         fall_count += int(fell.detach().sum().cpu())
         gamma_vec = gamma_vec * gamma * (~done).to(torch.float32)
         prev_action = action
+        progress = torch.where(done, torch.zeros_like(progress), progress + 1)
     denom = max(1, horizon * env.num_envs)
     return loss / denom, {
         "mean_reward": float(torch.stack(rewards).mean().detach().cpu()) if rewards else None,
@@ -1370,6 +1393,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        phase_observation=args.phase_observation,
+        phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
         locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
         hopper_reward=HopperRewardWeights(
@@ -1737,6 +1762,8 @@ def run_training(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        phase_observation=args.phase_observation,
+        phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
         locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
         ant_reward=AntRewardWeights(
@@ -1844,7 +1871,7 @@ def run_training(args: argparse.Namespace) -> dict:
         timeout_count = 0
 
         for step_idx in range(args.horizon):
-            obs_raw = env.observe(q, qd, prev_action)
+            obs_raw = env.observe(q, qd, prev_action, phase=progress)
             if obs_rms is not None:
                 with torch.no_grad():
                     obs_rms.update(obs_raw.detach())
@@ -1859,7 +1886,7 @@ def run_training(args: argparse.Namespace) -> dict:
             q_next, qd_next, action = env.sanitize_state(
                 q_next, qd_next, action, invalid, stochastic_init=args.stochastic_init
             )
-            next_obs_raw = env.observe(q_next, qd_next, action)
+            next_obs_raw = env.observe(q_next, qd_next, action, phase=progress + 1)
             rew = env.reward(q_next, qd_next, action, obs=next_obs_raw)
             rew = finalize_terminal_reward(
                 rew,
@@ -2063,6 +2090,8 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                phase_observation=args.phase_observation,
+                phase_period=args.phase_period,
                 hopper_terminate_angle=args.hopper_terminate_angle,
                 locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
                 cartpole_reward=env.cartpole_reward,
@@ -2138,6 +2167,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "phase_observation": env.phase_observation if args.env == "ant" else None,
+        "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "total_seconds": total_s,
         "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
@@ -2191,7 +2222,7 @@ def evaluate_policy(
     up_samples = []
     heading_samples = []
     for _ in range(horizon):
-        obs = normalize_obs(env.observe(q, qd, prev_action), obs_rms)
+        obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
         action = torch.tanh(actor(obs, deterministic=True))
         root_x_before = q[:, 0].clone()
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
@@ -2204,7 +2235,7 @@ def evaluate_policy(
             root_x_after - root_x_before,
         )
         q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=False)
-        final_obs = env.observe(q, qd, action)
+        final_obs = env.observe(q, qd, action, phase=progress + 1)
         if env.env_name == "ant":
             height_samples.append(final_obs[:, 0].detach().mean())
             up_samples.append(final_obs[:, 27].detach().mean())
@@ -2338,7 +2369,7 @@ def render_rollout(
                 frame = viewer.get_frame().numpy()
                 frames.append(frame)
                 writer.append_data(frame)
-                obs = normalize_obs(env.observe(q, qd, prev_action), obs_rms)
+                obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
                 action = torch.tanh(actor(obs, deterministic=True))
                 q, qd = env.step(q, qd, env.action_to_joint_f(action))
                 invalid = env.invalid_state(q, qd)
@@ -2470,6 +2501,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--phase-observation", action="store_true")
+    parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)
     parser.add_argument("--hopper-progress-weight", type=float, default=1.0)
     parser.add_argument("--hopper-angle-weight", type=float, default=1.0)
