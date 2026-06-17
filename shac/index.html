@@ -316,13 +316,15 @@
           23.24 m over 480 frames with 0 falls and 0 invalids.
           The latest multistep checks show why: reset-state one-step gradients are clean, while H=8/H=16 Ant rollouts enter
           grazing foot contacts where local contact-position gradients and finite differences diverge. The latest Ant import
-          pass found a separate report-harness bug: <code>nv_ant.xml</code> is already authored in Newton's Y-up convention,
-          while the DiffRL MJCF needs a -90 degree X free-root rotation after import. Reusing the DiffRL rotation for the NV
-          asset flattened the robot into the ground plane, so the earlier high-distance NV PPO/SHAC clips are now archived as
-          invalid over-rotated diagnostics, not accepted Ant results. The runner now keeps the NV root quaternion at identity
-          and still drops the embedded NV floor before adding Newton's ground plane. Corrected-upright NV PPO has not solved
-          locomotion yet: the best retuned run moves 1.74 m with 1790 falls across 1024 deterministic worlds. The valid Ant
-          baselines in this report therefore remain the DiffRL-asset PPO/SHAC runs above.
+          pass found a separate report-harness bug in the other direction: <code>nv_ant.xml</code> is authored Y-up, but the
+          Newton/MJWarp runtime start state still needs the same -90 degree X free-root quaternion as the DiffRL import to
+          match the stable diagonal support stance encoded by <code>ANT_START_JOINT_Q</code>. The identity-root NV diagnostic
+          looked upright by torso height, but passive zero-action rollouts folded the hips into their limits; it is now kept
+          only as a negative control. The runner again uses the stable root quaternion for NV and DiffRL, keeps the NV asset's
+          native 0.01 hinge armature, and still drops the embedded NV floor before adding Newton's ground plane. With that
+          stable-root/single-floor NV setup, PPO reaches 31.15 m and the low-lr SHAC warm-start reaches 33.66 m over 480
+          deterministic frames, although both remain fall-prone in large 1024-world evals. The reliable zero-fall Ant
+          baseline therefore remains the DiffRL stability-shaped SHAC run.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
           warm-started from that no-LayerNorm PPO actor selects a zero-fall 14.49 m rollout before longer short-horizon updates
           drift into falls.
@@ -386,10 +388,10 @@
           now run on a separate large randomized environment batch via <code>--selection-num-envs</code>. The PPO runner now
           mirrors that safeguard for loaded actors by evaluating and saving update 0 before any PPO fine-tune step. SHAC can also use a
           no-LayerNorm actor architecture that exactly matches PPO checkpoints.
-          The newest Ant harness fix preserves the NV MJCF free-root identity pose because that asset is already Y-up, while
-          still applying the DiffRL root rotation only to the DiffRL MJCF. It also drops the embedded NV floor before adding
-          Newton's ground plane; this removes the duplicate coplanar floor contacts and prevents the report renderer from
-          training/evaluating a flattened NV robot.
+          The newest Ant harness fix uses the stable -90 degree X free-root start quaternion for both DiffRL and NV Ant
+          imports, because this is the pose that matches the configured start joints after Newton exports to the MuJoCo/MJWarp
+          runtime. It also drops the embedded NV floor before adding Newton's ground plane; this removes the duplicate
+          coplanar floor contacts while preserving the native NV 0.01 hinge armature.
           Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
           joints back to MuJoCo and when it refreshes the MJWarp runtime model. Every run records the imported Newton and
@@ -408,11 +410,12 @@
           a compact DiffRL-style crawl rather than a tall natural walk. Stronger fall-gated selection alone, deterministic
           reset-each-epoch H=32, and a weaker height-aware reward were negative controls at 22.73 m/5 falls, 22.12 m/3 falls,
           and 22.79 m/8 falls. PPO is no longer a blanket negative control on Ant: the DiffRL-asset RSL-style PPO run is
-          reliable at 13.08 m with one fall in the fixed 1024-world replay. Correcting the NV import revealed that the older
-          31.15 m PPO and 33.66 m SHAC NV clips were trained on an over-rotated flattened asset; they are kept only as
-          archive diagnostics. On the corrected-upright NV asset, PPO is still a failure: the default IsaacLab-style force
-          scale reaches 1.10 m with 3072 falls, and a retuned heading-gated force-15 run reaches 1.74 m with 1790 falls.
-          This isolates a remaining NV asset/reward setup problem, not a renderer overlay issue.
+          reliable at 13.08 m with one fall in the fixed 1024-world replay. The stable-root native-armature NV setup trains
+          much farther, but it is not the reliability-selected Ant gait: PPO reaches 31.15 m with 100 falls/9 invalids in
+          the single-floor replay, and SHAC reaches 33.66 m with 39 falls/6 invalids. The identity-root NV runs are now
+          negative controls: default PPO moves 1.10 m with 3072 falls, and the retuned heading-gated force-15 run moves
+          1.74 m with 1790 falls. A 0.05-armature NV diagnostic was stable but mostly stationary at 0.47-1.20 m, so the
+          native 0.01 armature is retained for the NV baseline.
           A replay of the fastest pure-default policy shows the rare flips occur mid-rollout around
           steps 348, 370, 420, 422, and 461, so they are real long-horizon contact/pose failures rather than timeout
           bookkeeping. SHAC still needs strict full-horizon checkpoint selection: a stochastic H=32 continuation and later
@@ -487,22 +490,22 @@
               <td>Newton contacts improve local action rows, but randomized Ant rollouts are not yet stable.</td>
             </tr>
             <tr>
-              <td>Ant NV over-rotated archive, one-step actions</td>
+              <td>Ant NV stable-root PPO, one-step actions</td>
               <td>4.5e-2</td>
               <td>1.00</td>
-              <td>The archived flattened-NV setup had clean reset-state action derivatives, but the asset pose was invalid.</td>
+              <td>The stable-root single-floor NV setup has clean reset-state action derivatives.</td>
             </tr>
             <tr>
-              <td>Ant NV over-rotated archive, H=8 policy</td>
+              <td>Ant NV stable-root PPO, H=8 policy</td>
               <td>1.0e+0</td>
               <td>0.38</td>
-              <td>Full-horizon policy finite differences were dominated by contact/limit adjoints after the first contact steps.</td>
+              <td>Full-horizon policy finite differences are still dominated by contact/limit adjoints after the first contact steps.</td>
             </tr>
             <tr>
-              <td>Ant NV over-rotated archive, H=8 fixed actions</td>
+              <td>Ant NV stable-root PPO, H=8 fixed actions</td>
               <td>1.0e+0</td>
               <td>0.25</td>
-              <td>The corrected-upright NV asset needs fresh gradient checks once PPO produces a non-collapsed rollout.</td>
+              <td>The remaining gradient issue is multistep Ant contact/limit propagation, not renderer state or root pose.</td>
             </tr>
             <tr>
               <td>Hopper no limits, no contact, state/action</td>
@@ -755,50 +758,53 @@
         </figure>
       </article>
       <article class="panel warn">
-        <h2>Ant PPO, Over-Rotated NV Archive</h2>
+        <h2>Ant PPO, Native NV Stable Root</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Archived negative control. This PPO checkpoint was trained/evaluated after dropping the duplicate NV floor, but
-            before the report harness stopped applying the DiffRL -90 degree X root rotation to <code>nv_ant.xml</code>.
-            Because the NV asset is already Y-up, that rotation flattened the robot. The 31.15 m displacement is therefore
-            not a valid Ant baseline. The clip is retained only to document the import failure, and is still raw
-            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
+            Native <code>nv_ant.xml</code> hinge armature, stable -90 degree X free-root start quaternion, and the embedded
+            NV floor ignored before Newton adds its ground plane. Re-evaluating the selected PPO checkpoint in the corrected
+            single-floor environment gives 2220.9 return, 31.15 m displacement, 100 falls, 9 invalids, 0.649 m mean height,
+            0.967 mean up, and 0.911 mean heading across 1024 deterministic worlds. This is a moving positive control, but
+            the falls keep it out of the reliable headline metric. The clip is raw <code>ViewerGL.get_frame()</code> through
+            the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
       <article class="panel warn">
-        <h2>Ant SHAC, Over-Rotated NV Archive</h2>
+        <h2>Ant SHAC, Native NV Stable Root</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_poster.png">
             <source src="assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Archived negative control. SHAC warm-started from the invalid flattened NV PPO actor and selected a 33.66 m
-            rollout, but that result depends on the over-rotated asset pose and is not accepted as a solved Ant run. The
-            useful finding is negative: high displacement alone was insufficient to catch the import bug, so the report now
-            separates asset-pose diagnostics from valid DiffRL-asset Ant baselines.
+            SHAC warm-started from the stable-root NV PPO actor with H=16, 16 training envs, lr 1e-5, no critic bootstrap,
+            and MuJoCo contacts. The best selected epoch was 15; the fixed 1024-world replay reports 2333.4 return,
+            33.66 m displacement, 39 falls, 6 invalids, 0.649 m mean height, 0.977 mean up, and 0.902 mean heading. Runtime
+            was 138.0 s at 44.6 sim FPS with 22.5 MB peak allocated CUDA memory. This is the fastest NV result, but still
+            not the reliable zero-fall Ant policy.
           </figcaption>
         </figure>
       </article>
       <article class="panel bad">
-        <h2>Ant PPO, Corrected NV Upright</h2>
+        <h2>Ant PPO, NV Identity-Root Negative Control</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_ppo_nv_upright_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_nv_upright_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Fresh PPO after preserving the NV free-root identity quaternion and using a single Newton ground plane. With
-            IsaacLab-style force scale 7.5, the selected policy reaches only 795.9 return and 1.10 m displacement, with
-            3072 falls, 0 invalids, 0.563 m mean height, 0.890 mean up, and 0.854 mean heading across 1024 deterministic
-            worlds. Runtime was 178.2 s at 78.8k sim FPS with 114.9 MB peak allocated CUDA memory.
+            Negative control that preserved the NV free-root identity quaternion. It appears upright by torso height, but
+            passive zero-action rollouts fold the hips into their limits because the start joints no longer match the stable
+            support stance. PPO with force scale 7.5 reaches only 795.9 return and 1.10 m displacement, with 3072 falls,
+            0 invalids, 0.563 m mean height, 0.890 mean up, and 0.854 mean heading across 1024 deterministic worlds. Runtime
+            was 178.2 s at 78.8k sim FPS with 114.9 MB peak allocated CUDA memory.
           </figcaption>
         </figure>
       </article>
       <article class="panel bad">
-        <h2>Ant PPO, Corrected NV Retuned</h2>
+        <h2>Ant PPO, NV Identity-Root Retuned</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_ppo_nv_upright_headinggated_force15_up1_minup055_1024env_200upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_nv_upright_headinggated_force15_up1_minup055_1024env_200upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
@@ -807,8 +813,8 @@
             Retuned PPO with force scale 15, heading-gated progress, stronger up/height shaping, a 0.55 minimum-up
             termination gate, and stricter selection. It improves return to 1262.8 and displacement to 1.74 m, but still
             has 1790 falls, 0 invalids, 0.536 m mean height, 0.946 mean up, and 0.283 mean heading. Runtime was 183.4 s at
-            76.5k sim FPS with 114.9 MB peak allocated CUDA memory. This is the current corrected-upright NV status, not a
-            solved locomotion result.
+            76.5k sim FPS with 114.9 MB peak allocated CUDA memory. This confirms the identity-root failure is not fixed by
+            reward shaping.
           </figcaption>
         </figure>
       </article>
@@ -908,11 +914,11 @@
         <h2>Ant Strict-Height Finding</h2>
         <p>
           Raising the Ant termination floor to 0.55 m or forcing high-upright selection did not fix the visual gait. The
-          old NV-import run settled near 0.30 m because the report harness rotated an already-Y-up NV robot into a flattened
-          posture and also collided it with two coplanar floors. After preserving the NV identity root and dropping the
-          duplicate floor, passive NV rollouts start upright near the intended 0.5 m torso height, but PPO still fails to
-          learn useful locomotion. The current valid Ant successes therefore use the DiffRL asset; the corrected NV asset
-          remains an open environment/reward tuning problem.
+          identity-root NV diagnostic settled into a collapsed support pattern because the configured start joints no longer
+          matched the stable diagonal stance. Restoring the -90 degree X start quaternion and dropping the duplicate floor
+          recovers moving NV PPO/SHAC policies, but they are still long-horizon fall-prone low crawls. Matching NV armature
+          to the DiffRL 0.05 value was also tested; it produced stable but mostly stationary policies, so the native NV
+          0.01 armature is retained for that asset.
         </p>
       </article>
     </section>
@@ -1911,31 +1917,31 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       },
       {
         id: "antPpoNvUprightForce75",
-        label: "Ant PPO NV upright force 7.5",
+        label: "Ant PPO NV identity force 7.5",
         path: "assets/ant_ppo_nv_upright_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_results.json",
         color: colors.teal
       },
       {
         id: "antPpoNvUprightRetuned",
-        label: "Ant PPO NV upright retuned",
+        label: "Ant PPO NV identity retuned",
         path: "assets/ant_ppo_nv_upright_headinggated_force15_up1_minup055_1024env_200upd_run1/ant_ppo_results.json",
         color: colors.blue
       },
       {
         id: "antPpoNvRootfix",
-        label: "Ant PPO NV over-rotated archive",
+        label: "Ant PPO NV stable root",
         path: "assets/ant_ppo_nv_rootfix_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_results.json",
         color: colors.slate
       },
       {
         id: "antPpoNvRootfixSingleFloor",
-        label: "Ant PPO NV single-floor archive",
+        label: "Ant PPO NV single-floor stable",
         path: "assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_results.json",
         color: colors.amber
       },
       {
         id: "antShacNvRootfix",
-        label: "Ant SHAC NV over-rotated archive",
+        label: "Ant SHAC NV stable root",
         path: "assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_results.json",
         color: colors.coral
       },
@@ -2750,8 +2756,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Ant local H=8 Newton actions", bestSweep(antLocalH8Newton?.fixed_action_sequence)],
         ["Ant local H=8 no-contact actions", bestSweep(antLocalH8NoContact?.fixed_action_sequence)],
         ["Ant local H=8 margin 0.02 actions", bestSweep(antLocalH8Margin002?.fixed_action_sequence)],
-        ["Ant NV over-rotated archive H=8 PPO policy", bestSweep(antNvRootfixH8Ppo?.policy)],
-        ["Ant NV over-rotated archive H=8 fixed actions", bestSweep(antNvRootfixH8Ppo?.fixed_action_sequence)],
+        ["Ant NV stable-root H=8 PPO policy", bestSweep(antNvRootfixH8Ppo?.policy)],
+        ["Ant NV stable-root H=8 fixed actions", bestSweep(antNvRootfixH8Ppo?.fixed_action_sequence)],
         ["Ant NV H=8 PPO policy", bestSweep(antNvH8Ppo?.policy)],
         ["Ant NV H=8 PPO fixed actions", bestSweep(antNvH8Ppo?.fixed_action_sequence)],
         ["Ant NV H=8 no hard limits", bestSweep(antNvH8PpoSoftLimits?.fixed_action_sequence)]

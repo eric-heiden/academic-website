@@ -798,15 +798,14 @@ class NewtonMuJoCoTorchEnv:
         if self.ant_start_height is not None:
             source.joint_q[1] = self.ant_start_height
             source.joint_target_q[1] = self.ant_start_height
-        # Keep Ant assets in Newton's Y-up convention.  The DiffRL MJCF is Z-up
-        # and needs the -90 deg X root rotation after import.  The NV asset is
-        # authored Y-up already; rotating its free root lays the legs flat in the
-        # ground plane, so keep its identity root orientation.
+        # Keep Ant assets in Newton's Y-up convention.  Both the DiffRL import
+        # and the NV MJCF need the -90 deg X free-root quaternion here to match
+        # the stable diagonal support stance encoded by ANT_START_JOINT_Q after
+        # Newton exports the model to the MuJoCo/MJWarp runtime.
         source.joint_q[2] = 0.0
         source.joint_target_q[2] = 0.0
-        ant_start_rot = (0.0, 0.0, 0.0, 1.0) if self.ant_asset == "nv" else ANT_START_ROT
-        source.joint_q[3:7] = ant_start_rot
-        source.joint_target_q[3:7] = ant_start_rot
+        source.joint_q[3:7] = ANT_START_ROT
+        source.joint_target_q[3:7] = ANT_START_ROT
         ant_start_joint_q = self.ant_start_joint_q if self.ant_start_joint_q is not None else list(ANT_START_JOINT_Q)
         if len(ant_start_joint_q) != 8:
             raise ValueError("ant_start_joint_q must contain 8 values")
