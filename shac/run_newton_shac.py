@@ -392,6 +392,7 @@ class NewtonMuJoCoTorchEnv:
         self.acrobot_link_length = 1.0
         self.contact_body_radius = 0.22
         self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
+        self.world_spacing: tuple[float, float, float] | None = None
 
         if env_name == "cartpole":
             self._build_cartpole()
@@ -409,6 +410,12 @@ class NewtonMuJoCoTorchEnv:
             raise ValueError(f"unknown env_name: {env_name}")
 
         use_contacts = contact_backend != "none"
+        self.nconmax = None
+        self.njmax = None
+        if use_contacts:
+            # SolverMuJoCo treats these as per-world capacities.
+            self.nconmax = 128
+            self.njmax = 512
         self.solver = SolverMuJoCo(
             self.model,
             requires_grad=True,
@@ -419,8 +426,8 @@ class NewtonMuJoCoTorchEnv:
             iterations=8,
             ls_iterations=8,
             update_data_interval=1,
-            nconmax=128 if use_contacts else None,
-            njmax=512 if use_contacts else None,
+            nconmax=self.nconmax,
+            njmax=self.njmax,
         )
         # MuJoCo's implicit Euler damping path currently goes through a dense
         # no-grad solve in MJWarp. Keep physical damping forces, but integrate
@@ -588,7 +595,8 @@ class NewtonMuJoCoTorchEnv:
 
         builder = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(builder)
-        builder.replicate(source, self.num_envs, spacing=(0.0, 0.0, 0.0))
+        self.world_spacing = (0.0, 0.0, 4.0) if self.contact_backend == "newton" else (0.0, 0.0, 0.0)
+        builder.replicate(source, self.num_envs, spacing=self.world_spacing)
         ground_cfg = newton.ModelBuilder.ShapeConfig(
             ke=4.0e4,
             kd=1.0e4,
@@ -645,7 +653,8 @@ class NewtonMuJoCoTorchEnv:
 
         builder = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(builder)
-        builder.replicate(source, self.num_envs, spacing=(0.0, 0.0, 0.0))
+        self.world_spacing = (0.0, 0.0, 4.0) if self.contact_backend == "newton" else (0.0, 0.0, 0.0)
+        builder.replicate(source, self.num_envs, spacing=self.world_spacing)
         ground_cfg = newton.ModelBuilder.ShapeConfig(ke=2.0e4, kd=1.0e3, kf=1.0e3, mu=contact_mu)
         builder.add_ground_plane(cfg=ground_cfg)
         self.model = builder.finalize(device=self.wp_device, requires_grad=True)
@@ -1153,6 +1162,44 @@ def make_actor(env: NewtonMuJoCoTorchEnv, stochastic: bool = False) -> torch.nn.
     return actor
 
 
+def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.device) -> None:
+    state = torch.load(path, map_location=device)
+    try:
+        actor.load_state_dict(state)
+        return
+    except RuntimeError:
+        pass
+
+    if "backbone.0.weight" not in state:
+        actor.load_state_dict(state)
+        return
+
+    target = actor.state_dict()
+    prefix = "mu_net" if any(key.startswith("mu_net.") for key in target) else "actor"
+    mapped = {
+        f"{prefix}.0.weight": state["backbone.0.weight"],
+        f"{prefix}.0.bias": state["backbone.0.bias"],
+        f"{prefix}.2.weight": state["backbone.2.weight"],
+        f"{prefix}.2.bias": state["backbone.2.bias"],
+        f"{prefix}.3.weight": state["backbone.3.weight"],
+        f"{prefix}.3.bias": state["backbone.3.bias"],
+        f"{prefix}.5.weight": state["backbone.5.weight"],
+        f"{prefix}.5.bias": state["backbone.5.bias"],
+        f"{prefix}.6.weight": state["backbone.6.weight"],
+        f"{prefix}.6.bias": state["backbone.6.bias"],
+        f"{prefix}.8.weight": state["backbone.8.weight"],
+        f"{prefix}.8.bias": state["backbone.8.bias"],
+        f"{prefix}.9.weight": state["mean.weight"],
+        f"{prefix}.9.bias": state["mean.bias"],
+    }
+    if "logstd" in target and "log_std" in state:
+        mapped["logstd"] = state["log_std"]
+    missing, unexpected = actor.load_state_dict(mapped, strict=False)
+    unexpected = [key for key in unexpected if key not in target]
+    if unexpected or any(not key.startswith("logstd") for key in missing):
+        raise RuntimeError(f"could not map PPO actor checkpoint {path}: missing={missing}, unexpected={unexpected}")
+
+
 def make_critic(env: NewtonMuJoCoTorchEnv) -> torch.nn.Module:
     cfg = {
         "critic_mlp": {"units": [64, 64], "activation": "elu"},
@@ -1418,7 +1465,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
     )
     actor = make_actor(env, stochastic=args.stochastic_actor)
     if args.actor_path is not None:
-        actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
+        load_actor_checkpoint(actor, args.actor_path, env.torch_device)
     obs_stats = load_obs_rms(args.obs_rms_path, env.torch_device) if args.obs_rms_path is not None else None
 
     q0, qd0 = env.reset(noise=0.0, stochastic_init=False)
@@ -1647,11 +1694,17 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "title": "SHAC with MuJoCo Warp",
         "timestamp_pacific": pacific_now_iso(),
         "contact_backend": args.contact_backend,
+        "newton_commit": git_commit_for_imported_module(newton),
+        "newton_path": str(Path(newton.__path__[0]).resolve()) if hasattr(newton, "__path__") else None,
+        "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
         "horizon": args.horizon,
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "nconmax": env.nconmax,
+        "njmax": env.njmax,
+        "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
         "disable_eulerdamp": True,
         "force_scale": args.force_scale,
         "stochastic_actor": args.stochastic_actor,
@@ -1801,7 +1854,7 @@ def run_training(args: argparse.Namespace) -> dict:
     )
     actor = make_actor(env, stochastic=args.stochastic_actor)
     if args.actor_path is not None:
-        actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
+        load_actor_checkpoint(actor, args.actor_path, env.torch_device)
     adam_betas = (args.adam_beta1, args.adam_beta2)
     optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
     critic = None
@@ -1834,6 +1887,9 @@ def run_training(args: argparse.Namespace) -> dict:
         torch.cuda.reset_peak_memory_stats(env.torch_device)
         torch.cuda.synchronize(env.torch_device)
 
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    live_history_path = out_dir / f"{args.env}_history_live.json"
     t0 = time.perf_counter()
     for epoch in range(args.epochs):
         epoch_t0 = time.perf_counter()
@@ -2041,14 +2097,26 @@ def run_training(args: argparse.Namespace) -> dict:
                 "fps": args.num_envs * args.horizon / epoch_s,
             }
         )
+        write_json(
+            live_history_path,
+            {
+                "env": args.env,
+                "timestamp_pacific": pacific_now_iso(),
+                "history": history,
+                "best_epoch": best_epoch,
+                "best_eval_return": best_eval_return,
+                "best_eval_score": best_eval_score,
+            },
+        )
         print(
             f"{args.env} epoch {epoch + 1:03d}: reward={mean_reward: .4f} "
-            f"loss={float(loss.detach().cpu()): .4f} fps={history[-1]['fps']: .1f}"
+            f"loss={float(loss.detach().cpu()): .4f} sel={selection_score: .1f} "
+            f"ret={selection_rollout['return']: .1f} dx={selection_rollout['mean_forward_displacement']: .2f} "
+            f"falls={selection_rollout['fall_count']} invalid={selection_rollout['invalid_count']} "
+            f"fps={history[-1]['fps']: .1f}"
         )
 
     total_s = time.perf_counter() - t0
-    out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
     if best_state is not None:
         actor.load_state_dict(best_state)
     if obs_rms is not None and best_obs_rms is not None:
@@ -2115,6 +2183,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "title": "SHAC with MuJoCo Warp",
         "timestamp_pacific": pacific_now_iso(),
         "mujoco_warp_pr": "google-deepmind/mujoco_warp#1423",
+        "newton_commit": git_commit_for_imported_module(newton),
+        "newton_path": str(Path(newton.__path__[0]).resolve()) if hasattr(newton, "__path__") else None,
         "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
         "contact_backend": args.contact_backend,
@@ -2123,6 +2193,9 @@ def run_training(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "nconmax": env.nconmax,
+        "njmax": env.njmax,
+        "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
         "force_scale": args.force_scale,
         "episode_length": args.episode_length,
         "disable_eulerdamp": True,

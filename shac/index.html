@@ -274,11 +274,11 @@
           <code>qfrc_bias</code>/<code>cfrc_int</code> path, so free-fall mass/bias VJPs cancel correctly and Hopper/Ant
           one-step state gradients match finite differences again. Cheetah now has a clean SHAC stepping-stone result with
           MuJoCo contacts at substep 1: 10.33 m forward over 480 frames with zero falls/invalids. PPO verifies that the
-          16-substep Cheetah task itself is learnable. Hopper and Ant still need training stabilization and reward/curriculum
-          work: Hopper requires angle termination to avoid lying-down policies, and Ant's default reward trains standing rather
-          than locomotion. The newest Ant drilldown adds an opt-in phase/clock observation and an open-loop sine diagnostic:
-          a scripted gait can move 6.49 m, but it rolls over, behavior cloning does not preserve it, and the first phase-SHAC
-          probe still fails full-horizon selection.
+          16-substep Cheetah task itself is learnable. The runner now also records Newton/MJWarp revisions, writes live
+          history JSON, loads PPO checkpoints into SHAC actors, and spaces replicated Newton-contact worlds apart. Hopper
+          SHAC can preserve a PPO upright warm-start with zero falls, but it still selects balance over hopping. Ant SHAC
+          preserves a PPO standing policy with zero falls, but the locomotion gradient is still not escaping the standing
+          basin.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -330,7 +330,9 @@
           policy finite differences from 3.5e-1 to 1.3e-1 and Cheetah/MuJoCo policy finite differences to 1.1e-2. The
           newest RNE fix replaces auto-backward through <code>qfrc_bias</code> with an explicit adjoint and disables auto-backward
           through the cfrc tree accumulation; Hopper no-limit smooth dynamics now has 2.7e-4 full state/action error and Ant
-          H=5 one-step state/action error is 8.1e-5.
+          H=5 one-step state/action error is 8.1e-5. On the harness side, Newton-contact vectorized environments now use
+          nonzero world spacing, PPO checkpoints can warm-start SHAC actors, and every run records the imported Newton and
+          MJWarp commits in its JSON artifact.
         </p>
       </article>
       <article class="panel warn">
@@ -340,10 +342,12 @@
           differences at the reset pose because the thigh and leg start exactly on their upper limits; disabling those limits
           makes smooth state/action gradients pass, but training folds into invalid low postures. PPO confirms that height-only
           Hopper termination admits lying-down policies, while angle termination yields upright balance and progress-weighted
-          reward yields short bursts that still fall over 480 frames. Ant one-step state/action gradients now pass through H=5,
-          but PPO with the default reward learns a stable standing pose with 0.005 m displacement; a more locomotion-weighted
-          reward collapses early without a curriculum. The open-loop sine diagnostic proves the action mapping can generate
-          forward motion, but the motion is not upright or reliable and is not captured by the current memoryless MLP actor.
+          reward yields short bursts that still fall over 480 frames. The latest PPO-to-SHAC Hopper warm-start remains upright
+          for 480 frames, but its selected motion is still only 0.47 m. Ant one-step state/action gradients now pass through H=5,
+          but PPO and SHAC with the current default-style reward both learn stable standing; the new SHAC warm-start reaches
+          735.5 return with zero falls and only 0.008 m displacement. The open-loop sine diagnostic proves the action mapping
+          can generate forward motion, but the motion is not upright or reliable and is not captured by the current memoryless
+          MLP actor.
         </p>
       </article>
     </section>
@@ -580,6 +584,35 @@
           <figcaption>
             PPO positive control using the faithful 16-substep MuJoCo-contact dynamics. It reaches 703.2 return, 12.56 m
             displacement, and zero falls/invalids, so Cheetah's task setup is not the blocker.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel warn">
+        <h2>Hopper SHAC PPO Warm-Start</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/hopper_shac_warm_ppo_angle_progress1_64env_30ep_run1/hopper_poster.png">
+            <source src="assets/hopper_shac_warm_ppo_angle_progress1_64env_30ep_run1/hopper_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            SHAC initialized from the upright PPO angle-termination checkpoint. The best selected policy is stable for 480
+            frames with zero falls/invalids and 526.2 return, but it moves only 0.47 m, so this is a preserved balance policy
+            rather than solved hopping.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC PPO Warm-Start</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_shac_warm_ppo_progress3_16env_12ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_warm_ppo_progress3_16env_12ep_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            SHAC initialized from the stable PPO Ant checkpoint with progress weight 3. It remains upright for the full 480
+            frames with zero falls/invalids and 735.5 return, but forward displacement is only 0.008 m, showing that the
+            current setup is still trapped in the standing basin.
           </figcaption>
         </figure>
       </article>
@@ -1153,6 +1186,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.coral
       },
       {
+        id: "antShacWarmPpo",
+        label: "Ant SHAC PPO warm-start",
+        path: "assets/ant_shac_warm_ppo_progress3_16env_12ep_run1/ant_results.json",
+        color: colors.blue
+      },
+      {
         id: "cheetahNewton",
         label: "Cheetah Newton contacts",
         path: "assets/cheetah_train_limits_newton_level_kinematics_64env_100ep_run1/cheetah_results.json",
@@ -1241,6 +1280,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Hopper PPO curriculum",
         path: "assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_results.json",
         color: colors.violet
+      },
+      {
+        id: "hopperShacWarmPpo",
+        label: "Hopper SHAC PPO warm-start",
+        path: "assets/hopper_shac_warm_ppo_angle_progress1_64env_30ep_run1/hopper_results.json",
+        color: colors.teal
       }
     ];
 
@@ -1373,10 +1418,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       if (el) el.innerHTML = `<div class="plot-message">${message}</div>`;
     }
 
+    function traceHasFiniteData(trace) {
+      const yFinite = finitePoints(trace.y);
+      if (yFinite > 0) return true;
+      const xFinite = finitePoints(trace.x);
+      const yHasCategories = (trace.y || []).some((value) => typeof value === "string");
+      const horizontalBar = trace.type === "bar" && trace.orientation === "h";
+      const horizontalScatter = trace.type === "scatter" && yHasCategories;
+      return xFinite > 0 && (horizontalBar || horizontalScatter);
+    }
+
     function plotOrMessage(id, traces, layout, config = plotConfig) {
-      const useful = traces.filter((trace) => {
-        return Math.max(finitePoints(trace.x), finitePoints(trace.y)) > 0;
-      });
+      const useful = traces.filter(traceHasFiniteData);
       if (!useful.length) {
         plotMessage(id, "No finite data loaded for this plot. Check the linked JSON artifacts for this report build.");
         return;
@@ -1744,6 +1797,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["progress probe", presentRuns.find((run) => run.id === "hopperProgress")?.data, colors.coral],
         ["reset each epoch", presentRuns.find((run) => run.id === "hopperResetMujoco")?.data, colors.green],
         ["Newton contacts", presentRuns.find((run) => run.id === "hopperResetNewton")?.data, colors.amber],
+        ["PPO warm-start SHAC", presentRuns.find((run) => run.id === "hopperShacWarmPpo")?.data, colors.teal],
         ["no-limit diagnostic", hopperTrainNoLimits, colors.violet]
       ].filter(([, data]) => data?.history);
       if (hopperTrainingRows.length) {
