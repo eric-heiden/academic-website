@@ -18,6 +18,8 @@ from run_newton_shac import (
     ANT_DEFAULT_SELECTION_INVALID_PENALTY,
     ANT_DEFAULT_TERMINATION_PENALTY,
     ANT_INVALID_PENALTY,
+    ANT_ISAACLAB_START_JOINT_Q,
+    ANT_START_HEIGHT,
     HOPPER_TERMINATION_ANGLE,
     HOPPER_TERMINATION_HEIGHT,
     HOPPER_TERMINATION_HEIGHT_TOLERANCE,
@@ -120,7 +122,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco"
     if args.sim_substeps is None:
-        args.sim_substeps = 16 if is_locomotion_env(args.env) else 1
+        args.sim_substeps = 2 if args.env == "ant" else (16 if is_locomotion_env(args.env) else 1)
     if args.eval_horizon is None:
         args.eval_horizon = 480
     if args.selection_horizon is None and is_locomotion_env(args.env):
@@ -128,7 +130,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
     if args.episode_length is None:
         args.episode_length = 1000
     if args.force_scale is None:
-        args.force_scale = 200.0
+        args.force_scale = 7.5 if args.env == "ant" else 200.0
     if args.termination_penalty is None:
         args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env in {"ant", "hopper"} else 0.0
 
@@ -381,6 +383,13 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 fall_penalty=args.selection_fall_penalty,
                 invalid_penalty=args.selection_invalid_penalty,
                 displacement_weight=args.selection_displacement_weight,
+                height_weight=args.selection_height_weight,
+                up_weight=args.selection_up_weight,
+                heading_weight=args.selection_heading_weight,
+                min_height=args.selection_min_height,
+                min_up=args.selection_min_up,
+                min_heading=args.selection_min_heading,
+                posture_penalty=args.selection_posture_penalty,
             )
             if selection_score > best_score:
                 best_score = selection_score
@@ -469,6 +478,13 @@ def train_ppo(args: argparse.Namespace) -> dict:
         fall_penalty=args.selection_fall_penalty,
         invalid_penalty=args.selection_invalid_penalty,
         displacement_weight=args.selection_displacement_weight,
+        height_weight=args.selection_height_weight,
+        up_weight=args.selection_up_weight,
+        heading_weight=args.selection_heading_weight,
+        min_height=args.selection_min_height,
+        min_up=args.selection_min_up,
+        min_heading=args.selection_min_heading,
+        posture_penalty=args.selection_posture_penalty,
     )
     video_path = None
     poster_path = None
@@ -556,6 +572,13 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_fall_penalty": args.selection_fall_penalty,
         "selection_invalid_penalty": args.selection_invalid_penalty,
         "selection_displacement_weight": args.selection_displacement_weight,
+        "selection_height_weight": args.selection_height_weight,
+        "selection_up_weight": args.selection_up_weight,
+        "selection_heading_weight": args.selection_heading_weight,
+        "selection_min_height": args.selection_min_height,
+        "selection_min_up": args.selection_min_up,
+        "selection_min_heading": args.selection_min_heading,
+        "selection_posture_penalty": args.selection_posture_penalty,
         "lr": args.lr,
         "gamma": args.gamma,
         "gae_lambda": args.gae_lambda,
@@ -665,14 +688,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
     parser.add_argument("--ant-progress-weight", type=float, default=1.0)
-    parser.add_argument("--ant-heading-weight", type=float, default=1.0)
+    parser.add_argument("--ant-heading-weight", type=float, default=0.5)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
     parser.add_argument("--ant-alive-reward", type=float, default=0.5)
     parser.add_argument("--ant-actions-cost", type=float, default=0.005)
     parser.add_argument("--ant-energy-cost", type=float, default=0.05)
-    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=0.1)
     parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
@@ -680,12 +703,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-mu", type=float, default=0.75)
     parser.add_argument("--ant-joint-damping", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
-    parser.add_argument("--ant-start-height", type=float, default=None)
-    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
+    parser.add_argument("--ant-start-height", type=float, default=ANT_START_HEIGHT)
+    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=list(ANT_ISAACLAB_START_JOINT_Q))
     parser.add_argument("--ant-termination-height", type=float, default=0.27)
     parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
-    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
-    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac", "isaaclab"], default="diffrl")
+    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
+    parser.add_argument(
+        "--ant-reward-style",
+        choices=["diffrl", "isaac", "isaaclab", "isaac_heading_gated"],
+        default="isaaclab",
+    )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
@@ -713,6 +740,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
     parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
     parser.add_argument("--selection-displacement-weight", type=float, default=0.0)
+    parser.add_argument("--selection-height-weight", type=float, default=0.0)
+    parser.add_argument("--selection-up-weight", type=float, default=0.0)
+    parser.add_argument("--selection-heading-weight", type=float, default=0.0)
+    parser.add_argument("--selection-min-height", type=float, default=None)
+    parser.add_argument("--selection-min-up", type=float, default=None)
+    parser.add_argument("--selection-min-heading", type=float, default=None)
+    parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--render-video", action="store_true")
