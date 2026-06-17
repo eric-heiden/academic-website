@@ -91,6 +91,8 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_disable_joint_limits=bool(result.get("ant_disable_joint_limits") or False),
         ant_contact_margin=float(result.get("ant_contact_margin") or 0.0),
         ant_contact_gap=result.get("ant_contact_gap"),
+        ant_contact_mu=float(result.get("ant_contact_mu") or 0.75),
+        ant_joint_damping=result.get("ant_joint_damping"),
         ant_min_up=result.get("ant_min_up"),
         ant_start_height=result.get("ant_start_height"),
         ant_start_joint_q=result.get("ant_start_joint_q"),

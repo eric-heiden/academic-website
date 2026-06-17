@@ -145,6 +145,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
+        ant_contact_mu=args.ant_contact_mu,
+        ant_joint_damping=args.ant_joint_damping,
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
@@ -456,6 +458,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_disable_joint_limits=args.ant_disable_joint_limits,
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
+                ant_contact_mu=args.ant_contact_mu,
+                ant_joint_damping=args.ant_joint_damping,
                 ant_min_up=args.ant_min_up,
                 ant_start_height=args.ant_start_height,
                 ant_start_joint_q=args.ant_start_joint_q,
@@ -534,6 +538,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
+        "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
+        "ant_joint_damping": env.ant_joint_damping if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "ant_start_height": env.ant_start_height if args.env == "ant" else None,
         "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
@@ -617,6 +623,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
+    parser.add_argument("--ant-contact-mu", type=float, default=0.75)
+    parser.add_argument("--ant-joint-damping", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=None)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)

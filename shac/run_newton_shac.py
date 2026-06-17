@@ -374,6 +374,8 @@ class NewtonMuJoCoTorchEnv:
         ant_disable_joint_limits: bool = False,
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
+        ant_contact_mu: float = 0.75,
+        ant_joint_damping: float | None = None,
         ant_min_up: float | None = None,
         ant_start_height: float | None = None,
         ant_start_joint_q: list[float] | None = None,
@@ -408,6 +410,8 @@ class NewtonMuJoCoTorchEnv:
         self.ant_disable_joint_limits = ant_disable_joint_limits
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
+        self.ant_contact_mu = ant_contact_mu
+        self.ant_joint_damping = ant_joint_damping
         self.ant_min_up = ant_min_up
         self.ant_start_height = ant_start_height
         self.ant_start_joint_q = ant_start_joint_q
@@ -613,12 +617,21 @@ class NewtonMuJoCoTorchEnv:
         source.default_shape_cfg.ke = 4.0e4
         source.default_shape_cfg.kd = 1.0e4
         source.default_shape_cfg.kf = 3.0e3
-        source.default_shape_cfg.mu = 0.75
+        source.default_shape_cfg.mu = self.ant_contact_mu
         source.default_shape_cfg.margin = self.ant_contact_margin
         source.default_shape_cfg.gap = self.ant_contact_gap
         source.default_joint_cfg.limit_ke = 1.0e3
         source.default_joint_cfg.limit_kd = 1.0e1
         source.add_mjcf(str(DIFFRL_ROOT / "envs" / "assets" / "ant.xml"), up_axis="Z", armature_scale=50.0)
+        if self.ant_joint_damping is not None:
+            damping_alias = source.custom_attributes.get("mujoco:dof_passive_damping")
+            for dof_id in range(6, len(source.joint_damping)):
+                source.joint_damping[dof_id] = self.ant_joint_damping
+                if damping_alias is not None:
+                    if isinstance(damping_alias.values, dict):
+                        damping_alias.values[dof_id] = self.ant_joint_damping
+                    elif dof_id < len(damping_alias.values):
+                        damping_alias.values[dof_id] = self.ant_joint_damping
         if self.ant_contact_margin != 0.0:
             source.shape_margin = [self.ant_contact_margin] * len(source.shape_margin)
         if self.ant_contact_gap is not None:
@@ -646,7 +659,7 @@ class NewtonMuJoCoTorchEnv:
         source.shape_material_ke = [4.0e4] * len(source.shape_material_ke)
         source.shape_material_kd = [1.0e4] * len(source.shape_material_kd)
         source.shape_material_kf = [3.0e3] * len(source.shape_material_kf)
-        source.shape_material_mu = [0.75] * len(source.shape_material_mu)
+        source.shape_material_mu = [self.ant_contact_mu] * len(source.shape_material_mu)
 
         builder = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(builder)
@@ -656,7 +669,7 @@ class NewtonMuJoCoTorchEnv:
             ke=4.0e4,
             kd=1.0e4,
             kf=3.0e3,
-            mu=0.75,
+            mu=self.ant_contact_mu,
             margin=self.ant_contact_margin,
             gap=self.ant_contact_gap,
         )
@@ -1621,6 +1634,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
+        ant_contact_mu=args.ant_contact_mu,
+        ant_joint_damping=args.ant_joint_damping,
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
@@ -1933,6 +1948,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "directions": args.grad_check_directions,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
+        "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
+        "ant_joint_damping": env.ant_joint_damping if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "policy": {
@@ -2027,6 +2044,8 @@ def run_training(args: argparse.Namespace) -> dict:
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
+        ant_contact_mu=args.ant_contact_mu,
+        ant_joint_damping=args.ant_joint_damping,
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
@@ -2397,6 +2416,8 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_disable_joint_limits=args.ant_disable_joint_limits,
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
+                ant_contact_mu=args.ant_contact_mu,
+                ant_joint_damping=args.ant_joint_damping,
                 ant_min_up=args.ant_min_up,
                 ant_start_height=args.ant_start_height,
                 ant_start_joint_q=args.ant_start_joint_q,
@@ -2497,6 +2518,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
+        "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
+        "ant_joint_damping": env.ant_joint_damping if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
@@ -2803,6 +2826,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
+    parser.add_argument("--ant-contact-mu", type=float, default=0.75)
+    parser.add_argument("--ant-joint-damping", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=None)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)

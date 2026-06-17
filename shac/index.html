@@ -277,13 +277,13 @@
           16-substep Cheetah task itself is learnable. The runner now also records Newton/MJWarp revisions, writes live
           history JSON, loads PPO checkpoints into SHAC actors, spaces replicated Newton-contact worlds apart, and renders
           policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
-          MuJoCo actuator-order torque mapping, and the report runner now actually applies the advertised
-          <code>ant_height_weight</code> in that Isaac-style reward path. The current Ant fix switches the final PPO baseline
-          to IsaacLab-style direct-task settings: 0.5 m reset height, 0.785 rad foot pose, 7.5 Nm effort scale,
-          <code>implicitfast</code> with two substeps, 256/128/64 PPO, and height-only termination at 0.31 m. That run reaches
-          4.07 m over 480 frames with zero falls and mean heading 0.90. Replaying the same actor at force scale 9 reaches
-          5.24 m with zero falls and mean heading 0.90. SHAC can warm-start from this checkpoint and remain stable, but the
-          selected epoch only matches the PPO baseline instead of improving it.
+          joint-order effort mapping to match IsaacLab's wildcard joint order; MuJoCo actuator-order mapping remains available
+          for DiffRL/MuJoCo comparisons. The report runner now records Ant contact friction and joint damping, and actually
+          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The strongest PPO-only Ant
+          video still comes from the original Gym damping/friction actor replayed at force scale 9: 5.24 m over 480 frames
+          with zero falls and mean heading 0.90. The newest IsaacLab-physical run uses contact friction 1.0 and hinge damping
+          0.1; its force-10 PPO replay reaches 4.96 m with zero falls and mean heading 0.94, and a 12-epoch SHAC warm-start
+          improves the selected rollout to 5.15 m with zero falls. The final SHAC eval is 5.00 m with zero falls.
           Hopper remains unresolved: the new Newton
           per-DOF MJCF joint-anchor fix makes the MuJoCo-exported root slides/hinges physically coherent, and SHAC can
           preserve a zero-fall standing policy, but neither PPO nor SHAC has produced reliable hopping yet.
@@ -340,8 +340,9 @@
           newest RNE fix replaces auto-backward through <code>qfrc_bias</code> with an explicit adjoint and disables auto-backward
           through the cfrc tree accumulation; Hopper no-limit smooth dynamics now has 2.7e-4 full state/action error and Ant
           H=5 one-step state/action error is 8.1e-5. On the harness side, Newton-contact vectorized environments now use
-          nonzero world spacing, PPO checkpoints can warm-start SHAC actors, Ant actions can follow MuJoCo actuator order,
-          the Isaac-style Ant height reward now uses <code>ant_height_weight</code>, and checkpoint selection can include
+          nonzero world spacing, PPO checkpoints can warm-start SHAC actors, Ant actions can follow either IsaacLab-like
+          joint order or MuJoCo actuator order, the Isaac-style Ant height reward now uses <code>ant_height_weight</code>,
+          and checkpoint selection can include
           forward displacement. Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
           joints back to MuJoCo and when it refreshes the MJWarp runtime model. Every run records the imported Newton and
@@ -356,9 +357,9 @@
           limits and can start Hopper slightly inside the stops. That fix is necessary but not sufficient: PPO with a
           Gym-style alive/forward reward, PPO curriculum from the upright checkpoint, inside-limit progress-weighted PPO,
           and the post-anchor-fix SHAC warm-start all fail to produce true hopping. Ant PPO is now reliable under the
-          IsaacLab-style direct settings, but the gait is still a low crawl rather than a tall natural walk. SHAC currently
-          preserves the PPO warm-start but drifts toward slower policies after the first few epochs, so the remaining Ant
-          work is improving differentiable-policy updates without losing the PPO gait.
+          IsaacLab-style direct settings, but the gait is still a low crawl rather than a tall natural walk. The newest
+          force-10 SHAC run can slightly improve the physical PPO baseline, but longer SHAC runs still drift toward slower
+          policies, so the remaining Ant work is making that improvement reliable over longer training.
         </p>
       </article>
     </section>
@@ -630,29 +631,29 @@
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Ant PPO, IsaacLab Direct</h2>
+        <h2>Ant PPO, Physical Force 10</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_direct_force9_replay_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_direct_force9_replay_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_phys_force10_replay_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_phys_force10_replay_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Current best reliable Ant video. PPO was trained with IsaacLab-style direct-task settings at force scale 7.5,
-            then replayed at force scale 9. The 1024-env eval moves 5.24 m over 480 frames with zero falls/invalids,
-            mean heading 0.90, mean up 0.96, and mean height 0.48. The video is raw <code>ViewerGL.get_frame()</code>
-            through the shared smoothed COM follow camera.
+            PPO trained with IsaacLab-style direct-task rewards and the IsaacLab physical constants that differ from the
+            DiffRL MJCF: contact friction 1.0 and hinge damping 0.1. The retained actor is replayed at force scale 10 and
+            moves 4.96 m over 480 frames with zero falls/invalids, mean heading 0.94, mean up 0.95, and mean height 0.51.
+            The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, IsaacLab Warm-Start</h2>
+        <h2>Ant SHAC, Physical Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_direct_warm_ppo_16env_40ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_isaaclab_direct_warm_ppo_16env_40ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_phys_force10_warm_ppo_16env_12ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_isaaclab_phys_force10_warm_ppo_16env_12ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC initialized from the reliable PPO actor uses the same IsaacLab-style Ant setup with MuJoCo contacts and
-            deterministic 256/128/64 actor gradients. It remains stable with zero falls/invalids and 4.11 m displacement,
-            but the best epoch is epoch 2 and does not improve beyond the PPO warm-start.
+            SHAC initialized from the physical PPO actor uses MuJoCo contacts, deterministic 256/128/64 actor gradients,
+            and a lower 2e-5 actor learning rate. The best selected epoch is epoch 10 at 5.15 m with zero falls/invalids;
+            the final 1024-env eval is 5.00 m with zero falls, mean up 0.95, and mean height 0.51.
           </figcaption>
         </figure>
       </article>
@@ -1435,6 +1436,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC IsaacLab warm",
         path: "assets/ant_shac_isaaclab_direct_warm_ppo_16env_40ep_run1/ant_results.json",
         color: colors.violet
+      },
+      {
+        id: "antPpoIsaacPhysical",
+        label: "Ant PPO physical",
+        path: "assets/ant_ppo_isaaclab_phys_1024env_160upd_run1/ant_ppo_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antPpoIsaacPhysicalForce10",
+        label: "Ant PPO physical force-10",
+        path: "assets/ant_ppo_isaaclab_phys_force10_replay_run1/ant_ppo_results.json",
+        color: colors.coral
+      },
+      {
+        id: "antShacIsaacPhysicalForce10",
+        label: "Ant SHAC physical force-10",
+        path: "assets/ant_shac_isaaclab_phys_force10_warm_ppo_16env_12ep_run1/ant_results.json",
+        color: colors.blue
       },
       {
         id: "cheetahNewton",
