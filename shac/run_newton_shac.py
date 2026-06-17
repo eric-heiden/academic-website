@@ -115,12 +115,13 @@ ANT_INVALID_PENALTY = -50.0
 ANT_JOINT_VEL_OBS_SCALING = 0.1
 ANT_ACTION_PENALTY = 0.0
 ANT_DEFAULT_TERMINATION_PENALTY = 20.0
-ANT_DEFAULT_SELECTION_FALL_PENALTY = 500.0
-ANT_DEFAULT_SELECTION_INVALID_PENALTY = 500.0
+ANT_DEFAULT_SELECTION_FALL_PENALTY = 500000.0
+ANT_DEFAULT_SELECTION_INVALID_PENALTY = 500000.0
 HOPPER_TERMINATION_HEIGHT = -0.45
 HOPPER_TERMINATION_ANGLE = math.pi / 6.0
 HOPPER_TERMINATION_HEIGHT_TOLERANCE = 0.15
 HOPPER_START_HEIGHT = 0.0
+HOPPER_START_JOINT_Q = (-0.05, -0.05, 0.0)
 CHEETAH_START_HEIGHT = -0.2
 DEFAULT_GRAD_CHECK_EPS = (1.0e-1, 3.0e-2, 1.0e-2, 3.0e-3, 1.0e-3, 3.0e-4, 1.0e-4)
 
@@ -860,11 +861,15 @@ class NewtonMuJoCoTorchEnv:
         )
         source.joint_q[1] = start_height
         source.joint_target_q[1] = start_height
-        if asset_name == "hopper.xml" and self.hopper_start_joint_q is not None:
-            if len(self.hopper_start_joint_q) != num_actions:
+        hopper_start_joint_q = self.hopper_start_joint_q
+        if asset_name == "hopper.xml" and hopper_start_joint_q is None:
+            hopper_start_joint_q = list(HOPPER_START_JOINT_Q)
+        if asset_name == "hopper.xml" and hopper_start_joint_q is not None:
+            if len(hopper_start_joint_q) != num_actions:
                 raise ValueError(f"hopper_start_joint_q must have {num_actions} values")
-            source.joint_q[3 : 3 + num_actions] = self.hopper_start_joint_q
-            source.joint_target_q[3 : 3 + num_actions] = self.hopper_start_joint_q
+            source.joint_q[3 : 3 + num_actions] = hopper_start_joint_q
+            source.joint_target_q[3 : 3 + num_actions] = hopper_start_joint_q
+            self.hopper_start_joint_q = list(hopper_start_joint_q)
         self.planar_joint_limit_lower = torch.tensor(
             source.joint_limit_lower[3 : 3 + num_actions], dtype=torch.float32, device=self.torch_device
         )
