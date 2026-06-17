@@ -19,6 +19,7 @@ from run_newton_shac import (
     ANT_DEFAULT_TERMINATION_PENALTY,
     ANT_INVALID_PENALTY,
     ANT_ISAACLAB_START_JOINT_Q,
+    ANT_ISAACLAB_TERMINATION_HEIGHT,
     ANT_START_HEIGHT,
     HOPPER_TERMINATION_ANGLE,
     HOPPER_TERMINATION_HEIGHT,
@@ -695,17 +696,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-alive-reward", type=float, default=0.5)
     parser.add_argument("--ant-actions-cost", type=float, default=0.005)
     parser.add_argument("--ant-energy-cost", type=float, default=0.05)
-    parser.add_argument("--ant-dof-limit-cost", type=float, default=0.1)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
     parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
-    parser.add_argument("--ant-contact-mu", type=float, default=0.75)
-    parser.add_argument("--ant-joint-damping", type=float, default=None)
+    parser.add_argument("--ant-contact-mu", type=float, default=1.0)
+    parser.add_argument("--ant-joint-damping", type=float, default=0.1)
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=ANT_START_HEIGHT)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=list(ANT_ISAACLAB_START_JOINT_Q))
-    parser.add_argument("--ant-termination-height", type=float, default=0.27)
+    parser.add_argument("--ant-termination-height", type=float, default=ANT_ISAACLAB_TERMINATION_HEIGHT)
     parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
     parser.add_argument(

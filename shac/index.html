@@ -295,15 +295,16 @@
           policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
           joint-order effort mapping to match IsaacLab's wildcard joint order; MuJoCo actuator-order mapping remains available
           for DiffRL/MuJoCo comparisons. The report runner now records Ant contact friction and joint damping, and actually
-          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The Ant defaults now match
-          IsaacLab's Ant task: 0.5 m reset height, ±45 degree foot starts, 0.1 hinge damping, 0.05 armature, 7.5 effort scale,
-          2 physics substeps per 1/60 s policy step, Isaac local observations, and a 0.1 joint-limit cost. The strongest Ant baseline
-          still uses a tuned IsaacLab physical variant, force scale 10, progress reward weight 2, no dense height bonus, a terminal
-          fall penalty, and strict full-horizon fall selection. PPO reaches 12.49 m over 480 randomized frames, and SHAC
-          warm-started from that actor improves the selected policy to 12.77 m with zero falls/invalids in the final
-          randomized eval. Attempts to enforce a higher 0.55 m torso-height gate or high-force upright gait made PPO/SHAC
-          worse: they either stood nearly still or entered repeated flips/falls, consistent with the converted MuJoCo Ant's
-          passive rest height near 0.56 m.
+          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The latest Ant bug was an
+          environment-default mismatch: the runner claimed IsaacLab defaults, but the imported DiffRL XML still used hinge
+          damping 1.0, friction 0.75, termination height 0.27, and a 0.1 joint-limit cost. The corrected Ant defaults now
+          match IsaacLab's Ant task more closely: 0.5 m reset height, ±45 degree foot starts, 0.1 hinge damping, 0.05
+          armature, 7.5 effort scale, friction 1.0, 0.31 m termination height, 2 physics substeps per 1/60 s policy step,
+          Isaac local observations/reward, and unit joint-limit cost. With those settings, PPO reaches 20.37 m over 480
+          deterministic frames, and conservative deterministic SHAC warm-started from that actor improves the selected policy
+          to 23.34 m with 2 falls and 0 invalids across the 1024-env final eval. Attempts to enforce a higher 0.55 m
+          torso-height gate or high-force upright gait still make PPO/SHAC worse: they either stand nearly still or enter
+          repeated flips/falls, consistent with the converted MuJoCo Ant's passive rest height near 0.56 m.
           The latest multistep checks show why: reset-state one-step gradients are clean, while H=8/H=16 Ant rollouts enter
           grazing foot contacts where local contact-position gradients and finite differences diverge.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
@@ -326,14 +327,14 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Ant Gated SHAC Distance</div>
+        <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step randomized-start eval from the strict full-horizon SHAC checkpoint.</p>
+        <p class="note">480-step deterministic eval from the corrected IsaacLab-default SHAC checkpoint.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / Invalids</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Randomized-start full-horizon eval failures for the selected SHAC policy.</p>
+        <p class="note">Full-horizon eval failures for the selected SHAC policy.</p>
       </div>
       <div class="panel metric">
         <div class="label">Hopper SHAC Distance</div>
@@ -380,11 +381,11 @@
           Hopper is solved for PPO and SHAC warm-start selection, but not for long unconstrained SHAC continuation: after
           epoch 2, the 32-step differentiable objective increases short-horizon reward while the 480-step selected rollout
           accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant now moves
-          much farther under IsaacLab physical settings, and SHAC now improves the best strict PPO checkpoint, but the gait
-          is still a low DiffRL-style crawl rather than a tall natural walk. Adding a small height reward improves some scores
-          but does not fully change the crawl. SHAC still needs strict full-horizon checkpoint selection: several 5e-6,
-          1e-6, H=96, and stochastic-start continuations were rejected because they introduced rare falls or did not beat
-          the PPO warm start. The latest fixed-action Ant checks show why this remains hard: reset-state one-step
+          much farther under corrected IsaacLab-default settings, and low-lr deterministic SHAC improves the best strict PPO
+          checkpoint, but the gait is still a compact DiffRL-style crawl rather than a tall natural walk. Adding a small
+          height reward improves some scores but does not fully change the crawl. SHAC still needs strict full-horizon
+          checkpoint selection: a stochastic H=32 continuation and later deterministic epochs were rejected because they
+          introduced rare falls or did not beat the PPO warm start. The latest fixed-action Ant checks show why this remains hard: reset-state one-step
           gradients are clean, but H=8 rollouts enter grazing foot contacts where local contact-position and orientation
           derivatives diverge from finite differences. Newton contacts improve the local action rows, but the full Ant
           batch is not yet stable enough to use as the training backend.
@@ -672,31 +673,33 @@
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Ant PPO, IsaacLab Physical</h2>
+        <h2>Ant PPO, Corrected IsaacLab Defaults</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_phys_progress2_select480_1024env_300upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_phys_progress2_select480_1024env_300upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            PPO trained with IsaacLab-style direct-task rewards, contact friction 1.0, hinge damping 0.1, force scale 10,
-            progress reward weight 2, no dense height bonus, terminal fall penalty 2, and full-horizon selection with a
-            strict 20k fall/invalid penalty. The selected actor moves 12.49 m over 480 randomized frames; the 1024-env eval
-            reports 1852.5 return, 14 falls, and 0 invalids. The video is raw <code>ViewerGL.get_frame()</code> through the
-            shared smoothed COM follow camera.
+            PPO trained after correcting the Ant defaults: contact friction 1.0, hinge damping 0.1, force scale 7.5,
+            0.31 m termination height, IsaacLab reward, and unit joint-limit cost. The selected update 140 actor moves
+            20.37 m over 480 deterministic frames; the 1024-env eval reports 1658.0 return, 6 falls, 0 invalids,
+            0.648 m mean height, 0.990 mean up, and 0.930 mean heading. Runtime was 271.2 s at 74.3k sim FPS with
+            91.1 MB peak allocated CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared
+            smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, IsaacLab Physical</h2>
+        <h2>Ant SHAC, Corrected IsaacLab Defaults</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_phys_progress2_warm_ppo_16env_24ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_isaaclab_phys_progress2_warm_ppo_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_poster.png">
+            <source src="assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC initialized from the strict PPO actor uses MuJoCo contacts, 16 training envs, H=32, and 480-step selection.
-            It improves the PPO checkpoint instead of merely preserving it: selected score 4536.9, final score 4431.3,
-            1877.0 return, 12.77 m displacement, and zero falls/invalids over the randomized 480-step eval. Runtime was
-            145.2 s total, 6.05 s/epoch, 84.8 sim FPS, with 26.3 MB peak allocated CUDA memory.
+            Deterministic SHAC initialized from the corrected PPO actor uses MuJoCo contacts, 16 training envs, H=16,
+            lr 1e-5, no critic bootstrap, and 1024-env 480-step selection. It improves the PPO checkpoint: selected
+            epoch 11 scores 8907.8, with 1828.0 return, 23.34 m displacement, 2 falls, 0 invalids, 0.651 m mean height,
+            0.991 mean up, and 0.895 mean heading over the final 480-step eval. Runtime was 136.1 s total, 45.2 sim FPS,
+            with 20.8 MB peak allocated CUDA memory.
           </figcaption>
         </figure>
       </article>
@@ -704,17 +707,16 @@
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Ant PPO, IsaacLab Defaults Smoke</h2>
+        <h2>Ant PPO, Mislabeled Defaults Smoke</h2>
         <figure>
           <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Short 40-update smoke run after making Ant defaults match IsaacLab: 0.5 m reset height, ±45 degree foot joints,
-            force scale 7.5, 2 substeps, Isaac local observations, IsaacLab reward, and 0.1 joint-limit cost. It is deliberately
-            not the final policy: 554.4 return, 1.20 m displacement, zero falls/invalids, 0.498 m mean height, 0.964 mean up,
-            and 0.908 mean heading over 480 deterministic eval frames. The useful result is that the default setup is stable
-            from update 1 instead of entering the high-force flip/fall regime.
+            This 40-update smoke run is retained as a debugging negative control. It used the new reset pose and force scale,
+            but the runner still inherited XML hinge damping 1.0, friction 0.75, 0.27 m termination height, and a 0.1
+            joint-limit cost, so it was not actually IsaacLab-default. It produced 554.4 return, 1.20 m displacement,
+            zero falls/invalids, 0.498 m mean height, 0.964 mean up, and 0.908 mean heading over 480 deterministic frames.
           </figcaption>
         </figure>
       </article>
@@ -1299,13 +1301,15 @@
           environment. Ant needed two environment fixes beyond the MJWarp adjoints: local Isaac-style observations/reward terms
           and an action-order option that can match either IsaacLab-style joint order or MuJoCo actuator order. A later
           report-runner bug was that the Isaac-style reward accepted <code>--ant-height-weight</code> but ignored it; the
-          runners now support both height-shaped and no-height physical rewards. The strongest no-height PPO checkpoint reaches
-          12.49 m but still has rare stochastic-eval falls. SHAC warm-started from that checkpoint now improves the selected
-          policy to 12.77 m with zero falls/invalids, so Ant is no longer an optimizer-fails-to-move case. The remaining
-          problem is qualitative and long-horizon: the gait is a low DiffRL-style crawl, and contact finite differences still
-          degrade once feet sit on grazing active-set boundaries. The missing piece is now a curriculum/objective that preserves
-          more natural height and heading while increasing progress, plus a contact adjoint or smoothing strategy that remains
-          useful across long horizons and active-set boundaries. It no longer looks like a single RNE mass/bias cancellation bug.
+          runners now support both height-shaped and no-height physical rewards. A later pass found that the claimed IsaacLab
+          defaults were still inheriting DiffRL XML damping/friction/termination/limit-cost values. After correcting those
+          defaults, PPO reaches 20.37 m over 480 frames, and low-lr deterministic SHAC improves the selected policy to
+          23.34 m with 2 falls and 0 invalids across the 1024-env eval. Ant is therefore no longer an optimizer-fails-to-move
+          case. The remaining problem is qualitative and long-horizon: the gait is still a compact low crawl, and contact
+          finite differences still degrade once feet sit on grazing active-set boundaries. The missing piece is now a
+          curriculum/objective that preserves more natural height and heading while increasing progress, plus a contact
+          adjoint or smoothing strategy that remains useful across long horizons and active-set boundaries. It no longer
+          looks like a single RNE mass/bias cancellation bug.
         </p>
       </article>
     </section>
@@ -1586,8 +1590,26 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.green
       },
       {
+        id: "antPpoIsaacExactDefaults",
+        label: "Ant PPO corrected defaults",
+        path: "assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_results.json",
+        color: colors.violet
+      },
+      {
+        id: "antShacIsaacExactDefaultsDet",
+        label: "Ant SHAC corrected defaults",
+        path: "assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_results.json",
+        color: colors.green
+      },
+      {
+        id: "antShacIsaacExactDefaultsStochastic",
+        label: "Ant SHAC corrected stochastic",
+        path: "assets/ant_shac_isaaclab_exact_defaults_warm_ppo_16env_32ep_run1/ant_results.json",
+        color: colors.coral
+      },
+      {
         id: "antPpoIsaacDefaultsSmoke",
-        label: "Ant PPO IsaacLab defaults smoke",
+        label: "Ant PPO mislabeled defaults smoke",
         path: "assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_results.json",
         color: colors.blue
       },
@@ -2098,7 +2120,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2NoHeight")
+      const antLatest = presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
+        || presentRuns.find((run) => run.id === "antPpoIsaacExactDefaults")
+        || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2NoHeight")
         || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2NoHeight")
         || presentRuns.find((run) => run.id === "antShacStochasticTrainH32")
         || presentRuns.find((run) => run.id === "antShacHeightStochasticSel1024")
