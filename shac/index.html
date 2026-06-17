@@ -633,6 +633,30 @@
     </section>
 
     <section class="grid two">
+      <article class="panel warn">
+        <h2>Hopper PPO Curriculum</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Warm-starting from the upright angle-termination policy and switching to progress weight 3 preserves reliability:
+            573 return, 0.49 m displacement, zero falls/invalids. Later PPO updates increase short-horizon reward but destroy
+            full-horizon selection, so this is a safe balance curriculum point rather than solved hopping.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Hopper Curriculum Finding</h2>
+        <p>
+          The best checkpoint is update 1 from the warm-started run. Full-horizon selection immediately rejects later updates
+          even though their rollout rewards rise, which means the next Hopper fix should constrain continuation updates or
+          gradually ramp progress reward rather than applying a fixed large progress weight.
+        </p>
+      </article>
+    </section>
+
+    <section class="grid two">
       <article class="panel ok">
         <h2>Cheetah Newton Contacts</h2>
         <figure>
@@ -929,9 +953,11 @@
           reset because the thigh and leg joints start on their upper stops; no-limit Hopper verifies the smooth dynamics but folds
           during training. The latest Cheetah SHAC run is the current clean success case, but it uses substep 1 for iteration
           speed; PPO verifies the faithful 16-substep Cheetah environment. Hopper PPO showed that angle termination is required
-          to reject lying-down policies, while progress-weighted reward still falls after roughly 100 frames. Ant H=5
-          state/action gradients now match finite differences, but default-reward PPO only learns standing and a locomotion-weighted
-          PPO probe collapses without a curriculum. The next bug hunt should target contact/limit training stability,
+          to reject lying-down policies, while progress-weighted reward still falls after roughly 100 frames. A warm-started
+          Hopper curriculum preserves the upright policy but only reaches 0.49 m displacement before later updates destroy
+          full-horizon reliability. Ant H=5 state/action gradients now match finite differences, but default-reward PPO only
+          learns standing and a locomotion-weighted PPO probe collapses without a curriculum. The next bug hunt should target
+          contact/limit training stability,
           long-horizon selection, and policy-gradient variance, not the RNE mass/bias cancellation.
         </p>
       </article>
@@ -1161,6 +1187,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Hopper PPO progress x5",
         path: "assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_results.json",
         color: colors.coral
+      },
+      {
+        id: "hopperPpoCurriculum",
+        label: "Hopper PPO curriculum",
+        path: "assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_results.json",
+        color: colors.violet
       }
     ];
 

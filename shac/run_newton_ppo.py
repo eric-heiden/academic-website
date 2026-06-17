@@ -155,6 +155,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
     obs_dim = env.num_obs
     actor = PPOActor(obs_dim, env.num_actions).to(env.torch_device)
     critic = PPOValue(obs_dim).to(env.torch_device)
+    if args.actor_path is not None:
+        actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
     optimizer = torch.optim.Adam(
         list(actor.parameters()) + list(critic.parameters()),
         lr=args.lr,
@@ -162,6 +164,11 @@ def train_ppo(args: argparse.Namespace) -> dict:
         eps=1.0e-5,
     )
     obs_rms = RunningMeanStd(shape=(obs_dim,), device=env.torch_device) if args.obs_rms else None
+    if obs_rms is not None and args.obs_rms_path is not None:
+        obs_data = torch.load(args.obs_rms_path, map_location=env.torch_device)
+        obs_rms.mean = obs_data["mean"].to(env.torch_device)
+        obs_rms.var = obs_data["var"].to(env.torch_device)
+        obs_rms.count = obs_data["count"]
 
     q, qd = env.reset(noise=0.0, stochastic_init=args.stochastic_init)
     prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
@@ -426,6 +433,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "episode_length": args.episode_length,
         "stochastic_init": args.stochastic_init,
         "obs_rms": args.obs_rms,
+        "actor_path": str(args.actor_path) if args.actor_path is not None else None,
+        "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "termination_penalty": args.termination_penalty,
         "selection_fall_penalty": args.selection_fall_penalty,
         "selection_invalid_penalty": args.selection_invalid_penalty,
@@ -500,6 +509,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--deterministic-init", dest="stochastic_init", action="store_false")
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=True)
     parser.add_argument("--no-obs-rms", dest="obs_rms", action="store_false")
+    parser.add_argument("--actor-path", type=Path, default=None)
+    parser.add_argument("--obs-rms-path", type=Path, default=None)
     parser.add_argument("--ant-progress-weight", type=float, default=1.0)
     parser.add_argument("--ant-heading-weight", type=float, default=1.0)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
