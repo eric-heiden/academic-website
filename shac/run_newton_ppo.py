@@ -234,12 +234,57 @@ def train_ppo(args: argparse.Namespace) -> dict:
     best_obs_rms = None
     best_update = 0
     history = []
+    initial_selection = None
+    initial_selection_score = None
 
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats(env.torch_device)
         torch.cuda.synchronize(env.torch_device)
 
     t0 = time.perf_counter()
+    if args.actor_path is not None or args.updates == 0:
+        selection_horizon = args.selection_horizon or args.eval_horizon
+        initial_selection = evaluate_policy(
+            env,
+            actor,
+            selection_horizon,
+            obs_rms=obs_rms,
+            termination_penalty=args.termination_penalty,
+            stochastic_init=args.eval_stochastic_init,
+        )
+        initial_selection_score = rollout_selection_score(
+            initial_selection,
+            num_envs=args.num_envs,
+            fall_penalty=args.selection_fall_penalty,
+            invalid_penalty=args.selection_invalid_penalty,
+            displacement_weight=args.selection_displacement_weight,
+            height_weight=args.selection_height_weight,
+            up_weight=args.selection_up_weight,
+            heading_weight=args.selection_heading_weight,
+            min_height=args.selection_min_height,
+            min_up=args.selection_min_up,
+            min_heading=args.selection_min_heading,
+            posture_penalty=args.selection_posture_penalty,
+        )
+        best_score = initial_selection_score
+        best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+        torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
+        if obs_rms is not None:
+            best_obs_rms = {
+                "mean": obs_rms.mean.detach().clone(),
+                "var": obs_rms.var.detach().clone(),
+                "count": obs_rms.count,
+            }
+            torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
+        print(
+            f"{args.env} ppo initial: sel={initial_selection_score: .1f} "
+            f"ret={initial_selection['return']: .1f} "
+            f"dx={initial_selection['mean_forward_displacement']: .2f} "
+            f"falls={initial_selection['fall_count']} "
+            f"invalid={initial_selection['invalid_count']}",
+            flush=True,
+        )
+
     for update in range(args.updates):
         update_t0 = time.perf_counter()
         obs_buf = []
@@ -629,6 +674,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "total_seconds": total_s,
         "mean_update_seconds": float(np.mean([h["update_seconds"] for h in history])) if history else None,
         "mean_fps": float(np.mean([h["fps"] for h in history])) if history else None,
+        "initial_selection": initial_selection,
+        "initial_selection_score": initial_selection_score,
         "best_update": best_update,
         "best_eval_score": best_score,
         "eval_score": eval_score,

@@ -375,7 +375,8 @@
           joint order or MuJoCo actuator order, the Isaac-style Ant height reward now uses <code>ant_height_weight</code>,
           checkpoint selection can include
           forward displacement, initial PPO warm starts are evaluated and saved before any SHAC update, and SHAC selection can
-          now run on a separate large randomized environment batch via <code>--selection-num-envs</code>. SHAC can also use a
+          now run on a separate large randomized environment batch via <code>--selection-num-envs</code>. The PPO runner now
+          mirrors that safeguard for loaded actors by evaluating and saving update 0 before any PPO fine-tune step. SHAC can also use a
           no-LayerNorm actor architecture that exactly matches PPO checkpoints.
           Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
