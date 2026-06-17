@@ -296,9 +296,11 @@
           reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
           reliable 1024-world result after fixing action-squash semantics and checkpoint selection: the tanh-wrapped
           RSL-style PPO warm start improves from 13.04 m to 14.96 m uninterrupted with 0 terminals, 0 invalids, and minimum
-          up projection 0.93. The faster shaped Ant policy still replays at about 23.19 m but has late no-reset terminal
-          events, so it remains a diagnostic speed target rather than the reliable headline policy. The remaining Ant/Hopper
-          issue is therefore no longer camera rendering or basic environment setup; it is reliable long-horizon
+          up projection 0.93. A corrected tanh-semantics PPO continuation from that SHAC actor preserved the selected
+          zero-terminal policy but did not beat it; short-horizon PPO reward rose while full-horizon selection fell. The
+          faster shaped Ant policy still replays at about 23.19 m but has late no-reset terminal events, so it remains a
+          diagnostic speed target rather than the reliable headline policy. The remaining Ant/Hopper issue is therefore no
+          longer camera rendering or basic environment setup; it is reliable long-horizon
           contact-gradient/update quality under replicated MuJoCo Warp worlds.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
@@ -392,10 +394,12 @@
           beat slightly faster late-fall checkpoints. Ant's reliable SHAC policy now reaches 14.96 m uninterrupted with
           0 no-reset terminals, but the faster shaped policy still reaches 23.19 m with late terminal events. A true
           no-squash RSL-style PPO actor replay collapses under corrected action semantics, so no-squash PPO needs a clean
-          retrain/evaluation pass instead of being mixed with the tanh-wrapped SHAC actor family. Native NV Ant runs move
-          farther, but remain fall-prone in 1024-world replay and are not treated as reliable baselines. The latest fixed-action
-          checks explain the pattern: reset-state one-step gradients are clean, but H=8/H=16 Ant rollouts enter grazing foot
-          contacts where contact-position and orientation derivatives diverge from finite differences.
+          retrain/evaluation pass instead of being mixed with the tanh-wrapped SHAC actor family. Corrected PPO continuation
+          from the 14.96 m SHAC policy selected update 0 and ended with lower 480-step selection scores, so PPO is currently
+          a preservation/diagnostic control rather than an Ant improvement path. Native NV Ant runs move farther, but remain
+          fall-prone in 1024-world replay and are not treated as reliable baselines. The latest fixed-action checks explain
+          the pattern: reset-state one-step gradients are clean, but H=8/H=16 Ant rollouts enter grazing foot contacts where
+          contact-position and orientation derivatives diverge from finite differences.
         </p>
       </article>
     </section>
@@ -751,6 +755,22 @@
             minimum up projection 0.93, and minimum height 0.47 m. Runtime was 163.4 s with 25.9 MB peak allocated CUDA
             memory. The clip is raw <code>ViewerGL.get_frame()</code> with no overlays through the shared smoothed COM
             follow camera.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant PPO, Corrected SHAC Continuation</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_tanh_from_shac_minup075_1024env_80upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_tanh_from_shac_minup075_1024env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO continued from the reliable 14.96 m SHAC actor with corrected tanh action semantics, the same Ant objective,
+            1024 training worlds, 32-step rollouts, adaptive KL, and 480-step 1024-world selection. The selector kept update
+            0: final best replay is 14.94 m uninterrupted with 0 terminals, while later PPO updates increased short-horizon
+            reward but dropped full-horizon selection to lower 10-12 m gaits. Runtime was 148.1 s with 86.7 MB peak allocated
+            CUDA memory. The video is the selected best actor, rendered from raw <code>ViewerGL.get_frame()</code> with the
+            shared smoothed COM follow camera and no overlays.
           </figcaption>
         </figure>
       </article>
@@ -1532,7 +1552,9 @@
           evaluation, while SHAC actors still apply their explicit tanh output map. This exposed that the RSL-style PPO
           continuation was only reliable under the tanh wrapper used by the SHAC actor; true no-squash replay collapses and
           must be treated as a separate retraining target. With the wrapper made explicit, H=16 SHAC fine-tuning improves the
-          reliable Ant gait to 14.96 m uninterrupted with 0 terminals. For native NV Ant, the no-reset single deterministic
+          reliable Ant gait to 14.96 m uninterrupted with 0 terminals. PPO continued from that selected SHAC actor under the
+          corrected tanh semantics kept update 0 as best; later PPO updates improved short-horizon reward but reduced
+          full-horizon selected displacement to 10-12 m. For native NV Ant, the no-reset single deterministic
           videos now look physically continuous, but large identical-world replays expose robustness failures because contact
           dynamics amplify tiny per-world floating-point differences by mid-rollout. The 500k-penalty NV SHAC continuation
           reduced those failures but still ended at 14 falls/3 invalids, so NV remains a diagnostic asset rather than the
@@ -1884,6 +1906,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC tanh-wrapped RSL",
         path: "assets/ant_shac_tanhwrap_ppo_minup075_h16_16env_24ep_lr5e7_run1/ant_results.json",
         color: colors.teal
+      },
+      {
+        id: "antPpoFromShacTanhMinUp075",
+        label: "Ant PPO from SHAC corrected",
+        path: "assets/ant_ppo_tanh_from_shac_minup075_1024env_80upd_run1/ant_ppo_results.json",
+        color: colors.coral
       },
       {
         id: "antShacIsaacExactDefaultsDet",
