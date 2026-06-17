@@ -2398,7 +2398,7 @@ def run_training(args: argparse.Namespace) -> dict:
             480 if is_locomotion_env(args.env) else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
         )
     if args.selection_horizon is None and is_locomotion_env(args.env):
-        args.selection_horizon = min(args.eval_horizon, max(args.horizon, 96))
+        args.selection_horizon = args.eval_horizon
     if args.episode_length is None:
         args.episode_length = 1000 if is_locomotion_env(args.env) else 240
     if args.force_scale is None:
@@ -2483,6 +2483,7 @@ def run_training(args: argparse.Namespace) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     live_history_path = out_dir / f"{args.env}_history_live.json"
 
+    run_t0 = time.perf_counter()
     initial_selection_horizon = args.selection_horizon or args.eval_horizon
     initial_selection_rollout = evaluate_policy(
         selection_env,
@@ -2797,7 +2798,6 @@ def run_training(args: argparse.Namespace) -> dict:
             f"fps={history[-1]['fps']: .1f}"
         )
 
-    total_s = time.perf_counter() - t0
     if best_state is not None:
         actor.load_state_dict(best_state)
     if obs_rms is not None and best_obs_rms is not None:
@@ -2814,6 +2814,14 @@ def run_training(args: argparse.Namespace) -> dict:
         )
 
     rollout = evaluate_policy(
+        selection_env,
+        actor,
+        args.eval_horizon,
+        obs_rms=obs_rms,
+        termination_penalty=args.termination_penalty,
+        stochastic_init=args.eval_stochastic_init,
+    )
+    rollout_uninterrupted = evaluate_policy_uninterrupted(
         selection_env,
         actor,
         args.eval_horizon,
@@ -2906,6 +2914,7 @@ def run_training(args: argparse.Namespace) -> dict:
             args.env,
             obs_rms=obs_rms,
         )
+    total_s = time.perf_counter() - run_t0
 
     result = {
         "env": args.env,
@@ -3031,6 +3040,7 @@ def run_training(args: argparse.Namespace) -> dict:
         ),
         "history": history,
         "eval": rollout,
+        "eval_uninterrupted": rollout_uninterrupted,
         "video": video_path.name if video_path else None,
         "poster": poster_path.name if poster_path else None,
         "gpu": query_gpu(),
@@ -3138,6 +3148,93 @@ def evaluate_policy(
     }
 
 
+@torch.no_grad()
+def evaluate_policy_uninterrupted(
+    env: NewtonMuJoCoTorchEnv,
+    actor: torch.nn.Module,
+    horizon: int,
+    *,
+    obs_rms: RunningMeanStd | None = None,
+    termination_penalty: float = 0.0,
+    stochastic_init: bool = False,
+) -> dict:
+    q, qd = env.reset(noise=0.0, stochastic_init=stochastic_init)
+    prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
+    progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
+    active = torch.ones(env.num_envs, dtype=torch.bool, device=env.torch_device)
+    terminal_step = torch.full((env.num_envs,), -1, dtype=torch.long, device=env.torch_device)
+    terminal_fall = torch.zeros(env.num_envs, dtype=torch.bool, device=env.torch_device)
+    terminal_invalid = torch.zeros(env.num_envs, dtype=torch.bool, device=env.torch_device)
+    episode_returns = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
+    forward_displacement = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
+    rewards = []
+    height_samples = []
+    up_samples = []
+    heading_samples = []
+    for step_idx in range(horizon):
+        obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
+        action = deterministic_policy_action(actor, obs)
+        action = torch.where(active.unsqueeze(-1), action, torch.zeros_like(action))
+        root_x_before = q[:, 0].clone()
+        q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
+        root_x_after = q_next[:, 0].clone()
+        finite = torch.logical_and(torch.isfinite(q_next).all(dim=-1), torch.isfinite(qd_next).all(dim=-1))
+        invalid = torch.logical_or(env.invalid_state(q_next, qd_next), ~finite)
+        fell = torch.logical_and(env.fallen_state(q_next), ~invalid)
+        new_terminal = torch.logical_and(active, torch.logical_or(fell, invalid))
+
+        next_obs = env.observe(q_next, qd_next, action, phase=progress + 1)
+        rew = env.reward(q_next, qd_next, action, obs=next_obs)
+        rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
+        rew = torch.where(active, rew, torch.zeros_like(rew))
+        rewards.append(rew.mean())
+        episode_returns = episode_returns + rew
+        forward_displacement = forward_displacement + torch.where(
+            active & finite,
+            root_x_after - root_x_before,
+            torch.zeros_like(root_x_after),
+        )
+
+        if env.env_name == "ant":
+            torso_pos, _, _, _, up_vec, heading_alignment = env.ant_pose_terms(q_next, qd_next)
+            sample_mask = active & finite
+            if sample_mask.any():
+                height_samples.append(torso_pos[sample_mask, 1].detach().mean())
+                up_samples.append(up_vec[sample_mask, 1].detach().mean())
+                heading_samples.append(heading_alignment[sample_mask].detach().mean())
+
+        terminal_step = torch.where(new_terminal, torch.full_like(terminal_step, step_idx + 1), terminal_step)
+        terminal_fall = torch.logical_or(terminal_fall, torch.logical_and(active, fell))
+        terminal_invalid = torch.logical_or(terminal_invalid, torch.logical_and(active, invalid))
+        active = torch.logical_and(active, ~torch.logical_or(fell, invalid))
+        freeze = torch.logical_or(invalid, ~finite)
+        q = torch.where(freeze.unsqueeze(-1), q, q_next)
+        qd = torch.where(freeze.unsqueeze(-1), torch.zeros_like(qd), qd_next)
+        prev_action = action
+        progress = torch.where(active, progress + 1, progress)
+
+    terminal_count = int((terminal_step >= 0).sum().cpu())
+    fall_count = int(terminal_fall.sum().cpu())
+    invalid_count = int(terminal_invalid.sum().cpu())
+    terminal_steps = terminal_step[terminal_step >= 0]
+    return {
+        "mean_reward": float(torch.stack(rewards).mean().cpu()) if rewards else 0.0,
+        "return": float(torch.stack(rewards).sum().cpu()) if rewards else 0.0,
+        "alive_fraction": 1.0 - terminal_count / max(1, env.num_envs),
+        "terminal_count": terminal_count,
+        "fall_count": fall_count,
+        "invalid_count": invalid_count,
+        "first_terminal_step": int(terminal_steps.min().cpu()) if terminal_steps.numel() else None,
+        "mean_terminal_step": float(terminal_steps.to(torch.float32).mean().cpu()) if terminal_steps.numel() else None,
+        "mean_forward_displacement": float(forward_displacement.mean().detach().cpu()),
+        "mean_completed_return": float(episode_returns.mean().detach().cpu()),
+        "mean_height": float(torch.stack(height_samples).mean().cpu()) if height_samples else None,
+        "mean_up": float(torch.stack(up_samples).mean().cpu()) if up_samples else None,
+        "mean_heading": float(torch.stack(heading_samples).mean().cpu()) if heading_samples else None,
+        "horizon": horizon,
+    }
+
+
 def render_rollout(
     env: NewtonMuJoCoTorchEnv,
     actor: torch.nn.Module,
@@ -3195,6 +3292,22 @@ def render_rollout(
                     prev_action = torch.zeros_like(prev_action)
     viewer.close()
     imageio.imwrite(poster_path, frames[len(frames) // 2])
+    write_json(
+        out_dir / f"{env_name}_render_metadata.json",
+        {
+            "horizon": horizon,
+            "dt": env.dt,
+            "video": video_path.name,
+            "poster": poster_path.name,
+            "camera": "SmoothedFollowCamera",
+            "source": "ViewerGL.get_frame()",
+            "overlays": False,
+            "reset_splicing": False,
+            "invalid_state_policy": "freeze_invalid_worlds",
+            "width": 960,
+            "height": 544,
+        },
+    )
     return video_path, poster_path
 
 

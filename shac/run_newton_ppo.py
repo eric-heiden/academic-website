@@ -29,6 +29,7 @@ from run_newton_shac import (
     HopperRewardWeights,
     NewtonMuJoCoTorchEnv,
     evaluate_policy,
+    evaluate_policy_uninterrupted,
     finalize_terminal_reward,
     git_commit_for_imported_module,
     is_locomotion_env,
@@ -175,6 +176,11 @@ def load_actor_checkpoint(actor: PPOActor, path: Path, device: torch.device | st
         raise RuntimeError(f"actor checkpoint mapping failed for {path}: missing={missing}, unexpected={unexpected}")
 
 
+def load_critic_checkpoint(critic: PPOValue, path: Path, device: torch.device | str) -> None:
+    state = torch.load(path, map_location=device)
+    critic.load_state_dict(state)
+
+
 def tanh_normal_log_prob(
     dist: torch.distributions.Normal, raw_action: torch.Tensor, action: torch.Tensor
 ) -> torch.Tensor:
@@ -191,7 +197,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
     if args.eval_horizon is None:
         args.eval_horizon = 480
     if args.selection_horizon is None and is_locomotion_env(args.env):
-        args.selection_horizon = min(args.eval_horizon, 96)
+        args.selection_horizon = args.eval_horizon
     if args.episode_length is None:
         args.episode_length = 1000
     if args.force_scale is None:
@@ -281,6 +287,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
     critic = PPOValue(obs_dim, args.critic_hidden_dims, layer_norm=args.layer_norm).to(env.torch_device)
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
+    if args.critic_path is not None:
+        load_critic_checkpoint(critic, args.critic_path, env.torch_device)
     optimizer = torch.optim.Adam(
         list(actor.parameters()) + list(critic.parameters()),
         lr=args.lr,
@@ -340,6 +348,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         best_score = initial_selection_score
         best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
         torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
+        torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_best_critic.pt")
         if obs_rms is not None:
             best_obs_rms = {
                 "mean": obs_rms.mean.detach().clone(),
@@ -529,6 +538,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 best_update = update + 1
                 best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
                 torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
+                torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_best_critic.pt")
                 if obs_rms is not None:
                     best_obs_rms = {
                         "mean": obs_rms.mean.detach().clone(),
@@ -584,7 +594,6 @@ def train_ppo(args: argparse.Namespace) -> dict:
             flush=True,
         )
 
-    total_s = time.perf_counter() - t0
     if best_state is not None:
         actor.load_state_dict(best_state)
     if obs_rms is not None and best_obs_rms is not None:
@@ -592,6 +601,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         obs_rms.var = best_obs_rms["var"]
         obs_rms.count = best_obs_rms["count"]
     torch.save(actor.state_dict(), out_dir / f"{args.env}_ppo_actor.pt")
+    torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_critic.pt")
     if obs_rms is not None:
         torch.save(
             {"mean": obs_rms.mean, "var": obs_rms.var, "count": obs_rms.count},
@@ -599,6 +609,14 @@ def train_ppo(args: argparse.Namespace) -> dict:
         )
 
     rollout = evaluate_policy(
+        env,
+        actor,
+        args.eval_horizon,
+        obs_rms=obs_rms,
+        termination_penalty=args.termination_penalty,
+        stochastic_init=args.eval_stochastic_init,
+    )
+    rollout_uninterrupted = evaluate_policy_uninterrupted(
         env,
         actor,
         args.eval_horizon,
@@ -681,6 +699,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             f"{args.env}_ppo",
             obs_rms=obs_rms,
         )
+    total_s = time.perf_counter() - t0
 
     result = {
         "env": args.env,
@@ -707,6 +726,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "eval_stochastic_init": args.eval_stochastic_init,
         "obs_rms": args.obs_rms,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
+        "critic_path": str(args.critic_path) if args.critic_path is not None else None,
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "termination_penalty": args.termination_penalty,
         "selection_fall_penalty": args.selection_fall_penalty,
@@ -792,6 +812,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ),
         "history": history,
         "eval": rollout,
+        "eval_uninterrupted": rollout_uninterrupted,
         "video": str(video_path) if video_path is not None else None,
         "poster": str(poster_path) if poster_path is not None else None,
         "gpu": torch.cuda.get_device_name(env.torch_device) if torch.cuda.is_available() else "cpu",
@@ -844,6 +865,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=True)
     parser.add_argument("--no-obs-rms", dest="obs_rms", action="store_false")
     parser.add_argument("--actor-path", type=Path, default=None)
+    parser.add_argument("--critic-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
     parser.add_argument("--ant-progress-weight", type=float, default=1.0)
     parser.add_argument("--ant-heading-weight", type=float, default=0.5)
