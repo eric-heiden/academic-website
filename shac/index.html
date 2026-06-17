@@ -383,7 +383,11 @@
           accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant now moves
           much farther under corrected IsaacLab-default settings, and low-lr deterministic SHAC improves the best strict PPO
           checkpoint, but the gait is still a compact DiffRL-style crawl rather than a tall natural walk. Adding a small
-          height reward improves some scores but does not fully change the crawl. SHAC still needs strict full-horizon
+          height reward improves some scores but does not fully change the crawl. Follow-up reliability controls also did
+          not beat the selected 23.34 m policy: stronger fall-gated selection finished at 22.73 m with 5 falls, deterministic
+          reset-each-epoch H=32 finished at 22.12 m with 3 falls, and the height-aware reward fine-tune finished at 22.79 m
+          with 8 falls. A replay of the selected policy shows the rare flips occur mid-rollout around steps 348, 370, 420,
+          422, and 461, so they are real long-horizon contact/pose failures rather than timeout bookkeeping. SHAC still needs strict full-horizon
           checkpoint selection: a stochastic H=32 continuation and later deterministic epochs were rejected because they
           introduced rare falls or did not beat the PPO warm start. The latest fixed-action Ant checks show why this remains hard: reset-state one-step
           gradients are clean, but H=8 rollouts enter grazing foot contacts where local contact-position and orientation
@@ -702,6 +706,30 @@
             with 20.8 MB peak allocated CUDA memory.
           </figcaption>
         </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel warn">
+        <h2>Ant Reliability Controls</h2>
+        <p>
+          Three targeted SHAC follow-ups were run after the corrected-default Ant result. Increasing the selection fall
+          penalty from 100k to 1M did not reproduce the earlier zero-fall checkpoint and selected epoch 11 at 22.73 m,
+          1793.5 return, 5 falls, and 0 invalids. Matching the deterministic evaluation more directly with
+          <code>--deterministic-init --reset-each-epoch</code>, H=32, and the same 1M fall gate selected epoch 20 at
+          22.12 m, 1761.1 return, 3 falls, and 0 invalids. Switching the differentiable objective back to the
+          height-shaped Isaac reward increased return to 1968.5 but selected 22.79 m with 8 falls. These are kept in the
+          plots and table as negative controls; the primary video remains the faster 23.34 m corrected-default policy.
+        </p>
+      </article>
+      <article class="panel">
+        <h2>Ant Fall Timing</h2>
+        <p>
+          A separate 1024-world replay of the selected corrected-default SHAC actor found rare fallen worlds at steps
+          348, 370, 420, 422, and 461 of the 480-frame rollout. The failing worlds had torso heights around 0.28-0.30 m
+          and negative up projections, so the remaining falls are real flips after long contact interaction. This keeps
+          the current Ant status at “best so far” rather than “solved.”
+        </p>
       </article>
     </section>
 
@@ -1608,6 +1636,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.coral
       },
       {
+        id: "antShacIsaacExactDefaultsReliableGate",
+        label: "Ant SHAC 1M fall gate",
+        path: "assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_reliable_16env_24ep_lr1e5_run1/ant_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antShacIsaacExactDefaultsDetReset",
+        label: "Ant SHAC det reset H32",
+        path: "assets/ant_shac_isaaclab_exact_defaults_detinit_reset_warm_ppo_16env_24ep_h32_lr1e5_run1/ant_results.json",
+        color: colors.teal
+      },
+      {
+        id: "antShacIsaacHeightRewardForce75",
+        label: "Ant SHAC height reward",
+        path: "assets/ant_shac_isaac_height_reward_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_results.json",
+        color: colors.slate
+      },
+      {
         id: "antPpoIsaacDefaultsSmoke",
         label: "Ant PPO mislabeled defaults smoke",
         path: "assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_results.json",
@@ -1877,15 +1923,26 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       return best?.value ?? null;
     }
 
-    async function safeJson(path) {
-      try {
-        const res = await fetch(path, { cache: "no-cache" });
-        if (!res.ok) throw new Error(`${res.status} ${path}`);
-        return await res.json();
-      } catch (err) {
-        console.warn("Could not load", path, err);
-        return null;
+    function wait(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function safeJson(path, attempts = 4) {
+      let lastError = null;
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          const res = await fetch(path, { cache: "no-cache" });
+          if (!res.ok) throw new Error(`${res.status} ${path}`);
+          return await res.json();
+        } catch (err) {
+          lastError = err;
+          if (attempt < attempts) {
+            await wait(150 * attempt + Math.random() * 120);
+          }
+        }
       }
+      console.warn("Could not load", path, lastError);
+      return null;
     }
 
     function historyTrace(run, key, name = run.label, yaxis = "y") {
