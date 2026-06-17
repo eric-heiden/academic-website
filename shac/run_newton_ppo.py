@@ -10,6 +10,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import warp as wp
+import mujoco_warp
 
 from run_newton_shac import (
     ANT_DEFAULT_SELECTION_FALL_PENALTY,
@@ -22,6 +23,7 @@ from run_newton_shac import (
     NewtonMuJoCoTorchEnv,
     evaluate_policy,
     finalize_terminal_reward,
+    git_commit_for_imported_module,
     is_locomotion_env,
     is_planar_locomotion_env,
     normalize_obs,
@@ -102,8 +104,12 @@ def tanh_normal_log_prob(
 def train_ppo(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco"
+    if args.sim_substeps is None:
+        args.sim_substeps = 16 if is_locomotion_env(args.env) else 1
     if args.eval_horizon is None:
         args.eval_horizon = 480
+    if args.selection_horizon is None and is_locomotion_env(args.env):
+        args.selection_horizon = min(args.eval_horizon, 96)
     if args.episode_length is None:
         args.episode_length = 1000
     if args.force_scale is None:
@@ -408,6 +414,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "algo": "ppo",
         "title": "SHAC with MuJoCo Warp",
         "timestamp_pacific": pacific_now_iso(),
+        "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
         "contact_backend": args.contact_backend,
         "rollout_steps": args.rollout_steps,
@@ -422,6 +429,16 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "termination_penalty": args.termination_penalty,
         "selection_fall_penalty": args.selection_fall_penalty,
         "selection_invalid_penalty": args.selection_invalid_penalty,
+        "lr": args.lr,
+        "gamma": args.gamma,
+        "gae_lambda": args.gae_lambda,
+        "ppo_epochs": args.ppo_epochs,
+        "minibatch_size": args.minibatch_size,
+        "clip_coef": args.clip_coef,
+        "value_clip_coef": args.value_clip_coef,
+        "value_coef": args.value_coef,
+        "entropy_coef": args.entropy_coef,
+        "max_grad_norm": args.max_grad_norm,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
@@ -467,7 +484,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-interval", type=int, default=5)
     parser.add_argument("--episode-length", type=int, default=None)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
-    parser.add_argument("--sim-substeps", type=int, default=1)
+    parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
     parser.add_argument("--lr", type=float, default=3.0e-4)
     parser.add_argument("--gamma", type=float, default=0.99)

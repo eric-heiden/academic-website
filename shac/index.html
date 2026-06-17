@@ -272,10 +272,11 @@
           The latest pass stages the problem through acrobot target control, free-body control, sphere/capsule contact targets,
           Hopper, Cheetah, and Ant. The newest MJWarp fix removes duplicate auto-AD through the RNE
           <code>qfrc_bias</code>/<code>cfrc_int</code> path, so free-fall mass/bias VJPs cancel correctly and Hopper/Ant
-          one-step state gradients match finite differences again. Cheetah now works as a staged SHAC target: Newton
-          contacts move 7.57 m in the latest 8 s rollout, and MuJoCo contacts move 5.40 m when rollout state is reset each
-          epoch. Hopper and Ant still need training stabilization: their short-horizon gradients are now clean, but contact-rich
-          SHAC optimization still collapses or plateaus before reliable locomotion.
+          one-step state gradients match finite differences again. Cheetah now has a clean SHAC stepping-stone result with
+          MuJoCo contacts at substep 1: 10.33 m forward over 480 frames with zero falls/invalids. PPO verifies that the
+          16-substep Cheetah task itself is learnable. Hopper and Ant still need training stabilization and reward/curriculum
+          work: Hopper requires angle termination to avoid lying-down policies, and Ant's default reward trains standing rather
+          than locomotion.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -292,9 +293,9 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Best Cheetah Eval</div>
+        <div class="label">Best Cheetah SHAC Eval</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step Newton-contact eval, selected by rollout score.</p>
+        <p class="note">480-step MuJoCo-contact eval, selected by full-horizon rollout score.</p>
       </div>
       <div class="panel metric">
         <div class="label">Cheetah Invalid Resets</div>
@@ -309,7 +310,7 @@
       <div class="panel metric">
         <div class="label">Cheetah Training FPS</div>
         <div class="value" id="stable-fps">...</div>
-        <p class="note">64 envs, 32 differentiable steps per epoch.</p>
+        <p class="note">16 envs, 32 differentiable steps per epoch.</p>
       </div>
     </section>
 
@@ -333,11 +334,13 @@
       <article class="panel warn">
         <h2>What Is Not Fixed</h2>
         <p>
-          Contact-rich training is still not solved for Hopper or Ant. Hopper with joint limits has nonsmooth finite differences
-          at the reset pose because the thigh and leg start exactly on their upper limits; disabling those limits makes smooth
-          state/action gradients pass, but training folds into invalid low postures. Ant one-step state/action gradients now pass
-          through H=5, but a 64-env SHAC run improved only to roughly 1.5 mean reward before declining, so reliable Ant locomotion
-          still needs contact/optimization stabilization rather than another smooth-dynamics VJP fix.
+          Contact-rich SHAC training is still not solved for Hopper or Ant. Hopper with joint limits has nonsmooth finite
+          differences at the reset pose because the thigh and leg start exactly on their upper limits; disabling those limits
+          makes smooth state/action gradients pass, but training folds into invalid low postures. PPO confirms that height-only
+          Hopper termination admits lying-down policies, while angle termination yields upright balance and progress-weighted
+          reward yields short bursts that still fall over 480 frames. Ant one-step state/action gradients now pass through H=5,
+          but PPO with the default reward learns a stable standing pose with 0.005 m displacement; a more locomotion-weighted
+          reward collapses early without a curriculum.
         </p>
       </article>
     </section>
@@ -550,6 +553,83 @@
         </thead>
         <tbody id="run-table"></tbody>
       </table>
+    </section>
+
+    <section class="grid two">
+      <article class="panel ok">
+        <h2>Cheetah SHAC, MuJoCo Contacts</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1/cheetah_poster.png">
+            <source src="assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1/cheetah_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current best SHAC stepping-stone: MuJoCo contacts, substep 1, lr 5e-4, full 480-step selection, and invalid/fall
+            terminal penalty. The selected policy moves 10.33 m over 480 frames with zero falls/invalids.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Cheetah PPO, 16 Substeps</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/cheetah_ppo_mujoco_faithful_64env_40upd_run1/cheetah_ppo_poster.png">
+            <source src="assets/cheetah_ppo_mujoco_faithful_64env_40upd_run1/cheetah_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO positive control using the faithful 16-substep MuJoCo-contact dynamics. It reaches 703.2 return, 12.56 m
+            displacement, and zero falls/invalids, so Cheetah's task setup is not the blocker.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel warn">
+        <h2>Hopper PPO, Angle Termination</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Angle termination fixes the height-only lying-down exploit and yields a stable upright policy, but displacement is
+            only 0.44 m over 480 frames, so this is balance rather than locomotion.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel bad">
+        <h2>Hopper PPO, Progress Weighted</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Progress weight 5 produces forward bursts, but the full eval has repeated falls: 3.13 m displacement with 256 fall
+            events across the vectorized rollout. This is a failed locomotion policy despite high short-horizon reward.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel warn">
+        <h2>Ant PPO, Default Reward</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            The default Ant reward trains a stable standing pose: 652 return, zero falls/invalids, and only 0.005 m forward
+            displacement. This verifies stability but not locomotion.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel bad">
+        <h2>Ant Locomotion Reward Probe</h2>
+        <p>
+          A locomotion-weighted PPO probe with progress weight 5, reduced posture terms, full-horizon selection, and action
+          penalty -0.01 was stopped at update 24 because full-horizon selection remained strongly negative from falls/invalids.
+          The next Ant step should use a curriculum rather than jumping directly from standing reward to aggressive progress.
+        </p>
+      </article>
     </section>
 
     <section class="grid two">
@@ -847,9 +927,12 @@
           no longer a simple smooth-dynamics gradient bug: Hopper and Ant short-horizon state/action checks now pass, but SHAC
           training still trades progress against repeated contacts and active limits poorly. Hopper with limits on is nonsmooth at
           reset because the thigh and leg joints start on their upper stops; no-limit Hopper verifies the smooth dynamics but folds
-          during training. Ant H=5 state/action gradients now match finite differences, yet the latest 64-env SHAC run plateaued
-          near 1.5 reward and then declined. The next bug hunt should target contact/limit training stability and policy-gradient
-          variance, not the RNE mass/bias cancellation.
+          during training. The latest Cheetah SHAC run is the current clean success case, but it uses substep 1 for iteration
+          speed; PPO verifies the faithful 16-substep Cheetah environment. Hopper PPO showed that angle termination is required
+          to reject lying-down policies, while progress-weighted reward still falls after roughly 100 frames. Ant H=5
+          state/action gradients now match finite differences, but default-reward PPO only learns standing and a locomotion-weighted
+          PPO probe collapses without a curriculum. The next bug hunt should target contact/limit training stability,
+          long-horizon selection, and policy-gradient variance, not the RNE mass/bias cancellation.
         </p>
       </article>
     </section>
@@ -897,6 +980,30 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
   --horizon 3 --grad-check-directions 4 --locomotion-disable-joint-limits \
   --out-dir /home/horde/repos/academic-website-reports/shac/assets/cheetah_gradcheck_nolimits_none_probe_run1 \
   --grad-check-file cheetah_gradient_check.json</code></pre>
+      <pre style="margin-top: 12px;"><code>PYTHONPATH=/home/horde/repos/mujoco_warp-differentiability:/home/horde/repos/academic-website-reports/shac \
+uv run --no-sync --project /home/horde/repos/newton-shac \
+  python /home/horde/repos/academic-website-reports/shac/run_newton_shac.py \
+  --env cheetah --contact-backend mujoco --num-envs 16 --epochs 60 \
+  --horizon 32 --eval-horizon 480 --selection-horizon 480 --sim-substeps 1 \
+  --lr 5e-4 --min-lr 1e-5 --grad-clip 0.5 --termination-penalty 200 \
+  --render-video --video-num-envs 1 \
+  --out-dir /home/horde/repos/academic-website-reports/shac/assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1</code></pre>
+      <pre style="margin-top: 12px;"><code>PYTHONPATH=/home/horde/repos/mujoco_warp-differentiability:/home/horde/repos/academic-website-reports/shac \
+uv run --no-sync --project /home/horde/repos/newton-shac \
+  python /home/horde/repos/academic-website-reports/shac/run_newton_ppo.py \
+  --env hopper --contact-backend mujoco --num-envs 64 --updates 40 \
+  --rollout-steps 64 --eval-horizon 480 --sim-substeps 16 \
+  --termination-penalty 200 --hopper-terminate-angle \
+  --render-video --video-num-envs 1 \
+  --out-dir /home/horde/repos/academic-website-reports/shac/assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1</code></pre>
+      <pre style="margin-top: 12px;"><code>PYTHONPATH=/home/horde/repos/mujoco_warp-differentiability:/home/horde/repos/academic-website-reports/shac \
+uv run --no-sync --project /home/horde/repos/newton-shac \
+  python /home/horde/repos/academic-website-reports/shac/run_newton_ppo.py \
+  --env ant --contact-backend mujoco --num-envs 64 --updates 40 \
+  --rollout-steps 64 --eval-horizon 480 --sim-substeps 16 \
+  --termination-penalty 200 --ant-contact-margin 0.002 \
+  --render-video --video-num-envs 1 \
+  --out-dir /home/horde/repos/academic-website-reports/shac/assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1</code></pre>
     </section>
   </main>
 
@@ -966,6 +1073,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.amber
       },
       {
+        id: "antPpoDefaultStand",
+        label: "Ant PPO default stand",
+        path: "assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_results.json",
+        color: colors.slate
+      },
+      {
         id: "cheetahNewton",
         label: "Cheetah Newton contacts",
         path: "assets/cheetah_train_limits_newton_level_kinematics_64env_100ep_run1/cheetah_results.json",
@@ -996,6 +1109,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.coral
       },
       {
+        id: "cheetahPpo16",
+        label: "Cheetah PPO 16 substeps",
+        path: "assets/cheetah_ppo_mujoco_faithful_64env_40upd_run1/cheetah_ppo_results.json",
+        color: colors.slate
+      },
+      {
+        id: "cheetahShacSub1",
+        label: "Cheetah SHAC substep 1",
+        path: "assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1/cheetah_results.json",
+        color: colors.green
+      },
+      {
         id: "hopperDefault",
         label: "Hopper default reward",
         path: "assets/hopper_train_limits_mujoco_level_kinematics_run1/hopper_results.json",
@@ -1024,6 +1149,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Hopper Newton contacts",
         path: "assets/hopper_train_newton_reset_each_epoch_128env_80ep_run1/hopper_results.json",
         color: colors.amber
+      },
+      {
+        id: "hopperPpoAngle",
+        label: "Hopper PPO angle term",
+        path: "assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_results.json",
+        color: colors.blue
+      },
+      {
+        id: "hopperPpoProgress5",
+        label: "Hopper PPO progress x5",
+        path: "assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_results.json",
+        color: colors.coral
       }
     ];
 
@@ -1116,7 +1253,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         type: "scatter",
         mode: "lines",
         name,
-        x: data.history.map((row) => row.epoch),
+        x: data.history.map((row) => row.epoch ?? row.update),
         y: data.history.map((row) => row[key] ?? null),
         yaxis,
         line: { color: run.color, width: 3 }
@@ -1216,7 +1353,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       const d = run.data;
       const e = d.eval || {};
       return `<tr>
-        <td>${run.label}<br><span class="muted">best epoch ${d.best_epoch ?? "n/a"}</span></td>
+        <td>${run.label}<br><span class="muted">best ${d.best_epoch !== undefined ? `epoch ${d.best_epoch}` : (d.best_update !== undefined ? `update ${d.best_update}` : "n/a")}</span></td>
         <td>${runReward(run)}<br><span class="muted">${d.contact_backend || "n/a"} contacts</span></td>
         <td>${fmt(e.return, 1)}<br><span class="muted">score ${fmt(d.eval_score ?? d.best_eval_score, 1)}</span></td>
         <td>${fmt(e.fall_count, 0)} / ${fmt(e.invalid_count, 0)}<br><span class="muted">alive ${fmt(e.alive_fraction, 3)}</span></td>
@@ -1317,7 +1454,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.cheetahNoCdof)
       ]);
 
-      const stable = presentRuns.find((run) => run.id === "cheetahNewtonCinert")
+      const stable = presentRuns.find((run) => run.id === "cheetahShacSub1")
+        || presentRuns.find((run) => run.id === "cheetahPpo16")
+        || presentRuns.find((run) => run.id === "cheetahNewtonCinert")
         || presentRuns.find((run) => run.id === "cheetahMujocoReset")
         || presentRuns.find((run) => run.id === "cheetahNewton")
         || presentRuns.find((run) => run.id === "cheetahMujoco")

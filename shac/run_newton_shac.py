@@ -19,6 +19,7 @@ import numpy as np
 import torch
 import warp as wp
 import mujoco
+import mujoco_warp
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DIFFRL_ROOT = REPO_ROOT / "DiffRL"
@@ -1332,6 +1333,8 @@ def masked_random_directions(
 def run_gradient_check(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "newton" if args.env == "ant" else ("mujoco" if is_planar_locomotion_env(args.env) or is_contact_target_env(args.env) else "none")
+    if args.sim_substeps is None:
+        args.sim_substeps = 16 if is_locomotion_env(args.env) else 1
     if args.horizon is None:
         args.horizon = args.grad_check_horizon
     if args.eval_horizon is None:
@@ -1675,12 +1678,16 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
 def run_training(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco" if is_locomotion_env(args.env) or is_contact_target_env(args.env) else "none"
+    if args.sim_substeps is None:
+        args.sim_substeps = 16 if is_locomotion_env(args.env) else 1
     if args.horizon is None:
         args.horizon = 32 if is_locomotion_env(args.env) else (48 if is_contact_target_env(args.env) else (64 if args.env == "acrobot" else 48))
     if args.eval_horizon is None:
         args.eval_horizon = (
             480 if is_locomotion_env(args.env) else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
         )
+    if args.selection_horizon is None and is_locomotion_env(args.env):
+        args.selection_horizon = min(args.eval_horizon, max(args.horizon, 96))
     if args.episode_length is None:
         args.episode_length = 1000 if is_locomotion_env(args.env) else 240
     if args.force_scale is None:
@@ -2079,7 +2086,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "title": "SHAC with MuJoCo Warp",
         "timestamp_pacific": pacific_now_iso(),
         "mujoco_warp_pr": "google-deepmind/mujoco_warp#1423",
-        "mujoco_warp_commit": "255d522299c39a5c6905e439f26861072a10fdf0",
+        "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
         "contact_backend": args.contact_backend,
         "horizon": args.horizon,
@@ -2104,6 +2111,17 @@ def run_training(args: argparse.Namespace) -> dict:
         "terminal_fall_reward": -args.termination_penalty if args.termination_penalty > 0.0 else None,
         "selection_fall_penalty": args.selection_fall_penalty,
         "selection_invalid_penalty": args.selection_invalid_penalty,
+        "lr": args.lr,
+        "min_lr": args.min_lr,
+        "adam_beta1": args.adam_beta1,
+        "adam_beta2": args.adam_beta2,
+        "grad_clip": args.grad_clip,
+        "grad_value_clip": args.grad_value_clip,
+        "critic_lr": args.critic_lr,
+        "critic_iterations": args.critic_iterations,
+        "critic_batch_size": args.critic_batch_size,
+        "target_critic_alpha": args.target_critic_alpha,
+        "selection_horizon": args.selection_horizon,
         "ant_max_healthy_height": ANT_MAX_HEALTHY_HEIGHT if args.env == "ant" else None,
         "ant_height_reward_cap": ANT_HEIGHT_REWARD_CAP if args.env == "ant" else None,
         "ant_invalid_penalty": ANT_INVALID_PENALTY if args.env == "ant" else None,
@@ -2364,6 +2382,23 @@ def pacific_now_iso() -> str:
     return datetime.now(tz).isoformat(timespec="seconds")
 
 
+def git_commit_for_imported_module(module: Any) -> str | None:
+    module_path = Path(getattr(module, "__file__", "")).resolve()
+    if not module_path:
+        return None
+    for candidate in [module_path.parent, *module_path.parents]:
+        if (candidate / ".git").exists():
+            try:
+                return subprocess.check_output(
+                    ["git", "-C", str(candidate), "rev-parse", "HEAD"],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                ).strip()
+            except Exception:
+                return None
+    return None
+
+
 def parse_float_list(value: str) -> list[float]:
     return [float(item.strip()) for item in value.split(",") if item.strip()]
 
@@ -2384,7 +2419,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-horizon", type=int, default=None)
     parser.add_argument("--episode-length", type=int, default=None)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
-    parser.add_argument("--sim-substeps", type=int, default=1)
+    parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
     parser.add_argument("--lr", type=float, default=2.0e-3)
     parser.add_argument("--min-lr", type=float, default=1.0e-5)
