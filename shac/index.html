@@ -362,9 +362,9 @@
           much farther under IsaacLab physical settings, but the gait is still a low crawl rather than a tall natural walk.
           A faster 12-13 m Ant policy exists, but randomized 1024-env replays expose rare falls, so it is kept as a diagnostic
           rather than the headline result. Adding a small height reward improves the Ant score but does not fully change the
-          low-crawl gait. SHAC still needs strict full-horizon checkpoint selection: with 1024 randomized selection envs, both
-          5e-6 and 1e-6 actor-learning-rate SHAC continuations were rejected because they either introduced rare falls or did
-          not beat the PPO warm start.
+          low-crawl gait. SHAC still needs strict full-horizon checkpoint selection: with 1024 randomized selection envs,
+          5e-6, 1e-6, and a longer H=96 BPTT continuation were rejected because they either introduced rare falls or did not
+          beat the PPO warm start.
         </p>
       </article>
     </section>
@@ -1499,6 +1499,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC 1024-gated low LR",
         path: "assets/ant_shac_height1_warm_ppo_16env_24ep_sel1024_lr1e6_run1/ant_results.json",
         color: colors.coral
+      },
+      {
+        id: "antShacHeightStochasticSel1024H96",
+        label: "Ant SHAC 1024-gated H=96",
+        path: "assets/ant_shac_height1_warm_ppo_16env_12ep_h96_sel1024_lr1e6_run1/ant_results.json",
+        color: colors.slate
       },
       {
         id: "cheetahNewton",
