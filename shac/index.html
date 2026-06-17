@@ -279,13 +279,14 @@
           policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
           joint-order effort mapping to match IsaacLab's wildcard joint order; MuJoCo actuator-order mapping remains available
           for DiffRL/MuJoCo comparisons. The report runner now records Ant contact friction and joint damping, and actually
-          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The strongest PPO-only Ant
-          video still comes from the original Gym damping/friction actor replayed at force scale 9: 5.24 m over 480 frames
-          with zero falls and mean heading 0.90. The newest IsaacLab-physical run uses contact friction 1.0 and hinge damping
-          0.1; its force-10 PPO replay reaches 4.96 m with zero falls and mean heading 0.94, and a 12-epoch SHAC warm-start
-          improves the selected rollout to 5.15 m with zero falls. Hopper is now solved as a stepping-stone: a DiffRL-exact
-          PPO run reaches 14.49 m over 480 frames, and SHAC warm-started from that no-LayerNorm PPO actor selects a zero-fall
-          14.49 m rollout before longer short-horizon updates drift into falls.
+          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The strongest reliable Ant
+          run now uses IsaacLab physical constants, force scale 10, progress reward weight 2, a larger terminal fall penalty,
+          and strict full-horizon selection. PPO reaches 11.05 m over 480 frames with zero falls/invalids across 1024 eval
+          rollouts; SHAC warm-started from that actor improves the selected 16-env rollout to 11.37 m and replays at 11.07 m
+          with zero falls/invalids across 1024 eval rollouts. Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run
+          reaches 14.49 m over 480 frames, and SHAC
+          warm-started from that no-LayerNorm PPO actor selects a zero-fall 14.49 m rollout before longer short-horizon updates
+          drift into falls.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -303,24 +304,24 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Best Cheetah SHAC Eval</div>
+        <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step MuJoCo-contact eval, selected by full-horizon rollout score.</p>
+        <p class="note">480-step MuJoCo-contact eval from the latest PPO warm-started SHAC checkpoint.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Cheetah Invalid Resets</div>
+        <div class="label">Ant Falls / Invalids</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Falls and invalid resets during the selected Cheetah rollout.</p>
+        <p class="note">Full-horizon eval failures for the selected SHAC policy.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Cheetah Distance</div>
+        <div class="label">Hopper SHAC Distance</div>
         <div class="value" id="p5-displacement">...</div>
-        <p class="note">Forward distance over the 8 second ViewerGL rollout.</p>
+        <p class="note">DiffRL-exact Hopper warm-started from PPO.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Cheetah Training FPS</div>
+        <div class="label">Cheetah SHAC Distance</div>
         <div class="value" id="stable-fps">...</div>
-        <p class="note">16 envs, 32 differentiable steps per epoch.</p>
+        <p class="note">MuJoCo-contact substep-1 stepping-stone result.</p>
       </div>
     </section>
 
@@ -354,10 +355,11 @@
         <p>
           Hopper is solved for PPO and SHAC warm-start selection, but not for long unconstrained SHAC continuation: after
           epoch 2, the 32-step differentiable objective increases short-horizon reward while the 480-step selected rollout
-          accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant PPO is now
-          reliable under the IsaacLab-style direct settings, but the gait is still a low crawl rather than a tall natural
-          walk. The newest force-10 SHAC run can slightly improve the physical PPO baseline, but longer SHAC runs still drift
-          toward slower policies, so the remaining Ant work is making that improvement reliable over longer training.
+          accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant now moves
+          much farther under IsaacLab physical settings, but the gait is still a low crawl rather than a tall natural walk.
+          A faster 12-13 m Ant policy exists, but a 1024-env replay exposes rare falls, so it is kept as a diagnostic rather
+          than the headline result. SHAC still needs strict full-horizon checkpoint selection: low-LR updates can improve the
+          gait, but less conservative settings still create fall-prone contact sequences.
         </p>
       </article>
     </section>
@@ -630,29 +632,31 @@
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Ant PPO, Physical Force 10</h2>
+        <h2>Ant PPO, Reliable Progress x2</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_phys_force10_replay_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_phys_force10_replay_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_phys_progress2_reliable_1024env_120upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_phys_progress2_reliable_1024env_120upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            PPO trained with IsaacLab-style direct-task rewards and the IsaacLab physical constants that differ from the
-            DiffRL MJCF: contact friction 1.0 and hinge damping 0.1. The retained actor is replayed at force scale 10 and
-            moves 4.96 m over 480 frames with zero falls/invalids, mean heading 0.94, mean up 0.95, and mean height 0.51.
-            The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
+            PPO trained with IsaacLab-style direct-task rewards, contact friction 1.0, hinge damping 0.1, force scale 10,
+            progress reward weight 2, terminal fall penalty 50, and full-horizon fall selection. The best selected actor
+            moves 11.05 m over 480 frames with zero falls/invalids across the 1024-env eval, mean up 0.99, mean height
+            0.53, and mean heading 0.77. The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed
+            COM follow camera.
           </figcaption>
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Physical Warm-Start</h2>
+        <h2>Ant SHAC, Reliable Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_phys_force10_warm_ppo_16env_12ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_isaaclab_phys_force10_warm_ppo_16env_12ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_phys_progress2_reliable_warm_ppo_16env_24ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_isaaclab_phys_progress2_reliable_warm_ppo_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC initialized from the physical PPO actor uses MuJoCo contacts, deterministic 256/128/64 actor gradients,
-            and a lower 2e-5 actor learning rate. The best selected epoch is epoch 10 at 5.15 m with zero falls/invalids;
-            the final 1024-env eval is 5.00 m with zero falls, mean up 0.95, and mean height 0.51.
+            SHAC initialized from the reliable PPO actor uses MuJoCo contacts, deterministic 256/128/64 actor gradients,
+            a 1e-5 actor learning rate, and strict 480-step selection. Epoch 5 selects the best 16-env score at 11.59 m
+            with zero falls/invalids; the restored checkpoint evaluates at 11.37 m in the training eval and 11.07 m in a
+            separate 1024-env replay, again with zero falls/invalids. This is the current reliable Ant result.
           </figcaption>
         </figure>
       </article>
@@ -1455,6 +1459,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.blue
       },
       {
+        id: "antPpoIsaacPhysicalProgress2",
+        label: "Ant PPO reliable progress x2",
+        path: "assets/ant_ppo_isaaclab_phys_progress2_reliable_1024env_120upd_run1/ant_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "antShacIsaacPhysicalProgress2",
+        label: "Ant SHAC reliable progress x2",
+        path: "assets/ant_shac_isaaclab_phys_progress2_reliable_warm_ppo_16env_24ep_run1/ant_results.json",
+        color: colors.violet
+      },
+      {
         id: "cheetahNewton",
         label: "Cheetah Newton contacts",
         path: "assets/cheetah_train_limits_newton_level_kinematics_64env_100ep_run1/cheetah_results.json",
@@ -1901,8 +1917,15 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
+      const antLatest = presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2")
+        || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2");
+      const hopperLatest = presentRuns.find((run) => run.id === "hopperShacDiffrlExact")
+        || presentRuns.find((run) => run.id === "hopperPpoDiffrlExact");
+      const antReliableReplay = await safeJson("assets/ant_shac_isaaclab_phys_progress2_reliable_eval1024_run1/ant_results.json");
+      const antHeadline = antReliableReplay || antLatest?.data;
       const latestStamp = latestTimestamp([
         ...presentRuns.map((run) => run.data?.timestamp_pacific),
+        antReliableReplay?.timestamp_pacific,
         hopperTrainedPolicy?.timestamp_pacific,
         hopperAfterRne?.timestamp_pacific,
         hopperNoContactAfterRne?.timestamp_pacific,
@@ -1941,10 +1964,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       ]);
 
       document.getElementById("report-stamp").textContent = stamp(latestStamp);
-      document.getElementById("stable-return").textContent = fmt(stable?.data?.eval?.return, 1);
-      document.getElementById("stable-falls").textContent = `${fmt(stable?.data?.eval?.fall_count, 0)} / ${fmt(stable?.data?.eval?.invalid_count, 0)}`;
-      document.getElementById("p5-displacement").textContent = `${fmt(stable?.data?.eval?.mean_forward_displacement, 2)} m`;
-      document.getElementById("stable-fps").textContent = fmt(stable?.data?.mean_fps, 0);
+      document.getElementById("stable-return").textContent = `${fmt(antHeadline?.eval?.mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-falls").textContent = `${fmt(antHeadline?.eval?.fall_count, 0)} / ${fmt(antHeadline?.eval?.invalid_count, 0)}`;
+      document.getElementById("p5-displacement").textContent = `${fmt(hopperLatest?.data?.eval?.mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-fps").textContent = `${fmt(stable?.data?.eval?.mean_forward_displacement, 2)} m`;
 
       const envRuns = {
         ant: presentRuns.filter((run) => run.data?.env === "ant"),
