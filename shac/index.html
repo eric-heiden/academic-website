@@ -301,10 +301,13 @@
           match IsaacLab's Ant task more closely: 0.5 m reset height, ±45 degree foot starts, 0.1 hinge damping, 0.05
           armature, 7.5 effort scale, friction 1.0, 0.31 m termination height, 2 physics substeps per 1/60 s policy step,
           Isaac local observations/reward, and unit joint-limit cost. With those settings, PPO reaches 20.37 m over 480
-          deterministic frames, and conservative deterministic SHAC warm-started from that actor improves the selected policy
-          to 23.34 m with 2 falls and 0 invalids across the 1024-env final eval. Attempts to enforce a higher 0.55 m
-          torso-height gate or high-force upright gait still make PPO/SHAC worse: they either stand nearly still or enter
-          repeated flips/falls, consistent with the converted MuJoCo Ant's passive rest height near 0.56 m.
+          deterministic frames. Conservative deterministic SHAC warm-started from that actor reaches 23.34 m on the pure
+          corrected-default reward, but that fastest policy still has 2 rare long-horizon falls in the 1024-env final eval.
+          The best current reliable Ant policy uses the same corrected dynamics and PPO warm start with a stability-shaped
+          Isaac objective: progress weight 2, height weight 1, terminal penalty 50, and 500k fall-gated selection. It reaches
+          23.24 m over 480 frames with 0 falls and 0 invalids. Attempts to enforce a higher 0.55 m torso-height gate or
+          high-force upright gait still make PPO/SHAC worse: they either stand nearly still or enter repeated flips/falls,
+          consistent with the converted MuJoCo Ant's passive rest height near 0.56 m.
           The latest multistep checks show why: reset-state one-step gradients are clean, while H=8/H=16 Ant rollouts enter
           grazing foot contacts where local contact-position gradients and finite differences diverge.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
@@ -382,14 +385,15 @@
           epoch 2, the 32-step differentiable objective increases short-horizon reward while the 480-step selected rollout
           accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant now moves
           much farther under corrected IsaacLab-default settings, and low-lr deterministic SHAC improves the best strict PPO
-          checkpoint, but the gait is still a compact DiffRL-style crawl rather than a tall natural walk. Adding a small
-          height reward improves some scores but does not fully change the crawl. Follow-up reliability controls also did
-          not beat the selected 23.34 m policy: stronger fall-gated selection finished at 22.73 m with 5 falls, deterministic
-          reset-each-epoch H=32 finished at 22.12 m with 3 falls, and the height-aware reward fine-tune finished at 22.79 m
-          with 8 falls. A replay of the selected policy shows the rare flips occur mid-rollout around steps 348, 370, 420,
-          422, and 461, so they are real long-horizon contact/pose failures rather than timeout bookkeeping. SHAC still needs strict full-horizon
-          checkpoint selection: a stochastic H=32 continuation and later deterministic epochs were rejected because they
-          introduced rare falls or did not beat the PPO warm start. The latest fixed-action Ant checks show why this remains hard: reset-state one-step
+          checkpoint, but the fastest pure corrected-default policy is not yet the reliable one: it reaches 23.34 m with
+          2 rare falls. A stability-shaped Isaac objective now gives a reliable 23.24 m, 0-fall policy, but the gait is still
+          a compact DiffRL-style crawl rather than a tall natural walk. Stronger fall-gated selection alone, deterministic
+          reset-each-epoch H=32, and a weaker height-aware reward were negative controls at 22.73 m/5 falls, 22.12 m/3 falls,
+          and 22.79 m/8 falls. A replay of the fastest pure-default policy shows the rare flips occur mid-rollout around
+          steps 348, 370, 420, 422, and 461, so they are real long-horizon contact/pose failures rather than timeout
+          bookkeeping. SHAC still needs strict full-horizon checkpoint selection: a stochastic H=32 continuation and later
+          deterministic epochs were rejected because they introduced rare falls or did not beat the PPO warm start. The
+          latest fixed-action Ant checks show why this remains hard: reset-state one-step
           gradients are clean, but H=8 rollouts enter grazing foot contacts where local contact-position and orientation
           derivatives diverge from finite differences. Newton contacts improve the local action rows, but the full Ant
           batch is not yet stable enough to use as the training backend.
@@ -623,7 +627,7 @@
       <article class="panel ok">
         <h2>Cheetah SHAC, MuJoCo Contacts</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1/cheetah_poster.png">
+          <video controls preload="none" poster="assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1/cheetah_poster.png">
             <source src="assets/cheetah_shac_mujoco_sub1_lr5e4_clip05_term200_h32_select480_16env_60ep_run1/cheetah_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -635,7 +639,7 @@
       <article class="panel ok">
         <h2>Cheetah PPO, 16 Substeps</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/cheetah_ppo_mujoco_faithful_64env_40upd_run1/cheetah_ppo_poster.png">
+          <video controls preload="none" poster="assets/cheetah_ppo_mujoco_faithful_64env_40upd_run1/cheetah_ppo_poster.png">
             <source src="assets/cheetah_ppo_mujoco_faithful_64env_40upd_run1/cheetah_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -650,7 +654,7 @@
       <article class="panel ok">
         <h2>Hopper SHAC, DiffRL-Exact Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_shac_warm_ppo_diffrl_exact_64env_50ep_run2/hopper_poster.png">
+          <video controls preload="none" poster="assets/hopper_shac_warm_ppo_diffrl_exact_64env_50ep_run2/hopper_poster.png">
             <source src="assets/hopper_shac_warm_ppo_diffrl_exact_64env_50ep_run2/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -663,7 +667,7 @@
       <article class="panel ok">
         <h2>Hopper PPO, DiffRL-Exact</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_diffrl_exact_1024env_240upd_run1/hopper_ppo_poster.png">
+          <video controls preload="none" poster="assets/hopper_ppo_diffrl_exact_1024env_240upd_run1/hopper_ppo_poster.png">
             <source src="assets/hopper_ppo_diffrl_exact_1024env_240upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -679,7 +683,7 @@
       <article class="panel ok">
         <h2>Ant PPO, Corrected IsaacLab Defaults</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -693,33 +697,37 @@
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Corrected IsaacLab Defaults</h2>
+        <h2>Ant SHAC, Reliable Stability Reward</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_poster.png">
-            <source src="assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_stability_reward_progress2_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_poster.png">
+            <source src="assets/ant_shac_stability_reward_progress2_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
             Deterministic SHAC initialized from the corrected PPO actor uses MuJoCo contacts, 16 training envs, H=16,
-            lr 1e-5, no critic bootstrap, and 1024-env 480-step selection. It improves the PPO checkpoint: selected
-            epoch 11 scores 8907.8, with 1828.0 return, 23.34 m displacement, 2 falls, 0 invalids, 0.651 m mean height,
-            0.991 mean up, and 0.895 mean heading over the final 480-step eval. Runtime was 136.1 s total, 45.2 sim FPS,
-            with 20.8 MB peak allocated CUDA memory.
+            lr 1e-5, no critic bootstrap, and 1024-env 480-step selection. This run keeps the corrected Ant dynamics but
+            uses a stability-shaped Isaac reward with progress weight 2, height weight 1, terminal penalty 50, and a 500k
+            fall-gated selection score. The selected epoch 22 policy reaches 3378.8 return, 23.24 m displacement,
+            0 falls, 0 invalids, 0.647 m mean height, 0.991 mean up, and 0.903 mean heading over the final 480-step eval.
+            Runtime was 137.0 s total, 44.9 sim FPS, with 20.7 MB peak allocated CUDA memory. The faster pure
+            corrected-default SHAC reference remains in the plots at 23.34 m, but had 2 rare long-horizon falls.
           </figcaption>
         </figure>
       </article>
     </section>
 
     <section class="grid two">
-      <article class="panel warn">
+      <article class="panel ok">
         <h2>Ant Reliability Controls</h2>
         <p>
-          Three targeted SHAC follow-ups were run after the corrected-default Ant result. Increasing the selection fall
+          Four targeted SHAC follow-ups were run after the corrected-default Ant result. Increasing the selection fall
           penalty from 100k to 1M did not reproduce the earlier zero-fall checkpoint and selected epoch 11 at 22.73 m,
           1793.5 return, 5 falls, and 0 invalids. Matching the deterministic evaluation more directly with
           <code>--deterministic-init --reset-each-epoch</code>, H=32, and the same 1M fall gate selected epoch 20 at
-          22.12 m, 1761.1 return, 3 falls, and 0 invalids. Switching the differentiable objective back to the
-          height-shaped Isaac reward increased return to 1968.5 but selected 22.79 m with 8 falls. These are kept in the
-          plots and table as negative controls; the primary video remains the faster 23.34 m corrected-default policy.
+          22.12 m, 1761.1 return, 3 falls, and 0 invalids. Switching to a weaker height-aware Isaac reward increased
+          return to 1968.5 but selected 22.79 m with 8 falls. Combining the corrected dynamics, PPO warm start, progress
+          weight 2, height weight 1, terminal penalty 50, and 500k selection fall gate is the first reliable Ant SHAC
+          result in this batch: 23.24 m, 3378.8 return, 0 falls, and 0 invalids. The negative controls remain in the plots
+          to show that reliability required the full objective/selection change, not only a larger fall penalty.
         </p>
       </article>
       <article class="panel">
@@ -727,8 +735,9 @@
         <p>
           A separate 1024-world replay of the selected corrected-default SHAC actor found rare fallen worlds at steps
           348, 370, 420, 422, and 461 of the 480-frame rollout. The failing worlds had torso heights around 0.28-0.30 m
-          and negative up projections, so the remaining falls are real flips after long contact interaction. This keeps
-          the current Ant status at “best so far” rather than “solved.”
+          and negative up projections, so the fastest pure-default falls are real flips after long contact interaction.
+          The new stability-shaped run removes those final-eval falls under the same 480-step deterministic replay, while
+          preserving nearly the same forward distance.
         </p>
       </article>
     </section>
@@ -737,7 +746,7 @@
       <article class="panel ok">
         <h2>Ant PPO, Mislabeled Defaults Smoke</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -772,7 +781,7 @@
       <article class="panel warn">
         <h2>Ant SHAC, Stochastic-Start H=32</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_mujoco_stochastic_train_warm_ppo_32env_16ep_h32_sel1024_lr1e6_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_shac_mujoco_stochastic_train_warm_ppo_32env_16ep_h32_sel1024_lr1e6_run1/ant_poster.png">
             <source src="assets/ant_shac_mujoco_stochastic_train_warm_ppo_32env_16ep_h32_sel1024_lr1e6_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -801,7 +810,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Height-Fixed Selector</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_heightfix_heading2_warm_move_128env_80upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_heightfix_heading2_warm_move_128env_80upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_heightfix_heading2_warm_move_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -814,7 +823,7 @@
       <article class="panel warn">
         <h2>Ant SHAC, Height-Fixed Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_heightfix_heading2_warm_ppo_16env_24ep_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_shac_heightfix_heading2_warm_ppo_16env_24ep_run1/ant_poster.png">
             <source src="assets/ant_shac_heightfix_heading2_warm_ppo_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -829,7 +838,7 @@
       <article class="panel warn">
         <h2>Ant PPO, IsaacLab-Style MLP</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -841,7 +850,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Progress Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -856,7 +865,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Strict Up Selector</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_diffrl_force200_actuator_minup085_128env_80upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_diffrl_force200_actuator_minup085_128env_80upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_diffrl_force200_actuator_minup085_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -868,7 +877,7 @@
       <article class="panel warn">
         <h2>Ant SHAC, Strict Selection</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_warm_isaac_curriculum_progress3_force80_fallpen20000_32env_32ep_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_shac_warm_isaac_curriculum_progress3_force80_fallpen20000_32env_32ep_run1/ant_poster.png">
             <source src="assets/ant_shac_warm_isaac_curriculum_progress3_force80_fallpen20000_32env_32ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -883,7 +892,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Isaac Curriculum</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -896,7 +905,7 @@
       <article class="panel warn">
         <h2>Ant SHAC, Faster Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_warm_isaac_curriculum_progress3_force80_32env_24ep_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_shac_warm_isaac_curriculum_progress3_force80_32env_24ep_run1/ant_poster.png">
             <source src="assets/ant_shac_warm_isaac_curriculum_progress3_force80_32env_24ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -913,7 +922,7 @@
       <article class="panel warn">
         <h2>Hopper PPO, Angle Termination</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_poster.png">
+          <video controls preload="none" poster="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_poster.png">
             <source src="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -925,7 +934,7 @@
       <article class="panel bad">
         <h2>Hopper PPO, Progress Weighted</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
+          <video controls preload="none" poster="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
             <source src="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -947,7 +956,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Default Reward</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_poster.png">
+          <video controls preload="none" poster="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_poster.png">
             <source src="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -970,7 +979,7 @@
       <article class="panel bad">
         <h2>Ant Open-Loop Sine</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_open_loop_sine_probe_run1/ant_open_loop_sine_poster.png">
+          <video controls preload="none" poster="assets/ant_open_loop_sine_probe_run1/ant_open_loop_sine_poster.png">
             <source src="assets/ant_open_loop_sine_probe_run1/ant_open_loop_sine.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -983,7 +992,7 @@
       <article class="panel bad">
         <h2>Ant SHAC With Phase</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_phase_progress3_sub1_16env_40ep_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_shac_phase_progress3_sub1_16env_40ep_run1/ant_poster.png">
             <source src="assets/ant_shac_phase_progress3_sub1_16env_40ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1001,7 +1010,7 @@
       <article class="panel warn">
         <h2>Hopper PPO Curriculum</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
+          <video controls preload="none" poster="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
             <source src="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1025,7 +1034,7 @@
       <article class="panel ok">
         <h2>Cheetah Newton Contacts</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/cheetah_train_newton_after_cinert_record_64env_80ep_run1/cheetah_poster.png">
+          <video controls preload="none" poster="assets/cheetah_train_newton_after_cinert_record_64env_80ep_run1/cheetah_poster.png">
             <source src="assets/cheetah_train_newton_after_cinert_record_64env_80ep_run1/cheetah_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1038,7 +1047,7 @@
       <article class="panel">
         <h2>Cheetah MuJoCo Reset</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/cheetah_train_mujoco_reset_each_epoch_after_cinert_record_128env_60ep_run1/cheetah_poster.png">
+          <video controls preload="none" poster="assets/cheetah_train_mujoco_reset_each_epoch_after_cinert_record_128env_60ep_run1/cheetah_poster.png">
             <source src="assets/cheetah_train_mujoco_reset_each_epoch_after_cinert_record_128env_60ep_run1/cheetah_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1053,7 +1062,7 @@
       <article class="panel warn">
         <h2>Hopper Default Reward</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_train_limits_mujoco_level_kinematics_run1/hopper_poster.png">
+          <video controls preload="none" poster="assets/hopper_train_limits_mujoco_level_kinematics_run1/hopper_poster.png">
             <source src="assets/hopper_train_limits_mujoco_level_kinematics_run1/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1065,7 +1074,7 @@
       <article class="panel warn">
         <h2>Hopper Progress Probe</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_train_progress_mujoco_level_kinematics_128env_80ep_run1/hopper_poster.png">
+          <video controls preload="none" poster="assets/hopper_train_progress_mujoco_level_kinematics_128env_80ep_run1/hopper_poster.png">
             <source src="assets/hopper_train_progress_mujoco_level_kinematics_128env_80ep_run1/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1080,7 +1089,7 @@
       <article class="panel warn">
         <h2>Hopper Reset Each Epoch</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_train_mujoco_reset_each_epoch_128env_80ep_run1/hopper_poster.png">
+          <video controls preload="none" poster="assets/hopper_train_mujoco_reset_each_epoch_128env_80ep_run1/hopper_poster.png">
             <source src="assets/hopper_train_mujoco_reset_each_epoch_128env_80ep_run1/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1092,7 +1101,7 @@
       <article class="panel bad">
         <h2>Hopper Newton Contacts</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_train_newton_reset_each_epoch_128env_80ep_run1/hopper_poster.png">
+          <video controls preload="none" poster="assets/hopper_train_newton_reset_each_epoch_128env_80ep_run1/hopper_poster.png">
             <source src="assets/hopper_train_newton_reset_each_epoch_128env_80ep_run1/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1107,7 +1116,7 @@
       <article class="panel">
         <h2>Best Stable Ant Crawl</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1/ant_poster.png">
             <source src="assets/ant_mujoco_margin002_h8_upright_progress5_action002_force150_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1119,7 +1128,7 @@
       <article class="panel">
         <h2>Rejected Progress Exploit</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_mujoco_margin002_h8_limits_progress5_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_mujoco_margin002_h8_limits_progress5_run1/ant_poster.png">
             <source src="assets/ant_mujoco_margin002_h8_limits_progress5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1134,7 +1143,7 @@
       <article class="panel">
         <h2>Hopper No-Limit Diagnostic</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_train_nolimits_mujoco_probe_run1/hopper_poster.png">
+          <video controls preload="none" poster="assets/hopper_train_nolimits_mujoco_probe_run1/hopper_poster.png">
             <source src="assets/hopper_train_nolimits_mujoco_probe_run1/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1146,7 +1155,7 @@
       <article class="panel">
         <h2>Hopper PPO No-Limit</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_poster.png">
+          <video controls preload="none" poster="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_poster.png">
             <source src="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1162,7 +1171,7 @@
       <article class="panel bad">
         <h2>Hopper PPO Faithful Reward</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_poster.png">
+          <video controls preload="none" poster="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_poster.png">
             <source src="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1174,7 +1183,7 @@
       <article class="panel">
         <h2>Cartpole Rollout</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/cartpole_poster.png">
+          <video controls preload="none" poster="assets/cartpole_poster.png">
             <source src="assets/cartpole_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1189,7 +1198,7 @@
       <article class="panel">
         <h2>Original Failure Mode</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_newton_comvel_force200_term5_run1/ant_poster.png">
+          <video controls preload="none" poster="assets/ant_newton_comvel_force200_term5_run1/ant_poster.png">
             <source src="assets/ant_newton_comvel_force200_term5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1204,7 +1213,7 @@
       <article class="panel">
         <h2>Acrobot, Elbow Actuated</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/acrobot_nocontact_target_run1/acrobot_poster.png">
+          <video controls preload="none" poster="assets/acrobot_nocontact_target_run1/acrobot_poster.png">
             <source src="assets/acrobot_nocontact_target_run1/acrobot_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1216,7 +1225,7 @@
       <article class="panel">
         <h2>Two-Link Target Control</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/acrobot_both_reset_target_run1/acrobot_poster.png">
+          <video controls preload="none" poster="assets/acrobot_both_reset_target_run1/acrobot_poster.png">
             <source src="assets/acrobot_both_reset_target_run1/acrobot_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1231,7 +1240,7 @@
       <article class="panel">
         <h2>Sphere Contact Target</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/contact_sphere_train_after_applyft_run1/contact_sphere_poster.png">
+          <video controls preload="none" poster="assets/contact_sphere_train_after_applyft_run1/contact_sphere_poster.png">
             <source src="assets/contact_sphere_train_after_applyft_run1/contact_sphere_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1244,7 +1253,7 @@
       <article class="panel">
         <h2>Capsule Contact Target</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/contact_capsule_train_after_applyft_run1/contact_capsule_poster.png">
+          <video controls preload="none" poster="assets/contact_capsule_train_after_applyft_run1/contact_capsule_poster.png">
             <source src="assets/contact_capsule_train_after_applyft_run1/contact_capsule_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
@@ -1262,25 +1271,25 @@
       </p>
       <div class="grid two">
         <figure>
-          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/single_hinge_gravity_poster.png">
+          <video controls preload="none" poster="assets/solver_gradient_diagnostics/videos/single_hinge_gravity_poster.png">
             <source src="assets/solver_gradient_diagnostics/videos/single_hinge_gravity.mp4" type="video/mp4">
           </video>
           <figcaption>Single hinge gravity control case. q-gradient error stays near finite-difference noise.</figcaption>
         </figure>
         <figure>
-          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/double_hinge_gravity_static_poster.png">
+          <video controls preload="none" poster="assets/solver_gradient_diagnostics/videos/double_hinge_gravity_static_poster.png">
             <source src="assets/solver_gradient_diagnostics/videos/double_hinge_gravity_static.mp4" type="video/mp4">
           </video>
           <figcaption>Two-link gravity scene used to isolate the RNE bias-force adjoint.</figcaption>
         </figure>
         <figure>
-          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/double_hinge_zero_g_forced_poster.png">
+          <video controls preload="none" poster="assets/solver_gradient_diagnostics/videos/double_hinge_zero_g_forced_poster.png">
             <source src="assets/solver_gradient_diagnostics/videos/double_hinge_zero_g_forced.mp4" type="video/mp4">
           </video>
           <figcaption>Zero-gravity forced two-link scene used to isolate the dense mass-solve VJP.</figcaption>
         </figure>
         <figure>
-          <video controls preload="metadata" poster="assets/solver_gradient_diagnostics/videos/free_body_zero_g_poster.png">
+          <video controls preload="none" poster="assets/solver_gradient_diagnostics/videos/free_body_zero_g_poster.png">
             <source src="assets/solver_gradient_diagnostics/videos/free_body_zero_g.mp4" type="video/mp4">
           </video>
           <figcaption>Zero-gravity free body used to validate free-joint state bridging separately.</figcaption>
@@ -1331,13 +1340,15 @@
           report-runner bug was that the Isaac-style reward accepted <code>--ant-height-weight</code> but ignored it; the
           runners now support both height-shaped and no-height physical rewards. A later pass found that the claimed IsaacLab
           defaults were still inheriting DiffRL XML damping/friction/termination/limit-cost values. After correcting those
-          defaults, PPO reaches 20.37 m over 480 frames, and low-lr deterministic SHAC improves the selected policy to
-          23.34 m with 2 falls and 0 invalids across the 1024-env eval. Ant is therefore no longer an optimizer-fails-to-move
-          case. The remaining problem is qualitative and long-horizon: the gait is still a compact low crawl, and contact
-          finite differences still degrade once feet sit on grazing active-set boundaries. The missing piece is now a
-          curriculum/objective that preserves more natural height and heading while increasing progress, plus a contact
-          adjoint or smoothing strategy that remains useful across long horizons and active-set boundaries. It no longer
-          looks like a single RNE mass/bias cancellation bug.
+          defaults, PPO reaches 20.37 m over 480 frames, and low-lr deterministic SHAC improves the pure corrected-default
+          policy to 23.34 m with 2 falls and 0 invalids across the 1024-env eval. A stability-shaped Isaac objective then
+          trades 9 cm of distance for reliability: 23.24 m, 3378.8 return, 0 falls, and 0 invalids. Ant is therefore no
+          longer an optimizer-fails-to-move case, and SHAC can now train a reliable Ant policy in this Newton/MJWarp stack
+          when the objective includes explicit long-horizon stability pressure. The remaining problem is qualitative: the
+          gait is still a compact low crawl, and contact finite differences still degrade once feet sit on grazing active-set
+          boundaries. The missing piece is now a curriculum/objective that preserves more natural height and heading while
+          increasing progress, plus a contact adjoint or smoothing strategy that remains useful across long horizons and
+          active-set boundaries. It no longer looks like a single RNE mass/bias cancellation bug.
         </p>
       </article>
     </section>
@@ -1628,6 +1639,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC corrected defaults",
         path: "assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_results.json",
         color: colors.green
+      },
+      {
+        id: "antShacStabilityProgress2Force75",
+        label: "Ant SHAC stability reward",
+        path: "assets/ant_shac_stability_reward_progress2_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_results.json",
+        color: colors.blue
       },
       {
         id: "antShacIsaacExactDefaultsStochastic",
@@ -1927,11 +1944,31 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
+    const jsonQueue = { active: 0, limit: 6, pending: [] };
+
+    function withJsonSlot(fn) {
+      return new Promise((resolve, reject) => {
+        const launch = () => {
+          jsonQueue.active += 1;
+          Promise.resolve()
+            .then(fn)
+            .then(resolve, reject)
+            .finally(() => {
+              jsonQueue.active -= 1;
+              const next = jsonQueue.pending.shift();
+              if (next) next();
+            });
+        };
+        if (jsonQueue.active < jsonQueue.limit) launch();
+        else jsonQueue.pending.push(launch);
+      });
+    }
+
     async function safeJson(path, attempts = 4) {
       let lastError = null;
       for (let attempt = 1; attempt <= attempts; attempt += 1) {
         try {
-          const res = await fetch(path, { cache: "no-cache" });
+          const res = await withJsonSlot(() => fetch(path, { cache: "no-cache" }));
           if (!res.ok) throw new Error(`${res.status} ${path}`);
           return await res.json();
         } catch (err) {
@@ -2177,7 +2214,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
+      const antLatest = presentRuns.find((run) => run.id === "antShacStabilityProgress2Force75")
+        || presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
         || presentRuns.find((run) => run.id === "antPpoIsaacExactDefaults")
         || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2NoHeight")
         || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2NoHeight")
