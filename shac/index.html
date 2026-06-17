@@ -308,6 +308,11 @@
           23.24 m over 480 frames with 0 falls and 0 invalids. Attempts to enforce a higher 0.55 m torso-height gate or
           high-force upright gait still make PPO/SHAC worse: they either stand nearly still or enter repeated flips/falls,
           consistent with the converted MuJoCo Ant's passive rest height near 0.56 m.
+          PPO follow-ups under the same stability reward did not solve the optimizer side: from-scratch PPO selected a
+          zero-fall stationary update, while its final moving checkpoint reached 15.17 m but had 111 falls; a low-std PPO
+          fine-tune with terminal penalty 500 also reverted to a stationary zero-fall policy. Converting the reliable SHAC
+          actor into the PPO actor format reproduces 23.25 m with 0 falls, so the PPO actor/evaluation path is sound and the
+          failure is in PPO optimization under this long-horizon contact task.
           The latest multistep checks show why: reset-state one-step gradients are clean, while H=8/H=16 Ant rollouts enter
           grazing foot contacts where local contact-position gradients and finite differences diverge.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
@@ -389,7 +394,9 @@
           2 rare falls. A stability-shaped Isaac objective now gives a reliable 23.24 m, 0-fall policy, but the gait is still
           a compact DiffRL-style crawl rather than a tall natural walk. Stronger fall-gated selection alone, deterministic
           reset-each-epoch H=32, and a weaker height-aware reward were negative controls at 22.73 m/5 falls, 22.12 m/3 falls,
-          and 22.79 m/8 falls. A replay of the fastest pure-default policy shows the rare flips occur mid-rollout around
+          and 22.79 m/8 falls. PPO remains a negative control on Ant: the stability-reward PPO run learned a 15.17 m final
+          moving policy with 111 falls, so strict 480-step selection correctly kept the zero-fall standing checkpoint.
+          A replay of the fastest pure-default policy shows the rare flips occur mid-rollout around
           steps 348, 370, 420, 422, and 461, so they are real long-horizon contact/pose failures rather than timeout
           bookkeeping. SHAC still needs strict full-horizon checkpoint selection: a stochastic H=32 continuation and later
           deterministic epochs were rejected because they introduced rare falls or did not beat the PPO warm start. The
@@ -738,6 +745,18 @@
           and negative up projections, so the fastest pure-default falls are real flips after long contact interaction.
           The new stability-shaped run removes those final-eval falls under the same 480-step deterministic replay, while
           preserving nearly the same forward distance.
+        </p>
+      </article>
+      <article class="panel warn">
+        <h2>Ant PPO Reliability Check</h2>
+        <p>
+          PPO was rerun with the same corrected Ant dynamics and the same stability-shaped reward used by the reliable SHAC
+          policy. Full 480-step selection exposed the failure mode: from-scratch PPO's best selected update was the initial
+          zero-fall standing policy at -0.28 m, while the final moving policy reached 15.17 m but had 111 falls in the
+          1024-world deterministic eval. A second PPO pass initialized from that moving policy with low action std and
+          terminal penalty 500 again selected a stationary zero-fall policy. As a sanity check, the reliable SHAC actor was
+          converted into the PPO actor format and evaluated through the PPO runner; it reproduced 23.25 m with 0 falls. PPO
+          therefore verifies the evaluation/rendering path, but not the Ant optimizer path.
         </p>
       </article>
     </section>
@@ -1344,8 +1363,10 @@
           policy to 23.34 m with 2 falls and 0 invalids across the 1024-env eval. A stability-shaped Isaac objective then
           trades 9 cm of distance for reliability: 23.24 m, 3378.8 return, 0 falls, and 0 invalids. Ant is therefore no
           longer an optimizer-fails-to-move case, and SHAC can now train a reliable Ant policy in this Newton/MJWarp stack
-          when the objective includes explicit long-horizon stability pressure. The remaining problem is qualitative: the
-          gait is still a compact low crawl, and contact finite differences still degrade once feet sit on grazing active-set
+          when the objective includes explicit long-horizon stability pressure. PPO is not fixed by the same reward: it can
+          either stand safely or move with many late falls, and a low-std terminal-500 fine-tune did not repair that tradeoff.
+          The remaining problem is qualitative and algorithmic: the gait is still a compact low crawl, PPO does not yet find
+          the reliable moving solution, and contact finite differences still degrade once feet sit on grazing active-set
           boundaries. The missing piece is now a curriculum/objective that preserves more natural height and heading while
           increasing progress, plus a contact adjoint or smoothing strategy that remains useful across long horizons and
           active-set boundaries. It no longer looks like a single RNE mass/bias cancellation bug.
@@ -1633,6 +1654,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO corrected defaults",
         path: "assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_results.json",
         color: colors.violet
+      },
+      {
+        id: "antPpoStabilityReward",
+        label: "Ant PPO stability reward",
+        path: "assets/ant_ppo_stability_reward_progress2_force75_1024env_240upd_run1/ant_ppo_results.json",
+        color: colors.coral
+      },
+      {
+        id: "antPpoStabilityTerm500",
+        label: "Ant PPO term500 fine-tune",
+        path: "assets/ant_ppo_stability_term500_from_moving_lowstd_1024env_100upd_run1/ant_ppo_results.json",
+        color: colors.slate
+      },
+      {
+        id: "antPpoEvalFromShacSeed",
+        label: "Ant PPO eval SHAC seed",
+        path: "assets/ant_ppo_eval_from_shac_reliable_progress2_force75_run1/ant_ppo_results.json",
+        color: colors.teal
       },
       {
         id: "antShacIsaacExactDefaultsDet",
