@@ -354,6 +354,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 num_envs=args.num_envs,
                 fall_penalty=args.selection_fall_penalty,
                 invalid_penalty=args.selection_invalid_penalty,
+                displacement_weight=args.selection_displacement_weight,
             )
             if selection_score > best_score:
                 best_score = selection_score
@@ -378,6 +379,13 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "selection_return": selection["return"] if selection is not None else None,
             "selection_score": selection_score,
             "selection_mean_reward": selection["mean_reward"] if selection is not None else None,
+            "selection_forward_displacement": (
+                selection["mean_forward_displacement"] if selection is not None else None
+            ),
+            "selection_alive_fraction": selection["alive_fraction"] if selection is not None else None,
+            "selection_mean_height": selection["mean_height"] if selection is not None else None,
+            "selection_mean_up": selection["mean_up"] if selection is not None else None,
+            "selection_mean_heading": selection["mean_heading"] if selection is not None else None,
             "selection_fall_count": selection["fall_count"] if selection is not None else None,
             "selection_invalid_count": selection["invalid_count"] if selection is not None else None,
             "invalid_resets": invalid_count,
@@ -425,6 +433,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         num_envs=args.num_envs,
         fall_penalty=args.selection_fall_penalty,
         invalid_penalty=args.selection_invalid_penalty,
+        displacement_weight=args.selection_displacement_weight,
     )
     video_path = None
     poster_path = None
@@ -493,6 +502,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "termination_penalty": args.termination_penalty,
         "selection_fall_penalty": args.selection_fall_penalty,
         "selection_invalid_penalty": args.selection_invalid_penalty,
+        "selection_displacement_weight": args.selection_displacement_weight,
         "lr": args.lr,
         "gamma": args.gamma,
         "gae_lambda": args.gae_lambda,
@@ -614,6 +624,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
     parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
+    parser.add_argument("--selection-displacement-weight", type=float, default=0.0)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--render-video", action="store_true")

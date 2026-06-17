@@ -272,10 +272,17 @@ def rollout_selection_score(
     num_envs: int,
     fall_penalty: float,
     invalid_penalty: float,
+    displacement_weight: float = 0.0,
 ) -> float:
     fall_events = float(rollout.get("fall_count", 0)) / max(1, num_envs)
     invalid_events = float(rollout.get("invalid_count", 0)) / max(1, num_envs)
-    return float(rollout["return"]) - fall_penalty * fall_events - invalid_penalty * invalid_events
+    displacement = float(rollout.get("mean_forward_displacement") or 0.0)
+    return (
+        float(rollout["return"])
+        + displacement_weight * displacement
+        - fall_penalty * fall_events
+        - invalid_penalty * invalid_events
+    )
 
 
 def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor, torch.Tensor] | None:
@@ -1203,11 +1210,13 @@ class NewtonMuJoCoTorchEnv:
             actions_cost = action.square().sum(dim=-1)
             energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
             dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
+            height_reward = torch.clamp(q[:, 1] - ANT_TERMINATION_HEIGHT, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
             return (
                 weights.progress * qd[:, 0]
                 + weights.alive
                 + heading_reward
                 + up_reward
+                + weights.height * height_reward
                 - weights.actions_cost * actions_cost
                 - weights.energy_cost * energy_cost
                 - weights.dof_limit_cost * dof_limit_cost
@@ -2243,6 +2252,7 @@ def run_training(args: argparse.Namespace) -> dict:
             num_envs=args.num_envs,
             fall_penalty=args.selection_fall_penalty,
             invalid_penalty=args.selection_invalid_penalty,
+            displacement_weight=args.selection_displacement_weight,
         )
         if selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
@@ -2269,6 +2279,11 @@ def run_training(args: argparse.Namespace) -> dict:
                 "selection_return": selection_rollout["return"],
                 "selection_score": selection_score,
                 "selection_mean_reward": selection_rollout["mean_reward"],
+                "selection_forward_displacement": selection_rollout["mean_forward_displacement"],
+                "selection_alive_fraction": selection_rollout["alive_fraction"],
+                "selection_mean_height": selection_rollout["mean_height"],
+                "selection_mean_up": selection_rollout["mean_up"],
+                "selection_mean_heading": selection_rollout["mean_heading"],
                 "selection_fall_count": selection_rollout["fall_count"],
                 "selection_invalid_count": selection_rollout["invalid_count"],
                 "invalid_resets": invalid_count,
@@ -2319,6 +2334,7 @@ def run_training(args: argparse.Namespace) -> dict:
         num_envs=args.num_envs,
         fall_penalty=args.selection_fall_penalty,
         invalid_penalty=args.selection_invalid_penalty,
+        displacement_weight=args.selection_displacement_weight,
     )
     video_path = None
     poster_path = None
@@ -2399,6 +2415,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "terminal_fall_reward": -args.termination_penalty if args.termination_penalty > 0.0 else None,
         "selection_fall_penalty": args.selection_fall_penalty,
         "selection_invalid_penalty": args.selection_invalid_penalty,
+        "selection_displacement_weight": args.selection_displacement_weight,
         "lr": args.lr,
         "min_lr": args.min_lr,
         "adam_beta1": args.adam_beta1,
@@ -2748,6 +2765,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
     parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
+    parser.add_argument("--selection-displacement-weight", type=float, default=0.0)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)

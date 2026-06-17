@@ -110,6 +110,19 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
     )
 
 
+def ppo_actor_from_result(result: dict[str, Any], env: NewtonMuJoCoTorchEnv) -> PPOActor:
+    hidden_dims = result.get("actor_hidden_dims") or [128, 64, 32]
+    layer_norm = result.get("layer_norm")
+    initial_log_std = result.get("initial_log_std")
+    return PPOActor(
+        env.num_obs,
+        env.num_actions,
+        [int(width) for width in hidden_dims],
+        layer_norm=True if layer_norm is None else bool(layer_norm),
+        initial_log_std=-0.5 if initial_log_std is None else float(initial_log_std),
+    ).to(env.torch_device)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Refresh a report policy video with the shared smoothed follow camera.")
     parser.add_argument("result_json", type=Path)
@@ -135,7 +148,7 @@ def main() -> None:
 
     env = build_env(result, args)
     if algo == "ppo":
-        actor = PPOActor(env.num_obs, env.num_actions).to(env.torch_device)
+        actor = ppo_actor_from_result(result, env)
         actor.load_state_dict(torch.load(actor_path, map_location=env.torch_device))
     else:
         from run_newton_shac import make_actor
