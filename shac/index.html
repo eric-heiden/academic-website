@@ -293,10 +293,13 @@
           terminals, Hopper reaches 14.51 m with 0 no-reset terminals, and Cheetah reaches 12.66 m with 0 no-reset terminals.
           Cheetah is the clean SHAC stepping stone: MuJoCo contacts at substep 1 reach 10.41 m uninterrupted with 0 terminals.
           Hopper SHAC is now clean after moving the deterministic start pose off exact active joint limits and using a
-          reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC is fast but not yet reliable: the best fast shaped policy replays at about 23.19 m
-          uninterrupted, but still has 3/1024 late no-reset terminal events, and stricter SHAC fine-tuning did not eliminate
-          them. The remaining Ant/Hopper issue is therefore no longer camera rendering or basic environment setup; it is the
-          long-horizon contact-gradient/update quality under replicated MuJoCo Warp worlds.
+          reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
+          reliable 1024-world result after fixing action-squash semantics and checkpoint selection: the tanh-wrapped
+          RSL-style PPO warm start improves from 13.04 m to 14.96 m uninterrupted with 0 terminals, 0 invalids, and minimum
+          up projection 0.93. The faster shaped Ant policy still replays at about 23.19 m but has late no-reset terminal
+          events, so it remains a diagnostic speed target rather than the reliable headline policy. The remaining Ant/Hopper
+          issue is therefore no longer camera rendering or basic environment setup; it is reliable long-horizon
+          contact-gradient/update quality under replicated MuJoCo Warp worlds.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
@@ -361,7 +364,11 @@
           forward displacement, initial PPO warm starts are evaluated and saved before any SHAC update, and SHAC selection can
           now run on a separate large randomized environment batch via <code>--selection-num-envs</code>. The PPO runner now
           mirrors that safeguard for loaded actors by evaluating and saving update 0 before any PPO fine-tune step. SHAC can also use a
-          no-LayerNorm actor architecture that exactly matches PPO checkpoints.
+          no-LayerNorm actor architecture that exactly matches PPO checkpoints. Shared policy evaluation now preserves
+          explicit action semantics: SHAC actors output raw pre-tanh actions when configured with <code>action_squash=tanh</code>,
+          while PPO actors with <code>action_squash=none</code> are evaluated without an accidental second tanh. Ant selection
+          thresholds now use recorded minima such as <code>min_up</code> and <code>min_height</code> instead of batch means, so
+          rare inverted worlds are penalized instead of hidden by high average uprightness.
           The newest Ant harness fix uses the stable -90 degree X free-root start quaternion for both DiffRL and NV Ant
           imports, because this is the pose that matches the configured start joints after Newton exports to the MuJoCo/MJWarp
           runtime. It also drops the embedded NV floor before adding Newton's ground plane; this removes the duplicate
@@ -380,15 +387,15 @@
         <h2>What Is Not Fixed</h2>
         <p>
           PPO now works as an environment sanity check for all three locomotion tasks, and SHAC has clean stepping-stone
-          results for Cheetah and Hopper. Hopper required two harness fixes: the default deterministic start is now 0.05 rad
-          inside the two upper joint limits, and the selector uses a large fall gate so 0-fall checkpoints beat slightly faster
-          late-fall checkpoints. Ant SHAC remains the main blocker: the fast shaped policy reaches 23.19 m in the uninterrupted
-          replay but still has 3 late no-reset terminal events and 12 reset-style eval falls. A lower-speed Ant PPO policy is
-          fully reliable at 11.82 m with 0 no-reset terminals, and SHAC warm-started from that PPO actor preserves reliability
-          but does not improve it. Native NV Ant runs move farther, but remain fall-prone in 1024-world replay and are not
-          treated as reliable baselines. The latest fixed-action checks explain the pattern: reset-state one-step gradients
-          are clean, but H=8/H=16 Ant rollouts enter grazing foot contacts where contact-position and orientation derivatives
-          diverge from finite differences.
+          results for Cheetah, Hopper, and a reliable Ant gait. Hopper required two harness fixes: the default deterministic
+          start is now 0.05 rad inside the two upper joint limits, and the selector uses a large fall gate so 0-fall checkpoints
+          beat slightly faster late-fall checkpoints. Ant's reliable SHAC policy now reaches 14.96 m uninterrupted with
+          0 no-reset terminals, but the faster shaped policy still reaches 23.19 m with late terminal events. A true
+          no-squash RSL-style PPO actor replay collapses under corrected action semantics, so no-squash PPO needs a clean
+          retrain/evaluation pass instead of being mixed with the tanh-wrapped SHAC actor family. Native NV Ant runs move
+          farther, but remain fall-prone in 1024-world replay and are not treated as reliable baselines. The latest fixed-action
+          checks explain the pattern: reset-state one-step gradients are clean, but H=8/H=16 Ant rollouts enter grazing foot
+          contacts where contact-position and orientation derivatives diverge from finite differences.
         </p>
       </article>
     </section>
@@ -716,18 +723,34 @@
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Robust PPO Warm-Start</h2>
+        <h2>Ant PPO, Tanh-Wrapped RSL Continuation</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_rsl_stochppo_term20_head1_warm_physical_16env_24ep_lr1e5_run1/ant_poster.png">
-            <source src="assets/ant_shac_rsl_stochppo_term20_head1_warm_physical_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_ppo_rsl_exact_minup075_continue_1024env_100upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_rsl_exact_minup075_continue_1024env_100upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC warm-started from the robust PPO actor with the same physical objective, stochastic-start 1024-env
-            selector, H=16, 16 training envs, lr 1e-5, no critic bootstrap, and MuJoCo contacts. The best selected policy
-            stayed at epoch 0; later differentiable updates preserved zero falls but gradually reduced displacement. The
-            fixed best-policy replay reports 1468.3 return, 13.08 m displacement, 1 fall, 0 invalids, 0.571 m mean height,
-            0.993 mean up, and 0.978 mean heading. Runtime was 143.0 s total, 43.0 sim FPS, with 25.2 MB peak allocated
-            CUDA memory.
+            RSL-style PPO continuation with the same physical Ant objective and <code>ant_min_up=0.75</code>, shown under the
+            explicit tanh-wrapped action semantics that are compatible with the SHAC actor. The selected update reaches
+            13.04 m uninterrupted with 0 terminals, 0 invalids, minimum up projection 0.88, and minimum height 0.46 m. This
+            run exposed a loader bug: true <code>action_squash=none</code> replay of the same checkpoint collapses, so the
+            reliable result is reported as tanh-wrapped rather than native no-squash PPO. Runtime was 223.3 s with
+            151.2 MB peak allocated CUDA memory.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant SHAC, Tanh-Wrapped PPO Warm-Start</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_tanhwrap_ppo_minup075_h16_16env_24ep_lr5e7_run1/ant_poster.png">
+            <source src="assets/ant_shac_tanhwrap_ppo_minup075_h16_16env_24ep_lr5e7_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            H=16 SHAC fine-tuned from the tanh-wrapped RSL-style PPO actor with 16 training worlds, 1024-world selection,
+            MuJoCo contacts, <code>ant_min_up=0.75</code>, no critic bootstrap, and lr 5e-7. The corrected selector uses
+            minimum height/up/heading, not batch means, and chooses epoch 5: 14.96 m uninterrupted, 0 terminals, 0 invalids,
+            minimum up projection 0.93, and minimum height 0.47 m. Runtime was 163.4 s with 25.9 MB peak allocated CUDA
+            memory. The clip is raw <code>ViewerGL.get_frame()</code> with no overlays through the shared smoothed COM
+            follow camera.
           </figcaption>
         </figure>
       </article>
@@ -874,18 +897,20 @@
           The earlier Ant zero-fall claim came from reset-style evaluation and a shorter/default selector. Replaying the same
           family with the corrected full-horizon selector and an uninterrupted no-reset evaluator exposes late falls: the fast
           shaped SHAC actor still travels about 23.19 m, but 3 of 1024 worlds terminate late in the rollout and reset-style
-          eval records 12 falls. PPO is now the clean Ant positive control at 11.82 m with 0 no-reset terminals. The remaining
-          Ant problem is therefore not renderer state or basic reward feasibility; it is long-horizon SHAC update quality
-          around contact-rich gaits.
+          eval records 12 falls. PPO is now the clean Ant positive control at 11.82 m with 0 no-reset terminals, and the
+          tanh-wrapped RSL-style SHAC continuation is the current reliable Ant SHAC result at 14.96 m with 0 no-reset
+          terminals. The remaining Ant problem is therefore not renderer state or basic reward feasibility; it is pushing
+          the reliable gait toward the faster 20 m class without reintroducing late contact failures.
         </p>
       </article>
       <article class="panel">
         <h2>Ant Fall Timing</h2>
         <p>
-          The latest no-reset replay records first Ant SHAC terminals near step 458, with a mean terminal step around 465.
+          The late-fall no-reset replay records first Ant SHAC terminals near step 458, with a mean terminal step around 465.
           Earlier corrected-default probes also fell late, around steps 348-461. These are not reset splices or camera
           artifacts: the failed worlds have torso heights below the termination threshold and flipped/upside-down up
-          projections after long contact interaction.
+          projections after long contact interaction. The latest reliable tanh-wrapped SHAC replay has 0 terminal worlds,
+          minimum up projection 0.93, and minimum forward displacement 13.33 m over the same 1024-world trace.
         </p>
       </article>
       <article class="panel warn">
@@ -1490,9 +1515,10 @@
           isolate the gap to grazing foot contacts: local action derivatives are good at reset, then contact-position and
           orientation finite differences diverge once foot distances sit just inside the inclusion margin. Hopper with limits on is nonsmooth at
           reset because the thigh and leg joints start on their upper stops; reset noise is now clamped back inside finite limits,
-          and the new inside-limit start-pose probe confirms this was a real harness bug. It did not solve hopping: Gym-style
-          reward, upright warm-start curriculum, and inside-limit progress PPO all still become falling policies under the
-          480-step selection score. Cheetah remains the clean success case, and PPO verifies the faithful 16-substep Cheetah
+          and the new inside-limit start-pose probe confirms this was a real harness bug. Earlier Gym-style reward and
+          upright warm-start Hopper probes still became falling policies, but the inside-limit deterministic start plus
+          1024-world fall-gated selector gives a clean 13.65 m SHAC result. Cheetah remains the cleanest success case, and
+          PPO verifies the faithful 16-substep Cheetah
           environment. Ant needed two environment fixes beyond the MJWarp adjoints: local Isaac-style observations/reward terms
           and an action-order option that can match either IsaacLab-style joint order or MuJoCo actuator order. A later
           report-runner bug was that the Isaac-style reward accepted <code>--ant-height-weight</code> but ignored it; the
@@ -1501,18 +1527,25 @@
           defaults, PPO reaches 11.82 m with 0 no-reset terminals in the current full-horizon replay, and low-lr
           deterministic SHAC improves fast shaped Ant displacement to 23.19 m. The stricter no-reset evaluator changed the
           conclusion, though: that fast SHAC policy still terminates in 3 of 1024 worlds and has 12 reset-style eval falls.
-          Ant is therefore no longer an optimizer-fails-to-move case, but it is not yet a reliable SHAC result. PPO is the
-          reliable positive control, while SHAC remains faster and less robust. For native NV Ant, the no-reset single
-          deterministic videos now look physically continuous, but large identical-world replays expose robustness failures
-          because contact dynamics amplify tiny per-world floating-point differences by mid-rollout. The 500k-penalty NV SHAC
-          continuation reduced those failures but still ended at 14 falls/3 invalids, so NV remains a diagnostic asset rather
-          than the headline result.
+          Ant is therefore no longer an optimizer-fails-to-move case. The latest harness fix also corrected action-squash
+          semantics: PPO actors that declare <code>action_squash=none</code> are no longer silently tanh-wrapped by shared
+          evaluation, while SHAC actors still apply their explicit tanh output map. This exposed that the RSL-style PPO
+          continuation was only reliable under the tanh wrapper used by the SHAC actor; true no-squash replay collapses and
+          must be treated as a separate retraining target. With the wrapper made explicit, H=16 SHAC fine-tuning improves the
+          reliable Ant gait to 14.96 m uninterrupted with 0 terminals. For native NV Ant, the no-reset single deterministic
+          videos now look physically continuous, but large identical-world replays expose robustness failures because contact
+          dynamics amplify tiny per-world floating-point differences by mid-rollout. The 500k-penalty NV SHAC continuation
+          reduced those failures but still ended at 14 falls/3 invalids, so NV remains a diagnostic asset rather than the
+          headline result.
           The remaining problem is qualitative and algorithmic: Hopper SHAC needed the start-pose active-set fix and a much
-          stronger fall gate before it became reliable, while Ant SHAC still either preserves the slower PPO gait or improves
-          speed at the cost of rare late falls. Contact finite differences still degrade once Ant feet sit on grazing
+          stronger fall gate before it became reliable, while Ant SHAC now has a reliable 14.96 m gait but still loses
+          reliability when pushed toward the faster 23 m shaped policy. Contact finite differences still degrade once Ant feet sit on grazing
           active-set boundaries. The missing piece is now a curriculum/objective that preserves more natural height and
           heading while increasing progress, plus a contact adjoint or smoothing strategy that remains useful across long
-          horizons and active-set boundaries. It no longer looks like a single RNE mass/bias cancellation bug.
+          horizons and active-set boundaries. The current reliable matrix is Cheetah SHAC at 10.41 m, Hopper SHAC at
+          13.65 m, and Ant SHAC at 14.96 m; the open target is pushing Ant into the faster 20 m class without the late
+          fall modes, and retraining/evaluating a true no-squash RSL-style PPO actor under corrected semantics. It no longer
+          looks like a single RNE mass/bias cancellation bug.
         </p>
       </article>
     </section>
@@ -1839,6 +1872,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO full-horizon reliable",
         path: "assets/ant_ppo_phys_progress2_fullselect_uninterrupted_eval_run1/ant_ppo_results.json",
         color: colors.green
+      },
+      {
+        id: "antPpoTanhWrappedMinUp075",
+        label: "Ant PPO tanh-wrapped RSL",
+        path: "assets/ant_ppo_rsl_exact_minup075_continue_1024env_100upd_run1/ant_ppo_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antShacTanhWrappedMinUp075",
+        label: "Ant SHAC tanh-wrapped RSL",
+        path: "assets/ant_shac_tanhwrap_ppo_minup075_h16_16env_24ep_lr5e7_run1/ant_results.json",
+        color: colors.teal
       },
       {
         id: "antShacIsaacExactDefaultsDet",
@@ -2543,7 +2588,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacReliabilityFineTune")
+      const antLatest = presentRuns.find((run) => run.id === "antShacTanhWrappedMinUp075")
+        || presentRuns.find((run) => run.id === "antPpoTanhWrappedMinUp075")
+        || presentRuns.find((run) => run.id === "antShacReliabilityFineTune")
         || presentRuns.find((run) => run.id === "antShacStabilityProgress2Force75")
         || presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
         || presentRuns.find((run) => run.id === "antShacRslStochTerm20Head1")

@@ -452,6 +452,7 @@ def run(args: argparse.Namespace) -> dict:
         hidden_dims=args.actor_hidden_dims,
         actor_logstd_init=args.actor_logstd_init,
         actor_layer_norm=args.actor_layer_norm,
+        action_squash=args.action_squash,
     )
     load_actor_checkpoint(actor, args.actor_path, env.torch_device)
     obs_stats = load_obs_rms(args.obs_rms_path, env.torch_device) if args.obs_rms_path is not None else None
@@ -518,6 +519,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--obs-rms-path", type=Path, default=None)
     parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=[256, 128, 64])
     parser.add_argument("--actor-logstd-init", type=float, default=0.0)
+    parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
     parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
     parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)

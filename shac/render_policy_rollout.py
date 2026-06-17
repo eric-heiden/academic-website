@@ -191,6 +191,7 @@ def main() -> None:
             hidden_dims=result.get("actor_hidden_dims"),
             actor_logstd_init=float(result.get("actor_logstd_init") or -1.0),
             actor_layer_norm=bool(result.get("actor_layer_norm", True)),
+            action_squash=result.get("action_squash") or "tanh",
         )
         load_actor_checkpoint(actor, actor_path, env.torch_device)
     actor.eval()

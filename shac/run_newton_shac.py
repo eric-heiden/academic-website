@@ -302,11 +302,17 @@ def rollout_selection_score(
     heading = float(rollout.get("mean_heading") or 0.0)
     shortfall = 0.0
     if min_height is not None:
-        shortfall += max(0.0, float(min_height) - height)
+        threshold_height = rollout.get("min_height")
+        threshold_height = height if threshold_height is None else float(threshold_height)
+        shortfall += max(0.0, float(min_height) - threshold_height)
     if min_up is not None:
-        shortfall += max(0.0, float(min_up) - up)
+        threshold_up = rollout.get("min_up")
+        threshold_up = up if threshold_up is None else float(threshold_up)
+        shortfall += max(0.0, float(min_up) - threshold_up)
     if min_heading is not None:
-        shortfall += max(0.0, float(min_heading) - heading)
+        threshold_heading = rollout.get("min_heading")
+        threshold_heading = heading if threshold_heading is None else float(threshold_heading)
+        shortfall += max(0.0, float(min_heading) - threshold_heading)
     return (
         float(rollout["return"])
         + displacement_weight * displacement
@@ -1551,11 +1557,12 @@ def make_actor(
     hidden_dims: list[int] | None = None,
     actor_logstd_init: float = -1.0,
     actor_layer_norm: bool = True,
+    action_squash: str = "tanh",
 ) -> torch.nn.Module:
     if hidden_dims is None:
         hidden_dims = [128, 64, 32] if is_locomotion_env(env.env_name) else [64, 64]
     if not actor_layer_norm:
-        return NewtonPolicyMLP(
+        actor = NewtonPolicyMLP(
             env.num_obs,
             env.num_actions,
             hidden_dims,
@@ -1563,6 +1570,9 @@ def make_actor(
             actor_logstd_init=actor_logstd_init,
             device=env.torch_device,
         )
+        actor.action_squash = action_squash
+        actor.outputs_raw_action = True
+        return actor
     cfg = {
         "actor_mlp": {"units": hidden_dims, "activation": "elu"},
         "actor_logstd_init": actor_logstd_init,
@@ -1575,6 +1585,8 @@ def make_actor(
         if env.env_name == "cartpole" and isinstance(final, torch.nn.Linear):
             torch.nn.init.zeros_(final.weight)
             torch.nn.init.zeros_(final.bias)
+    actor.action_squash = action_squash
+    actor.outputs_raw_action = True
     return actor
 
 
@@ -1681,9 +1693,17 @@ def normalize_obs(obs: torch.Tensor, stats: tuple[torch.Tensor, torch.Tensor] | 
 
 def deterministic_policy_action(actor: torch.nn.Module, obs: torch.Tensor) -> torch.Tensor:
     action = actor(obs, deterministic=True)
-    if getattr(actor, "action_squash", None) == "tanh":
+    if getattr(actor, "outputs_raw_action", False):
+        return squash_policy_action(actor, action)
+    if getattr(actor, "action_squash", None) in {"tanh", "none"}:
         return action
     return torch.tanh(action)
+
+
+def squash_policy_action(actor: torch.nn.Module, raw_action: torch.Tensor) -> torch.Tensor:
+    if getattr(actor, "action_squash", "tanh") == "none":
+        return raw_action
+    return torch.tanh(raw_action)
 
 
 @torch.no_grad()
@@ -1745,7 +1765,7 @@ def shac_rollout_loss(
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_stats)
         raw_action = actor(obs, deterministic=not stochastic_actor)
-        action = torch.tanh(raw_action)
+        action = squash_policy_action(actor, raw_action)
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
         invalid = env.invalid_state(q, qd)
         fell = torch.logical_and(env.fallen_state(q), ~invalid)
@@ -1979,6 +1999,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         hidden_dims=args.actor_hidden_dims,
         actor_logstd_init=args.actor_logstd_init,
         actor_layer_norm=args.actor_layer_norm,
+        action_squash=args.action_squash,
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
@@ -2233,6 +2254,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "actor_hidden_dims": args.actor_hidden_dims,
         "actor_logstd_init": args.actor_logstd_init,
         "actor_layer_norm": args.actor_layer_norm,
+        "action_squash": args.action_squash,
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
@@ -2449,6 +2471,7 @@ def run_training(args: argparse.Namespace) -> dict:
         hidden_dims=args.actor_hidden_dims,
         actor_logstd_init=args.actor_logstd_init,
         actor_layer_norm=args.actor_layer_norm,
+        action_squash=args.action_squash,
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
@@ -2595,7 +2618,7 @@ def run_training(args: argparse.Namespace) -> dict:
             if args.use_critic:
                 critic_obs.append(obs.detach())
             raw_action = actor(obs, deterministic=not args.stochastic_actor)
-            action = torch.tanh(raw_action)
+            action = squash_policy_action(actor, raw_action)
             q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
             invalid = env.invalid_state(q_next, qd_next)
             fell = torch.logical_and(env.fallen_state(q_next), ~invalid)
@@ -2950,6 +2973,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "actor_hidden_dims": args.actor_hidden_dims,
         "actor_logstd_init": args.actor_logstd_init,
         "actor_layer_norm": args.actor_layer_norm,
+        "action_squash": args.action_squash,
         "critic_hidden_dims": args.critic_hidden_dims,
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
@@ -3080,8 +3104,11 @@ def evaluate_policy(
     completed_returns = []
     completed_lengths = []
     height_samples = []
+    height_mins = []
     up_samples = []
+    up_mins = []
     heading_samples = []
+    heading_mins = []
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
         action = deterministic_policy_action(actor, obs)
@@ -3099,9 +3126,15 @@ def evaluate_policy(
         final_obs = env.observe(q, qd, action, phase=progress + 1)
         if env.env_name == "ant":
             torso_pos, _, _, _, up_vec, heading_alignment = env.ant_pose_terms(q, qd)
-            height_samples.append(torso_pos[:, 1].detach().mean())
-            up_samples.append(up_vec[:, 1].detach().mean())
-            heading_samples.append(heading_alignment.squeeze(-1).detach().mean())
+            heights = torso_pos[:, 1].detach()
+            ups = up_vec[:, 1].detach()
+            headings = heading_alignment.squeeze(-1).detach()
+            height_samples.append(heights.mean())
+            height_mins.append(heights.min())
+            up_samples.append(ups.mean())
+            up_mins.append(ups.min())
+            heading_samples.append(headings.mean())
+            heading_mins.append(headings.min())
         rew = env.reward(q, qd, action, obs=final_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
@@ -3144,8 +3177,11 @@ def evaluate_policy(
         "mean_completed_length": float(np.mean(completed_lengths)) if completed_lengths else None,
         "mean_forward_displacement": float(forward_displacement.mean().detach().cpu()),
         "mean_height": float(torch.stack(height_samples).mean().cpu()) if height_samples else None,
+        "min_height": float(torch.stack(height_mins).min().cpu()) if height_mins else None,
         "mean_up": float(torch.stack(up_samples).mean().cpu()) if up_samples else None,
+        "min_up": float(torch.stack(up_mins).min().cpu()) if up_mins else None,
         "mean_heading": float(torch.stack(heading_samples).mean().cpu()) if heading_samples else None,
+        "min_heading": float(torch.stack(heading_mins).min().cpu()) if heading_mins else None,
         "unfinished_mean_return": float(episode_returns.mean().detach().cpu()),
         "unfinished_mean_length": float(episode_lengths.to(torch.float32).mean().detach().cpu()),
         "final_obs_mean": [float(x) for x in final_obs.mean(dim=0).cpu().tolist()],
@@ -3174,8 +3210,11 @@ def evaluate_policy_uninterrupted(
     forward_displacement = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
     rewards = []
     height_samples = []
+    height_mins = []
     up_samples = []
+    up_mins = []
     heading_samples = []
+    heading_mins = []
     for step_idx in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
         action = deterministic_policy_action(actor, obs)
@@ -3204,9 +3243,15 @@ def evaluate_policy_uninterrupted(
             torso_pos, _, _, _, up_vec, heading_alignment = env.ant_pose_terms(q_next, qd_next)
             sample_mask = active & finite
             if sample_mask.any():
-                height_samples.append(torso_pos[sample_mask, 1].detach().mean())
-                up_samples.append(up_vec[sample_mask, 1].detach().mean())
-                heading_samples.append(heading_alignment[sample_mask].detach().mean())
+                heights = torso_pos[sample_mask, 1].detach()
+                ups = up_vec[sample_mask, 1].detach()
+                headings = heading_alignment[sample_mask].detach()
+                height_samples.append(heights.mean())
+                height_mins.append(heights.min())
+                up_samples.append(ups.mean())
+                up_mins.append(ups.min())
+                heading_samples.append(headings.mean())
+                heading_mins.append(headings.min())
 
         terminal_step = torch.where(new_terminal, torch.full_like(terminal_step, step_idx + 1), terminal_step)
         terminal_fall = torch.logical_or(terminal_fall, torch.logical_and(active, fell))
@@ -3234,8 +3279,11 @@ def evaluate_policy_uninterrupted(
         "mean_forward_displacement": float(forward_displacement.mean().detach().cpu()),
         "mean_completed_return": float(episode_returns.mean().detach().cpu()),
         "mean_height": float(torch.stack(height_samples).mean().cpu()) if height_samples else None,
+        "min_height": float(torch.stack(height_mins).min().cpu()) if height_mins else None,
         "mean_up": float(torch.stack(up_samples).mean().cpu()) if up_samples else None,
+        "min_up": float(torch.stack(up_mins).min().cpu()) if up_mins else None,
         "mean_heading": float(torch.stack(heading_samples).mean().cpu()) if heading_samples else None,
+        "min_heading": float(torch.stack(heading_mins).min().cpu()) if heading_mins else None,
         "horizon": horizon,
     }
 
@@ -3411,6 +3459,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=None)
     parser.add_argument("--critic-hidden-dims", type=parse_int_list, default=None)
     parser.add_argument("--actor-logstd-init", type=float, default=-1.0)
+    parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
     parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
     parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
     parser.add_argument("--use-critic", dest="use_critic", action="store_true", default=None)
