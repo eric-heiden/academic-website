@@ -270,11 +270,12 @@
         <p class="lede">
           Newton experiments coupling SHAC-style differentiable policy optimization to the MuJoCo Warp differentiability branch.
           The latest pass stages the problem through acrobot target control, free-body control, sphere/capsule contact targets,
-          Hopper, Cheetah, and Ant. The newest MJWarp fix records the composite-inertia (<code>cinert</code>) adjoint so dense
-          mass-matrix VJPs reach <code>qpos</code> during multi-step BPTT. Cheetah now works as a staged SHAC target: Newton
+          Hopper, Cheetah, and Ant. The newest MJWarp fix removes duplicate auto-AD through the RNE
+          <code>qfrc_bias</code>/<code>cfrc_int</code> path, so free-fall mass/bias VJPs cancel correctly and Hopper/Ant
+          one-step state gradients match finite differences again. Cheetah now works as a staged SHAC target: Newton
           contacts move 7.57 m in the latest 8 s rollout, and MuJoCo contacts move 5.40 m when rollout state is reset each
-          epoch. Hopper is now the active stepping-stone failure: SolverMuJoCo CPU and MJWarp agree on passive dynamics, but
-          Hopper gradients around contacts/limits are not clean enough for reliable SHAC hopping. Ant remains the final unsolved target.
+          epoch. Hopper and Ant still need training stabilization: their short-horizon gradients are now clean, but contact-rich
+          SHAC optimization still collapses or plateaus before reliable locomotion.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -323,18 +324,20 @@
           <code>efc.J</code> force-law term. The latest fix computes differentiable kinematics once per body level instead of
           replaying <code>body_branches</code>; this removes the duplicated root-pitch gradient in branched planar bodies and
           drops Cheetah no-contact state/action error to 6.4e-5. The newest <code>cinert</code> adjoint hook improves Ant H=2
-          policy finite differences from 3.5e-1 to 1.3e-1 and Cheetah/MuJoCo policy finite differences to 1.1e-2.
+          policy finite differences from 3.5e-1 to 1.3e-1 and Cheetah/MuJoCo policy finite differences to 1.1e-2. The
+          newest RNE fix replaces auto-backward through <code>qfrc_bias</code> with an explicit adjoint and disables auto-backward
+          through the cfrc tree accumulation; Hopper no-limit smooth dynamics now has 2.7e-4 full state/action error and Ant
+          H=5 one-step state/action error is 8.1e-5.
         </p>
       </article>
       <article class="panel warn">
         <h2>What Is Not Fixed</h2>
         <p>
-          Contact-rich state finite differences are still discontinuous for MuJoCo contacts, and Hopper is not solved as a task.
-          With DiffRL-style 16 substeps, Hopper one-step action gradients are usable, but joint-position and short-horizon policy
-          gradients remain inaccurate around active contacts/limits. PPO confirms that disabling limits can stabilize passive
-          dynamics, but it still selects a folded low posture instead of hopping. Cheetah/MuJoCo trains only with reset-each-epoch;
-          without resets it drifts into poor rollout states despite good policy finite differences. Ant H=5/H=8 policy gradients
-          are still inaccurate, so Ant locomotion is not yet reliable.
+          Contact-rich training is still not solved for Hopper or Ant. Hopper with joint limits has nonsmooth finite differences
+          at the reset pose because the thigh and leg start exactly on their upper limits; disabling those limits makes smooth
+          state/action gradients pass, but training folds into invalid low postures. Ant one-step state/action gradients now pass
+          through H=5, but a 64-env SHAC run improved only to roughly 1.5 mean reward before declining, so reliable Ant locomotion
+          still needs contact/optimization stabilization rather than another smooth-dynamics VJP fix.
         </p>
       </article>
     </section>
@@ -378,21 +381,21 @@
             </tr>
             <tr>
               <td>Ant, MuJoCo contact, one-step state/action</td>
-              <td>5.7e-5</td>
+              <td>8.1e-5</td>
               <td>1.00</td>
-              <td>Local reset-state contact derivatives are clean after contact-row VJPs.</td>
+              <td>H=5 state/action derivatives remain clean after the RNE <code>qfrc_bias</code> fix.</td>
             </tr>
             <tr>
-              <td>Ant policy H=2, margin 0.02</td>
-              <td>1.3e-1</td>
-              <td>1.00</td>
-              <td><code>cinert</code> recording improves short BPTT but does not fix longer Ant horizons.</td>
-            </tr>
-            <tr>
-              <td>Ant policy H=8, margin 0.02</td>
+              <td>Ant policy H=5, margin 0.002</td>
               <td>3.9e-1</td>
               <td>1.00</td>
-              <td>Longer contact-rich BPTT is still not accurate enough for reliable gait learning.</td>
+              <td>Policy finite differences are noisy but sign-consistent; direct state/action gradients now pass.</td>
+            </tr>
+            <tr>
+              <td>Hopper no limits, no contact, state/action</td>
+              <td>2.7e-4</td>
+              <td>1.00</td>
+              <td>Forced smooth dynamics now matches finite differences; the prior free-fall residual is gone.</td>
             </tr>
             <tr>
               <td>Two-link no-limit solver q-gradient</td>
@@ -414,9 +417,9 @@
             </tr>
             <tr>
               <td>Hopper, MuJoCo contacts, active limits</td>
-              <td>3.5e-4 policy</td>
+              <td>2.7e-3 policy</td>
               <td>1.00</td>
-              <td>Comparable patched Hopper policy gradients check; direct q-position contact perturbations are nonsmooth.</td>
+              <td>Policy/action gradients check, but direct q-position perturbations are dominated by active joint-limit discontinuities.</td>
             </tr>
             <tr>
               <td>Hopper trained standing policy, H=3</td>
@@ -444,9 +447,9 @@
             </tr>
             <tr>
               <td>Cheetah, MuJoCo contacts</td>
-              <td>1.1e-2 policy</td>
+              <td>2.8e-2 policy</td>
               <td>1.00</td>
-              <td>Policy finite differences are now good, but direct q-position finite differences still cross nonsmooth contact changes.</td>
+              <td>Policy/action gradients remain usable after the RNE fix; direct state perturbations still cross nonsmooth contact changes.</td>
             </tr>
             <tr>
               <td>Cheetah, Newton contacts</td>
@@ -827,8 +830,12 @@
           <code>_advance</code> had to isolate output <code>qpos</code>/<code>qvel</code> arrays under AD to avoid overwriting
           saved inputs. Fifth, Newton's free-joint force route writes to MJWarp <code>xfrc_applied</code>; the
           <code>support.apply_ft</code> map into <code>qfrc_smooth</code> needed an explicit VJP for free-root force controls.
-          The active-limit drilldown now shows that the solver mass correction's matrix gradient is algebraically right, but the
-          dense diagonal <code>M00</code> adjoint over-injects through the parent <code>cdof</code> path.
+          The latest Hopper free-fall drilldown showed the key cancellation bug: CPU MuJoCo and MJWarp both produce pose-independent
+          free-fall acceleration, but AD still injected root-angle and joint-position gradients. Finite-difference decomposition
+          showed the dense M VJP was correct; the residual came from leaving Warp auto-AD active through
+          <code>qfrc_bias = dot(cdof, cfrc)</code> and the cfrc tree accumulation while also recording the custom RNE adjoint.
+          The fix disables those auto-backward kernels and records an explicit <code>qfrc_bias</code> adjoint that routes
+          <code>cdof.grad</code> and <code>cfrc_total.grad</code> exactly once.
         </p>
       </article>
       <article class="panel">
@@ -837,14 +844,12 @@
           The harness had its own bug: early terminal falls still bootstrapped from the critic. DiffRL sets the terminal value to
           zero for early termination. Matching that behavior, and making terminal fall reward a fixed negative value, removes the
           high-speed crash exploit. The new upright gate also rejects the rolled-over progress policy. The remaining failure is
-          not a simple one-step gradient sign bug; it appears when the task trades long-horizon progress against repeated Ant
-          contacts and active joint limits. The simple sphere/capsule scenes now check out, and the no-limit Ant decomposition is
-          accurate again after the RNE fixes, but limit-enabled Ant still inherits the dense mass-diagonal residual and SHAC
-          currently reaches only a stable crawl. Hopper now shows a separate optimization issue: keeping vectorized rollout state
-          across epochs can drift into solver-pathological states, while reset-each-epoch remains stable but selects a standing
-          local optimum under the DiffRL reward. The 16-substep Hopper check is worse than the one-step diagnostic, and PPO
-          negative controls also fold/collapse, so Hopper needs a tighter contact/limit reproduction before it can serve as a
-          reliable bridge to Ant.
+          no longer a simple smooth-dynamics gradient bug: Hopper and Ant short-horizon state/action checks now pass, but SHAC
+          training still trades progress against repeated contacts and active limits poorly. Hopper with limits on is nonsmooth at
+          reset because the thigh and leg joints start on their upper stops; no-limit Hopper verifies the smooth dynamics but folds
+          during training. Ant H=5 state/action gradients now match finite differences, yet the latest 64-env SHAC run plateaued
+          near 1.5 reward and then declined. The next bug hunt should target contact/limit training stability and policy-gradient
+          variance, not the RNE mass/bias cancellation.
         </p>
       </article>
     </section>
@@ -1049,9 +1054,15 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       hopperSubsteps: "assets/hopper_gradcheck_mujoco_sub16_implicitfast_run1/hopper_gradient_check.json",
       hopperNoLimitsSubsteps: "assets/hopper_gradcheck_mujoco_nolimits_sub16_implicitfast_run1/hopper_gradient_check.json",
       hopperTrainedPolicy: "assets/hopper_gradcheck_mujoco_reset_each_epoch_actor_run1/hopper_gradient_check.json",
+      hopperAfterRne: "assets/hopper_gradcheck_mujoco_after_rne_qfrc_fix_run1/hopper_gradient_check.json",
+      hopperNoContactAfterRne: "assets/hopper_gradcheck_none_after_rne_qfrc_fix_run1/hopper_gradient_check.json",
+      hopperNoLimitsAfterRne: "assets/hopper_gradcheck_none_nolimits_after_rne_qfrc_fix_run1/hopper_gradient_check.json",
       hopperTrainNoLimits: "assets/hopper_train_nolimits_mujoco_probe_run1/hopper_results.json",
       hopperPpoFaithful: "assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_results.json",
       hopperPpoNoLimitsSubsteps: "assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_results.json",
+      antH3AfterRne: "assets/ant_gradcheck_mujoco_h3_after_rne_qfrc_fix_run1/ant_gradient_check.json",
+      antH5AfterRne: "assets/ant_gradcheck_mujoco_h5_after_rne_qfrc_fix_run1/ant_gradient_check.json",
+      cheetahAfterRne: "assets/cheetah_gradcheck_mujoco_after_rne_qfrc_fix_run1/cheetah_gradient_check.json",
       cheetahLimitsNone: "assets/cheetah_gradcheck_limits_none_level_kinematics_run2/cheetah_gradient_check.json",
       cheetahLimitsMujoco: "assets/cheetah_gradcheck_mujoco_after_cinert_record_comparable_run1/cheetah_gradient_check.json",
       cheetahLimitsNewton: "assets/cheetah_gradcheck_newton_after_cinert_record_run1/cheetah_gradient_check.json",
@@ -1245,9 +1256,15 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         hopperSubsteps,
         hopperNoLimitsSubsteps,
         hopperTrainedPolicy,
+        hopperAfterRne,
+        hopperNoContactAfterRne,
+        hopperNoLimitsAfterRne,
         hopperTrainNoLimits,
         hopperPpoFaithful,
         hopperPpoNoLimitsSubsteps,
+        antH3AfterRne,
+        antH5AfterRne,
+        cheetahAfterRne,
         cheetahLimitsNone,
         cheetahLimitsMujoco,
         cheetahLimitsNewton,
@@ -1282,9 +1299,15 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.hopperSubsteps),
         safeJson(diagPaths.hopperNoLimitsSubsteps),
         safeJson(diagPaths.hopperTrainedPolicy),
+        safeJson(diagPaths.hopperAfterRne),
+        safeJson(diagPaths.hopperNoContactAfterRne),
+        safeJson(diagPaths.hopperNoLimitsAfterRne),
         safeJson(diagPaths.hopperTrainNoLimits),
         safeJson(diagPaths.hopperPpoFaithful),
         safeJson(diagPaths.hopperPpoNoLimitsSubsteps),
+        safeJson(diagPaths.antH3AfterRne),
+        safeJson(diagPaths.antH5AfterRne),
+        safeJson(diagPaths.cheetahAfterRne),
         safeJson(diagPaths.cheetahLimitsNone),
         safeJson(diagPaths.cheetahLimitsMujoco),
         safeJson(diagPaths.cheetahLimitsNewton),
@@ -1304,6 +1327,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       const latestStamp = latestTimestamp([
         ...presentRuns.map((run) => run.data?.timestamp_pacific),
         hopperTrainedPolicy?.timestamp_pacific,
+        hopperAfterRne?.timestamp_pacific,
+        hopperNoContactAfterRne?.timestamp_pacific,
+        hopperNoLimitsAfterRne?.timestamp_pacific,
+        antH3AfterRne?.timestamp_pacific,
+        antH5AfterRne?.timestamp_pacific,
+        cheetahAfterRne?.timestamp_pacific,
         hopperCinert?.timestamp_pacific,
         cheetahLimitsNewton?.timestamp_pacific,
         cheetahLimitsMujoco?.timestamp_pacific,
@@ -1445,12 +1474,16 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       }
 
       const locomotionGradRows = [
+        ["Hopper MuJoCo after RNE fix", hopperAfterRne],
+        ["Hopper no-contact after RNE fix", hopperNoContactAfterRne],
+        ["Hopper no-limit smooth after RNE fix", hopperNoLimitsAfterRne],
         ["Hopper MuJoCo contacts", hopperCinert || hopperLimits],
         ["Hopper Newton contacts", hopperNewton],
         ["Hopper trained stand policy", hopperTrainedPolicy],
         ["Hopper no limits", hopperNoLimits],
         ["Hopper substeps limits", hopperSubsteps],
         ["Hopper substeps no limits", hopperNoLimitsSubsteps],
+        ["Cheetah MuJoCo after RNE fix", cheetahAfterRne],
         ["Cheetah no contact", cheetahLimitsNone],
         ["Cheetah MuJoCo contacts", cheetahLimitsMujoco],
         ["Cheetah Newton contacts", cheetahLimitsNewton],
@@ -1534,6 +1567,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["capsule contact policy", bestSweep(contactCapsule?.policy)]
       ].filter(([, row]) => positiveMetric(row) !== null);
       const antRows = [
+        ["Ant H=3 after RNE fix", bestSweep(antH3AfterRne?.one_step_state_action)],
+        ["Ant H=5 after RNE fix", bestSweep(antH5AfterRne?.one_step_state_action)],
+        ["Ant policy H=5 after RNE fix", bestSweep(antH5AfterRne?.policy)],
         ["Ant H=2 margin + cinert", bestSweep(antH2Cinert?.policy)],
         ["Ant H=5 no margin", bestSweep(antH5NoMargin?.policy)],
         ["Ant H=5 margin + cinert", bestSweep(antH5Margin?.policy)],
