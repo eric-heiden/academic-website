@@ -26,6 +26,12 @@ PRESETS: dict[str, CameraPreset] = {
     "hopper": CameraPreset(offset=(-2.6, 1.2, 4.0), look_offset=(0.0, 0.25, 0.0), pitch=-15.0, yaw=-120.0, fov=45.0),
     "cheetah": CameraPreset(offset=(-3.6, 1.0, 5.5), look_offset=(0.0, 0.0, 0.0), pitch=-12.0, yaw=-115.0, fov=45.0),
     "ant": CameraPreset(offset=(-2.45, 1.35, 3.35), look_offset=(0.0, 0.32, 0.0), pitch=-18.0, yaw=-135.0, fov=40.0),
+    "single_hinge_gravity": CameraPreset(offset=(0.55, 1.05, 2.65), look_offset=(0.55, 0.0, 0.0), pitch=-8.0, yaw=-90.0, fov=42.0),
+    "double_hinge_gravity_static": CameraPreset(offset=(0.55, 1.05, 2.65), look_offset=(0.55, 0.0, 0.0), pitch=-8.0, yaw=-90.0, fov=42.0),
+    "double_hinge_zero_g_forced": CameraPreset(offset=(0.55, 1.05, 2.65), look_offset=(0.55, 0.0, 0.0), pitch=-8.0, yaw=-90.0, fov=42.0),
+    "planar_chain_zero_g": CameraPreset(offset=(0.0, 1.05, 2.8), look_offset=(0.0, 0.0, 0.0), pitch=-8.0, yaw=-90.0, fov=42.0),
+    "planar_branch_zero_g": CameraPreset(offset=(0.0, 1.05, 2.8), look_offset=(0.0, 0.0, 0.0), pitch=-8.0, yaw=-90.0, fov=42.0),
+    "free_body_zero_g": CameraPreset(offset=(0.0, 1.25, 2.8), look_offset=(0.0, 0.0, 0.0), pitch=-10.0, yaw=-90.0, fov=42.0),
 }
 
 
@@ -45,6 +51,10 @@ class SmoothedFollowCamera:
             return torch.tensor([float(q0[0]), float(q0[1]), 0.0], dtype=torch.float32)
         if self.base_env_name == "cartpole":
             return torch.tensor([float(q0[0]), 0.0, 0.0], dtype=torch.float32)
+        if self.base_env_name in {"planar_chain_zero_g", "planar_branch_zero_g"}:
+            return torch.tensor([float(q0[0]), 0.0, float(q0[1])], dtype=torch.float32)
+        if self.base_env_name == "free_body_zero_g":
+            return q0[0:3].clone()
         return torch.zeros(3, dtype=torch.float32)
 
     def update(self, viewer, q: torch.Tensor) -> None:

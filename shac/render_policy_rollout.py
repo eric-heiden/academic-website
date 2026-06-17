@@ -206,6 +206,8 @@ def main() -> None:
                 "video": video_path.name,
                 "poster": poster_path.name,
                 "camera": "SmoothedFollowCamera",
+                "source": "ViewerGL.get_frame()",
+                "overlays": False,
             },
         )
 

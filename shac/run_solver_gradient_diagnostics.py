@@ -20,6 +20,8 @@ import warp as wp
 import newton
 from newton.solvers import SolverMuJoCo
 
+from follow_camera import SmoothedFollowCamera
+
 
 DEFAULT_EPS = [1.0e-1, 3.0e-2, 1.0e-2, 3.0e-3, 1.0e-3, 3.0e-4, 1.0e-4, 3.0e-5, 1.0e-5]
 
@@ -970,23 +972,14 @@ def render_scene_video(
     frame_count = max(1, int(round(seconds * fps)))
 
     viewer.set_model(env.model)
-    if env.scene == "free_body_zero_g":
-        viewer.set_camera(pos=wp.vec3(0.1, 1.25, 2.8), pitch=-10.0, yaw=-90.0)
-        viewer.camera.look_at((0.05, 0.05, 0.0))
-    elif env.scene.startswith("planar_"):
-        viewer.set_camera(pos=wp.vec3(0.0, 1.05, 2.8), pitch=-8.0, yaw=-90.0)
-        viewer.camera.look_at((0.0, 0.0, 0.0))
-    else:
-        viewer.set_camera(pos=wp.vec3(0.55, 1.05, 2.65), pitch=-8.0, yaw=-90.0)
-        viewer.camera.look_at((0.55, 0.0, 0.0))
-    if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-        viewer.camera.fov = 42.0
+    follow_camera = SmoothedFollowCamera(env.scene, env.dt)
 
     q, qd, joint_f = env.base_state()
     frames = []
     with imageio.get_writer(video_path, fps=fps, codec="libx264", quality=8) as writer:
         with torch.no_grad():
             for frame_idx in range(frame_count):
+                follow_camera.update(viewer, q)
                 state = env.make_viewer_state(q, qd)
                 viewer.begin_frame(frame_idx / float(fps))
                 viewer.log_state(state)
@@ -1009,6 +1002,7 @@ def render_scene_video(
         "frames": frame_count,
         "source": "ViewerGL.get_frame()",
         "overlays": False,
+        "camera": "SmoothedFollowCamera",
     }
 
 

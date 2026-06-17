@@ -334,9 +334,9 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Ant SHAC Distance</div>
+        <div class="label">Ant Robust SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step stochastic-start eval from the robust physical-objective SHAC/PPO warm start.</p>
+        <p class="note">480-step stochastic-start eval from the zero-fall robust physical-objective warm start.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / Invalids</div>
@@ -716,6 +716,20 @@
             final best-policy eval reports 1467.3 return, 13.07 m displacement, 0 falls, 0 invalids, 0.570 m mean height,
             0.993 mean up, and 0.978 mean heading. Runtime was 143.0 s total, 43.0 sim FPS, with 25.2 MB peak allocated
             CUDA memory.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Fast Corrected Defaults</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_poster.png">
+            <source src="assets/ant_shac_isaaclab_exact_defaults_det_warm_ppo_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Pure corrected-default IsaacLab-style reward, warm-started from the 20.37 m PPO checkpoint and updated by
+            deterministic low-lr SHAC. This is the fastest physical-objective Ant policy in the report at 23.34 m over
+            480 steps, but the 1024-world stochastic eval still reports 2 falls, so it is not the reliability-selected
+            policy. The clip is a raw <code>ViewerGL.get_frame()</code> render through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
