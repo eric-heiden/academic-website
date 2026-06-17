@@ -39,6 +39,7 @@ from run_newton_shac import (
     pacific_now_iso,
     parse_float_list,
     render_rollout,
+    rollout_constraint_shortfalls,
     rollout_selection_score,
     write_json,
 )
@@ -509,6 +510,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         )
         selection = None
         selection_score = None
+        selection_shortfalls = {}
         if should_eval:
             selection_horizon = args.selection_horizon or args.eval_horizon
             selection = evaluate_policy(
@@ -532,6 +534,12 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 min_up=args.selection_min_up,
                 min_heading=args.selection_min_heading,
                 posture_penalty=args.selection_posture_penalty,
+            )
+            selection_shortfalls = rollout_constraint_shortfalls(
+                selection,
+                min_height=args.selection_min_height,
+                min_up=args.selection_min_up,
+                min_heading=args.selection_min_heading,
             )
             if selection_score > best_score:
                 best_score = selection_score
@@ -565,8 +573,15 @@ def train_ppo(args: argparse.Namespace) -> dict:
             ),
             "selection_alive_fraction": selection["alive_fraction"] if selection is not None else None,
             "selection_mean_height": selection["mean_height"] if selection is not None else None,
+            "selection_min_height": selection.get("min_height") if selection is not None else None,
             "selection_mean_up": selection["mean_up"] if selection is not None else None,
+            "selection_min_up": selection.get("min_up") if selection is not None else None,
             "selection_mean_heading": selection["mean_heading"] if selection is not None else None,
+            "selection_min_heading": selection.get("min_heading") if selection is not None else None,
+            "selection_height_shortfall": selection_shortfalls.get("height_shortfall"),
+            "selection_up_shortfall": selection_shortfalls.get("up_shortfall"),
+            "selection_heading_shortfall": selection_shortfalls.get("heading_shortfall"),
+            "selection_posture_shortfall": selection_shortfalls.get("posture_shortfall"),
             "selection_fall_count": selection["fall_count"] if selection is not None else None,
             "selection_invalid_count": selection["invalid_count"] if selection is not None else None,
             "invalid_resets": invalid_count,

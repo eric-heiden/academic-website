@@ -300,19 +300,12 @@ def rollout_selection_score(
     height = float(rollout.get("mean_height") or 0.0)
     up = float(rollout.get("mean_up") or 0.0)
     heading = float(rollout.get("mean_heading") or 0.0)
-    shortfall = 0.0
-    if min_height is not None:
-        threshold_height = rollout.get("min_height")
-        threshold_height = height if threshold_height is None else float(threshold_height)
-        shortfall += max(0.0, float(min_height) - threshold_height)
-    if min_up is not None:
-        threshold_up = rollout.get("min_up")
-        threshold_up = up if threshold_up is None else float(threshold_up)
-        shortfall += max(0.0, float(min_up) - threshold_up)
-    if min_heading is not None:
-        threshold_heading = rollout.get("min_heading")
-        threshold_heading = heading if threshold_heading is None else float(threshold_heading)
-        shortfall += max(0.0, float(min_heading) - threshold_heading)
+    shortfall = rollout_constraint_shortfalls(
+        rollout,
+        min_height=min_height,
+        min_up=min_up,
+        min_heading=min_heading,
+    )["posture_shortfall"]
     return (
         float(rollout["return"])
         + displacement_weight * displacement
@@ -323,6 +316,37 @@ def rollout_selection_score(
         - invalid_penalty * invalid_events
         - posture_penalty * shortfall
     )
+
+
+def rollout_constraint_shortfalls(
+    rollout: dict,
+    *,
+    min_height: float | None = None,
+    min_up: float | None = None,
+    min_heading: float | None = None,
+) -> dict[str, float | None]:
+    def metric_value(mean_key: str, min_key: str) -> float:
+        value = rollout.get(min_key)
+        if value is None:
+            value = rollout.get(mean_key)
+        return float(value or 0.0)
+
+    height_value = metric_value("mean_height", "min_height")
+    up_value = metric_value("mean_up", "min_up")
+    heading_value = metric_value("mean_heading", "min_heading")
+    height_shortfall = None if min_height is None else max(0.0, float(min_height) - height_value)
+    up_shortfall = None if min_up is None else max(0.0, float(min_up) - up_value)
+    heading_shortfall = None if min_heading is None else max(0.0, float(min_heading) - heading_value)
+    posture_shortfall = sum(v for v in (height_shortfall, up_shortfall, heading_shortfall) if v is not None)
+    return {
+        "height_threshold_value": height_value,
+        "up_threshold_value": up_value,
+        "heading_threshold_value": heading_value,
+        "height_shortfall": height_shortfall,
+        "up_shortfall": up_shortfall,
+        "heading_shortfall": heading_shortfall,
+        "posture_shortfall": posture_shortfall,
+    }
 
 
 def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor, torch.Tensor] | None:
@@ -2759,6 +2783,12 @@ def run_training(args: argparse.Namespace) -> dict:
             min_heading=args.selection_min_heading,
             posture_penalty=args.selection_posture_penalty,
         )
+        selection_shortfalls = rollout_constraint_shortfalls(
+            selection_rollout,
+            min_height=args.selection_min_height,
+            min_up=args.selection_min_up,
+            min_heading=args.selection_min_heading,
+        )
         if selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
             best_eval_score = selection_score
@@ -2794,8 +2824,15 @@ def run_training(args: argparse.Namespace) -> dict:
                 "selection_forward_displacement": selection_rollout["mean_forward_displacement"],
                 "selection_alive_fraction": selection_rollout["alive_fraction"],
                 "selection_mean_height": selection_rollout["mean_height"],
+                "selection_min_height": selection_rollout.get("min_height"),
                 "selection_mean_up": selection_rollout["mean_up"],
+                "selection_min_up": selection_rollout.get("min_up"),
                 "selection_mean_heading": selection_rollout["mean_heading"],
+                "selection_min_heading": selection_rollout.get("min_heading"),
+                "selection_height_shortfall": selection_shortfalls["height_shortfall"],
+                "selection_up_shortfall": selection_shortfalls["up_shortfall"],
+                "selection_heading_shortfall": selection_shortfalls["heading_shortfall"],
+                "selection_posture_shortfall": selection_shortfalls["posture_shortfall"],
                 "selection_fall_count": selection_rollout["fall_count"],
                 "selection_invalid_count": selection_rollout["invalid_count"],
                 "invalid_resets": invalid_count,

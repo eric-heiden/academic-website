@@ -298,6 +298,9 @@
           RSL-style PPO warm start improves from 13.04 m to 14.96 m uninterrupted with 0 terminals, 0 invalids, and minimum
           up projection 0.93. A corrected tanh-semantics PPO continuation from that SHAC actor preserved the selected
           zero-terminal policy but did not beat it; short-horizon PPO reward rose while full-horizon selection fell. The
+          newest SHAC continuations show the same pattern more directly: progress-2 differentiable updates increase
+          short-horizon reward, but the 1024-world selector keeps the initial 14.96 m actor; min-up logging shows rejected
+          candidates dip toward 0.72-0.84 up projection while height remains healthy.
           faster shaped Ant policy still replays at about 23.19 m but has late no-reset terminal events, so it remains a
           diagnostic speed target rather than the reliable headline policy. The remaining Ant/Hopper issue is therefore no
           longer camera rendering or basic environment setup; it is reliable long-horizon
@@ -396,7 +399,10 @@
           no-squash RSL-style PPO actor replay collapses under corrected action semantics, so no-squash PPO needs a clean
           retrain/evaluation pass instead of being mixed with the tanh-wrapped SHAC actor family. Corrected PPO continuation
           from the 14.96 m SHAC policy selected update 0 and ended with lower 480-step selection scores, so PPO is currently
-          a preservation/diagnostic control rather than an Ant improvement path. Native NV Ant runs move farther, but remain
+          a preservation/diagnostic control rather than an Ant improvement path. New SHAC continuations with progress weight
+          2.0, H=16, and lr 3e-7 or 1e-7 also selected epoch 0; the best safe candidates stayed at 14.79 m or lower, while
+          rejected updates had minimum up projections around 0.72-0.84. Raising the actual termination gate to
+          <code>ant_min_up=0.8</code> produced a slower 14.58 m reliable gait. Native NV Ant runs move farther, but remain
           fall-prone in 1024-world replay and are not treated as reliable baselines. The latest fixed-action checks explain
           the pattern: reset-state one-step gradients are clean, but H=8/H=16 Ant rollouts enter grazing foot contacts where
           contact-position and orientation derivatives diverge from finite differences.
@@ -578,6 +584,10 @@
       <div class="panel">
         <h2>Ant Selection Score</h2>
         <div id="ant-selection-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Ant Selection Min-Up</h2>
+        <div id="ant-min-up-chart" class="chart"></div>
       </div>
       <div class="panel">
         <h2>Hopper Training Reward</h2>
@@ -921,6 +931,12 @@
           tanh-wrapped RSL-style SHAC continuation is the current reliable Ant SHAC result at 14.96 m with 0 no-reset
           terminals. The remaining Ant problem is therefore not renderer state or basic reward feasibility; it is pushing
           the reliable gait toward the faster 20 m class without reintroducing late contact failures.
+          The newest continuation sweeps add explicit selection-minimum logging. With progress weight 2.0, H=16, and lr
+          3e-7, the best selected update stayed at epoch 0; the best safe update reached 14.79 m with min-up 0.89, while
+          failed updates dipped to min-up 0.73-0.74. Reducing lr to 1e-7 made the same tradeoff slower rather than better:
+          best safe update 14.77 m, later updates again dipped to min-up 0.72-0.84. A stricter <code>ant_min_up=0.8</code>
+          H=32 run selected a slower 14.58 m gait. Height stayed above the 0.42 m safety gate in these probes; uprightness,
+          not torso height, is the first safety constraint hit by progress-seeking SHAC updates.
         </p>
       </article>
       <article class="panel">
@@ -1554,7 +1570,10 @@
           must be treated as a separate retraining target. With the wrapper made explicit, H=16 SHAC fine-tuning improves the
           reliable Ant gait to 14.96 m uninterrupted with 0 terminals. PPO continued from that selected SHAC actor under the
           corrected tanh semantics kept update 0 as best; later PPO updates improved short-horizon reward but reduced
-          full-horizon selected displacement to 10-12 m. For native NV Ant, the no-reset single deterministic
+          full-horizon selected displacement to 10-12 m. The newest SHAC instrumentation records selection minima and posture
+          shortfalls in every history row. Progress-2 SHAC continuation did not beat the selected actor: safe updates stayed
+          below 14.79 m, while updates that chased more progress first lost uprightness, with min-up falling to roughly
+          0.72-0.84; torso height was not the limiting constraint. For native NV Ant, the no-reset single deterministic
           videos now look physically continuous, but large identical-world replays expose robustness failures because contact
           dynamics amplify tiny per-world floating-point differences by mid-rollout. The 500k-penalty NV SHAC continuation
           reduced those failures but still ended at 14 falls/3 invalids, so NV remains a diagnostic asset rather than the
@@ -1912,6 +1931,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO from SHAC corrected",
         path: "assets/ant_ppo_tanh_from_shac_minup075_1024env_80upd_run1/ant_ppo_results.json",
         color: colors.coral
+      },
+      {
+        id: "antShacProgress2MinLog",
+        label: "Ant SHAC progress2 min-log",
+        path: "assets/ant_shac_tanhwrap_progress2_minlog_h16_16env_24ep_lr3e7_run1/ant_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antShacProgress2LowLrMinLog",
+        label: "Ant SHAC progress2 low LR",
+        path: "assets/ant_shac_tanhwrap_progress2_minlog_h16_16env_32ep_lr1e7_run1/ant_results.json",
+        color: colors.slate
+      },
+      {
+        id: "antShacStrictMinUpH32",
+        label: "Ant SHAC strict min-up H32",
+        path: "assets/ant_shac_tanhwrap_continue_progress15_minup08_h32_16env_32ep_lr2e7_run1/ant_results.json",
+        color: colors.violet
       },
       {
         id: "antShacIsaacExactDefaultsDet",
@@ -2771,6 +2808,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
 
       plotEnvHistory("ant-reward-chart", envHistoryRuns.ant, "mean_reward", "Mean step reward");
       plotEnvSelection("ant-selection-chart", envHistoryRuns.ant);
+      plotEnvHistory("ant-min-up-chart", envHistoryRuns.ant, "selection_min_up", "Selection minimum up projection");
       plotEnvHistory("hopper-reward-chart", envHistoryRuns.hopper, "mean_reward", "Mean step reward");
       plotEnvSelection("hopper-selection-chart", envHistoryRuns.hopper);
       plotEnvHistory("cheetah-reward-chart", envHistoryRuns.cheetah, "mean_reward", "Mean step reward");
