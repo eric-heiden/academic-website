@@ -275,16 +275,19 @@
           one-step state gradients match finite differences again. Cheetah now has a clean SHAC stepping-stone result with
           MuJoCo contacts at substep 1: 10.33 m forward over 480 frames with zero falls/invalids. PPO verifies that the
           16-substep Cheetah task itself is learnable. The runner now also records Newton/MJWarp revisions, writes live
-          history JSON, loads PPO checkpoints into SHAC actors, and spaces replicated Newton-contact worlds apart. Hopper
-          SHAC can preserve a PPO upright warm-start with zero falls, but it still selects balance over hopping. Ant SHAC
-          preserves a PPO standing policy with zero falls, but the locomotion gradient is still not escaping the standing
-          basin.
+          history JSON, loads PPO checkpoints into SHAC actors, spaces replicated Newton-contact worlds apart, and renders
+          policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
+          MuJoCo actuator-order torque mapping; PPO reaches 5.88 m with 8 falls, SHAC reaches 7.57 m with 2 falls, and the
+          stricter fall-penalty SHAC selection reaches 5.21 m with zero falls/invalids. Hopper remains unresolved: the latest
+          reset-limit clamp and Gym-style reward probes avoid one known reset bug but still collapse into falling policies
+          once forward progress is emphasized.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
           <a class="chip" href="https://github.com/NVlabs/DiffRL">NVlabs/DiffRL</a>
           <span class="chip">Newton branch: <code>shac</code></span>
           <span class="chip">Raw <code>ViewerGL.get_frame()</code> videos</span>
+          <span class="chip">Smoothed COM follow camera</span>
         </div>
       </div>
       <aside class="stamp">
@@ -331,23 +334,21 @@
           newest RNE fix replaces auto-backward through <code>qfrc_bias</code> with an explicit adjoint and disables auto-backward
           through the cfrc tree accumulation; Hopper no-limit smooth dynamics now has 2.7e-4 full state/action error and Ant
           H=5 one-step state/action error is 8.1e-5. On the harness side, Newton-contact vectorized environments now use
-          nonzero world spacing, PPO checkpoints can warm-start SHAC actors, and every run records the imported Newton and
+          nonzero world spacing, PPO checkpoints can warm-start SHAC actors, Ant actions can follow MuJoCo actuator order,
+          Hopper stochastic resets are clamped inside finite joint limits, and every run records the imported Newton and
           MJWarp commits in its JSON artifact.
         </p>
       </article>
       <article class="panel warn">
         <h2>What Is Not Fixed</h2>
         <p>
-          Contact-rich SHAC training is still not solved for Hopper or Ant. Hopper with joint limits has nonsmooth finite
-          differences at the reset pose because the thigh and leg start exactly on their upper limits; disabling those limits
-          makes smooth state/action gradients pass, but training folds into invalid low postures. PPO confirms that height-only
-          Hopper termination admits lying-down policies, while angle termination yields upright balance and progress-weighted
-          reward yields short bursts that still fall over 480 frames. The latest PPO-to-SHAC Hopper warm-start remains upright
-          for 480 frames, but its selected motion is still only 0.47 m. Ant one-step state/action gradients now pass through H=5,
-          but PPO and SHAC with the current default-style reward both learn stable standing; the new SHAC warm-start reaches
-          735.5 return with zero falls and only 0.008 m displacement. The open-loop sine diagnostic proves the action mapping
-          can generate forward motion, but the motion is not upright or reliable and is not captured by the current memoryless
-          MLP actor.
+          Hopper is still not solved. The thigh and leg start on their upper stops in the DiffRL MJCF, so stochastic reset
+          noise was previously injecting limit violations; the harness now clamps finite-limit planar joints back inside the
+          limits and can start Hopper slightly inside the stops. That fix is necessary but not sufficient: PPO with a
+          Gym-style alive/forward reward, PPO curriculum from the upright checkpoint, and inside-limit progress-weighted PPO
+          all still select falling policies under the 480-step fall-penalized score. Ant is improved but not perfect: the
+          fastest SHAC warm-start still has 2 falls across the vectorized eval, while the stricter selector trades speed for
+          zero falls and weaker heading alignment.
         </p>
       </article>
     </section>
@@ -603,16 +604,43 @@
           </figcaption>
         </figure>
       </article>
-      <article class="panel warn">
-        <h2>Ant SHAC PPO Warm-Start</h2>
+      <article class="panel ok">
+        <h2>Ant SHAC, Strict Selection</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_warm_ppo_progress3_16env_12ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_warm_ppo_progress3_16env_12ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_shac_warm_isaac_curriculum_progress3_force80_fallpen20000_32env_32ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_warm_isaac_curriculum_progress3_force80_fallpen20000_32env_32ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC initialized from the stable PPO Ant checkpoint with progress weight 3. It remains upright for the full 480
-            frames with zero falls/invalids and 735.5 return, but forward displacement is only 0.008 m, showing that the
-            current setup is still trapped in the standing basin.
+            SHAC initialized from the Isaac-style PPO curriculum checkpoint with MuJoCo actuator-order actions and a much
+            stronger full-horizon fall penalty. The selected policy moves 5.21 m over 480 frames with zero falls/invalids.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel warn">
+        <h2>Ant PPO, Isaac Curriculum</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO with Isaac-style observations/reward terms, actuator-order torque mapping, and force scale 80 moves 5.88 m
+            over 480 frames. It still has 8 fall events across the 128-env eval, so it is useful as a warm-start but not a
+            fully reliable final policy.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Faster Warm-Start</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_shac_warm_isaac_curriculum_progress3_force80_32env_24ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_warm_isaac_curriculum_progress3_force80_32env_24ep_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            The less conservative SHAC selection reaches 7.57 m and 1718 return, but has 2 fall events in the vectorized
+            eval. The strict run above is slower but currently the best reliable Ant policy.
           </figcaption>
         </figure>
       </article>
@@ -1015,15 +1043,14 @@
           high-speed crash exploit. The new upright gate also rejects the rolled-over progress policy. The remaining failure is
           no longer a simple smooth-dynamics gradient bug: Hopper and Ant short-horizon state/action checks now pass, but SHAC
           training still trades progress against repeated contacts and active limits poorly. Hopper with limits on is nonsmooth at
-          reset because the thigh and leg joints start on their upper stops; no-limit Hopper verifies the smooth dynamics but folds
-          during training. The latest Cheetah SHAC run is the current clean success case, but it uses substep 1 for iteration
-          speed; PPO verifies the faithful 16-substep Cheetah environment. Hopper PPO showed that angle termination is required
-          to reject lying-down policies, while progress-weighted reward still falls after roughly 100 frames. A warm-started
-          Hopper curriculum preserves the upright policy but only reaches 0.49 m displacement before later updates destroy
-          full-horizon reliability. Ant H=5 state/action gradients now match finite differences, but default-reward PPO only
-          learns standing and a locomotion-weighted PPO probe collapses without a curriculum. The next bug hunt should target
-          contact/limit training stability,
-          long-horizon selection, and policy-gradient variance, not the RNE mass/bias cancellation.
+          reset because the thigh and leg joints start on their upper stops; reset noise is now clamped back inside finite limits,
+          and the new inside-limit start-pose probe confirms this was a real harness bug. It did not solve hopping: Gym-style
+          reward, upright warm-start curriculum, and inside-limit progress PPO all still become falling policies under the
+          480-step selection score. Cheetah remains the clean success case, and PPO verifies the faithful 16-substep Cheetah
+          environment. Ant needed two environment fixes beyond the MJWarp adjoints: local Isaac-style observations/reward terms
+          and MuJoCo actuator-order torque mapping. With those, PPO produces a moving but imperfect warm-start, SHAC reaches
+          7.57 m with 2 falls, and strict fall-penalty selection reaches 5.21 m with zero falls. The next bug hunt should target
+          Hopper contact/limit training stability and long-horizon policy-gradient variance, not the RNE mass/bias cancellation.
         </p>
       </article>
     </section>
@@ -1192,6 +1219,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.blue
       },
       {
+        id: "antPpoIsaacCurriculum",
+        label: "Ant PPO Isaac curriculum",
+        path: "assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_results.json",
+        color: colors.teal
+      },
+      {
+        id: "antShacIsaacFast",
+        label: "Ant SHAC Isaac fast",
+        path: "assets/ant_shac_warm_isaac_curriculum_progress3_force80_32env_24ep_run1/ant_results.json",
+        color: colors.violet
+      },
+      {
+        id: "antShacIsaacStrict",
+        label: "Ant SHAC Isaac strict",
+        path: "assets/ant_shac_warm_isaac_curriculum_progress3_force80_fallpen20000_32env_32ep_run1/ant_results.json",
+        color: colors.green
+      },
+      {
         id: "cheetahNewton",
         label: "Cheetah Newton contacts",
         path: "assets/cheetah_train_limits_newton_level_kinematics_64env_100ep_run1/cheetah_results.json",
@@ -1286,6 +1331,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Hopper SHAC PPO warm-start",
         path: "assets/hopper_shac_warm_ppo_angle_progress1_64env_30ep_run1/hopper_results.json",
         color: colors.teal
+      },
+      {
+        id: "hopperPpoGymBad",
+        label: "Hopper PPO Gym probe",
+        path: "assets/hopper_ppo_gym_progress2_term_angle_256env_200upd_run1/hopper_ppo_history_live.json",
+        color: colors.coral
+      },
+      {
+        id: "hopperPpoGymCurriculumBad",
+        label: "Hopper PPO Gym curriculum",
+        path: "assets/hopper_ppo_gym_curriculum_from_angle_progress15_128env_120upd_run1/hopper_ppo_history_live.json",
+        color: colors.amber
+      },
+      {
+        id: "hopperPpoInsideLimitBad",
+        label: "Hopper PPO inside-limit probe",
+        path: "assets/hopper_ppo_inside_limits_progress3_term200_256env_160upd_run1/hopper_ppo_history_live.json",
+        color: colors.slate
       }
     ];
 
@@ -1674,6 +1737,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       }
 
       function plotEnvEval(id, rows, fallLabel) {
+        rows = rows.filter((run) => run.data?.eval);
         if (!rows.length) {
           plotMessage(id, "No eval JSON loaded for this environment.");
           return;

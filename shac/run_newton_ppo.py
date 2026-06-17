@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 import warp as wp
 import mujoco_warp
+import newton
 
 from run_newton_shac import (
     ANT_DEFAULT_SELECTION_FALL_PENALTY,
@@ -29,6 +30,7 @@ from run_newton_shac import (
     normalize_obs,
     obs_rms_snapshot,
     pacific_now_iso,
+    parse_float_list,
     render_rollout,
     rollout_selection_score,
     write_json,
@@ -134,6 +136,11 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        ant_observation_style=args.ant_observation_style,
+        ant_reward_style=args.ant_reward_style,
+        ant_action_order=args.ant_action_order,
+        hopper_reward_style=args.hopper_reward_style,
+        hopper_start_joint_q=args.hopper_start_joint_q,
         phase_observation=args.phase_observation,
         phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
@@ -144,12 +151,18 @@ def train_ppo(args: argparse.Namespace) -> dict:
             up=args.ant_up_weight,
             height=args.ant_height_weight,
             action=args.ant_action_penalty,
+            alive=args.ant_alive_reward,
+            actions_cost=args.ant_actions_cost,
+            energy_cost=args.ant_energy_cost,
+            dof_limit_cost=args.ant_dof_limit_cost,
+            dof_vel_scale=args.ant_dof_vel_scale,
         ),
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
             height=args.hopper_height_weight,
             angle=args.hopper_angle_weight,
             action=args.hopper_action_penalty,
+            alive=args.hopper_alive_reward,
         ),
         cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
     )
@@ -172,6 +185,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
         obs_rms.var = obs_data["var"].to(env.torch_device)
         obs_rms.count = obs_data["count"]
 
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    live_history_path = out_dir / f"{args.env}_ppo_history_live.json"
     q, qd = env.reset(noise=0.0, stochastic_init=args.stochastic_init)
     prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
     progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
@@ -355,6 +371,17 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "fps": args.num_envs * args.rollout_steps / update_s,
         }
         history.append(row)
+        write_json(
+            live_history_path,
+            {
+                "env": args.env,
+                "algo": "ppo",
+                "timestamp_pacific": pacific_now_iso(),
+                "history": history,
+                "best_update": best_update,
+                "best_eval_score": best_score,
+            },
+        )
         sel_text = f"{selection_score: .1f}" if selection_score is not None else " skipped"
         print(
             f"{args.env} ppo update {update + 1:03d}: reward={mean_reward: .4f} "
@@ -363,8 +390,6 @@ def train_ppo(args: argparse.Namespace) -> dict:
         )
 
     total_s = time.perf_counter() - t0
-    out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
     if best_state is not None:
         actor.load_state_dict(best_state)
     if obs_rms is not None and best_obs_rms is not None:
@@ -403,6 +428,11 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                ant_observation_style=args.ant_observation_style,
+                ant_reward_style=args.ant_reward_style,
+                ant_action_order=args.ant_action_order,
+                hopper_reward_style=args.hopper_reward_style,
+                hopper_start_joint_q=args.hopper_start_joint_q,
                 phase_observation=args.phase_observation,
                 phase_period=args.phase_period,
                 hopper_terminate_angle=args.hopper_terminate_angle,
@@ -459,18 +489,23 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "max_grad_norm": args.max_grad_norm,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
+        "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
+        "hopper_start_joint_q": env.hopper_start_joint_q if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_reward": env.ant_reward.__dict__ if args.env == "ant" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
+        "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
+        "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "phase_observation": env.phase_observation if args.env == "ant" else None,
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "total_seconds": total_s,
-        "mean_update_seconds": float(np.mean([h["update_seconds"] for h in history])),
-        "mean_fps": float(np.mean([h["fps"] for h in history])),
+        "mean_update_seconds": float(np.mean([h["update_seconds"] for h in history])) if history else None,
+        "mean_fps": float(np.mean([h["fps"] for h in history])) if history else None,
         "best_update": best_update,
         "best_eval_score": best_score,
         "eval_score": eval_score,
@@ -527,16 +562,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
+    parser.add_argument("--ant-alive-reward", type=float, default=0.5)
+    parser.add_argument("--ant-actions-cost", type=float, default=0.005)
+    parser.add_argument("--ant-energy-cost", type=float, default=0.05)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
+    parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
+    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac"], default="diffrl")
+    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)
     parser.add_argument("--hopper-progress-weight", type=float, default=1.0)
     parser.add_argument("--hopper-angle-weight", type=float, default=1.0)
     parser.add_argument("--hopper-action-penalty", type=float, default=-0.1)
+    parser.add_argument("--hopper-alive-reward", type=float, default=1.0)
+    parser.add_argument("--hopper-reward-style", choices=["diffrl", "gym"], default="diffrl")
+    parser.add_argument("--hopper-start-joint-q", type=parse_float_list, default=None)
     parser.add_argument("--hopper-terminate-angle", action="store_true")
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")

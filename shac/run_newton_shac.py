@@ -34,6 +34,8 @@ from models.actor import ActorDeterministicMLP, ActorStochasticMLP
 from models.critic import CriticMLP
 from utils.running_mean_std import RunningMeanStd
 
+from follow_camera import SmoothedFollowCamera
+
 
 @dataclass
 class StepContext:
@@ -56,6 +58,11 @@ class AntRewardWeights:
     up: float = 0.1
     height: float = 1.0
     action: float = 0.0
+    alive: float = 0.5
+    actions_cost: float = 0.005
+    energy_cost: float = 0.05
+    dof_limit_cost: float = 1.0
+    dof_vel_scale: float = 0.2
 
 
 @dataclass
@@ -64,6 +71,7 @@ class HopperRewardWeights:
     height: float = 1.0
     angle: float = 1.0
     action: float = -0.1
+    alive: float = 1.0
 
 
 @dataclass
@@ -360,6 +368,11 @@ class NewtonMuJoCoTorchEnv:
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
         ant_min_up: float | None = None,
+        ant_observation_style: str = "diffrl",
+        ant_reward_style: str = "diffrl",
+        ant_action_order: str = "joint",
+        hopper_reward_style: str = "diffrl",
+        hopper_start_joint_q: list[float] | None = None,
         phase_observation: bool = False,
         phase_period: int = 60,
         hopper_terminate_angle: bool = False,
@@ -385,6 +398,11 @@ class NewtonMuJoCoTorchEnv:
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
         self.ant_min_up = ant_min_up
+        self.ant_observation_style = ant_observation_style
+        self.ant_reward_style = ant_reward_style
+        self.ant_action_order = ant_action_order
+        self.hopper_reward_style = hopper_reward_style
+        self.hopper_start_joint_q = hopper_start_joint_q
         self.phase_observation = phase_observation
         self.phase_period = max(1, int(phase_period))
         self.hopper_terminate_angle = hopper_terminate_angle
@@ -393,6 +411,8 @@ class NewtonMuJoCoTorchEnv:
         self.contact_body_radius = 0.22
         self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
         self.world_spacing: tuple[float, float, float] | None = None
+        self.planar_joint_limit_lower: torch.Tensor | None = None
+        self.planar_joint_limit_upper: torch.Tensor | None = None
 
         if env_name == "cartpole":
             self._build_cartpole()
@@ -459,6 +479,14 @@ class NewtonMuJoCoTorchEnv:
         self.ant_targets = torch.tensor([10000.0, 0.0, 0.0], dtype=torch.float32, device=self.torch_device).repeat(
             self.num_envs, 1
         )
+        self.ant_actuator_dof_indices = None
+        if env_name == "ant" and getattr(self.solver, "mj_model", None) is not None:
+            mj_model = self.solver.mj_model
+            dof_indices = []
+            for actuator_id in range(mj_model.nu):
+                joint_id = int(mj_model.actuator(actuator_id).trnid[0])
+                dof_indices.append(int(mj_model.jnt_dofadr[joint_id]))
+            self.ant_actuator_dof_indices = torch.tensor(dof_indices, dtype=torch.long, device=self.torch_device)
         self.num_obs = int(self.observe(self.start_q, self.start_qd).shape[-1])
 
     def _build_contact_target(self, *, capsule: bool) -> None:
@@ -586,6 +614,12 @@ class NewtonMuJoCoTorchEnv:
                 source.joint_limit_upper[dof_id] = 1.0e10
                 source.joint_limit_ke[dof_id] = 0.0
                 source.joint_limit_kd[dof_id] = 0.0
+        self.ant_joint_limit_lower = torch.tensor(
+            source.joint_limit_lower[6:14], dtype=torch.float32, device=self.torch_device
+        )
+        self.ant_joint_limit_upper = torch.tensor(
+            source.joint_limit_upper[6:14], dtype=torch.float32, device=self.torch_device
+        )
         source.joint_q[7:15] = ANT_START_JOINT_Q
         source.joint_target_q[7:15] = ANT_START_JOINT_Q
         source.shape_material_ke = [4.0e4] * len(source.shape_material_ke)
@@ -637,6 +671,17 @@ class NewtonMuJoCoTorchEnv:
         )
         source.joint_q[1] = start_height
         source.joint_target_q[1] = start_height
+        if asset_name == "hopper.xml" and self.hopper_start_joint_q is not None:
+            if len(self.hopper_start_joint_q) != num_actions:
+                raise ValueError(f"hopper_start_joint_q must have {num_actions} values")
+            source.joint_q[3 : 3 + num_actions] = self.hopper_start_joint_q
+            source.joint_target_q[3 : 3 + num_actions] = self.hopper_start_joint_q
+        self.planar_joint_limit_lower = torch.tensor(
+            source.joint_limit_lower[3 : 3 + num_actions], dtype=torch.float32, device=self.torch_device
+        )
+        self.planar_joint_limit_upper = torch.tensor(
+            source.joint_limit_upper[3 : 3 + num_actions], dtype=torch.float32, device=self.torch_device
+        )
         for dof_id in range(3, len(source.joint_limit_lower)):
             if self.locomotion_disable_joint_limits:
                 source.joint_limit_lower[dof_id] = -1.0e10
@@ -646,6 +691,9 @@ class NewtonMuJoCoTorchEnv:
             else:
                 source.joint_limit_ke[dof_id] = 1.0e3
                 source.joint_limit_kd[dof_id] = 1.0e1
+        if self.locomotion_disable_joint_limits:
+            self.planar_joint_limit_lower = None
+            self.planar_joint_limit_upper = None
         source.shape_material_ke = [2.0e4] * len(source.shape_material_ke)
         source.shape_material_kd = [1.0e3] * len(source.shape_material_kd)
         source.shape_material_kf = [1.0e3] * len(source.shape_material_kf)
@@ -811,8 +859,23 @@ class NewtonMuJoCoTorchEnv:
         q[:, 0:2] = q[:, 0:2] + position_scale * (torch.rand((q.shape[0], 2), device=self.torch_device) - 0.5) * 2.0
         q[:, 2] = q[:, 2] + angle_scale * (torch.rand(q.shape[0], device=self.torch_device) - 0.5)
         q[:, 3:] = q[:, 3:] + joint_scale * (torch.rand_like(q[:, 3:]) - 0.5) * 2.0
+        q = self._clamp_planar_joint_q(q)
         qd[:] = velocity_scale * (torch.rand_like(qd) - 0.5) * 2.0
         return q, qd
+
+    def _clamp_planar_joint_q(self, q: torch.Tensor, margin: float = 0.02) -> torch.Tensor:
+        if self.planar_joint_limit_lower is None or self.planar_joint_limit_upper is None:
+            return q
+        lower = self.planar_joint_limit_lower.view(1, -1)
+        upper = self.planar_joint_limit_upper.view(1, -1)
+        finite = torch.isfinite(lower) & torch.isfinite(upper) & (upper > lower + 2.0 * margin)
+        if not bool(finite.any().detach().cpu()):
+            return q
+        q_joints = q[:, 3:]
+        clamped = torch.maximum(torch.minimum(q_joints, upper - margin), lower + margin)
+        q = q.clone()
+        q[:, 3:] = torch.where(finite, clamped, q_joints)
+        return q
 
     def reset_done(
         self,
@@ -873,6 +936,66 @@ class NewtonMuJoCoTorchEnv:
         angle = 2.0 * math.pi * phase / float(self.phase_period)
         return torch.stack([torch.sin(angle), torch.cos(angle)], dim=-1)
 
+    def ant_dof_pos_scaled(self, q: torch.Tensor) -> torch.Tensor:
+        lower = self.ant_joint_limit_lower[: q.shape[-1] - 7].view(1, -1)
+        upper = self.ant_joint_limit_upper[: q.shape[-1] - 7].view(1, -1)
+        center = 0.5 * (upper + lower)
+        half_range = 0.5 * (upper - lower).clamp(min=1.0e-6)
+        return ((q[:, 7:] - center) / half_range).clamp(-5.0, 5.0)
+
+    def ant_pose_terms(
+        self, q: torch.Tensor, qd: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        torso_pos = q[:, 0:3]
+        torso_rot = normalize_vec(q[:, 3:7])
+        lin_vel = qd[:, 0:3]
+        ang_vel = qd[:, 3:6]
+        to_target = self.ant_targets[: q.shape[0]] + self.start_q[: q.shape[0], 0:3] - torso_pos
+        to_target = to_target.clone()
+        to_target[:, 1] = 0.0
+        target_dirs = normalize_vec(to_target)
+        torso_quat = quat_mul(torso_rot, self.ant_inv_start_rotation[: q.shape[0]])
+        up_vec = quat_rotate(torso_quat, self.ant_basis_y[: q.shape[0]])
+        heading_vec = quat_rotate(torso_quat, self.ant_basis_x[: q.shape[0]])
+        heading_alignment = (heading_vec * target_dirs).sum(dim=-1, keepdim=True)
+        return torso_pos, torso_quat, lin_vel, ang_vel, up_vec, heading_alignment
+
+    def ant_isaac_observation(
+        self, q: torch.Tensor, qd: torch.Tensor, prev_action: torch.Tensor, phase: torch.Tensor | None
+    ) -> torch.Tensor:
+        torso_pos, torso_quat, lin_vel, ang_vel, up_vec, heading_alignment = self.ant_pose_terms(q, qd)
+        inv_torso_quat = quat_conjugate(torso_quat)
+        vel_local = quat_rotate(inv_torso_quat, lin_vel)
+        angvel_local = quat_rotate(inv_torso_quat, ang_vel)
+        heading_vec = quat_rotate(torso_quat, self.ant_basis_x[: q.shape[0]])
+        target_dirs = normalize_vec(self.ant_targets[: q.shape[0]] + self.start_q[: q.shape[0], 0:3] - torso_pos)
+        target_dirs = target_dirs.clone()
+        target_dirs[:, 1] = 0.0
+        target_dirs = normalize_vec(target_dirs)
+        signed_target = torch.cross(heading_vec, target_dirs, dim=-1)[:, 1:2]
+        angle_to_target = torch.atan2(signed_target, heading_alignment.clamp(-1.0, 1.0))
+        yaw = torch.atan2(heading_vec[:, 2:3], heading_vec[:, 0:1])
+        roll = torch.atan2(up_vec[:, 0:1], up_vec[:, 1:2])
+        obs = torch.cat(
+            [
+                torso_pos[:, 1:2],
+                vel_local,
+                angvel_local,
+                torch.atan2(torch.sin(yaw), torch.cos(yaw)),
+                torch.atan2(torch.sin(roll), torch.cos(roll)),
+                torch.atan2(torch.sin(angle_to_target), torch.cos(angle_to_target)),
+                up_vec[:, 1:2],
+                heading_alignment,
+                self.ant_dof_pos_scaled(q),
+                self.ant_reward.dof_vel_scale * qd[:, 6:],
+                prev_action.clone(),
+            ],
+            dim=-1,
+        )
+        if self.phase_observation:
+            obs = torch.cat([obs, self.phase_features(phase, q.shape[0])], dim=-1)
+        return obs
+
     def observe(
         self,
         q: torch.Tensor,
@@ -927,22 +1050,14 @@ class NewtonMuJoCoTorchEnv:
         if prev_action is None:
             prev_action = torch.zeros((q.shape[0], self.num_actions), dtype=torch.float32, device=self.torch_device)
 
-        torso_pos = q[:, 0:3]
-        torso_rot = normalize_vec(q[:, 3:7])
-        lin_vel = qd[:, 0:3]
-        ang_vel = qd[:, 3:6]
-        to_target = self.ant_targets[: q.shape[0]] + self.start_q[: q.shape[0], 0:3] - torso_pos
-        to_target = to_target.clone()
-        to_target[:, 1] = 0.0
-        target_dirs = normalize_vec(to_target)
-        torso_quat = quat_mul(torso_rot, self.ant_inv_start_rotation[: q.shape[0]])
-        up_vec = quat_rotate(torso_quat, self.ant_basis_y[: q.shape[0]])
-        heading_vec = quat_rotate(torso_quat, self.ant_basis_x[: q.shape[0]])
-        heading_alignment = (heading_vec * target_dirs).sum(dim=-1, keepdim=True)
+        if self.ant_observation_style == "isaac":
+            return self.ant_isaac_observation(q, qd, prev_action, phase)
+
+        torso_pos, _, lin_vel, ang_vel, up_vec, heading_alignment = self.ant_pose_terms(q, qd)
         obs = torch.cat(
             [
                 torso_pos[:, 1:2],
-                torso_rot,
+                normalize_vec(q[:, 3:7]),
                 lin_vel,
                 ang_vel,
                 q[:, 7:],
@@ -972,7 +1087,10 @@ class NewtonMuJoCoTorchEnv:
         elif is_planar_locomotion_env(self.env_name):
             joint_f[:, 3 : 3 + self.num_actions] = action[:, : self.num_actions] * self.force_scale
         elif self.env_name == "ant":
-            joint_f[:, 6 : 6 + self.num_actions] = action[:, : self.num_actions] * self.force_scale
+            if self.ant_action_order == "actuator" and self.ant_actuator_dof_indices is not None:
+                joint_f[:, self.ant_actuator_dof_indices] = action[:, : self.num_actions] * self.force_scale
+            else:
+                joint_f[:, 6 : 6 + self.num_actions] = action[:, : self.num_actions] * self.force_scale
         else:
             raise ValueError(f"unknown env_name: {self.env_name}")
         return joint_f
@@ -1039,10 +1157,12 @@ class NewtonMuJoCoTorchEnv:
         if self.env_name == "hopper":
             if obs is None:
                 obs = self.observe(q, qd, action)
+            weights = self.hopper_reward
+            if self.hopper_reward_style == "gym":
+                return weights.progress * obs[:, 5] + weights.alive + weights.action * action.square().sum(dim=-1)
             height_diff = obs[:, 0] - (HOPPER_TERMINATION_HEIGHT + HOPPER_TERMINATION_HEIGHT_TOLERANCE)
             height_reward = torch.clamp(height_diff, -1.0, 0.3)
             height_reward = torch.where(height_reward < 0.0, -200.0 * height_reward.square(), height_reward)
-            weights = self.hopper_reward
             progress_reward = weights.progress * obs[:, 5]
             angle_reward = weights.angle * (1.0 - obs[:, 1].square() / (HOPPER_TERMINATION_ANGLE**2))
             return (
@@ -1062,6 +1182,36 @@ class NewtonMuJoCoTorchEnv:
 
         if obs is None:
             obs = self.observe(q, qd, action)
+        if self.ant_reward_style == "isaac":
+            if self.ant_observation_style == "isaac":
+                up_proj = obs[:, 10]
+                heading_proj = obs[:, 11]
+                dof_pos_scaled = obs[:, 12:20]
+                dof_vel = qd[:, 6:]
+            else:
+                up_proj = obs[:, 27]
+                heading_proj = obs[:, 28]
+                dof_pos_scaled = self.ant_dof_pos_scaled(q)
+                dof_vel = qd[:, 6:]
+            weights = self.ant_reward
+            heading_reward = torch.where(
+                heading_proj > 0.8,
+                torch.full_like(heading_proj, weights.heading),
+                weights.heading * heading_proj / 0.8,
+            )
+            up_reward = torch.where(up_proj > 0.93, torch.full_like(up_proj, weights.up), torch.zeros_like(up_proj))
+            actions_cost = action.square().sum(dim=-1)
+            energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
+            dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
+            return (
+                weights.progress * qd[:, 0]
+                + weights.alive
+                + heading_reward
+                + up_reward
+                - weights.actions_cost * actions_cost
+                - weights.energy_cost * energy_cost
+                - weights.dof_limit_cost * dof_limit_cost
+            )
         progress_reward = obs[:, 5]
         up_reward = self.ant_reward.up * obs[:, 27]
         heading_reward = self.ant_reward.heading * obs[:, 28]
@@ -1440,15 +1590,33 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        ant_observation_style=args.ant_observation_style,
+        ant_reward_style=args.ant_reward_style,
+        ant_action_order=args.ant_action_order,
+        hopper_reward_style=args.hopper_reward_style,
+        hopper_start_joint_q=args.hopper_start_joint_q,
         phase_observation=args.phase_observation,
         phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
         locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
+        ant_reward=AntRewardWeights(
+            progress=args.ant_progress_weight,
+            heading=args.ant_heading_weight,
+            up=args.ant_up_weight,
+            height=args.ant_height_weight,
+            action=args.ant_action_penalty,
+            alive=args.ant_alive_reward,
+            actions_cost=args.ant_actions_cost,
+            energy_cost=args.ant_energy_cost,
+            dof_limit_cost=args.ant_dof_limit_cost,
+            dof_vel_scale=args.ant_dof_vel_scale,
+        ),
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
             height=args.hopper_height_weight,
             angle=args.hopper_angle_weight,
             action=args.hopper_action_penalty,
+            alive=args.hopper_alive_reward,
         ),
         cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
         acrobot_reward=AcrobotRewardWeights(
@@ -1711,6 +1879,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
+        "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
+        "hopper_start_joint_q": env.hopper_start_joint_q if args.env == "hopper" else None,
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
@@ -1815,6 +1985,11 @@ def run_training(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        ant_observation_style=args.ant_observation_style,
+        ant_reward_style=args.ant_reward_style,
+        ant_action_order=args.ant_action_order,
+        hopper_reward_style=args.hopper_reward_style,
+        hopper_start_joint_q=args.hopper_start_joint_q,
         phase_observation=args.phase_observation,
         phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
@@ -1825,12 +2000,18 @@ def run_training(args: argparse.Namespace) -> dict:
             up=args.ant_up_weight,
             height=args.ant_height_weight,
             action=args.ant_action_penalty,
+            alive=args.ant_alive_reward,
+            actions_cost=args.ant_actions_cost,
+            energy_cost=args.ant_energy_cost,
+            dof_limit_cost=args.ant_dof_limit_cost,
+            dof_vel_scale=args.ant_dof_vel_scale,
         ),
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
             height=args.hopper_height_weight,
             angle=args.hopper_angle_weight,
             action=args.hopper_action_penalty,
+            alive=args.hopper_alive_reward,
         ),
         cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
         acrobot_reward=AcrobotRewardWeights(
@@ -2158,6 +2339,11 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                ant_observation_style=args.ant_observation_style,
+                ant_reward_style=args.ant_reward_style,
+                ant_action_order=args.ant_action_order,
+                hopper_reward_style=args.hopper_reward_style,
+                hopper_start_joint_q=args.hopper_start_joint_q,
                 phase_observation=args.phase_observation,
                 phase_period=args.phase_period,
                 hopper_terminate_angle=args.hopper_terminate_angle,
@@ -2235,11 +2421,16 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_reward": env.ant_reward.__dict__,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
+        "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
+        "hopper_start_joint_q": env.hopper_start_joint_q if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
+        "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
+        "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "phase_observation": env.phase_observation if args.env == "ant" else None,
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
@@ -2310,9 +2501,10 @@ def evaluate_policy(
         q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=False)
         final_obs = env.observe(q, qd, action, phase=progress + 1)
         if env.env_name == "ant":
-            height_samples.append(final_obs[:, 0].detach().mean())
-            up_samples.append(final_obs[:, 27].detach().mean())
-            heading_samples.append(final_obs[:, 28].detach().mean())
+            torso_pos, _, _, _, up_vec, heading_alignment = env.ant_pose_terms(q, qd)
+            height_samples.append(torso_pos[:, 1].detach().mean())
+            up_samples.append(up_vec[:, 1].detach().mean())
+            heading_samples.append(heading_alignment.squeeze(-1).detach().mean())
         rew = env.reward(q, qd, action, obs=final_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
@@ -2379,36 +2571,7 @@ def render_rollout(
     viewer.show_static = True
     viewer.show_collision = False
     viewer.set_model(env.model)
-    if env_name == "cartpole":
-        viewer.set_camera(pos=wp.vec3(0.0, 2.0, 7.0), pitch=0.0, yaw=-90.0)
-        viewer.camera.look_at((0.0, 0.0, 0.0))
-        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 45.0
-    elif env_name == "acrobot":
-        viewer.set_camera(pos=wp.vec3(0.0, 0.0, 5.0), pitch=-90.0, yaw=-90.0)
-        viewer.camera.look_at((0.0, 0.0, 0.0))
-        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 42.0
-    elif is_contact_target_env(env_name):
-        viewer.set_camera(pos=wp.vec3(-2.0, 1.35, 3.4), pitch=-18.0, yaw=-145.0)
-        viewer.camera.look_at((0.75, 0.25, 0.0))
-        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 45.0
-    elif env_name == "hopper":
-        viewer.set_camera(pos=wp.vec3(-2.6, 1.4, 4.0), pitch=-15.0, yaw=-120.0)
-        viewer.camera.look_at((0.0, 0.25, 0.0))
-        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 45.0
-    elif env_name == "cheetah":
-        viewer.set_camera(pos=wp.vec3(-3.6, 1.1, 5.5), pitch=-12.0, yaw=-115.0)
-        viewer.camera.look_at((0.0, -0.05, 0.0))
-        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 45.0
-    else:
-        viewer.set_camera(pos=wp.vec3(-3.0, 2.8, 5.0), pitch=-20.0, yaw=-140.0)
-        viewer.camera.look_at((0.0, 0.7, 0.0))
-        if hasattr(viewer, "camera") and hasattr(viewer.camera, "fov"):
-            viewer.camera.fov = 52.0
+    follow_camera = SmoothedFollowCamera(env_name, env.dt)
 
     q, qd = env.reset(noise=0.0)
     prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
@@ -2419,22 +2582,7 @@ def render_rollout(
     with imageio.get_writer(video_path, fps=max(1, int(round(1.0 / env.dt))), codec="libx264", quality=8) as writer:
         with torch.no_grad():
             for frame_idx in range(horizon):
-                if env_name == "ant":
-                    target_x = float(q[0, 0].detach().cpu())
-                    target_y = float(q[0, 1].detach().cpu())
-                    target_z = float(q[0, 2].detach().cpu())
-                    viewer.set_camera(pos=wp.vec3(target_x - 3.0, target_y + 2.2, target_z + 4.5), pitch=-20.0, yaw=-140.0)
-                    viewer.camera.look_at((target_x, target_y, target_z))
-                elif env_name == "hopper":
-                    target_x = float(q[0, 0].detach().cpu())
-                    target_y = float(q[0, 1].detach().cpu())
-                    viewer.set_camera(pos=wp.vec3(target_x - 2.6, target_y + 1.2, 4.0), pitch=-15.0, yaw=-120.0)
-                    viewer.camera.look_at((target_x, target_y + 0.25, 0.0))
-                elif env_name == "cheetah":
-                    target_x = float(q[0, 0].detach().cpu())
-                    target_y = float(q[0, 1].detach().cpu())
-                    viewer.set_camera(pos=wp.vec3(target_x - 3.6, target_y + 1.0, 5.5), pitch=-12.0, yaw=-115.0)
-                    viewer.camera.look_at((target_x, target_y, 0.0))
+                follow_camera.update(viewer, q)
                 state = env.make_viewer_state(q, qd)
                 viewer.begin_frame(frame_idx * env.dt)
                 viewer.log_state(state)
@@ -2570,16 +2718,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
+    parser.add_argument("--ant-alive-reward", type=float, default=0.5)
+    parser.add_argument("--ant-actions-cost", type=float, default=0.005)
+    parser.add_argument("--ant-energy-cost", type=float, default=0.05)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
+    parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
+    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac"], default="diffrl")
+    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)
     parser.add_argument("--hopper-progress-weight", type=float, default=1.0)
     parser.add_argument("--hopper-angle-weight", type=float, default=1.0)
     parser.add_argument("--hopper-action-penalty", type=float, default=-0.1)
+    parser.add_argument("--hopper-alive-reward", type=float, default=1.0)
+    parser.add_argument("--hopper-reward-style", choices=["diffrl", "gym"], default="diffrl")
+    parser.add_argument("--hopper-start-joint-q", type=parse_float_list, default=None)
     parser.add_argument("--hopper-terminate-angle", action="store_true")
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")
