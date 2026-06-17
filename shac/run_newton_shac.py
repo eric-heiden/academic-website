@@ -2083,57 +2083,10 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
     return result
 
 
-def run_training(args: argparse.Namespace) -> dict:
-    if args.contact_backend is None:
-        args.contact_backend = "mujoco" if is_locomotion_env(args.env) or is_contact_target_env(args.env) else "none"
-    if args.sim_substeps is None:
-        args.sim_substeps = 16 if is_locomotion_env(args.env) else 1
-    if args.horizon is None:
-        args.horizon = 32 if is_locomotion_env(args.env) else (48 if is_contact_target_env(args.env) else (64 if args.env == "acrobot" else 48))
-    if args.eval_horizon is None:
-        args.eval_horizon = (
-            480 if is_locomotion_env(args.env) else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
-        )
-    if args.selection_horizon is None and is_locomotion_env(args.env):
-        args.selection_horizon = min(args.eval_horizon, max(args.horizon, 96))
-    if args.episode_length is None:
-        args.episode_length = 1000 if is_locomotion_env(args.env) else 240
-    if args.force_scale is None:
-        args.force_scale = 200.0 if is_locomotion_env(args.env) else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
-    if args.grad_clip is None:
-        args.grad_clip = 1.0 if is_locomotion_env(args.env) else (10.0 if args.env == "acrobot" or is_contact_target_env(args.env) else 100.0)
-    if args.reset_noise is None:
-        args.reset_noise = 0.0 if is_locomotion_env(args.env) or is_contact_target_env(args.env) else 0.05
-    if args.termination_penalty is None:
-        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env in {"ant", "hopper"} else 0.0
-    if args.lr_schedule is None:
-        args.lr_schedule = "linear" if is_locomotion_env(args.env) else "constant"
-    if args.adam_beta1 is None:
-        args.adam_beta1 = 0.7 if is_locomotion_env(args.env) else 0.9
-    if args.adam_beta2 is None:
-        args.adam_beta2 = 0.95 if is_locomotion_env(args.env) else 0.999
-    if args.critic_lr is None:
-        args.critic_lr = 2.0e-4 if args.env == "hopper" else (2.0e-3 if args.env in {"ant", "cheetah"} else 1.0e-3)
-    if args.critic_iterations is None:
-        args.critic_iterations = 16 if is_locomotion_env(args.env) else 8
-    if args.critic_method is None:
-        args.critic_method = "td-lambda" if is_locomotion_env(args.env) else "one-step"
-    if args.stochastic_actor is None:
-        args.stochastic_actor = is_locomotion_env(args.env)
-    if args.stochastic_init is None:
-        args.stochastic_init = is_locomotion_env(args.env)
-    if args.use_critic is None:
-        args.use_critic = is_locomotion_env(args.env)
-    if args.obs_rms is None:
-        args.obs_rms = is_locomotion_env(args.env)
-
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    wp.init()
-
-    env = NewtonMuJoCoTorchEnv(
+def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoTorchEnv:
+    return NewtonMuJoCoTorchEnv(
         env_name=args.env,
-        num_envs=args.num_envs,
+        num_envs=num_envs,
         device=args.device,
         dt=args.dt,
         force_scale=args.force_scale,
@@ -2209,6 +2162,60 @@ def run_training(args: argparse.Namespace) -> dict:
             action=args.cartpole_action_penalty,
         ),
     )
+
+
+def run_training(args: argparse.Namespace) -> dict:
+    if args.contact_backend is None:
+        args.contact_backend = "mujoco" if is_locomotion_env(args.env) or is_contact_target_env(args.env) else "none"
+    if args.sim_substeps is None:
+        args.sim_substeps = 16 if is_locomotion_env(args.env) else 1
+    if args.horizon is None:
+        args.horizon = 32 if is_locomotion_env(args.env) else (48 if is_contact_target_env(args.env) else (64 if args.env == "acrobot" else 48))
+    if args.eval_horizon is None:
+        args.eval_horizon = (
+            480 if is_locomotion_env(args.env) else (240 if args.env == "acrobot" or is_contact_target_env(args.env) else 180)
+        )
+    if args.selection_horizon is None and is_locomotion_env(args.env):
+        args.selection_horizon = min(args.eval_horizon, max(args.horizon, 96))
+    if args.episode_length is None:
+        args.episode_length = 1000 if is_locomotion_env(args.env) else 240
+    if args.force_scale is None:
+        args.force_scale = 200.0 if is_locomotion_env(args.env) else (35.0 if is_contact_target_env(args.env) else (20.0 if args.env == "acrobot" else 1000.0))
+    if args.grad_clip is None:
+        args.grad_clip = 1.0 if is_locomotion_env(args.env) else (10.0 if args.env == "acrobot" or is_contact_target_env(args.env) else 100.0)
+    if args.reset_noise is None:
+        args.reset_noise = 0.0 if is_locomotion_env(args.env) or is_contact_target_env(args.env) else 0.05
+    if args.termination_penalty is None:
+        args.termination_penalty = ANT_DEFAULT_TERMINATION_PENALTY if args.env in {"ant", "hopper"} else 0.0
+    if args.lr_schedule is None:
+        args.lr_schedule = "linear" if is_locomotion_env(args.env) else "constant"
+    if args.adam_beta1 is None:
+        args.adam_beta1 = 0.7 if is_locomotion_env(args.env) else 0.9
+    if args.adam_beta2 is None:
+        args.adam_beta2 = 0.95 if is_locomotion_env(args.env) else 0.999
+    if args.critic_lr is None:
+        args.critic_lr = 2.0e-4 if args.env == "hopper" else (2.0e-3 if args.env in {"ant", "cheetah"} else 1.0e-3)
+    if args.critic_iterations is None:
+        args.critic_iterations = 16 if is_locomotion_env(args.env) else 8
+    if args.critic_method is None:
+        args.critic_method = "td-lambda" if is_locomotion_env(args.env) else "one-step"
+    if args.stochastic_actor is None:
+        args.stochastic_actor = is_locomotion_env(args.env)
+    if args.stochastic_init is None:
+        args.stochastic_init = is_locomotion_env(args.env)
+    if args.use_critic is None:
+        args.use_critic = is_locomotion_env(args.env)
+    if args.obs_rms is None:
+        args.obs_rms = is_locomotion_env(args.env)
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    wp.init()
+
+    env = make_env_from_args(args, args.num_envs)
+    selection_env = env
+    if args.selection_num_envs is not None and args.selection_num_envs != args.num_envs:
+        selection_env = make_env_from_args(args, args.selection_num_envs)
     actor = make_actor(
         env,
         stochastic=args.stochastic_actor,
@@ -2239,7 +2246,7 @@ def run_training(args: argparse.Namespace) -> dict:
     best_state = None
     best_obs_rms = None
     best_epoch = 0
-    best_train_reward = -float("inf")
+    best_train_reward = None
     best_eval_return = -float("inf")
     best_eval_score = -float("inf")
     q, qd = env.reset(noise=args.reset_noise, stochastic_init=args.stochastic_init)
@@ -2253,6 +2260,61 @@ def run_training(args: argparse.Namespace) -> dict:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     live_history_path = out_dir / f"{args.env}_history_live.json"
+
+    initial_selection_horizon = args.selection_horizon or args.eval_horizon
+    initial_selection_rollout = evaluate_policy(
+        selection_env,
+        actor,
+        initial_selection_horizon,
+        obs_rms=obs_rms,
+        termination_penalty=args.termination_penalty,
+        stochastic_init=args.eval_stochastic_init,
+    )
+    initial_selection_score = rollout_selection_score(
+        initial_selection_rollout,
+        num_envs=selection_env.num_envs,
+        fall_penalty=args.selection_fall_penalty,
+        invalid_penalty=args.selection_invalid_penalty,
+        displacement_weight=args.selection_displacement_weight,
+    )
+    best_eval_return = initial_selection_rollout["return"]
+    best_eval_score = initial_selection_score
+    best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+    torch.save(best_state, out_dir / f"{args.env}_best_actor.pt")
+    if critic is not None:
+        torch.save(
+            {name: value.detach().clone() for name, value in critic.state_dict().items()},
+            out_dir / f"{args.env}_best_critic.pt",
+        )
+    if obs_rms is not None:
+        best_obs_rms = {
+            "mean": obs_rms.mean.detach().clone(),
+            "var": obs_rms.var.detach().clone(),
+            "count": obs_rms.count,
+        }
+        torch.save(best_obs_rms, out_dir / f"{args.env}_best_obs_rms.pt")
+    write_json(
+        live_history_path,
+        {
+            "env": args.env,
+            "timestamp_pacific": pacific_now_iso(),
+            "history": history,
+            "initial_selection": initial_selection_rollout,
+            "initial_selection_score": initial_selection_score,
+            "best_epoch": best_epoch,
+            "best_eval_return": best_eval_return,
+            "best_eval_score": best_eval_score,
+        },
+    )
+    print(
+        f"{args.env} initial: sel={initial_selection_score: .1f} "
+        f"ret={initial_selection_rollout['return']: .1f} "
+        f"dx={initial_selection_rollout['mean_forward_displacement']: .2f} "
+        f"falls={initial_selection_rollout['fall_count']} "
+        f"invalid={initial_selection_rollout['invalid_count']}",
+        flush=True,
+    )
+
     t0 = time.perf_counter()
     for epoch in range(args.epochs):
         epoch_t0 = time.perf_counter()
@@ -2418,11 +2480,16 @@ def run_training(args: argparse.Namespace) -> dict:
 
         selection_horizon = args.selection_horizon or args.eval_horizon
         selection_rollout = evaluate_policy(
-            env, actor, selection_horizon, obs_rms=obs_rms, termination_penalty=args.termination_penalty
+            selection_env,
+            actor,
+            selection_horizon,
+            obs_rms=obs_rms,
+            termination_penalty=args.termination_penalty,
+            stochastic_init=args.eval_stochastic_init,
         )
         selection_score = rollout_selection_score(
             selection_rollout,
-            num_envs=args.num_envs,
+            num_envs=selection_env.num_envs,
             fall_penalty=args.selection_fall_penalty,
             invalid_penalty=args.selection_invalid_penalty,
             displacement_weight=args.selection_displacement_weight,
@@ -2479,6 +2546,8 @@ def run_training(args: argparse.Namespace) -> dict:
                 "env": args.env,
                 "timestamp_pacific": pacific_now_iso(),
                 "history": history,
+                "initial_selection": initial_selection_rollout,
+                "initial_selection_score": initial_selection_score,
                 "best_epoch": best_epoch,
                 "best_eval_return": best_eval_return,
                 "best_eval_score": best_eval_score,
@@ -2508,10 +2577,17 @@ def run_training(args: argparse.Namespace) -> dict:
             out_dir / f"{args.env}_obs_rms.pt",
         )
 
-    rollout = evaluate_policy(env, actor, args.eval_horizon, obs_rms=obs_rms, termination_penalty=args.termination_penalty)
+    rollout = evaluate_policy(
+        selection_env,
+        actor,
+        args.eval_horizon,
+        obs_rms=obs_rms,
+        termination_penalty=args.termination_penalty,
+        stochastic_init=args.eval_stochastic_init,
+    )
     eval_score = rollout_selection_score(
         rollout,
-        num_envs=args.num_envs,
+        num_envs=selection_env.num_envs,
         fall_penalty=args.selection_fall_penalty,
         invalid_penalty=args.selection_invalid_penalty,
         displacement_weight=args.selection_displacement_weight,
@@ -2585,6 +2661,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "newton_path": str(Path(newton.__path__[0]).resolve()) if hasattr(newton, "__path__") else None,
         "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
+        "selection_num_envs": selection_env.num_envs,
+        "seed": args.seed,
         "contact_backend": args.contact_backend,
         "horizon": args.horizon,
         "epochs": args.epochs,
@@ -2598,6 +2676,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "episode_length": args.episode_length,
         "disable_eulerdamp": True,
         "stochastic_init": args.stochastic_init,
+        "eval_stochastic_init": args.eval_stochastic_init,
         "stochastic_actor": args.stochastic_actor,
         "actor_hidden_dims": args.actor_hidden_dims,
         "actor_logstd_init": args.actor_logstd_init,
@@ -2667,8 +2746,10 @@ def run_training(args: argparse.Namespace) -> dict:
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "total_seconds": total_s,
-        "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])),
-        "mean_fps": float(np.mean([h["fps"] for h in history])),
+        "mean_epoch_seconds": float(np.mean([h["epoch_seconds"] for h in history])) if history else None,
+        "mean_fps": float(np.mean([h["fps"] for h in history])) if history else None,
+        "initial_selection": initial_selection_rollout,
+        "initial_selection_score": initial_selection_score,
         "best_epoch": best_epoch,
         "best_train_reward": best_train_reward,
         "best_eval_return": best_eval_return,
@@ -2698,8 +2779,9 @@ def evaluate_policy(
     *,
     obs_rms: RunningMeanStd | None = None,
     termination_penalty: float = 0.0,
+    stochastic_init: bool = False,
 ) -> dict:
-    q, qd = env.reset(noise=0.0)
+    q, qd = env.reset(noise=0.0, stochastic_init=stochastic_init)
     prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
     progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
     rewards = []
@@ -2730,7 +2812,7 @@ def evaluate_policy(
             torch.zeros_like(root_x_after),
             root_x_after - root_x_before,
         )
-        q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=False)
+        q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=stochastic_init)
         final_obs = env.observe(q, qd, action, phase=progress + 1)
         if env.env_name == "ant":
             torso_pos, _, _, _, up_vec, heading_alignment = env.ant_pose_terms(q, qd)
@@ -2761,7 +2843,7 @@ def evaluate_policy(
                 forward_displacement[done_ids],
                 torch.zeros_like(forward_displacement[done_ids]),
             )
-            q, qd = env.reset_done(q, qd, done_ids, stochastic_init=False)
+            q, qd = env.reset_done(q, qd, done_ids, stochastic_init=stochastic_init)
             action = torch.where(done.unsqueeze(-1), torch.zeros_like(action), action)
             progress = torch.where(done, torch.zeros_like(progress), progress)
         prev_action = action
@@ -2902,6 +2984,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", default=str(Path(__file__).resolve().parent / "assets"))
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--num-envs", type=int, default=32)
+    parser.add_argument("--selection-num-envs", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--horizon", type=int, default=None)
     parser.add_argument("--eval-horizon", type=int, default=None)
@@ -2924,6 +3007,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reset-each-epoch", action="store_true")
     parser.add_argument("--stochastic-init", dest="stochastic_init", action="store_true", default=None)
     parser.add_argument("--deterministic-init", dest="stochastic_init", action="store_false")
+    parser.add_argument("--eval-stochastic-init", dest="eval_stochastic_init", action="store_true")
+    parser.add_argument("--eval-deterministic-init", dest="eval_stochastic_init", action="store_false")
+    parser.set_defaults(eval_stochastic_init=False)
     parser.add_argument("--stochastic-actor", dest="stochastic_actor", action="store_true", default=None)
     parser.add_argument("--deterministic-actor", dest="stochastic_actor", action="store_false")
     parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=None)

@@ -367,7 +367,14 @@ def train_ppo(args: argparse.Namespace) -> dict:
         selection_score = None
         if should_eval:
             selection_horizon = args.selection_horizon or args.eval_horizon
-            selection = evaluate_policy(env, actor, selection_horizon, obs_rms=obs_rms, termination_penalty=args.termination_penalty)
+            selection = evaluate_policy(
+                env,
+                actor,
+                selection_horizon,
+                obs_rms=obs_rms,
+                termination_penalty=args.termination_penalty,
+                stochastic_init=args.eval_stochastic_init,
+            )
             selection_score = rollout_selection_score(
                 selection,
                 num_envs=args.num_envs,
@@ -448,7 +455,14 @@ def train_ppo(args: argparse.Namespace) -> dict:
             out_dir / f"{args.env}_ppo_obs_rms.pt",
         )
 
-    rollout = evaluate_policy(env, actor, args.eval_horizon, obs_rms=obs_rms, termination_penalty=args.termination_penalty)
+    rollout = evaluate_policy(
+        env,
+        actor,
+        args.eval_horizon,
+        obs_rms=obs_rms,
+        termination_penalty=args.termination_penalty,
+        stochastic_init=args.eval_stochastic_init,
+    )
     eval_score = rollout_selection_score(
         rollout,
         num_envs=args.num_envs,
@@ -521,6 +535,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "newton_path": str(Path(newton.__path__[0]).resolve()) if hasattr(newton, "__path__") else None,
         "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
+        "seed": args.seed,
         "contact_backend": args.contact_backend,
         "rollout_steps": args.rollout_steps,
         "updates": args.updates,
@@ -533,6 +548,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "force_scale": args.force_scale,
         "episode_length": args.episode_length,
         "stochastic_init": args.stochastic_init,
+        "eval_stochastic_init": args.eval_stochastic_init,
         "obs_rms": args.obs_rms,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
@@ -641,6 +657,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--termination-penalty", type=float, default=None)
     parser.add_argument("--stochastic-init", dest="stochastic_init", action="store_true", default=True)
     parser.add_argument("--deterministic-init", dest="stochastic_init", action="store_false")
+    parser.add_argument("--eval-stochastic-init", dest="eval_stochastic_init", action="store_true")
+    parser.add_argument("--eval-deterministic-init", dest="eval_stochastic_init", action="store_false")
+    parser.set_defaults(eval_stochastic_init=False)
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=True)
     parser.add_argument("--no-obs-rms", dest="obs_rms", action="store_false")
     parser.add_argument("--actor-path", type=Path, default=None)

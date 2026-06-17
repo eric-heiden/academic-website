@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SHAC with MuJoCo Warp</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="assets/plotly-2.35.2.min.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -279,12 +279,13 @@
           policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
           joint-order effort mapping to match IsaacLab's wildcard joint order; MuJoCo actuator-order mapping remains available
           for DiffRL/MuJoCo comparisons. The report runner now records Ant contact friction and joint damping, and actually
-          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The strongest reliable Ant
-          run now uses IsaacLab physical constants, force scale 10, progress reward weight 2, a larger terminal fall penalty,
-          strict full-horizon selection, and a small height reward. PPO reaches 11.40 m over 480 frames with zero falls/invalids
-          across 1024 eval rollouts; SHAC warm-started from that actor selects an 11.51 m 16-env rollout and replays at
-          11.30 m with zero falls/invalids across 1024 eval rollouts. Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run
-          reaches 14.49 m over 480 frames, and SHAC
+          applies the advertised <code>ant_height_weight</code> in the Isaac-style reward path. The strongest Ant baseline
+          now uses IsaacLab physical constants, force scale 10, progress reward weight 2, a larger terminal fall penalty,
+          strict full-horizon selection, and a small height reward. Deterministic videos are stable, but randomized-start
+          1024-env Ant replays expose rare falls that single deterministic replays hid. PPO typically moves about 10.5 m
+          over 480 randomized frames. SHAC warm-started from that actor can improve small-batch selection, but 1024-env
+          stochastic checkpoint selection rejects those updates and keeps the PPO warm start as the best robust policy.
+          Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
           warm-started from that no-LayerNorm PPO actor selects a zero-fall 14.49 m rollout before longer short-horizon updates
           drift into falls.
         </p>
@@ -304,14 +305,14 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Ant SHAC Distance</div>
+        <div class="label">Ant Gated SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step MuJoCo-contact eval from the latest PPO warm-started SHAC checkpoint.</p>
+        <p class="note">480-step randomized-start eval from the 1024-env gated SHAC checkpoint.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / Invalids</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Full-horizon eval failures for the selected SHAC policy.</p>
+        <p class="note">Randomized-start full-horizon eval failures for the selected SHAC policy.</p>
       </div>
       <div class="panel metric">
         <div class="label">Hopper SHAC Distance</div>
@@ -343,7 +344,9 @@
           nonzero world spacing, PPO checkpoints can warm-start SHAC actors, Ant actions can follow either IsaacLab-like
           joint order or MuJoCo actuator order, the Isaac-style Ant height reward now uses <code>ant_height_weight</code>,
           checkpoint selection can include
-          forward displacement, and SHAC can now use a no-LayerNorm actor architecture that exactly matches PPO checkpoints.
+          forward displacement, initial PPO warm starts are evaluated and saved before any SHAC update, and SHAC selection can
+          now run on a separate large randomized environment batch via <code>--selection-num-envs</code>. SHAC can also use a
+          no-LayerNorm actor architecture that exactly matches PPO checkpoints.
           Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
           joints back to MuJoCo and when it refreshes the MJWarp runtime model. Every run records the imported Newton and
@@ -357,10 +360,11 @@
           epoch 2, the 32-step differentiable objective increases short-horizon reward while the 480-step selected rollout
           accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant now moves
           much farther under IsaacLab physical settings, but the gait is still a low crawl rather than a tall natural walk.
-          A faster 12-13 m Ant policy exists, but a 1024-env replay exposes rare falls, so it is kept as a diagnostic rather
-          than the headline result. Adding a small height reward improves the reliable Ant score but does not fully change the
-          low-crawl gait. SHAC still needs strict full-horizon checkpoint selection: low-LR updates can improve the gait, but
-          less conservative settings still create fall-prone contact sequences.
+          A faster 12-13 m Ant policy exists, but randomized 1024-env replays expose rare falls, so it is kept as a diagnostic
+          rather than the headline result. Adding a small height reward improves the Ant score but does not fully change the
+          low-crawl gait. SHAC still needs strict full-horizon checkpoint selection: with 1024 randomized selection envs, both
+          5e-6 and 1e-6 actor-learning-rate SHAC continuations were rejected because they either introduced rare falls or did
+          not beat the PPO warm start.
         </p>
       </article>
     </section>
@@ -641,24 +645,24 @@
           <figcaption>
             PPO trained with IsaacLab-style direct-task rewards, contact friction 1.0, hinge damping 0.1, force scale 10,
             progress reward weight 2, terminal fall penalty 50, full-horizon fall selection, and height weight 1. The best
-            selected actor moves 11.40 m over 480 frames with zero falls/invalids across the 1024-env eval, mean up 1.00,
-            mean height 0.54, and mean heading 0.74. The video is raw <code>ViewerGL.get_frame()</code> through the shared
-            smoothed COM follow camera.
+            selected actor moves 11.40 m over 480 deterministic frames with zero falls/invalids; randomized 1024-env replays
+            move about 10.5 m and show rare seed-dependent falls. The video is raw <code>ViewerGL.get_frame()</code> through
+            the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Height-Shaped Warm-Start</h2>
+        <h2>Ant SHAC, 1024-Env Stochastic Selection</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_phys_progress2_height1_warm_ppo_16env_24ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_isaaclab_phys_progress2_height1_warm_ppo_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/ant_shac_height1_warm_ppo_16env_24ep_sel1024_run1/ant_poster.png">
+            <source src="assets/ant_shac_height1_warm_ppo_16env_24ep_sel1024_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
             SHAC initialized from the height-shaped PPO actor uses MuJoCo contacts, deterministic 256/128/64 actor gradients,
-            a 1e-5 actor learning rate, and strict 480-step selection. Epoch 1 selects the best 16-env score at 11.57 m
-            with zero falls/invalids; the restored checkpoint evaluates at 11.51 m in the training eval and 11.30 m in a
-            separate 1024-env replay, again with zero falls/invalids. PPO remains slightly ahead in the 1024-env replay,
-            but this is the strongest reliable SHAC Ant checkpoint so far.
+            and a separate 1024-env randomized selection environment. This fixes the earlier selection bug where small-batch
+            SHAC updates looked good but had rare falls. In the 5e-6 run, no SHAC update beat the initial policy under the
+            1024-env gate; the saved best is epoch 0. The final randomized replay moves 10.55 m with 2 falls/0 invalids,
+            matching the rare-fall behavior seen in PPO seed sweeps.
           </figcaption>
         </figure>
       </article>
@@ -1467,10 +1471,34 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.green
       },
       {
+        id: "antPpoHeightStochasticEval",
+        label: "Ant PPO stochastic replay",
+        path: "assets/ant_ppo_height1_stochastic_eval1024_run1/ant_results.json",
+        color: colors.teal
+      },
+      {
+        id: "antPpoHeightStochasticSeed17",
+        label: "Ant PPO stochastic seed 17",
+        path: "assets/ant_ppo_height1_stochastic_eval1024_seed17_run1/ant_results.json",
+        color: colors.amber
+      },
+      {
         id: "antShacIsaacPhysicalProgress2",
-        label: "Ant SHAC height-shaped",
+        label: "Ant SHAC 16-env selected",
         path: "assets/ant_shac_isaaclab_phys_progress2_height1_warm_ppo_16env_24ep_run1/ant_results.json",
         color: colors.violet
+      },
+      {
+        id: "antShacHeightStochasticSel1024",
+        label: "Ant SHAC 1024-gated",
+        path: "assets/ant_shac_height1_warm_ppo_16env_24ep_sel1024_run1/ant_results.json",
+        color: colors.blue
+      },
+      {
+        id: "antShacHeightStochasticSel1024LowLR",
+        label: "Ant SHAC 1024-gated low LR",
+        path: "assets/ant_shac_height1_warm_ppo_16env_24ep_sel1024_lr1e6_run1/ant_results.json",
+        color: colors.coral
       },
       {
         id: "cheetahNewton",
@@ -1919,15 +1947,17 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2")
+      const antLatest = presentRuns.find((run) => run.id === "antShacHeightStochasticSel1024")
+        || presentRuns.find((run) => run.id === "antShacHeightStochasticSel1024LowLR")
+        || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2")
         || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2");
       const hopperLatest = presentRuns.find((run) => run.id === "hopperShacDiffrlExact")
         || presentRuns.find((run) => run.id === "hopperPpoDiffrlExact");
-      const antReliableReplay = await safeJson("assets/ant_shac_isaaclab_phys_progress2_height1_eval1024_run1/ant_results.json");
-      const antHeadline = antReliableReplay || antLatest?.data;
+      const antDeterministicReplay = await safeJson("assets/ant_shac_isaaclab_phys_progress2_height1_eval1024_run1/ant_results.json");
+      const antHeadline = antLatest?.data || antDeterministicReplay;
       const latestStamp = latestTimestamp([
         ...presentRuns.map((run) => run.data?.timestamp_pacific),
-        antReliableReplay?.timestamp_pacific,
+        antDeterministicReplay?.timestamp_pacific,
         hopperTrainedPolicy?.timestamp_pacific,
         hopperAfterRne?.timestamp_pacific,
         hopperNoContactAfterRne?.timestamp_pacific,
