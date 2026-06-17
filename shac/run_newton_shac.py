@@ -3158,6 +3158,7 @@ def render_rollout(
     q, qd = env.reset(noise=0.0)
     prev_action = torch.zeros((env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device)
     progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
+    invalid_terminal = torch.zeros(env.num_envs, dtype=torch.bool, device=env.torch_device)
     video_path = out_dir / f"{env_name}_rollout.mp4"
     poster_path = out_dir / f"{env_name}_poster.png"
     frames = []
@@ -3172,23 +3173,26 @@ def render_rollout(
                 frame = viewer.get_frame().numpy()
                 frames.append(frame)
                 writer.append_data(frame)
-                obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
-                action = deterministic_policy_action(actor, obs)
-                q, qd = env.step(q, qd, env.action_to_joint_f(action))
-                invalid = env.invalid_state(q, qd)
-                fell = torch.logical_and(env.fallen_state(q), ~invalid)
-                q, qd, action = env.sanitize_state(q, qd, action, invalid, stochastic_init=False)
-                q = torch.nan_to_num(q, nan=0.0, posinf=0.0, neginf=0.0)
-                qd = torch.nan_to_num(qd, nan=0.0, posinf=0.0, neginf=0.0)
-                progress = progress + 1
-                timeout = progress >= horizon
-                done = torch.logical_or(torch.logical_or(timeout, fell), invalid)
-                if done.any():
-                    done_ids = done.nonzero(as_tuple=False).squeeze(-1)
-                    q, qd = env.reset_done(q, qd, done_ids, stochastic_init=False)
-                    action = torch.where(done.unsqueeze(-1), torch.zeros_like(action), action)
-                    progress = torch.where(done, torch.zeros_like(progress), progress)
-                prev_action = action
+                active = ~invalid_terminal
+                if active.any():
+                    obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
+                    action = deterministic_policy_action(actor, obs)
+                    action = torch.where(active.unsqueeze(-1), action, torch.zeros_like(action))
+                    q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
+                    invalid = env.invalid_state(q_next, qd_next)
+                    finite = torch.logical_and(
+                        torch.isfinite(q_next).all(dim=-1),
+                        torch.isfinite(qd_next).all(dim=-1),
+                    )
+                    freeze = torch.logical_or(invalid, ~finite)
+                    q = torch.where(freeze.unsqueeze(-1), q, q_next)
+                    qd = torch.where(freeze.unsqueeze(-1), torch.zeros_like(qd), qd_next)
+                    action = torch.where(freeze.unsqueeze(-1), torch.zeros_like(action), action)
+                    invalid_terminal = torch.logical_or(invalid_terminal, freeze)
+                    progress = progress + active.to(dtype=progress.dtype)
+                    prev_action = action
+                else:
+                    prev_action = torch.zeros_like(prev_action)
     viewer.close()
     imageio.imwrite(poster_path, frames[len(frames) // 2])
     return video_path, poster_path

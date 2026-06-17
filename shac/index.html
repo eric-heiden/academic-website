@@ -323,8 +323,14 @@
           only as a negative control. The runner again uses the stable root quaternion for NV and DiffRL, keeps the NV asset's
           native 0.01 hinge armature, and still drops the embedded NV floor before adding Newton's ground plane. With that
           stable-root/single-floor NV setup, PPO reaches 31.15 m and the low-lr SHAC warm-start reaches 33.66 m over 480
-          deterministic frames, although both remain fall-prone in large 1024-world evals. The reliable zero-fall Ant
-          baseline therefore remains the DiffRL stability-shaped SHAC run.
+          deterministic frames, although both remain fall-prone in large 1024-world evals. The latest renderer update
+          removes reset-on-fall behavior from report videos: policy clips are still raw <code>ViewerGL.get_frame()</code>
+          through the shared smoothed COM follow camera, but terminal/fallen states are no longer hidden by an automatic
+          reset. A new deterministic multi-world check shows why the 1024-world NV replay is a stricter robustness test than
+          the single video: all model constants and starts are identical, but tiny per-world floating-point differences
+          appear by step 2-3 and are amplified by contact dynamics over hundreds of steps. A 500k-fall-penalty NV SHAC
+          continuation reduced the large-batch replay from 35 falls/8 invalids to 14 falls/3 invalids, but still did not
+          make native NV reliable. The reliable zero-fall Ant baseline therefore remains the DiffRL stability-shaped SHAC run.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
           warm-started from that no-LayerNorm PPO actor selects a zero-fall 14.49 m rollout before longer short-horizon updates
           drift into falls.
@@ -392,6 +398,8 @@
           imports, because this is the pose that matches the configured start joints after Newton exports to the MuJoCo/MJWarp
           runtime. It also drops the embedded NV floor before adding Newton's ground plane; this removes the duplicate
           coplanar floor contacts while preserving the native NV 0.01 hinge armature.
+          The shared report renderer now follows a smoothed mass-weighted COM target and no longer resets videos on falls,
+          so visible rollouts show the actual policy trajectory rather than a reset-spliced episode.
           Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
           joints back to MuJoCo and when it refreshes the MJWarp runtime model. Every run records the imported Newton and
@@ -412,8 +420,12 @@
           and 22.79 m/8 falls. PPO is no longer a blanket negative control on Ant: the DiffRL-asset RSL-style PPO run is
           reliable at 13.08 m with one fall in the fixed 1024-world replay. The stable-root native-armature NV setup trains
           much farther, but it is not the reliability-selected Ant gait: PPO reaches 31.15 m with 100 falls/9 invalids in
-          the single-floor replay, and SHAC reaches 33.66 m with 39 falls/6 invalids. The identity-root NV runs are now
-          negative controls: default PPO moves 1.10 m with 3072 falls, and the retuned heading-gated force-15 run moves
+          the single-floor replay, and SHAC reaches 33.66 m with 39 falls/6 invalids. Re-rendering the selected policies
+          without reset-on-fall shows clean single deterministic episodes, but a controlled 16/128/1024-world replay of the
+          same NV actor diverges from tiny step-2/3 numerical differences into rare late falls. A high-penalty NV SHAC
+          continuation improved the deterministic 1024-world replay to 31.72 m with 14 falls/3 invalids, but it still fails
+          the zero-fall bar. The identity-root NV runs are now negative controls: default PPO moves 1.10 m with 3072 falls,
+          and the retuned heading-gated force-15 run moves
           1.74 m with 1790 falls. A 0.05-armature NV diagnostic was stable but mostly stationary at 0.47-1.20 m, so the
           native 0.01 armature is retained for the NV baseline.
           A replay of the fastest pure-default policy shows the rare flips occur mid-rollout around
@@ -788,6 +800,22 @@
           </figcaption>
         </figure>
       </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, NV High-Penalty Continuation</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_nv_rootfix_reliable_continue_h16_16env_16ep_lr5e6_run1/ant_poster.png">
+            <source src="assets/ant_shac_nv_rootfix_reliable_continue_h16_16env_16ep_lr5e6_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            SHAC continued from the native NV stable-root actor with the selector fall/invalid penalties raised to 500k,
+            H=16, 16 training envs, lr 5e-6, no critic, and 1024-world selection. The high-penalty replay improved from
+            33.69 m with 35 falls/8 invalids at initialization to a selected 31.72 m with 14 falls/3 invalids, 2198.4
+            return, 0.645 m mean height, 0.979 mean up, and 0.926 mean heading. Runtime was 94.6 s total, 43.3 sim FPS,
+            with 22.5 MB peak allocated CUDA memory. This is better than the prior NV reliability replay, but still below
+            the zero-fall requirement.
+          </figcaption>
+        </figure>
+      </article>
       <article class="panel bad">
         <h2>Ant PPO, NV Identity-Root Negative Control</h2>
         <figure>
@@ -843,6 +871,22 @@
             deterministic 1024-env 480-step selection. It remains the fastest reliable Ant policy in this report at
             23.24 m with 0 falls and 0 invalids, but it is not the pure physical-objective RSL/IsaacLab reward used in the
             two stochastic-selector runs above.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant PPO, Reliable Continuation Probe</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_isaaclab_exact_reliable_continue_1024env_140upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_exact_reliable_continue_1024env_140upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO continued from the 20.37 m corrected-default actor with 1024 envs, lr 1e-4, the same 500k fall gate, and
+            <code>300 * displacement</code> selection used by the SHAC reliable run. It did not beat the loaded update-0
+            actor: the best selection score remained the initial 21.72 m / 4-fall replay. The final saved best actor
+            replayed at 21.60 m with 9 falls, 0 invalids, 1727.8 return, 0.649 m mean height, 0.990 mean up, and 0.904
+            mean heading. Runtime was 196.6 s at 73.5k sim FPS with 134.2 MB peak allocated CUDA memory. This is a
+            negative continuation result: the reliable 23.24 m Ant policy still comes from SHAC plus stability shaping.
           </figcaption>
         </figure>
       </article>
@@ -1499,6 +1543,12 @@
           longer an optimizer-fails-to-move case, and SHAC can now train a reliable Ant policy in this Newton/MJWarp stack
           when the objective includes explicit long-horizon stability pressure. PPO is not fixed by the same reward: it can
           either stand safely or move with many late falls, and a low-std terminal-500 fine-tune did not repair that tradeoff.
+          The latest PPO continuation from the 20.37 m corrected-default actor also failed to beat its loaded update-0
+          checkpoint under the 500k fall gate; later PPO updates repeatedly reintroduced falls. For native NV Ant, the
+          no-reset single deterministic videos now look physically continuous, but large identical-world replays expose
+          robustness failures because contact dynamics amplify tiny per-world floating-point differences by mid-rollout.
+          The 500k-penalty NV SHAC continuation reduced those failures but still ended at 14 falls/3 invalids, so NV remains
+          a diagnostic/positive-control asset rather than the headline reliable result.
           The remaining problem is qualitative and algorithmic: the gait is still a compact low crawl, PPO does not yet find
           the reliable moving solution, and contact finite differences still degrade once feet sit on grazing active-set
           boundaries. The missing piece is now a curriculum/objective that preserves more natural height and heading while
@@ -1790,6 +1840,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.violet
       },
       {
+        id: "antPpoIsaacReliableContinue",
+        label: "Ant PPO reliable continuation",
+        path: "assets/ant_ppo_isaaclab_exact_reliable_continue_1024env_140upd_run1/ant_ppo_results.json",
+        color: colors.amber
+      },
+      {
         id: "antPpoRslAdaptiveKlFall500k",
         label: "Ant PPO RSL adaptive KL",
         path: "assets/ant_ppo_rsl_exact_adaptivekl_fall500k_1024env_200upd_run1/ant_ppo_results.json",
@@ -1944,6 +2000,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC NV stable root",
         path: "assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_results.json",
         color: colors.coral
+      },
+      {
+        id: "antShacNvReliableContinue",
+        label: "Ant SHAC NV high penalty",
+        path: "assets/ant_shac_nv_rootfix_reliable_continue_h16_16env_16ep_lr5e6_run1/ant_results.json",
+        color: colors.green
       },
       {
         id: "antPpoNvLowNoise",
