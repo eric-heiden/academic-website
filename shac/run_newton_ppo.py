@@ -394,7 +394,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                     q_next, qd_next, action, invalid, stochastic_init=args.stochastic_init
                 )
                 next_obs = env.observe(q_next, qd_next, action, phase=progress + 1)
-                reward = env.reward(q_next, qd_next, action, obs=next_obs)
+                reward = env.transition_reward(q, qd, q_next, qd_next, action, obs=next_obs)
                 reward = finalize_terminal_reward(
                     reward,
                     invalid=invalid,
@@ -911,7 +911,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
     parser.add_argument(
         "--ant-reward-style",
-        choices=["diffrl", "isaac", "isaaclab", "isaac_heading_gated"],
+        choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaac_heading_gated"],
         default="isaaclab",
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")

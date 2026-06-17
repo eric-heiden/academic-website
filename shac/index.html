@@ -289,8 +289,9 @@
           videos through one shared smoothed COM follow camera, and a new uninterrupted no-reset evaluator so terminal states
           are not hidden by reset-spliced metrics. PPO now saves/loads critic checkpoints for valid continuation, and PPO
           actors are no longer double-squashed during shared evaluation.
-          The clean 1024-world PPO baselines now verify the Newton/MJWarp task setups: Ant reaches 11.82 m with 0 no-reset
-          terminals, Hopper reaches 14.51 m with 0 no-reset terminals, and Cheetah reaches 12.66 m with 0 no-reset terminals.
+          The clean 1024-world PPO baselines now verify the Newton/MJWarp task setups: the reliable Ant PPO control reaches
+          13.04 m with 0 no-reset terminals, Hopper reaches 14.51 m with 0 no-reset terminals, and Cheetah reaches 12.66 m
+          with 0 no-reset terminals.
           Cheetah is the clean SHAC stepping stone: MuJoCo contacts at substep 1 reach 10.41 m uninterrupted with 0 terminals.
           Hopper SHAC is now clean after moving the deterministic start pose off exact active joint limits and using a
           reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
@@ -301,9 +302,13 @@
           newest SHAC continuations show the same pattern more directly: progress-2 differentiable updates increase
           short-horizon reward, but the 1024-world selector keeps the initial 14.96 m actor; min-up logging shows rejected
           candidates dip toward 0.72-0.84 up projection while height remains healthy.
-          faster shaped Ant policy still replays at about 23.19 m but has late no-reset terminal events, so it remains a
-          diagnostic speed target rather than the reliable headline policy. The remaining Ant/Hopper issue is therefore no
-          longer camera rendering or basic environment setup; it is reliable long-horizon
+          The fast corrected-default PPO policy now replays at 39.66 m in the uninterrupted evaluator, but 88 of 1024 worlds
+          terminate by 16 s and minimum up projection goes negative. A deterministic consistency probe confirmed that
+          identical replicated worlds diverge from roundoff-level contact differences into different gait branches, so this
+          is an unstable gait rather than a renderer or reset-splicing artifact. The faster shaped Ant SHAC policy still
+          replays at about 23.19 m but has late no-reset terminal events, so it remains a diagnostic speed target rather than
+          the reliable headline policy. The remaining Ant issue is therefore no longer camera rendering or basic environment
+          setup; it is reliable long-horizon
           contact-gradient/update quality under replicated MuJoCo Warp worlds.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
@@ -395,7 +400,9 @@
           results for Cheetah, Hopper, and a reliable Ant gait. Hopper required two harness fixes: the default deterministic
           start is now 0.05 rad inside the two upper joint limits, and the selector uses a large fall gate so 0-fall checkpoints
           beat slightly faster late-fall checkpoints. Ant's reliable SHAC policy now reaches 14.96 m uninterrupted with
-          0 no-reset terminals, but the faster shaped policy still reaches 23.19 m with late terminal events. A true
+          0 no-reset terminals, but the faster policies are still not robust: the corrected-default PPO checkpoint reaches
+          39.66 m in one uninterrupted 1024-world replay but has 88 terminal worlds, and the faster shaped SHAC policy still
+          reaches 23.19 m with late terminal events. A true
           no-squash RSL-style PPO actor replay collapses under corrected action semantics, so no-squash PPO needs a clean
           retrain/evaluation pass instead of being mixed with the tanh-wrapped SHAC actor family. Corrected PPO continuation
           from the 14.96 m SHAC policy selected update 0 and ended with lower 480-step selection scores, so PPO is currently
@@ -403,9 +410,11 @@
           2.0, H=16, and lr 3e-7 or 1e-7 also selected epoch 0; the best safe candidates stayed at 14.79 m or lower, while
           rejected updates had minimum up projections around 0.72-0.84. Raising the actual termination gate to
           <code>ant_min_up=0.8</code> produced a slower 14.58 m reliable gait. Native NV Ant runs move farther, but remain
-          fall-prone in 1024-world replay and are not treated as reliable baselines. The latest fixed-action checks explain
-          the pattern: reset-state one-step gradients are clean, but H=8/H=16 Ant rollouts enter grazing foot contacts where
-          contact-position and orientation derivatives diverge from finite differences.
+          fall-prone in 1024-world replay and are not treated as reliable baselines. The latest PPO probes also show that
+          IsaacLab potential-difference progress is physically stable but initially learns standing unless progress pressure
+          is raised; raising it without stronger reliability shaping produces repeated fall exploits. The latest fixed-action
+          checks explain the SHAC side of the pattern: reset-state one-step gradients are clean, but H=8/H=16 Ant rollouts
+          enter grazing foot contacts where contact-position and orientation derivatives diverge from finite differences.
         </p>
       </article>
     </section>
@@ -723,6 +732,21 @@
     </section>
 
     <section class="grid two">
+      <article class="panel warn">
+        <h2>Ant PPO, Fast but Unstable</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_isaaclab_exact_defaults_reeval_followcam_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_exact_defaults_reeval_followcam_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Re-evaluation of the corrected-default IsaacLab-style PPO checkpoint with the current uninterrupted evaluator and
+            shared follow camera. The single rendered rollout looks physically plausible and travels quickly, but the
+            1024-world no-reset replay reaches 39.66 m with 88 terminal worlds, 0 invalids, and negative minimum up
+            projection. This is the current speed target, not a reliable baseline. The clip is raw
+            <code>ViewerGL.get_frame()</code> with no overlays.
+          </figcaption>
+        </figure>
+      </article>
       <article class="panel ok">
         <h2>Ant PPO, Full-Horizon Reliable</h2>
         <figure>
@@ -926,11 +950,14 @@
         <p>
           The earlier Ant zero-fall claim came from reset-style evaluation and a shorter/default selector. Replaying the same
           family with the corrected full-horizon selector and an uninterrupted no-reset evaluator exposes late falls: the fast
-          shaped SHAC actor still travels about 23.19 m, but 3 of 1024 worlds terminate late in the rollout and reset-style
-          eval records 12 falls. PPO is now the clean Ant positive control at 11.82 m with 0 no-reset terminals, and the
-          tanh-wrapped RSL-style SHAC continuation is the current reliable Ant SHAC result at 14.96 m with 0 no-reset
-          terminals. The remaining Ant problem is therefore not renderer state or basic reward feasibility; it is pushing
-          the reliable gait toward the faster 20 m class without reintroducing late contact failures.
+          corrected-default PPO actor travels 39.66 m but 88 of 1024 worlds terminate, while the fast shaped SHAC actor still
+          travels about 23.19 m with 3 terminal worlds. The reliable tanh-wrapped PPO control reaches 13.04 m with 0 terminals,
+          and the tanh-wrapped PPO-warm-started SHAC result reaches 14.96 m with 0 terminals. A deterministic consistency
+          probe using identical starts/actions across 256 separate MuJoCo Warp worlds stayed bit-identical for the first few
+          steps, then grew from 1e-6 state differences near step 60 to contact-branch divergence by step 120; 115/256 worlds
+          had terminal events by step 960 for the fast PPO actor. The remaining Ant problem is therefore not renderer state,
+          reset splicing, or basic reward feasibility; it is pushing reliable progress beyond the 15 m class without entering
+          late contact-instability modes.
           The newest continuation sweeps add explicit selection-minimum logging. With progress weight 2.0, H=16, and lr
           3e-7, the best selected update stayed at epoch 0; the best safe update reached 14.79 m with min-up 0.89, while
           failed updates dipped to min-up 0.73-0.74. Reducing lr to 1e-7 made the same tradeoff slower rather than better:
@@ -952,11 +979,13 @@
       <article class="panel warn">
         <h2>Ant PPO Reliability Check</h2>
         <p>
-          PPO was rerun after fixing full-horizon selection and critic checkpoint restore. The reliable canonical PPO actor
-          now reaches 11.86 m in reset-style eval and 11.82 m in the uninterrupted no-reset replay, both with 0 falls/terminals
-          and 0 invalid states. Earlier PPO continuation runs degraded because actor checkpoints were restored without the
-          matching critic, so the first continuation update started with a random value function. That is now fixed in the
-          runner and the PPO baseline verifies the Ant dynamics, reset pose, camera, and video path.
+          PPO was rerun after fixing full-horizon selection and critic checkpoint restore. The latest PPO probes split into
+          two regimes. Potential-difference IsaacLab progress with no observation RMS and force scale 7.5 is stable but
+          initially learns a stand: the 256-env smoke run finishes at 0 terminals, 0 invalids, min-up 0.94, and only 0.24 m
+          displacement. Increasing progress pressure gives short bursts but creates repeated falls unless a much stronger
+          reliability objective is used. The loaded reliable tanh-wrapped PPO actor still scores 4747.7 under 1024-world
+          selection and 13.04 m in no-reset replay with 0 terminals. Continuing PPO for 80 updates from the 14.96 m SHAC actor
+          selected update 0, so PPO currently preserves reliable Ant policies better than it improves them.
         </p>
       </article>
     </section>
@@ -1871,6 +1900,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO corrected defaults",
         path: "assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_results.json",
         color: colors.violet
+      },
+      {
+        id: "antPpoIsaacExactReevalFollowCam",
+        label: "Ant PPO fast re-eval",
+        path: "assets/ant_ppo_isaaclab_exact_defaults_reeval_followcam_run1/ant_ppo_results.json",
+        color: colors.coral
+      },
+      {
+        id: "antPpoIsaacPotentialSmoke",
+        label: "Ant PPO potential smoke",
+        path: "assets/ant_ppo_isaaclab_potential_smoke_256env_40upd_run1/ant_ppo_results.json",
+        color: colors.slate
       },
       {
         id: "antPpoIsaacReliableContinue",

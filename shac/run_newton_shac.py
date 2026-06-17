@@ -1421,7 +1421,7 @@ class NewtonMuJoCoTorchEnv:
 
         if obs is None:
             obs = self.observe(q, qd, action)
-        if self.ant_reward_style in {"isaac", "isaaclab", "isaac_heading_gated"}:
+        if self.ant_reward_style in {"isaac", "isaaclab", "isaaclab_potential", "isaac_heading_gated"}:
             if self.ant_observation_style == "isaac":
                 up_proj = obs[:, 10]
                 heading_proj = obs[:, 11]
@@ -1470,6 +1470,22 @@ class NewtonMuJoCoTorchEnv:
             + self.ant_reward.height * height_reward
             + self.ant_reward.action * action.square().sum(dim=-1)
         )
+
+    def transition_reward(
+        self,
+        q: torch.Tensor,
+        qd: torch.Tensor,
+        q_next: torch.Tensor,
+        qd_next: torch.Tensor,
+        action: torch.Tensor,
+        obs: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        reward = self.reward(q_next, qd_next, action, obs=obs)
+        if self.env_name == "ant" and self.ant_reward_style == "isaaclab_potential":
+            physics_dt = max(float(self.dt) / float(self.sim_substeps), 1.0e-8)
+            potential_progress = (q_next[:, 0] - q[:, 0]) / physics_dt
+            reward = reward + self.ant_reward.progress * (potential_progress - qd_next[:, 0])
+        return reward
 
     def done(self, q: torch.Tensor, progress: torch.Tensor, episode_length: int) -> torch.Tensor:
         done = progress >= episode_length
@@ -1790,11 +1806,11 @@ def shac_rollout_loss(
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_stats)
         raw_action = actor(obs, deterministic=not stochastic_actor)
         action = squash_policy_action(actor, raw_action)
-        q, qd = env.step(q, qd, env.action_to_joint_f(action))
-        invalid = env.invalid_state(q, qd)
-        fell = torch.logical_and(env.fallen_state(q), ~invalid)
-        next_obs = env.observe(q, qd, action, phase=progress + 1)
-        rew = env.reward(q, qd, action, obs=next_obs)
+        q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
+        invalid = env.invalid_state(q_next, qd_next)
+        fell = torch.logical_and(env.fallen_state(q_next), ~invalid)
+        next_obs = env.observe(q_next, qd_next, action, phase=progress + 1)
+        rew = env.transition_reward(q, qd, q_next, qd_next, action, obs=next_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.detach().mean())
         loss = loss - (gamma_vec * rew * rew_scale).sum()
@@ -1802,6 +1818,7 @@ def shac_rollout_loss(
         invalid_count += int(invalid.detach().sum().cpu())
         fall_count += int(fell.detach().sum().cpu())
         gamma_vec = gamma_vec * gamma * (~done).to(torch.float32)
+        q, qd = q_next, qd_next
         prev_action = action
         progress = torch.where(done, torch.zeros_like(progress), progress + 1)
     denom = max(1, horizon * env.num_envs)
@@ -1824,7 +1841,7 @@ def one_step_action_loss(
     invalid = env.invalid_state(q, qd)
     fell = torch.logical_and(env.fallen_state(q), ~invalid)
     obs = env.observe(q, qd, action)
-    rew = env.reward(q, qd, action, obs=obs)
+    rew = env.transition_reward(q0, qd0, q, qd, action, obs=obs)
     rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
     return -rew.mean(), {
         "mean_reward": float(rew.detach().mean().cpu()),
@@ -2650,7 +2667,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 q_next, qd_next, action, invalid, stochastic_init=args.stochastic_init
             )
             next_obs_raw = env.observe(q_next, qd_next, action, phase=progress + 1)
-            rew = env.reward(q_next, qd_next, action, obs=next_obs_raw)
+            rew = env.transition_reward(q, qd, q_next, qd_next, action, obs=next_obs_raw)
             rew = finalize_terminal_reward(
                 rew,
                 invalid=invalid,
@@ -3149,6 +3166,8 @@ def evaluate_policy(
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
         action = deterministic_policy_action(actor, obs)
+        q_prev = q
+        qd_prev = qd
         root_x_before = q[:, 0].clone()
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
         root_x_after = q[:, 0].clone()
@@ -3172,7 +3191,7 @@ def evaluate_policy(
             up_mins.append(ups.min())
             heading_samples.append(headings.mean())
             heading_mins.append(headings.min())
-        rew = env.reward(q, qd, action, obs=final_obs)
+        rew = env.transition_reward(q_prev, qd_prev, q, qd, action, obs=final_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
         episode_returns = episode_returns + rew
@@ -3265,7 +3284,7 @@ def evaluate_policy_uninterrupted(
         new_terminal = torch.logical_and(active, torch.logical_or(fell, invalid))
 
         next_obs = env.observe(q_next, qd_next, action, phase=progress + 1)
-        rew = env.reward(q_next, qd_next, action, obs=next_obs)
+        rew = env.transition_reward(q, qd, q_next, qd_next, action, obs=next_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rew = torch.where(active, rew, torch.zeros_like(rew))
         rewards.append(rew.mean())
@@ -3551,7 +3570,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
     parser.add_argument(
         "--ant-reward-style",
-        choices=["diffrl", "isaac", "isaaclab", "isaac_heading_gated"],
+        choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaac_heading_gated"],
         default="isaaclab",
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
