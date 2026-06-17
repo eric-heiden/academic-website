@@ -374,6 +374,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         value_loss_value = 0.0
         entropy_value = 0.0
         approx_kl_value = 0.0
+        kl_values = []
         for _ in range(args.ppo_epochs):
             order = torch.randperm(sample_count, device=env.torch_device)
             for start in range(0, sample_count, batch_size):
@@ -401,7 +402,22 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 policy_loss_value = float(policy_loss.detach().cpu())
                 value_loss_value = float(value_loss.detach().cpu())
                 entropy_value = float(entropy_loss.detach().cpu())
-                approx_kl_value = float(((ratio - 1.0) - log_ratio).mean().detach().cpu())
+                approx_kl = ((ratio - 1.0) - log_ratio).mean()
+                approx_kl_value = float(approx_kl.detach().cpu())
+                kl_values.append(approx_kl_value)
+
+        if kl_values:
+            approx_kl_value = float(sum(kl_values) / len(kl_values))
+        if args.adaptive_kl and approx_kl_value > 0.0:
+            current_lr = optimizer.param_groups[0]["lr"]
+            new_lr = current_lr
+            if approx_kl_value > 2.0 * args.desired_kl:
+                new_lr = max(args.min_lr, current_lr / 1.5)
+            elif approx_kl_value < 0.5 * args.desired_kl:
+                new_lr = min(args.max_lr, current_lr * 1.5)
+            if new_lr != current_lr:
+                for group in optimizer.param_groups:
+                    group["lr"] = new_lr
 
         if torch.cuda.is_available():
             torch.cuda.synchronize(env.torch_device)
@@ -459,6 +475,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "value_loss": value_loss_value,
             "entropy": entropy_value,
             "approx_kl": approx_kl_value,
+            "lr": optimizer.param_groups[0]["lr"],
             "selection_return": selection["return"] if selection is not None else None,
             "selection_score": selection_score,
             "selection_mean_reward": selection["mean_reward"] if selection is not None else None,
@@ -626,6 +643,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_min_heading": args.selection_min_heading,
         "selection_posture_penalty": args.selection_posture_penalty,
         "lr": args.lr,
+        "adaptive_kl": args.adaptive_kl,
+        "desired_kl": args.desired_kl,
+        "min_lr": args.min_lr,
+        "max_lr": args.max_lr,
         "gamma": args.gamma,
         "gae_lambda": args.gae_lambda,
         "ppo_epochs": args.ppo_epochs,
@@ -717,6 +738,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
     parser.add_argument("--lr", type=float, default=3.0e-4)
+    parser.add_argument("--adaptive-kl", action="store_true")
+    parser.add_argument("--desired-kl", type=float, default=0.01)
+    parser.add_argument("--min-lr", type=float, default=1.0e-5)
+    parser.add_argument("--max-lr", type=float, default=1.0e-2)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--gae-lambda", type=float, default=0.95)
     parser.add_argument("--clip-coef", type=float, default=0.2)

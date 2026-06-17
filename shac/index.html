@@ -689,18 +689,18 @@
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Ant PPO, Corrected IsaacLab Defaults</h2>
+        <h2>Ant PPO, RSL-Style Adaptive KL</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_ppo_rsl_exact_adaptivekl_fall500k_1024env_200upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_rsl_exact_adaptivekl_fall500k_1024env_200upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            PPO trained after correcting the Ant defaults: contact friction 1.0, hinge damping 0.1, force scale 7.5,
-            0.31 m termination height, IsaacLab reward, and unit joint-limit cost. The selected update 140 actor moves
-            20.37 m over 480 deterministic frames; the 1024-env eval reports 1658.0 return, 6 falls, 0 invalids,
-            0.648 m mean height, 0.990 mean up, and 0.930 mean heading. Runtime was 271.2 s at 74.3k sim FPS with
-            91.1 MB peak allocated CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared
-            smoothed COM follow camera.
+            PPO now uses the closer IsaacLab/RSL setup: 400-200-100 ELU actor/critic, no observation RMS, no LayerNorm,
+            32-step rollouts, 5 PPO epochs, value coefficient 1.0, adaptive KL at desired KL 0.01, force scale 7.5, and
+            strict 480-step selection with a 500k fall gate. The selected update 160 actor reaches 1359.7 return,
+            15.37 m displacement, 0 falls, 0 invalids, 0.587 m mean height, 0.992 mean up, and 0.980 mean heading over
+            the final 1024-world deterministic eval. Runtime was 190.3 s at 69.1k sim FPS with 137.8 MB peak allocated
+            CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
@@ -756,8 +756,11 @@
           zero-fall standing policy at -0.28 m, while the final moving policy reached 15.17 m but had 111 falls in the
           1024-world deterministic eval. A second PPO pass initialized from that moving policy with low action std and
           terminal penalty 500 again selected a stationary zero-fall policy. As a sanity check, the reliable SHAC actor was
-          converted into the PPO actor format and evaluated through the PPO runner; it reproduced 23.25 m with 0 falls. PPO
-          therefore verifies the evaluation/rendering path, but not the Ant optimizer path.
+          converted into the PPO actor format and evaluated through the PPO runner; it reproduced 23.25 m with 0 falls.
+          The new RSL-style adaptive-KL run fixes the best PPO checkpoint selection problem for the physical Ant objective:
+          the selected policy now moves 15.37 m with 0 falls, although adjacent higher-reward updates still show large
+          late-rollout fall spikes. PPO therefore verifies the evaluation/rendering path and can train a reliable stepping
+          stone, but it is still less robust than the SHAC warm-started stability run.
         </p>
       </article>
     </section>
@@ -1655,6 +1658,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO corrected defaults",
         path: "assets/ant_ppo_isaaclab_exact_defaults_1024env_240upd_run1/ant_ppo_results.json",
         color: colors.violet
+      },
+      {
+        id: "antPpoRslAdaptiveKlFall500k",
+        label: "Ant PPO RSL adaptive KL",
+        path: "assets/ant_ppo_rsl_exact_adaptivekl_fall500k_1024env_200upd_run1/ant_ppo_results.json",
+        color: colors.blue
       },
       {
         id: "antPpoStabilityReward",
