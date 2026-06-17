@@ -273,7 +273,8 @@
           Hopper, Cheetah, and Ant. The newest MJWarp fix records the composite-inertia (<code>cinert</code>) adjoint so dense
           mass-matrix VJPs reach <code>qpos</code> during multi-step BPTT. Cheetah now works as a staged SHAC target: Newton
           contacts move 7.57 m in the latest 8 s rollout, and MuJoCo contacts move 5.40 m when rollout state is reset each
-          epoch. Hopper policy gradients remain clean and select a stable standing policy. Ant remains the final unsolved target.
+          epoch. Hopper is now the active stepping-stone failure: SolverMuJoCo CPU and MJWarp agree on passive dynamics, but
+          Hopper gradients around contacts/limits are not clean enough for reliable SHAC hopping. Ant remains the final unsolved target.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -329,10 +330,11 @@
         <h2>What Is Not Fixed</h2>
         <p>
           Contact-rich state finite differences are still discontinuous for MuJoCo contacts, and Hopper is not solved as a task.
-          Hopper policy/action gradients check, including around the stable standing policy, so the remaining Hopper issue looks
-          like reward shaping rather than the earlier obvious VJP bug. Cheetah/MuJoCo trains only with reset-each-epoch; without
-          resets it drifts into poor rollout states despite good policy finite differences. Ant H=5/H=8 policy gradients are still
-          inaccurate, so Ant locomotion is not yet reliable.
+          With DiffRL-style 16 substeps, Hopper one-step action gradients are usable, but joint-position and short-horizon policy
+          gradients remain inaccurate around active contacts/limits. PPO confirms that disabling limits can stabilize passive
+          dynamics, but it still selects a folded low posture instead of hopping. Cheetah/MuJoCo trains only with reset-each-epoch;
+          without resets it drifts into poor rollout states despite good policy finite differences. Ant H=5/H=8 policy gradients
+          are still inaccurate, so Ant locomotion is not yet reliable.
         </p>
       </article>
     </section>
@@ -423,6 +425,18 @@
               <td>Policy/action gradients remain accurate around the selected standing policy; direct joint-q perturbations are nonsmooth near contact/limit transitions.</td>
             </tr>
             <tr>
+              <td>Hopper, 16 substeps, implicitfast</td>
+              <td>2.2e-1 policy</td>
+              <td>1.00</td>
+              <td>DiffRL-style substeps expose inaccurate short-horizon policy gradients; disabling joint limits improves one-step action error to 1.3e-2 but does not solve training.</td>
+            </tr>
+            <tr>
+              <td>Hopper, SolverMuJoCo CPU vs MJWarp</td>
+              <td>7.9e-3 q norm at 60 steps</td>
+              <td>n/a</td>
+              <td>Passive CPU and MJWarp rollouts agree through the solver mapping, so the visible low-rest posture is the converted MuJoCo task dynamics, not a GPU forward mismatch.</td>
+            </tr>
+            <tr>
               <td>Cheetah, no contact, active limits</td>
               <td>6.4e-5 state/action</td>
               <td>1.00</td>
@@ -451,19 +465,46 @@
 
     <section class="grid two">
       <div class="panel">
-        <h2>Training Reward</h2>
+        <h2>Ant Training Reward</h2>
         <div id="ant-reward-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Selection Score</h2>
+        <h2>Ant Selection Score</h2>
         <div id="ant-selection-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Eval Stability and Motion</h2>
+        <h2>Hopper Training Reward</h2>
+        <div id="hopper-reward-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Hopper Selection Score</h2>
+        <div id="hopper-selection-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Cheetah Training Reward</h2>
+        <div id="cheetah-reward-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Cheetah Selection Score</h2>
+        <div id="cheetah-selection-chart" class="chart"></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
+        <h2>Ant Eval Stability and Motion</h2>
         <div id="ant-eval-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Runtime and Memory</h2>
+        <h2>Hopper Eval Stability and Motion</h2>
+        <div id="hopper-eval-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Cheetah Eval Stability and Motion</h2>
+        <div id="cheetah-eval-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Runtime and Memory by Run</h2>
         <div id="runtime-chart" class="chart"></div>
       </div>
     </section>
@@ -631,6 +672,34 @@
         </figure>
       </article>
       <article class="panel">
+        <h2>Hopper PPO No-Limit</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO/A2C-style control with MuJoCo contacts, joint limits disabled, 16 substeps, and implicitfast integration. Passive
+            dynamics are more stable without limits, but the learned policy folds into a low posture: return -1456.3, displacement
+            0.70 m over 480 frames, and no valid hopping gait.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel bad">
+        <h2>Hopper PPO Faithful Reward</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO with the DiffRL-style Hopper reward, MuJoCo contacts, and height-only termination. This negative control also
+            collapses rather than hopping: return -226.3, displacement 0.007 m, and repeated short episodes.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel">
         <h2>Cartpole Rollout</h2>
         <figure>
           <video controls preload="metadata" poster="assets/cartpole_poster.png">
@@ -773,7 +842,9 @@
           accurate again after the RNE fixes, but limit-enabled Ant still inherits the dense mass-diagonal residual and SHAC
           currently reaches only a stable crawl. Hopper now shows a separate optimization issue: keeping vectorized rollout state
           across epochs can drift into solver-pathological states, while reset-each-epoch remains stable but selects a standing
-          local optimum under the DiffRL reward.
+          local optimum under the DiffRL reward. The 16-substep Hopper check is worse than the one-step diagnostic, and PPO
+          negative controls also fold/collapse, so Hopper needs a tighter contact/limit reproduction before it can serve as a
+          reliable bridge to Ant.
         </p>
       </article>
     </section>
@@ -938,6 +1009,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.green
       },
       {
+        id: "hopperResetMujocoCinert",
+        label: "Hopper reset + cinert",
+        path: "assets/hopper_train_mujoco_reset_each_epoch_after_cinert_record_128env_80ep_run1/hopper_results.json",
+        color: colors.blue
+      },
+      {
         id: "hopperResetNewton",
         label: "Hopper Newton contacts",
         path: "assets/hopper_train_newton_reset_each_epoch_128env_80ep_run1/hopper_results.json",
@@ -969,8 +1046,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       hopperCinert: "assets/hopper_gradcheck_mujoco_after_cinert_record_comparable_run1/hopper_gradient_check.json",
       hopperNewton: "assets/hopper_gradcheck_limits_newton_level_kinematics_run1/hopper_gradient_check.json",
       hopperNoLimits: "assets/hopper_gradcheck_nolimits_mujoco_probe_run1/hopper_gradient_check.json",
+      hopperSubsteps: "assets/hopper_gradcheck_mujoco_sub16_implicitfast_run1/hopper_gradient_check.json",
+      hopperNoLimitsSubsteps: "assets/hopper_gradcheck_mujoco_nolimits_sub16_implicitfast_run1/hopper_gradient_check.json",
       hopperTrainedPolicy: "assets/hopper_gradcheck_mujoco_reset_each_epoch_actor_run1/hopper_gradient_check.json",
       hopperTrainNoLimits: "assets/hopper_train_nolimits_mujoco_probe_run1/hopper_results.json",
+      hopperPpoFaithful: "assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_results.json",
+      hopperPpoNoLimitsSubsteps: "assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_results.json",
       cheetahLimitsNone: "assets/cheetah_gradcheck_limits_none_level_kinematics_run2/cheetah_gradient_check.json",
       cheetahLimitsMujoco: "assets/cheetah_gradcheck_mujoco_after_cinert_record_comparable_run1/cheetah_gradient_check.json",
       cheetahLimitsNewton: "assets/cheetah_gradcheck_newton_after_cinert_record_run1/cheetah_gradient_check.json",
@@ -1161,8 +1242,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         hopperCinert,
         hopperNewton,
         hopperNoLimits,
+        hopperSubsteps,
+        hopperNoLimitsSubsteps,
         hopperTrainedPolicy,
         hopperTrainNoLimits,
+        hopperPpoFaithful,
+        hopperPpoNoLimitsSubsteps,
         cheetahLimitsNone,
         cheetahLimitsMujoco,
         cheetahLimitsNewton,
@@ -1194,8 +1279,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.hopperCinert),
         safeJson(diagPaths.hopperNewton),
         safeJson(diagPaths.hopperNoLimits),
+        safeJson(diagPaths.hopperSubsteps),
+        safeJson(diagPaths.hopperNoLimitsSubsteps),
         safeJson(diagPaths.hopperTrainedPolicy),
         safeJson(diagPaths.hopperTrainNoLimits),
+        safeJson(diagPaths.hopperPpoFaithful),
+        safeJson(diagPaths.hopperPpoNoLimitsSubsteps),
         safeJson(diagPaths.cheetahLimitsNone),
         safeJson(diagPaths.cheetahLimitsMujoco),
         safeJson(diagPaths.cheetahLimitsNewton),
@@ -1205,7 +1294,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.cheetahNoCdof)
       ]);
 
-      const stable = presentRuns.find((run) => run.id === "cheetahNewton")
+      const stable = presentRuns.find((run) => run.id === "cheetahNewtonCinert")
+        || presentRuns.find((run) => run.id === "cheetahMujocoReset")
+        || presentRuns.find((run) => run.id === "cheetahNewton")
         || presentRuns.find((run) => run.id === "cheetahMujoco")
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
@@ -1225,6 +1316,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antH8Margin?.timestamp_pacific,
         antH5Margin?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
+        hopperPpoFaithful?.timestamp_pacific,
+        hopperPpoNoLimitsSubsteps?.timestamp_pacific,
+        hopperSubsteps?.timestamp_pacific,
+        hopperNoLimitsSubsteps?.timestamp_pacific,
         hopperNoLimits?.timestamp_pacific,
         cheetahNoLimitsMujoco?.timestamp_pacific,
         cheetahNoLimitsNone?.timestamp_pacific,
@@ -1245,33 +1340,56 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       document.getElementById("p5-displacement").textContent = `${fmt(stable?.data?.eval?.mean_forward_displacement, 2)} m`;
       document.getElementById("stable-fps").textContent = fmt(stable?.data?.mean_fps, 0);
 
-      if (presentRuns.length) {
-        plotOrMessage("ant-reward-chart", presentRuns.map((run) => historyTrace(run, "mean_reward")), {
-          ...baseLayout,
-          yaxis: { ...baseLayout.yaxis, title: "Mean step reward" }
-        });
+      const envRuns = {
+        ant: presentRuns.filter((run) => run.data?.env === "ant"),
+        hopper: presentRuns.filter((run) => run.data?.env === "hopper"),
+        cheetah: presentRuns.filter((run) => run.data?.env === "cheetah")
+      };
 
-        plotOrMessage("ant-selection-chart", presentRuns.map((run) => {
-          const key = run.data.history.some((row) => row.selection_score !== undefined) ? "selection_score" : "selection_return";
-          return historyTrace(run, key);
-        }), {
+      function selectionKey(data) {
+        return data?.history?.some((row) => row.selection_score !== undefined) ? "selection_score" : "selection_return";
+      }
+
+      function plotEnvHistory(id, rows, key, yTitle) {
+        if (!rows.length) {
+          plotMessage(id, "No training history JSON loaded for this environment.");
+          return;
+        }
+        plotOrMessage(id, rows.map((run) => historyTrace(run, key)), {
+          ...baseLayout,
+          yaxis: { ...baseLayout.yaxis, title: yTitle }
+        });
+      }
+
+      function plotEnvSelection(id, rows) {
+        if (!rows.length) {
+          plotMessage(id, "No selection history JSON loaded for this environment.");
+          return;
+        }
+        plotOrMessage(id, rows.map((run) => historyTrace(run, selectionKey(run.data))), {
           ...baseLayout,
           yaxis: { ...baseLayout.yaxis, title: "Selection score" }
         });
+      }
 
-        plotOrMessage("ant-eval-chart", [
+      function plotEnvEval(id, rows, fallLabel) {
+        if (!rows.length) {
+          plotMessage(id, "No eval JSON loaded for this environment.");
+          return;
+        }
+        plotOrMessage(id, [
           {
             type: "bar",
             name: "forward displacement (m)",
-            x: presentRuns.map((run) => run.label),
-            y: presentRuns.map((run) => evalValue(run, "mean_forward_displacement") ?? 0),
+            x: rows.map((run) => run.label),
+            y: rows.map((run) => evalValue(run, "mean_forward_displacement") ?? 0),
             marker: { color: colors.teal }
           },
           {
             type: "bar",
-            name: "falls / 64 env eval",
-            x: presentRuns.map((run) => run.label),
-            y: presentRuns.map((run) => evalValue(run, "fall_count") ?? 0),
+            name: fallLabel,
+            x: rows.map((run) => run.label),
+            y: rows.map((run) => evalValue(run, "fall_count") ?? 0),
             yaxis: "y2",
             marker: { color: colors.coral }
           }
@@ -1281,6 +1399,19 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
           yaxis: { ...baseLayout.yaxis, title: "Displacement" },
           yaxis2: { title: "Falls", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false }
         });
+      }
+
+      plotEnvHistory("ant-reward-chart", envRuns.ant, "mean_reward", "Mean step reward");
+      plotEnvSelection("ant-selection-chart", envRuns.ant);
+      plotEnvHistory("hopper-reward-chart", envRuns.hopper, "mean_reward", "Mean step reward");
+      plotEnvSelection("hopper-selection-chart", envRuns.hopper);
+      plotEnvHistory("cheetah-reward-chart", envRuns.cheetah, "mean_reward", "Mean step reward");
+      plotEnvSelection("cheetah-selection-chart", envRuns.cheetah);
+      plotEnvEval("ant-eval-chart", envRuns.ant, "falls / eval");
+      plotEnvEval("hopper-eval-chart", envRuns.hopper, "falls / eval");
+      plotEnvEval("cheetah-eval-chart", envRuns.cheetah, "falls / eval");
+
+      if (presentRuns.length) {
 
         plotOrMessage("runtime-chart", [
           {
@@ -1308,7 +1439,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
 
         document.getElementById("run-table").innerHTML = presentRuns.map(runRow).join("");
       } else {
-        ["ant-reward-chart", "ant-selection-chart", "ant-eval-chart", "runtime-chart"].forEach((id) => {
+        ["runtime-chart"].forEach((id) => {
           plotMessage(id, "No training history JSON files loaded for this report build.");
         });
       }
@@ -1318,6 +1449,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Hopper Newton contacts", hopperNewton],
         ["Hopper trained stand policy", hopperTrainedPolicy],
         ["Hopper no limits", hopperNoLimits],
+        ["Hopper substeps limits", hopperSubsteps],
+        ["Hopper substeps no limits", hopperNoLimitsSubsteps],
         ["Cheetah no contact", cheetahLimitsNone],
         ["Cheetah MuJoCo contacts", cheetahLimitsMujoco],
         ["Cheetah Newton contacts", cheetahLimitsNewton],

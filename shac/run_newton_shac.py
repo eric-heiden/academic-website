@@ -346,6 +346,8 @@ class NewtonMuJoCoTorchEnv:
         dt: float,
         force_scale: float,
         contact_backend: str,
+        sim_substeps: int = 1,
+        mujoco_integrator: str = "euler",
         cartpole_reward: CartpoleRewardWeights | None = None,
         ant_reward: AntRewardWeights | None = None,
         hopper_reward: HopperRewardWeights | None = None,
@@ -357,6 +359,7 @@ class NewtonMuJoCoTorchEnv:
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
         ant_min_up: float | None = None,
+        hopper_terminate_angle: bool = False,
         locomotion_disable_joint_limits: bool = False,
     ):
         self.env_name = env_name
@@ -364,8 +367,10 @@ class NewtonMuJoCoTorchEnv:
         self.torch_device = torch.device(device)
         self.wp_device = wp.device_from_torch(self.torch_device)
         self.dt = dt
+        self.sim_substeps = max(1, int(sim_substeps))
         self.force_scale = force_scale
         self.contact_backend = contact_backend
+        self.mujoco_integrator = mujoco_integrator
         self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
         self.ant_reward = ant_reward or AntRewardWeights()
         self.hopper_reward = hopper_reward or HopperRewardWeights()
@@ -377,6 +382,7 @@ class NewtonMuJoCoTorchEnv:
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
         self.ant_min_up = ant_min_up
+        self.hopper_terminate_angle = hopper_terminate_angle
         self.locomotion_disable_joint_limits = locomotion_disable_joint_limits
         self.acrobot_link_length = 1.0
         self.contact_body_radius = 0.22
@@ -403,7 +409,7 @@ class NewtonMuJoCoTorchEnv:
             requires_grad=True,
             disable_contacts=not use_contacts,
             use_mujoco_contacts=contact_backend != "newton",
-            integrator="euler",
+            integrator=mujoco_integrator,
             solver="newton",
             iterations=8,
             ls_iterations=8,
@@ -682,10 +688,6 @@ class NewtonMuJoCoTorchEnv:
     ) -> dict[str, wp.array]:
         if zero_buffers:
             self.zero_solver_buffers()
-        state_in = self.model.state(requires_grad=requires_grad)
-        state_out = self.model.state(requires_grad=requires_grad)
-        control = self.model.control(requires_grad=requires_grad)
-
         q_wp = wp.from_torch(
             q.contiguous().view(-1), dtype=wp.float32, requires_grad=requires_grad, retain_grad=requires_grad
         )
@@ -705,19 +707,43 @@ class NewtonMuJoCoTorchEnv:
             qd_out.contiguous().view(-1), dtype=wp.float32, requires_grad=requires_grad, retain_grad=requires_grad
         )
 
-        state_in.joint_q = q_wp
-        state_in.joint_qd = qd_wp
-        state_out.joint_q = q_out_wp
-        state_out.joint_qd = qd_out_wp
-        control.joint_f = f_wp
-        contacts = None
-        if self.contact_backend == "newton":
-            newton.eval_fk(self.model, state_in.joint_q, state_in.joint_qd, state_in)
-            contacts = self.model.collide(state_in, self.contacts)
-        self.solver.step(state_in, state_out, control, contacts, self.dt)
+        current_q_wp = q_wp
+        current_qd_wp = qd_wp
+        intermediates = []
+        sub_dt = self.dt / self.sim_substeps
+        for substep in range(self.sim_substeps):
+            state_in = self.model.state(requires_grad=requires_grad)
+            state_out = self.model.state(requires_grad=requires_grad)
+            control = self.model.control(requires_grad=requires_grad)
+            if substep == self.sim_substeps - 1:
+                next_q_wp = q_out_wp
+                next_qd_wp = qd_out_wp
+            else:
+                next_q_wp = wp.empty_like(q_wp, requires_grad=requires_grad)
+                next_qd_wp = wp.empty_like(qd_wp, requires_grad=requires_grad)
+                intermediates.extend([next_q_wp, next_qd_wp])
+            state_in.joint_q = current_q_wp
+            state_in.joint_qd = current_qd_wp
+            state_out.joint_q = next_q_wp
+            state_out.joint_qd = next_qd_wp
+            control.joint_f = f_wp
+            contacts = None
+            if self.contact_backend == "newton":
+                newton.eval_fk(self.model, state_in.joint_q, state_in.joint_qd, state_in)
+                contacts = self.model.collide(state_in, self.contacts)
+            self.solver.step(state_in, state_out, control, contacts, sub_dt)
+            current_q_wp = next_q_wp
+            current_qd_wp = next_qd_wp
         wp.synchronize()
         self.last_state = state_out
-        return {"q": q_wp, "qd": qd_wp, "joint_f": f_wp, "q_out": q_out_wp, "qd_out": qd_out_wp}
+        return {
+            "q": q_wp,
+            "qd": qd_wp,
+            "joint_f": f_wp,
+            "q_out": q_out_wp,
+            "qd_out": qd_out_wp,
+            "_intermediates": intermediates,
+        }
 
     def step(self, q: torch.Tensor, qd: torch.Tensor, joint_f: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return NewtonMuJoCoStep.apply(q, qd, joint_f, self.step_ctx)
@@ -1026,7 +1052,11 @@ class NewtonMuJoCoTorchEnv:
     def fallen_state(self, q: torch.Tensor) -> torch.Tensor:
         if self.env_name == "hopper":
             finite = torch.isfinite(q).all(dim=-1)
-            return torch.logical_and(finite, q[:, 1] < HOPPER_TERMINATION_HEIGHT)
+            low_height = q[:, 1] < HOPPER_TERMINATION_HEIGHT
+            if self.hopper_terminate_angle:
+                bad_angle = q[:, 2].abs() > HOPPER_TERMINATION_ANGLE
+                low_height = torch.logical_or(low_height, bad_angle)
+            return torch.logical_and(finite, low_height)
         if self.env_name != "ant":
             return torch.zeros(q.shape[0], dtype=torch.bool, device=q.device)
         finite = torch.isfinite(q).all(dim=-1)
@@ -1330,11 +1360,14 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        sim_substeps=args.sim_substeps,
+        mujoco_integrator=args.mujoco_integrator,
         acrobot_actuation=args.acrobot_actuation,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        hopper_terminate_angle=args.hopper_terminate_angle,
         locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
@@ -1589,10 +1622,14 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "num_envs": args.num_envs,
         "horizon": args.horizon,
         "dt": args.dt,
+        "sim_substeps": env.sim_substeps,
+        "mujoco_integrator": env.mujoco_integrator,
+        "disable_eulerdamp": True,
         "force_scale": args.force_scale,
         "stochastic_actor": args.stochastic_actor,
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
+        "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
@@ -1686,11 +1723,14 @@ def run_training(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        sim_substeps=args.sim_substeps,
+        mujoco_integrator=args.mujoco_integrator,
         acrobot_actuation=args.acrobot_actuation,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        hopper_terminate_angle=args.hopper_terminate_angle,
         locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
         ant_reward=AntRewardWeights(
             progress=args.ant_progress_weight,
@@ -2009,11 +2049,14 @@ def run_training(args: argparse.Namespace) -> dict:
                 dt=args.dt,
                 force_scale=args.force_scale,
                 contact_backend=args.contact_backend,
+                sim_substeps=args.sim_substeps,
+                mujoco_integrator=args.mujoco_integrator,
                 acrobot_actuation=args.acrobot_actuation,
                 ant_disable_joint_limits=args.ant_disable_joint_limits,
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                hopper_terminate_angle=args.hopper_terminate_angle,
                 locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
                 cartpole_reward=env.cartpole_reward,
                 ant_reward=env.ant_reward,
@@ -2042,6 +2085,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "horizon": args.horizon,
         "epochs": args.epochs,
         "dt": args.dt,
+        "sim_substeps": env.sim_substeps,
+        "mujoco_integrator": env.mujoco_integrator,
         "force_scale": args.force_scale,
         "episode_length": args.episode_length,
         "disable_eulerdamp": True,
@@ -2069,6 +2114,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "ant_reward": env.ant_reward.__dict__,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
+        "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
@@ -2338,6 +2384,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-horizon", type=int, default=None)
     parser.add_argument("--episode-length", type=int, default=None)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
+    parser.add_argument("--sim-substeps", type=int, default=1)
+    parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
     parser.add_argument("--lr", type=float, default=2.0e-3)
     parser.add_argument("--min-lr", type=float, default=1.0e-5)
     parser.add_argument("--lr-schedule", choices=["constant", "linear"], default=None)
@@ -2391,6 +2439,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hopper-progress-weight", type=float, default=1.0)
     parser.add_argument("--hopper-angle-weight", type=float, default=1.0)
     parser.add_argument("--hopper-action-penalty", type=float, default=-0.1)
+    parser.add_argument("--hopper-terminate-angle", action="store_true")
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")
     parser.add_argument("--seed", type=int, default=7)
