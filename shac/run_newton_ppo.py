@@ -685,7 +685,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-termination-height", type=float, default=0.27)
     parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
-    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac"], default="diffrl")
+    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac", "isaaclab"], default="diffrl")
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)

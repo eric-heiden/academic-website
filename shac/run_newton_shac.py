@@ -294,6 +294,30 @@ def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor,
 
 class NewtonMuJoCoStep(torch.autograd.Function):
     @staticmethod
+    def _snapshot_solver_state(env) -> tuple[int | None, dict[str, object]]:
+        solver = getattr(env, "solver", None)
+        data = getattr(solver, "mjw_data", None)
+        step = getattr(solver, "_step", None)
+        if data is None:
+            return step, {}
+        fields = {}
+        for name in ("qfrc_applied", "xfrc_applied", "ctrl", "act", "qacc_warmstart"):
+            if hasattr(data, name):
+                fields[name] = getattr(data, name)
+        return step, fields
+
+    @staticmethod
+    def _restore_solver_state(env, step: int | None, fields: dict[str, object]) -> None:
+        solver = getattr(env, "solver", None)
+        data = getattr(solver, "mjw_data", None)
+        if solver is not None and step is not None:
+            solver._step = step
+        if data is None:
+            return
+        for name, value in fields.items():
+            setattr(data, name, value)
+
+    @staticmethod
     def forward(ctx, q: torch.Tensor, qd: torch.Tensor, joint_f: torch.Tensor, step_ctx: StepContext):
         env = step_ctx.env
         q_in = q.detach().contiguous()
@@ -317,39 +341,47 @@ class NewtonMuJoCoStep(torch.autograd.Function):
         q_out = torch.empty_like(q_req)
         qd_out = torch.empty_like(qd_req)
 
-        env.zero_solver_buffers()
-        with wp.Tape() as tape:
-            arrays = env.step_warp(
-                q_req,
-                qd_req,
-                joint_f_req,
-                q_out,
-                qd_out,
-                requires_grad=True,
-                zero_buffers=False,
-            )
+        solver_step, solver_fields = NewtonMuJoCoStep._snapshot_solver_state(env)
+        try:
+            env.zero_solver_buffers()
+            with wp.Tape() as tape:
+                arrays = env.step_warp(
+                    q_req,
+                    qd_req,
+                    joint_f_req,
+                    q_out,
+                    qd_out,
+                    requires_grad=True,
+                    zero_buffers=False,
+                )
 
-        grads = {}
-        if grad_q_out is not None:
-            grads[arrays["q_out"]] = wp.from_torch(grad_q_out.contiguous().view(-1), dtype=wp.float32)
-        if grad_qd_out is not None:
-            grads[arrays["qd_out"]] = wp.from_torch(grad_qd_out.contiguous().view(-1), dtype=wp.float32)
+            grads = {}
+            if grad_q_out is not None:
+                grads[arrays["q_out"]] = wp.from_torch(grad_q_out.contiguous().view(-1), dtype=wp.float32)
+            if grad_qd_out is not None:
+                grads[arrays["qd_out"]] = wp.from_torch(grad_qd_out.contiguous().view(-1), dtype=wp.float32)
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Running the tape backwards may produce incorrect gradients.*",
-                category=UserWarning,
-            )
-            tape.backward(grads=grads)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Running the tape backwards may produce incorrect gradients.*",
+                    category=UserWarning,
+                )
+                tape.backward(grads=grads)
 
-        def torch_grad(name: str, template: torch.Tensor) -> torch.Tensor:
-            grad = tape.gradients.get(arrays[name])
-            if grad is None:
-                return torch.zeros_like(template)
-            return wp.to_torch(grad).reshape_as(template).clone()
+            def torch_grad(name: str, template: torch.Tensor) -> torch.Tensor:
+                grad = tape.gradients.get(arrays[name])
+                if grad is None:
+                    return torch.zeros_like(template)
+                return wp.to_torch(grad).reshape_as(template).clone()
 
-        return torch_grad("q", q), torch_grad("qd", qd), torch_grad("joint_f", joint_f), None
+            q_grad = torch_grad("q", q)
+            qd_grad = torch_grad("qd", qd)
+            joint_f_grad = torch_grad("joint_f", joint_f)
+        finally:
+            NewtonMuJoCoStep._restore_solver_state(env, solver_step, solver_fields)
+
+        return q_grad, qd_grad, joint_f_grad, None
 
 
 class NewtonMuJoCoTorchEnv:
@@ -400,6 +432,12 @@ class NewtonMuJoCoTorchEnv:
         phase_period: int = 60,
         hopper_terminate_angle: bool = False,
         locomotion_disable_joint_limits: bool = False,
+        mujoco_smooth_adjoint: str = "off",
+        mujoco_smooth_friction_viscosity: float = 10.0,
+        mujoco_smooth_friction_scale: float = 0.01,
+        mujoco_smooth_friction_bypass_kf: float = 0.0,
+        mujoco_smooth_penalty_damping_alpha: float = 0.0,
+        mujoco_smooth_friction_surrogate_alpha: float = 0.9,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -446,6 +484,12 @@ class NewtonMuJoCoTorchEnv:
         self.phase_period = max(1, int(phase_period))
         self.hopper_terminate_angle = hopper_terminate_angle
         self.locomotion_disable_joint_limits = locomotion_disable_joint_limits
+        self.mujoco_smooth_adjoint = mujoco_smooth_adjoint
+        self.mujoco_smooth_friction_viscosity = mujoco_smooth_friction_viscosity
+        self.mujoco_smooth_friction_scale = mujoco_smooth_friction_scale
+        self.mujoco_smooth_friction_bypass_kf = mujoco_smooth_friction_bypass_kf
+        self.mujoco_smooth_penalty_damping_alpha = mujoco_smooth_penalty_damping_alpha
+        self.mujoco_smooth_friction_surrogate_alpha = mujoco_smooth_friction_surrogate_alpha
         self.acrobot_link_length = 1.0
         self.contact_body_radius = 0.22
         self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
@@ -493,6 +537,17 @@ class NewtonMuJoCoTorchEnv:
         # them explicitly so SHAC receives reliable state gradients.
         self.solver.mj_model.opt.disableflags |= mujoco.mjtDisableBit.mjDSBL_EULERDAMP
         self.solver.mjw_model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_EULERDAMP)
+        if use_contacts and mujoco_smooth_adjoint != "off":
+            mujoco_warp.enable_smooth_adjoint(
+                self.solver.mjw_data,
+                friction_viscosity=mujoco_smooth_friction_viscosity,
+                friction_scale=mujoco_smooth_friction_scale,
+                friction_bypass_kf=mujoco_smooth_friction_bypass_kf,
+                free_body_adjoint=mujoco_smooth_adjoint == "free_body",
+                penalty_damping_alpha=mujoco_smooth_penalty_damping_alpha,
+                friction_surrogate_adjoint=mujoco_smooth_adjoint == "surrogate",
+                friction_surrogate_alpha=mujoco_smooth_friction_surrogate_alpha,
+            )
         self.contacts = self.model.contacts() if contact_backend == "newton" else None
         self.step_ctx = StepContext(self)
         self.q_dim = self.model.joint_coord_count // self.num_envs
@@ -1243,7 +1298,7 @@ class NewtonMuJoCoTorchEnv:
 
         if obs is None:
             obs = self.observe(q, qd, action)
-        if self.ant_reward_style == "isaac":
+        if self.ant_reward_style in {"isaac", "isaaclab"}:
             if self.ant_observation_style == "isaac":
                 up_proj = obs[:, 10]
                 heading_proj = obs[:, 11]
@@ -1264,13 +1319,16 @@ class NewtonMuJoCoTorchEnv:
             actions_cost = action.square().sum(dim=-1)
             energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
             dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
-            height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
+            height_term: torch.Tensor | float = 0.0
+            if self.ant_reward_style == "isaac":
+                height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
+                height_term = weights.height * height_reward
             return (
                 weights.progress * qd[:, 0]
                 + weights.alive
                 + heading_reward
                 + up_reward
-                + weights.height * height_reward
+                + height_term
                 - weights.actions_cost * actions_cost
                 - weights.energy_cost * energy_cost
                 - weights.dof_limit_cost * dof_limit_cost
@@ -3061,7 +3119,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-termination-height", type=float, default=ANT_TERMINATION_HEIGHT)
     parser.add_argument("--ant-max-healthy-height", type=float, default=ANT_MAX_HEALTHY_HEIGHT)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
-    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac"], default="diffrl")
+    parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac", "isaaclab"], default="diffrl")
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
