@@ -283,10 +283,9 @@
           video still comes from the original Gym damping/friction actor replayed at force scale 9: 5.24 m over 480 frames
           with zero falls and mean heading 0.90. The newest IsaacLab-physical run uses contact friction 1.0 and hinge damping
           0.1; its force-10 PPO replay reaches 4.96 m with zero falls and mean heading 0.94, and a 12-epoch SHAC warm-start
-          improves the selected rollout to 5.15 m with zero falls. The final SHAC eval is 5.00 m with zero falls.
-          Hopper remains unresolved: the new Newton
-          per-DOF MJCF joint-anchor fix makes the MuJoCo-exported root slides/hinges physically coherent, and SHAC can
-          preserve a zero-fall standing policy, but neither PPO nor SHAC has produced reliable hopping yet.
+          improves the selected rollout to 5.15 m with zero falls. Hopper is now solved as a stepping-stone: a DiffRL-exact
+          PPO run reaches 14.49 m over 480 frames, and SHAC warm-started from that no-LayerNorm PPO actor selects a zero-fall
+          14.49 m rollout before longer short-horizon updates drift into falls.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -342,8 +341,9 @@
           H=5 one-step state/action error is 8.1e-5. On the harness side, Newton-contact vectorized environments now use
           nonzero world spacing, PPO checkpoints can warm-start SHAC actors, Ant actions can follow either IsaacLab-like
           joint order or MuJoCo actuator order, the Isaac-style Ant height reward now uses <code>ant_height_weight</code>,
-          and checkpoint selection can include
-          forward displacement. Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
+          checkpoint selection can include
+          forward displacement, and SHAC can now use a no-LayerNorm actor architecture that exactly matches PPO checkpoints.
+          Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
           joints back to MuJoCo and when it refreshes the MJWarp runtime model. Every run records the imported Newton and
           MJWarp commits in its JSON artifact.
@@ -352,14 +352,12 @@
       <article class="panel warn">
         <h2>What Is Not Fixed</h2>
         <p>
-          Hopper is still not solved. The thigh and leg start on their upper stops in the DiffRL MJCF, so stochastic reset
-          noise was previously injecting limit violations; the harness now clamps finite-limit planar joints back inside the
-          limits and can start Hopper slightly inside the stops. That fix is necessary but not sufficient: PPO with a
-          Gym-style alive/forward reward, PPO curriculum from the upright checkpoint, inside-limit progress-weighted PPO,
-          and the post-anchor-fix SHAC warm-start all fail to produce true hopping. Ant PPO is now reliable under the
-          IsaacLab-style direct settings, but the gait is still a low crawl rather than a tall natural walk. The newest
-          force-10 SHAC run can slightly improve the physical PPO baseline, but longer SHAC runs still drift toward slower
-          policies, so the remaining Ant work is making that improvement reliable over longer training.
+          Hopper is solved for PPO and SHAC warm-start selection, but not for long unconstrained SHAC continuation: after
+          epoch 2, the 32-step differentiable objective increases short-horizon reward while the 480-step selected rollout
+          accumulates falls. The Gym-style Hopper reward remains a negative control for this DiffRL asset. Ant PPO is now
+          reliable under the IsaacLab-style direct settings, but the gait is still a low crawl rather than a tall natural
+          walk. The newest force-10 SHAC run can slightly improve the physical PPO baseline, but longer SHAC runs still drift
+          toward slower policies, so the remaining Ant work is making that improvement reliable over longer training.
         </p>
       </article>
     </section>
@@ -602,28 +600,29 @@
     </section>
 
     <section class="grid two">
-      <article class="panel warn">
-        <h2>Hopper SHAC After Anchor Fix</h2>
+      <article class="panel ok">
+        <h2>Hopper SHAC, DiffRL-Exact Warm-Start</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_shac_warm_anchorfix_diffrl_ppo100_32env_40ep_run1/hopper_poster.png">
-            <source src="assets/hopper_shac_warm_anchorfix_diffrl_ppo100_32env_40ep_run1/hopper_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/hopper_shac_warm_ppo_diffrl_exact_64env_50ep_run2/hopper_poster.png">
+            <source src="assets/hopper_shac_warm_ppo_diffrl_exact_64env_50ep_run2/hopper_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC initialized from the post-anchor-fix PPO checkpoint. It selects a 480-frame zero-fall policy with 574.5
-            return, but only 0.41 m displacement. The fix makes Hopper coherent; the optimizer still preserves balance
-            rather than learning to hop.
+            SHAC initialized from the DiffRL-exact PPO actor with matching no-LayerNorm architecture. The selected epoch
+            reaches 14.49 m over 480 frames with zero falls; final best-policy eval reports 14.30 m with one fall event.
+            Later SHAC epochs drift into short-horizon fall-prone updates, so best-rollout selection remains necessary.
           </figcaption>
         </figure>
       </article>
-      <article class="panel warn">
-        <h2>Hopper PPO After Anchor Fix</h2>
+      <article class="panel ok">
+        <h2>Hopper PPO, DiffRL-Exact</h2>
         <figure>
-          <video controls preload="metadata" poster="assets/hopper_ppo_anchorfix_diffrl_128env_100upd_run1/hopper_ppo_poster.png">
-            <source src="assets/hopper_ppo_anchorfix_diffrl_128env_100upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="metadata" poster="assets/hopper_ppo_diffrl_exact_1024env_240upd_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_diffrl_exact_1024env_240upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            PPO with corrected root joint anchors and DiffRL-style Hopper reward moves 1.51 m, but every eval episode still
-            terminates by falling. This is better than the pre-anchor collapse, but not solved locomotion.
+            PPO matched to DiffRL Hopper settings: 1024 actors, 32-step rollouts, no LayerNorm, 16 substeps, height-only
+            early termination, and the original DiffRL reward. The selected policy reaches 14.49 m over 480 frames with
+            one fall event in final eval and trains at 15.1k sim FPS.
           </figcaption>
         </figure>
       </article>
@@ -1564,6 +1563,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.violet
       },
       {
+        id: "hopperPpoDiffrlExact",
+        label: "Hopper PPO DiffRL-exact",
+        path: "assets/hopper_ppo_diffrl_exact_1024env_240upd_run1/hopper_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "hopperShacDiffrlExact",
+        label: "Hopper SHAC DiffRL-exact",
+        path: "assets/hopper_shac_warm_ppo_diffrl_exact_64env_50ep_run2/hopper_results.json",
+        color: colors.teal
+      },
+      {
         id: "hopperPpoGymBad",
         label: "Hopper PPO Gym probe",
         path: "assets/hopper_ppo_gym_progress2_term_angle_256env_200upd_run1/hopper_ppo_history_live.json",
@@ -2095,6 +2106,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["PPO warm-start SHAC", presentRuns.find((run) => run.id === "hopperShacWarmPpo")?.data, colors.teal],
         ["anchor-fix PPO", presentRuns.find((run) => run.id === "hopperPpoAnchorFix")?.data, colors.green],
         ["anchor-fix SHAC", presentRuns.find((run) => run.id === "hopperShacAnchorFix")?.data, colors.violet],
+        ["DiffRL-exact PPO", presentRuns.find((run) => run.id === "hopperPpoDiffrlExact")?.data, colors.green],
+        ["DiffRL-exact SHAC", presentRuns.find((run) => run.id === "hopperShacDiffrlExact")?.data, colors.teal],
         ["no-limit diagnostic", hopperTrainNoLimits, colors.violet]
       ].filter(([, data]) => data?.history);
       if (hopperTrainingRows.length) {
@@ -2103,7 +2116,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
             type: "scatter",
             mode: "lines",
             name: `${name} reward`,
-            x: data.history.map((row) => row.epoch),
+            x: data.history.map((row, index) => row.epoch ?? row.update ?? index + 1),
             y: data.history.map((row) => row.mean_reward),
             line: { color, width: 3 }
           })),
@@ -2111,7 +2124,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
             type: "scatter",
             mode: "lines",
             name: `${name} selection`,
-            x: data.history.map((row) => row.epoch),
+            x: data.history.map((row, index) => row.epoch ?? row.update ?? index + 1),
             y: data.history.map((row) => row.selection_score),
             yaxis: "y2",
             line: { color, width: 2, dash: "dot" }

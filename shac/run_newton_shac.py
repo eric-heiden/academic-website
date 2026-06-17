@@ -386,6 +386,16 @@ class NewtonMuJoCoTorchEnv:
         ant_action_order: str = "joint",
         hopper_reward_style: str = "diffrl",
         hopper_start_joint_q: list[float] | None = None,
+        hopper_contact_mu: float = 0.9,
+        hopper_joint_damping: float = 2.0,
+        hopper_armature: float = 1.0,
+        hopper_termination_height: float = HOPPER_TERMINATION_HEIGHT,
+        hopper_termination_angle: float = HOPPER_TERMINATION_ANGLE,
+        hopper_termination_height_tolerance: float = HOPPER_TERMINATION_HEIGHT_TOLERANCE,
+        hopper_reset_position_scale: float = 0.05,
+        hopper_reset_angle_scale: float = 0.1,
+        hopper_reset_joint_scale: float = 0.05,
+        hopper_reset_velocity_scale: float = 0.05,
         phase_observation: bool = False,
         phase_period: int = 60,
         hopper_terminate_angle: bool = False,
@@ -422,6 +432,16 @@ class NewtonMuJoCoTorchEnv:
         self.ant_action_order = ant_action_order
         self.hopper_reward_style = hopper_reward_style
         self.hopper_start_joint_q = hopper_start_joint_q
+        self.hopper_contact_mu = hopper_contact_mu
+        self.hopper_joint_damping = hopper_joint_damping
+        self.hopper_armature = hopper_armature
+        self.hopper_termination_height = hopper_termination_height
+        self.hopper_termination_angle = hopper_termination_angle
+        self.hopper_termination_height_tolerance = hopper_termination_height_tolerance
+        self.hopper_reset_position_scale = hopper_reset_position_scale
+        self.hopper_reset_angle_scale = hopper_reset_angle_scale
+        self.hopper_reset_joint_scale = hopper_reset_joint_scale
+        self.hopper_reset_velocity_scale = hopper_reset_velocity_scale
         self.phase_observation = phase_observation
         self.phase_period = max(1, int(phase_period))
         self.hopper_terminate_angle = hopper_terminate_angle
@@ -747,9 +767,9 @@ class NewtonMuJoCoTorchEnv:
             asset_name="hopper.xml",
             num_actions=3,
             start_height=HOPPER_START_HEIGHT,
-            contact_mu=0.9,
-            joint_damping=2.0,
-            armature=1.0,
+            contact_mu=self.hopper_contact_mu,
+            joint_damping=self.hopper_joint_damping,
+            armature=self.hopper_armature,
         )
 
     def _build_cheetah(self) -> None:
@@ -850,7 +870,14 @@ class NewtonMuJoCoTorchEnv:
         if self.env_name == "ant" and stochastic_init:
             q, qd = self._randomize_ant_reset(q, qd)
         elif self.env_name == "hopper" and stochastic_init:
-            q, qd = self._randomize_planar_reset(q, qd, position_scale=0.05, angle_scale=0.1, joint_scale=0.05, velocity_scale=0.05)
+            q, qd = self._randomize_planar_reset(
+                q,
+                qd,
+                position_scale=self.hopper_reset_position_scale,
+                angle_scale=self.hopper_reset_angle_scale,
+                joint_scale=self.hopper_reset_joint_scale,
+                velocity_scale=self.hopper_reset_velocity_scale,
+            )
         elif self.env_name == "cheetah" and stochastic_init:
             q, qd = self._randomize_planar_reset(q, qd, position_scale=0.1, angle_scale=0.2, joint_scale=0.1, velocity_scale=0.5)
         elif is_contact_target_env(self.env_name) and stochastic_init:
@@ -929,10 +956,10 @@ class NewtonMuJoCoTorchEnv:
             reset_q, reset_qd = self._randomize_planar_reset(
                 reset_q,
                 reset_qd,
-                position_scale=0.05,
-                angle_scale=0.1,
-                joint_scale=0.05,
-                velocity_scale=0.05,
+                position_scale=self.hopper_reset_position_scale,
+                angle_scale=self.hopper_reset_angle_scale,
+                joint_scale=self.hopper_reset_joint_scale,
+                velocity_scale=self.hopper_reset_velocity_scale,
             )
         elif self.env_name == "cheetah" and stochastic_init:
             reset_q, reset_qd = self._randomize_planar_reset(
@@ -1194,11 +1221,11 @@ class NewtonMuJoCoTorchEnv:
             weights = self.hopper_reward
             if self.hopper_reward_style == "gym":
                 return weights.progress * obs[:, 5] + weights.alive + weights.action * action.square().sum(dim=-1)
-            height_diff = obs[:, 0] - (HOPPER_TERMINATION_HEIGHT + HOPPER_TERMINATION_HEIGHT_TOLERANCE)
+            height_diff = obs[:, 0] - (self.hopper_termination_height + self.hopper_termination_height_tolerance)
             height_reward = torch.clamp(height_diff, -1.0, 0.3)
             height_reward = torch.where(height_reward < 0.0, -200.0 * height_reward.square(), height_reward)
             progress_reward = weights.progress * obs[:, 5]
-            angle_reward = weights.angle * (1.0 - obs[:, 1].square() / (HOPPER_TERMINATION_ANGLE**2))
+            angle_reward = weights.angle * (1.0 - obs[:, 1].square() / (self.hopper_termination_angle**2))
             return (
                 progress_reward
                 + weights.height * height_reward
@@ -1269,9 +1296,9 @@ class NewtonMuJoCoTorchEnv:
     def fallen_state(self, q: torch.Tensor) -> torch.Tensor:
         if self.env_name == "hopper":
             finite = torch.isfinite(q).all(dim=-1)
-            low_height = q[:, 1] < HOPPER_TERMINATION_HEIGHT
+            low_height = q[:, 1] < self.hopper_termination_height
             if self.hopper_terminate_angle:
-                bad_angle = q[:, 2].abs() > HOPPER_TERMINATION_ANGLE
+                bad_angle = q[:, 2].abs() > self.hopper_termination_angle
                 low_height = torch.logical_or(low_height, bad_angle)
             return torch.logical_and(finite, low_height)
         if self.env_name != "ant":
@@ -1332,14 +1359,56 @@ class NewtonMuJoCoTorchEnv:
         return state
 
 
+class NewtonPolicyMLP(torch.nn.Module):
+    def __init__(
+        self,
+        obs_dim: int,
+        action_dim: int,
+        hidden_dims: list[int],
+        *,
+        stochastic: bool,
+        actor_logstd_init: float,
+        device: torch.device,
+    ):
+        super().__init__()
+        layers: list[torch.nn.Module] = []
+        last_dim = obs_dim
+        for hidden_dim in hidden_dims:
+            layers.append(torch.nn.Linear(last_dim, hidden_dim))
+            layers.append(torch.nn.ELU())
+            last_dim = hidden_dim
+        self.backbone = torch.nn.Sequential(*layers)
+        self.mean = torch.nn.Linear(last_dim, action_dim)
+        self.log_std = torch.nn.Parameter(torch.full((action_dim,), actor_logstd_init))
+        self.stochastic = stochastic
+        self.to(device)
+
+    def forward(self, obs: torch.Tensor, deterministic: bool = False) -> torch.Tensor:
+        mean = self.mean(self.backbone(obs))
+        if deterministic or not self.stochastic:
+            return mean
+        std = self.log_std.exp()
+        return torch.distributions.Normal(mean, std).rsample()
+
+
 def make_actor(
     env: NewtonMuJoCoTorchEnv,
     stochastic: bool = False,
     hidden_dims: list[int] | None = None,
     actor_logstd_init: float = -1.0,
+    actor_layer_norm: bool = True,
 ) -> torch.nn.Module:
     if hidden_dims is None:
         hidden_dims = [128, 64, 32] if is_locomotion_env(env.env_name) else [64, 64]
+    if not actor_layer_norm:
+        return NewtonPolicyMLP(
+            env.num_obs,
+            env.num_actions,
+            hidden_dims,
+            stochastic=stochastic,
+            actor_logstd_init=actor_logstd_init,
+            device=env.torch_device,
+        )
     cfg = {
         "actor_mlp": {"units": hidden_dims, "activation": "elu"},
         "actor_logstd_init": actor_logstd_init,
@@ -1362,6 +1431,15 @@ def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.devi
         return
     except RuntimeError:
         pass
+
+    if "backbone.0.weight" in state and any(key.startswith("backbone.") for key in actor.state_dict()):
+        target = actor.state_dict()
+        filtered = {key: value for key, value in state.items() if key in target and target[key].shape == value.shape}
+        missing, unexpected = actor.load_state_dict(filtered, strict=False)
+        unexpected = [key for key in unexpected if key not in target]
+        missing = [key for key in missing if key != "log_std"]
+        if not unexpected and not missing:
+            return
 
     if "backbone.0.weight" not in state:
         actor.load_state_dict(state)
@@ -1646,6 +1724,16 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_action_order=args.ant_action_order,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
+        hopper_contact_mu=args.hopper_contact_mu,
+        hopper_joint_damping=args.hopper_joint_damping,
+        hopper_armature=args.hopper_armature,
+        hopper_termination_height=args.hopper_termination_height,
+        hopper_termination_angle=args.hopper_termination_angle,
+        hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+        hopper_reset_position_scale=args.hopper_reset_position_scale,
+        hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+        hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+        hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
         phase_observation=args.phase_observation,
         phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
@@ -1687,6 +1775,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         stochastic=args.stochastic_actor,
         hidden_dims=args.actor_hidden_dims,
         actor_logstd_init=args.actor_logstd_init,
+        actor_layer_norm=args.actor_layer_norm,
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
@@ -1934,11 +2023,22 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "stochastic_actor": args.stochastic_actor,
         "actor_hidden_dims": args.actor_hidden_dims,
         "actor_logstd_init": args.actor_logstd_init,
+        "actor_layer_norm": args.actor_layer_norm,
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
+        "hopper_termination_angle": env.hopper_termination_angle if args.env == "hopper" else None,
+        "hopper_termination_height": env.hopper_termination_height if args.env == "hopper" else None,
+        "hopper_termination_height_tolerance": env.hopper_termination_height_tolerance if args.env == "hopper" else None,
         "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
         "hopper_start_joint_q": env.hopper_start_joint_q if args.env == "hopper" else None,
+        "hopper_contact_mu": env.hopper_contact_mu if args.env == "hopper" else None,
+        "hopper_joint_damping": env.hopper_joint_damping if args.env == "hopper" else None,
+        "hopper_armature": env.hopper_armature if args.env == "hopper" else None,
+        "hopper_reset_position_scale": env.hopper_reset_position_scale if args.env == "hopper" else None,
+        "hopper_reset_angle_scale": env.hopper_reset_angle_scale if args.env == "hopper" else None,
+        "hopper_reset_joint_scale": env.hopper_reset_joint_scale if args.env == "hopper" else None,
+        "hopper_reset_velocity_scale": env.hopper_reset_velocity_scale if args.env == "hopper" else None,
         "contact_reward": env.contact_reward.__dict__ if is_contact_target_env(args.env) else None,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
@@ -2056,6 +2156,16 @@ def run_training(args: argparse.Namespace) -> dict:
         ant_action_order=args.ant_action_order,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
+        hopper_contact_mu=args.hopper_contact_mu,
+        hopper_joint_damping=args.hopper_joint_damping,
+        hopper_armature=args.hopper_armature,
+        hopper_termination_height=args.hopper_termination_height,
+        hopper_termination_angle=args.hopper_termination_angle,
+        hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+        hopper_reset_position_scale=args.hopper_reset_position_scale,
+        hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+        hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+        hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
         phase_observation=args.phase_observation,
         phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
@@ -2104,6 +2214,7 @@ def run_training(args: argparse.Namespace) -> dict:
         stochastic=args.stochastic_actor,
         hidden_dims=args.actor_hidden_dims,
         actor_logstd_init=args.actor_logstd_init,
+        actor_layer_norm=args.actor_layer_norm,
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
@@ -2322,12 +2433,19 @@ def run_training(args: argparse.Namespace) -> dict:
             best_train_reward = mean_reward
             best_epoch = epoch + 1
             best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+            torch.save(best_state, out_dir / f"{args.env}_best_actor.pt")
+            if critic is not None:
+                torch.save(
+                    {name: value.detach().clone() for name, value in critic.state_dict().items()},
+                    out_dir / f"{args.env}_best_critic.pt",
+                )
             if obs_rms is not None:
                 best_obs_rms = {
                     "mean": obs_rms.mean.detach().clone(),
                     "var": obs_rms.var.detach().clone(),
                     "count": obs_rms.count,
                 }
+                torch.save(best_obs_rms, out_dir / f"{args.env}_best_obs_rms.pt")
 
         epoch_s = time.perf_counter() - epoch_t0
         history.append(
@@ -2428,6 +2546,16 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_action_order=args.ant_action_order,
                 hopper_reward_style=args.hopper_reward_style,
                 hopper_start_joint_q=args.hopper_start_joint_q,
+                hopper_contact_mu=args.hopper_contact_mu,
+                hopper_joint_damping=args.hopper_joint_damping,
+                hopper_armature=args.hopper_armature,
+                hopper_termination_height=args.hopper_termination_height,
+                hopper_termination_angle=args.hopper_termination_angle,
+                hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+                hopper_reset_position_scale=args.hopper_reset_position_scale,
+                hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+                hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+                hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
                 phase_observation=args.phase_observation,
                 phase_period=args.phase_period,
                 hopper_terminate_angle=args.hopper_terminate_angle,
@@ -2473,6 +2601,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "stochastic_actor": args.stochastic_actor,
         "actor_hidden_dims": args.actor_hidden_dims,
         "actor_logstd_init": args.actor_logstd_init,
+        "actor_layer_norm": args.actor_layer_norm,
         "critic_hidden_dims": args.critic_hidden_dims,
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
@@ -2512,8 +2641,18 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_reward": env.ant_reward.__dict__,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
+        "hopper_termination_angle": env.hopper_termination_angle if args.env == "hopper" else None,
+        "hopper_termination_height": env.hopper_termination_height if args.env == "hopper" else None,
+        "hopper_termination_height_tolerance": env.hopper_termination_height_tolerance if args.env == "hopper" else None,
         "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
         "hopper_start_joint_q": env.hopper_start_joint_q if args.env == "hopper" else None,
+        "hopper_contact_mu": env.hopper_contact_mu if args.env == "hopper" else None,
+        "hopper_joint_damping": env.hopper_joint_damping if args.env == "hopper" else None,
+        "hopper_armature": env.hopper_armature if args.env == "hopper" else None,
+        "hopper_reset_position_scale": env.hopper_reset_position_scale if args.env == "hopper" else None,
+        "hopper_reset_angle_scale": env.hopper_reset_angle_scale if args.env == "hopper" else None,
+        "hopper_reset_joint_scale": env.hopper_reset_joint_scale if args.env == "hopper" else None,
+        "hopper_reset_velocity_scale": env.hopper_reset_velocity_scale if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
@@ -2790,6 +2929,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=None)
     parser.add_argument("--critic-hidden-dims", type=parse_int_list, default=None)
     parser.add_argument("--actor-logstd-init", type=float, default=-1.0)
+    parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
+    parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
     parser.add_argument("--use-critic", dest="use_critic", action="store_true", default=None)
     parser.add_argument("--no-critic", dest="use_critic", action="store_false")
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=None)
@@ -2845,6 +2986,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hopper-alive-reward", type=float, default=1.0)
     parser.add_argument("--hopper-reward-style", choices=["diffrl", "gym"], default="diffrl")
     parser.add_argument("--hopper-start-joint-q", type=parse_float_list, default=None)
+    parser.add_argument("--hopper-contact-mu", type=float, default=0.9)
+    parser.add_argument("--hopper-joint-damping", type=float, default=2.0)
+    parser.add_argument("--hopper-armature", type=float, default=1.0)
+    parser.add_argument("--hopper-termination-height", type=float, default=HOPPER_TERMINATION_HEIGHT)
+    parser.add_argument("--hopper-termination-angle", type=float, default=HOPPER_TERMINATION_ANGLE)
+    parser.add_argument("--hopper-termination-height-tolerance", type=float, default=HOPPER_TERMINATION_HEIGHT_TOLERANCE)
+    parser.add_argument("--hopper-reset-position-scale", type=float, default=0.05)
+    parser.add_argument("--hopper-reset-angle-scale", type=float, default=0.1)
+    parser.add_argument("--hopper-reset-joint-scale", type=float, default=0.05)
+    parser.add_argument("--hopper-reset-velocity-scale", type=float, default=0.05)
     parser.add_argument("--hopper-terminate-angle", action="store_true")
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")

@@ -16,6 +16,9 @@ from run_newton_shac import (
     CartpoleRewardWeights,
     CheetahRewardWeights,
     ContactTargetRewardWeights,
+    HOPPER_TERMINATION_ANGLE,
+    HOPPER_TERMINATION_HEIGHT,
+    HOPPER_TERMINATION_HEIGHT_TOLERANCE,
     HopperRewardWeights,
     NewtonMuJoCoTorchEnv,
     load_actor_checkpoint,
@@ -33,6 +36,10 @@ def dataclass_from_json(cls: type[T], value: dict[str, Any] | None) -> T:
     if not value:
         return cls()
     return cls(**{key: item for key, item in value.items() if key in allowed})
+
+
+def json_float(value: Any, default: float) -> float:
+    return default if value is None else float(value)
 
 
 def load_run_json(path: Path) -> dict[str, Any]:
@@ -103,6 +110,18 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_action_order=result.get("ant_action_order") or "joint",
         hopper_reward_style=result.get("hopper_reward_style") or "diffrl",
         hopper_start_joint_q=result.get("hopper_start_joint_q"),
+        hopper_contact_mu=json_float(result.get("hopper_contact_mu"), 0.9),
+        hopper_joint_damping=json_float(result.get("hopper_joint_damping"), 2.0),
+        hopper_armature=json_float(result.get("hopper_armature"), 1.0),
+        hopper_termination_height=json_float(result.get("hopper_termination_height"), HOPPER_TERMINATION_HEIGHT),
+        hopper_termination_angle=json_float(result.get("hopper_termination_angle"), HOPPER_TERMINATION_ANGLE),
+        hopper_termination_height_tolerance=json_float(
+            result.get("hopper_termination_height_tolerance"), HOPPER_TERMINATION_HEIGHT_TOLERANCE
+        ),
+        hopper_reset_position_scale=json_float(result.get("hopper_reset_position_scale"), 0.05),
+        hopper_reset_angle_scale=json_float(result.get("hopper_reset_angle_scale"), 0.1),
+        hopper_reset_joint_scale=json_float(result.get("hopper_reset_joint_scale"), 0.05),
+        hopper_reset_velocity_scale=json_float(result.get("hopper_reset_velocity_scale"), 0.05),
         phase_observation=bool(result.get("phase_observation") or False),
         phase_period=int(result.get("phase_period") or 60),
         hopper_terminate_angle=bool(result.get("hopper_terminate_angle") or False),
@@ -164,6 +183,7 @@ def main() -> None:
             stochastic=bool(result.get("stochastic_actor") or False),
             hidden_dims=result.get("actor_hidden_dims"),
             actor_logstd_init=float(result.get("actor_logstd_init") or -1.0),
+            actor_layer_norm=bool(result.get("actor_layer_norm", True)),
         )
         load_actor_checkpoint(actor, actor_path, env.torch_device)
     actor.eval()

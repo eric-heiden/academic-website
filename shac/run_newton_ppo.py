@@ -18,6 +18,9 @@ from run_newton_shac import (
     ANT_DEFAULT_SELECTION_INVALID_PENALTY,
     ANT_DEFAULT_TERMINATION_PENALTY,
     ANT_INVALID_PENALTY,
+    HOPPER_TERMINATION_ANGLE,
+    HOPPER_TERMINATION_HEIGHT,
+    HOPPER_TERMINATION_HEIGHT_TOLERANCE,
     AntRewardWeights,
     CheetahRewardWeights,
     HopperRewardWeights,
@@ -157,6 +160,16 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_action_order=args.ant_action_order,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
+        hopper_contact_mu=args.hopper_contact_mu,
+        hopper_joint_damping=args.hopper_joint_damping,
+        hopper_armature=args.hopper_armature,
+        hopper_termination_height=args.hopper_termination_height,
+        hopper_termination_angle=args.hopper_termination_angle,
+        hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+        hopper_reset_position_scale=args.hopper_reset_position_scale,
+        hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+        hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+        hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
         phase_observation=args.phase_observation,
         phase_period=args.phase_period,
         hopper_terminate_angle=args.hopper_terminate_angle,
@@ -366,12 +379,14 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 best_score = selection_score
                 best_update = update + 1
                 best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+                torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
                 if obs_rms is not None:
                     best_obs_rms = {
                         "mean": obs_rms.mean.detach().clone(),
                         "var": obs_rms.var.detach().clone(),
                         "count": obs_rms.count,
                     }
+                    torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
 
         update_s = time.perf_counter() - update_t0
         mean_reward = float(torch.stack(mean_reward_steps).mean().cpu())
@@ -470,6 +485,16 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_action_order=args.ant_action_order,
                 hopper_reward_style=args.hopper_reward_style,
                 hopper_start_joint_q=args.hopper_start_joint_q,
+                hopper_contact_mu=args.hopper_contact_mu,
+                hopper_joint_damping=args.hopper_joint_damping,
+                hopper_armature=args.hopper_armature,
+                hopper_termination_height=args.hopper_termination_height,
+                hopper_termination_angle=args.hopper_termination_angle,
+                hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+                hopper_reset_position_scale=args.hopper_reset_position_scale,
+                hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+                hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+                hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
                 phase_observation=args.phase_observation,
                 phase_period=args.phase_period,
                 hopper_terminate_angle=args.hopper_terminate_angle,
@@ -531,8 +556,18 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "initial_log_std": args.initial_log_std,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
+        "hopper_termination_angle": env.hopper_termination_angle if args.env == "hopper" else None,
+        "hopper_termination_height": env.hopper_termination_height if args.env == "hopper" else None,
+        "hopper_termination_height_tolerance": env.hopper_termination_height_tolerance if args.env == "hopper" else None,
         "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
         "hopper_start_joint_q": env.hopper_start_joint_q if args.env == "hopper" else None,
+        "hopper_contact_mu": env.hopper_contact_mu if args.env == "hopper" else None,
+        "hopper_joint_damping": env.hopper_joint_damping if args.env == "hopper" else None,
+        "hopper_armature": env.hopper_armature if args.env == "hopper" else None,
+        "hopper_reset_position_scale": env.hopper_reset_position_scale if args.env == "hopper" else None,
+        "hopper_reset_angle_scale": env.hopper_reset_angle_scale if args.env == "hopper" else None,
+        "hopper_reset_joint_scale": env.hopper_reset_joint_scale if args.env == "hopper" else None,
+        "hopper_reset_velocity_scale": env.hopper_reset_velocity_scale if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_reward": env.ant_reward.__dict__ if args.env == "ant" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
@@ -642,6 +677,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hopper-alive-reward", type=float, default=1.0)
     parser.add_argument("--hopper-reward-style", choices=["diffrl", "gym"], default="diffrl")
     parser.add_argument("--hopper-start-joint-q", type=parse_float_list, default=None)
+    parser.add_argument("--hopper-contact-mu", type=float, default=0.9)
+    parser.add_argument("--hopper-joint-damping", type=float, default=2.0)
+    parser.add_argument("--hopper-armature", type=float, default=1.0)
+    parser.add_argument("--hopper-termination-height", type=float, default=HOPPER_TERMINATION_HEIGHT)
+    parser.add_argument("--hopper-termination-angle", type=float, default=HOPPER_TERMINATION_ANGLE)
+    parser.add_argument("--hopper-termination-height-tolerance", type=float, default=HOPPER_TERMINATION_HEIGHT_TOLERANCE)
+    parser.add_argument("--hopper-reset-position-scale", type=float, default=0.05)
+    parser.add_argument("--hopper-reset-angle-scale", type=float, default=0.1)
+    parser.add_argument("--hopper-reset-joint-scale", type=float, default=0.05)
+    parser.add_argument("--hopper-reset-velocity-scale", type=float, default=0.05)
     parser.add_argument("--hopper-terminate-angle", action="store_true")
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")
