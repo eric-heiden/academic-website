@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
+import numpy as np
 import torch
 import warp as wp
 
@@ -43,7 +44,46 @@ class SmoothedFollowCamera:
         self.preset = preset or PRESETS.get(self.base_env_name, PRESETS["ant"])
         self._target: torch.Tensor | None = None
 
-    def target_from_q(self, q: torch.Tensor) -> torch.Tensor:
+    def target_from_state(self, q: torch.Tensor, state=None, model=None) -> torch.Tensor | None:
+        if state is None or model is None or not hasattr(state, "body_q") or state.body_q is None:
+            return None
+        try:
+            body_q = state.body_q.numpy()
+        except Exception:
+            return None
+        if body_q is None or len(body_q) == 0:
+            return None
+        body_q = np.asarray(body_q)
+        if body_q.ndim != 2 or body_q.shape[1] < 3:
+            return None
+        env_count = int(q.shape[0]) if hasattr(q, "shape") and len(q.shape) > 0 else 1
+        body_count = body_q.shape[0] // max(1, env_count)
+        if body_count <= 0:
+            return None
+        pos = body_q[:body_count, :3]
+        finite = np.isfinite(pos).all(axis=1)
+        if not finite.any():
+            return None
+
+        weights = None
+        if hasattr(model, "body_mass") and model.body_mass is not None:
+            try:
+                mass = np.asarray(model.body_mass.numpy(), dtype=np.float64)
+                if mass.shape[0] >= body_count:
+                    weights = mass[:body_count]
+                    weights = np.where(np.isfinite(weights) & (weights > 0.0), weights, 0.0)
+            except Exception:
+                weights = None
+        if weights is None or float(weights[finite].sum()) <= 0.0:
+            center = pos[finite].mean(axis=0)
+        else:
+            center = np.average(pos[finite], axis=0, weights=weights[finite])
+        return torch.tensor(center, dtype=torch.float32)
+
+    def target_from_q(self, q: torch.Tensor, state=None, model=None) -> torch.Tensor:
+        state_target = self.target_from_state(q, state=state, model=model)
+        if state_target is not None and self.base_env_name in {"ant", "hopper", "cheetah"}:
+            return state_target
         q0 = q[0].detach().to(dtype=torch.float32, device="cpu")
         if self.base_env_name in {"ant", "contact_sphere", "contact_capsule"}:
             return q0[0:3].clone()
@@ -57,8 +97,8 @@ class SmoothedFollowCamera:
             return q0[0:3].clone()
         return torch.zeros(3, dtype=torch.float32)
 
-    def update(self, viewer, q: torch.Tensor) -> None:
-        raw_target = self.target_from_q(q)
+    def update(self, viewer, q: torch.Tensor, *, state=None, model=None) -> None:
+        raw_target = self.target_from_q(q, state=state, model=model)
         if self._target is None:
             self._target = raw_target
         else:

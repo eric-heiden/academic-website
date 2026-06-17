@@ -95,7 +95,9 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         force_scale=float(result.get("force_scale") or 200.0),
         contact_backend=result.get("contact_backend") or ("mujoco" if env_name in {"ant", "hopper", "cheetah"} else "none"),
         acrobot_actuation=result.get("acrobot_actuation") or "elbow",
+        ant_asset=result.get("ant_asset") or "diffrl",
         ant_disable_joint_limits=bool(result.get("ant_disable_joint_limits") or False),
+        ant_density_override=result.get("ant_density_override"),
         ant_contact_margin=float(result.get("ant_contact_margin") or 0.0),
         ant_contact_gap=result.get("ant_contact_gap"),
         ant_contact_mu=float(result.get("ant_contact_mu") or 0.75),
@@ -103,6 +105,10 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_min_up=result.get("ant_min_up"),
         ant_start_height=result.get("ant_start_height"),
         ant_start_joint_q=result.get("ant_start_joint_q"),
+        ant_reset_position_scale=json_float(result.get("ant_reset_position_scale"), 0.1),
+        ant_reset_angle_scale=json_float(result.get("ant_reset_angle_scale"), 0.1308996938995747),
+        ant_reset_joint_scale=json_float(result.get("ant_reset_joint_scale"), 0.2),
+        ant_reset_velocity_scale=json_float(result.get("ant_reset_velocity_scale"), 0.25),
         ant_termination_height=float(result.get("ant_termination_height") or 0.27),
         ant_max_healthy_height=float(result.get("ant_max_healthy_height") or 1.5),
         ant_observation_style=result.get("ant_observation_style") or "diffrl",
@@ -145,6 +151,7 @@ def ppo_actor_from_result(result: dict[str, Any], env: NewtonMuJoCoTorchEnv) -> 
         [int(width) for width in hidden_dims],
         layer_norm=True if layer_norm is None else bool(layer_norm),
         initial_log_std=-0.5 if initial_log_std is None else float(initial_log_std),
+        action_squash=result.get("action_squash") or "tanh",
     ).to(env.torch_device)
 
 

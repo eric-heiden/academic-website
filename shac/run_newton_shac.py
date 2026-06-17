@@ -436,7 +436,9 @@ class NewtonMuJoCoTorchEnv:
         acrobot_reward: AcrobotRewardWeights | None = None,
         contact_reward: ContactTargetRewardWeights | None = None,
         acrobot_actuation: str = "elbow",
+        ant_asset: str = "diffrl",
         ant_disable_joint_limits: bool = False,
+        ant_density_override: float | None = None,
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
         ant_contact_mu: float = 0.75,
@@ -444,6 +446,10 @@ class NewtonMuJoCoTorchEnv:
         ant_min_up: float | None = None,
         ant_start_height: float | None = None,
         ant_start_joint_q: list[float] | None = None,
+        ant_reset_position_scale: float = 0.1,
+        ant_reset_angle_scale: float = math.pi / 24.0,
+        ant_reset_joint_scale: float = 0.2,
+        ant_reset_velocity_scale: float = 0.25,
         ant_termination_height: float = ANT_TERMINATION_HEIGHT,
         ant_max_healthy_height: float = ANT_MAX_HEALTHY_HEIGHT,
         ant_observation_style: str = "diffrl",
@@ -488,7 +494,9 @@ class NewtonMuJoCoTorchEnv:
         self.acrobot_reward = acrobot_reward or AcrobotRewardWeights()
         self.contact_reward = contact_reward or ContactTargetRewardWeights()
         self.acrobot_actuation = acrobot_actuation
+        self.ant_asset = ant_asset
         self.ant_disable_joint_limits = ant_disable_joint_limits
+        self.ant_density_override = ant_density_override
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
         self.ant_contact_mu = ant_contact_mu
@@ -496,6 +504,10 @@ class NewtonMuJoCoTorchEnv:
         self.ant_min_up = ant_min_up
         self.ant_start_height = ant_start_height
         self.ant_start_joint_q = ant_start_joint_q
+        self.ant_reset_position_scale = ant_reset_position_scale
+        self.ant_reset_angle_scale = ant_reset_angle_scale
+        self.ant_reset_joint_scale = ant_reset_joint_scale
+        self.ant_reset_velocity_scale = ant_reset_velocity_scale
         self.ant_termination_height = ant_termination_height
         self.ant_max_healthy_height = ant_max_healthy_height
         self.ant_observation_style = ant_observation_style
@@ -595,8 +607,14 @@ class NewtonMuJoCoTorchEnv:
             dtype=torch.float32,
             device=self.torch_device,
         )
-        self.ant_start_rotation = torch.tensor(ANT_START_ROT, dtype=torch.float32, device=self.torch_device)
-        self.ant_inv_start_rotation = quat_conjugate(self.ant_start_rotation).view(1, 4).repeat(self.num_envs, 1)
+        if env_name == "ant":
+            self.ant_start_rotation = normalize_vec(self.start_q[:, 3:7])
+            self.ant_inv_start_rotation = quat_conjugate(self.ant_start_rotation)
+        else:
+            self.ant_start_rotation = torch.tensor(ANT_START_ROT, dtype=torch.float32, device=self.torch_device).view(
+                1, 4
+            ).repeat(self.num_envs, 1)
+            self.ant_inv_start_rotation = quat_conjugate(self.ant_start_rotation)
         self.ant_basis_x = torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32, device=self.torch_device).repeat(
             self.num_envs, 1
         )
@@ -730,7 +748,25 @@ class NewtonMuJoCoTorchEnv:
         source.default_shape_cfg.gap = self.ant_contact_gap
         source.default_joint_cfg.limit_ke = 1.0e3
         source.default_joint_cfg.limit_kd = 1.0e1
-        source.add_mjcf(str(DIFFRL_ROOT / "envs" / "assets" / "ant.xml"), up_axis="Z", armature_scale=50.0)
+        if self.ant_asset == "nv":
+            ant_asset = Path(newton.examples.get_asset("nv_ant.xml"))
+            ant_source = str(ant_asset)
+            ant_up_axis = "Y"
+            armature_scale = 1.0
+        else:
+            ant_asset = DIFFRL_ROOT / "envs" / "assets" / "ant.xml"
+            ant_source = str(ant_asset)
+            ant_up_axis = "Z"
+            armature_scale = 50.0
+        if self.ant_density_override is not None:
+            import xml.etree.ElementTree as ET
+
+            root = ET.fromstring(ant_asset.read_text())
+            for elem in root.iter("geom"):
+                if "density" in elem.attrib:
+                    elem.set("density", f"{self.ant_density_override:g}")
+            ant_source = ET.tostring(root, encoding="unicode")
+        source.add_mjcf(ant_source, up_axis=ant_up_axis, armature_scale=armature_scale)
         if self.ant_joint_damping is not None:
             damping_alias = source.custom_attributes.get("mujoco:dof_passive_damping")
             for dof_id in range(6, len(source.joint_damping)):
@@ -744,6 +780,8 @@ class NewtonMuJoCoTorchEnv:
             source.shape_margin = [self.ant_contact_margin] * len(source.shape_margin)
         if self.ant_contact_gap is not None:
             source.shape_gap = [self.ant_contact_gap] * len(source.shape_gap)
+        ant_joint_limit_lower = list(source.joint_limit_lower[6:14])
+        ant_joint_limit_upper = list(source.joint_limit_upper[6:14])
         if self.ant_disable_joint_limits:
             for dof_id in range(6, len(source.joint_limit_lower)):
                 source.joint_limit_lower[dof_id] = -1.0e10
@@ -751,10 +789,10 @@ class NewtonMuJoCoTorchEnv:
                 source.joint_limit_ke[dof_id] = 0.0
                 source.joint_limit_kd[dof_id] = 0.0
         self.ant_joint_limit_lower = torch.tensor(
-            source.joint_limit_lower[6:14], dtype=torch.float32, device=self.torch_device
+            ant_joint_limit_lower, dtype=torch.float32, device=self.torch_device
         )
         self.ant_joint_limit_upper = torch.tensor(
-            source.joint_limit_upper[6:14], dtype=torch.float32, device=self.torch_device
+            ant_joint_limit_upper, dtype=torch.float32, device=self.torch_device
         )
         if self.ant_start_height is not None:
             source.joint_q[1] = self.ant_start_height
@@ -987,12 +1025,20 @@ class NewtonMuJoCoTorchEnv:
         return q, qd
 
     def _randomize_ant_reset(self, q: torch.Tensor, qd: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        q[:, 0:3] = q[:, 0:3] + 0.1 * (torch.rand((q.shape[0], 3), device=self.torch_device) - 0.5) * 2.0
-        angle = (torch.rand(q.shape[0], device=self.torch_device) - 0.5) * math.pi / 12.0
-        axis = normalize_vec(torch.rand((q.shape[0], 3), device=self.torch_device) - 0.5)
-        q[:, 3:7] = normalize_vec(quat_mul(q[:, 3:7], quat_from_angle_axis(angle, axis)))
-        q[:, 7:] = q[:, 7:] + 0.2 * (torch.rand_like(q[:, 7:]) - 0.5) * 2.0
-        qd[:] = 0.5 * (torch.rand_like(qd) - 0.5)
+        if self.ant_reset_position_scale > 0.0:
+            q[:, 0:3] = q[:, 0:3] + self.ant_reset_position_scale * (
+                torch.rand((q.shape[0], 3), device=self.torch_device) - 0.5
+            ) * 2.0
+        if self.ant_reset_angle_scale > 0.0:
+            angle = self.ant_reset_angle_scale * (torch.rand(q.shape[0], device=self.torch_device) - 0.5) * 2.0
+            axis = normalize_vec(torch.rand((q.shape[0], 3), device=self.torch_device) - 0.5)
+            q[:, 3:7] = normalize_vec(quat_mul(q[:, 3:7], quat_from_angle_axis(angle, axis)))
+        if self.ant_reset_joint_scale > 0.0:
+            q[:, 7:] = q[:, 7:] + self.ant_reset_joint_scale * (torch.rand_like(q[:, 7:]) - 0.5) * 2.0
+        if self.ant_reset_velocity_scale > 0.0:
+            qd[:] = self.ant_reset_velocity_scale * (torch.rand_like(qd) - 0.5) * 2.0
+        else:
+            qd.zero_()
         return q, qd
 
     def _randomize_planar_reset(
@@ -1526,6 +1572,36 @@ def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.devi
     except RuntimeError:
         pass
 
+    source_prefix = None
+    for prefix in ("actor.", "mu_net."):
+        if any(key.startswith(prefix) for key in state):
+            source_prefix = prefix
+            break
+    if source_prefix is not None:
+        target = actor.state_dict()
+        if any(key.startswith("mu_net.") for key in target):
+            target_prefix = "mu_net."
+        elif any(key.startswith("actor.") for key in target):
+            target_prefix = "actor."
+        else:
+            target_prefix = None
+        if target_prefix is not None:
+            mapped = {}
+            for key, value in state.items():
+                if key in {"logstd", "log_std"}:
+                    if "logstd" in target:
+                        mapped["logstd"] = value
+                    elif "log_std" in target:
+                        mapped["log_std"] = value
+                    continue
+                if key.startswith(source_prefix):
+                    mapped[f"{target_prefix}{key.removeprefix(source_prefix)}"] = value
+            missing, unexpected = actor.load_state_dict(mapped, strict=False)
+            unexpected = [key for key in unexpected if key not in target]
+            missing = [key for key in missing if key not in {"logstd", "log_std"}]
+            if not unexpected and not missing:
+                return
+
     if "backbone.0.weight" in state and any(key.startswith("backbone.") for key in actor.state_dict()):
         target = actor.state_dict()
         filtered = {key: value for key, value in state.items() if key in target and target[key].shape == value.shape}
@@ -1587,6 +1663,13 @@ def normalize_obs(obs: torch.Tensor, stats: tuple[torch.Tensor, torch.Tensor] | 
         return stats.normalize(obs)
     mean, var = stats
     return (obs - mean) / torch.sqrt(var + 1.0e-5)
+
+
+def deterministic_policy_action(actor: torch.nn.Module, obs: torch.Tensor) -> torch.Tensor:
+    action = actor(obs, deterministic=True)
+    if getattr(actor, "action_squash", None) == "tanh":
+        return action
+    return torch.tanh(action)
 
 
 @torch.no_grad()
@@ -1802,8 +1885,16 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         contact_backend=args.contact_backend,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
+        mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
+        mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
+        mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
+        mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
+        mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
         acrobot_actuation=args.acrobot_actuation,
+        ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
+        ant_density_override=args.ant_density_override,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_contact_mu=args.ant_contact_mu,
@@ -1811,6 +1902,10 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
+        ant_reset_position_scale=args.ant_reset_position_scale,
+        ant_reset_angle_scale=args.ant_reset_angle_scale,
+        ant_reset_joint_scale=args.ant_reset_joint_scale,
+        ant_reset_velocity_scale=args.ant_reset_velocity_scale,
         ant_termination_height=args.ant_termination_height,
         ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
@@ -2109,6 +2204,12 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "mujoco_smooth_adjoint": args.mujoco_smooth_adjoint,
+        "mujoco_smooth_friction_viscosity": args.mujoco_smooth_friction_viscosity,
+        "mujoco_smooth_friction_scale": args.mujoco_smooth_friction_scale,
+        "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
+        "mujoco_smooth_penalty_damping_alpha": args.mujoco_smooth_penalty_damping_alpha,
+        "mujoco_smooth_friction_surrogate_alpha": args.mujoco_smooth_friction_surrogate_alpha,
         "nconmax": env.nconmax,
         "njmax": env.njmax,
         "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
@@ -2119,7 +2220,13 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "actor_logstd_init": args.actor_logstd_init,
         "actor_layer_norm": args.actor_layer_norm,
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
+        "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
+        "ant_density_override": env.ant_density_override if args.env == "ant" else None,
+        "ant_reset_position_scale": env.ant_reset_position_scale if args.env == "ant" else None,
+        "ant_reset_angle_scale": env.ant_reset_angle_scale if args.env == "ant" else None,
+        "ant_reset_joint_scale": env.ant_reset_joint_scale if args.env == "ant" else None,
+        "ant_reset_velocity_scale": env.ant_reset_velocity_scale if args.env == "ant" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
         "hopper_termination_angle": env.hopper_termination_angle if args.env == "hopper" else None,
         "hopper_termination_height": env.hopper_termination_height if args.env == "hopper" else None,
@@ -2187,8 +2294,16 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         contact_backend=args.contact_backend,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
+        mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
+        mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
+        mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
+        mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
+        mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
         acrobot_actuation=args.acrobot_actuation,
+        ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
+        ant_density_override=args.ant_density_override,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_contact_mu=args.ant_contact_mu,
@@ -2196,6 +2311,10 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
+        ant_reset_position_scale=args.ant_reset_position_scale,
+        ant_reset_angle_scale=args.ant_reset_angle_scale,
+        ant_reset_joint_scale=args.ant_reset_joint_scale,
+        ant_reset_velocity_scale=args.ant_reset_velocity_scale,
         ant_termination_height=args.ant_termination_height,
         ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
@@ -2721,8 +2840,16 @@ def run_training(args: argparse.Namespace) -> dict:
                 contact_backend=args.contact_backend,
                 sim_substeps=args.sim_substeps,
                 mujoco_integrator=args.mujoco_integrator,
+                mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
+                mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
+                mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
+                mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
+                mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
+                mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
                 acrobot_actuation=args.acrobot_actuation,
+                ant_asset=args.ant_asset,
                 ant_disable_joint_limits=args.ant_disable_joint_limits,
+                ant_density_override=args.ant_density_override,
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_contact_mu=args.ant_contact_mu,
@@ -2730,6 +2857,10 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_min_up=args.ant_min_up,
                 ant_start_height=args.ant_start_height,
                 ant_start_joint_q=args.ant_start_joint_q,
+                ant_reset_position_scale=args.ant_reset_position_scale,
+                ant_reset_angle_scale=args.ant_reset_angle_scale,
+                ant_reset_joint_scale=args.ant_reset_joint_scale,
+                ant_reset_velocity_scale=args.ant_reset_velocity_scale,
                 ant_termination_height=args.ant_termination_height,
                 ant_max_healthy_height=args.ant_max_healthy_height,
                 ant_observation_style=args.ant_observation_style,
@@ -2828,10 +2959,16 @@ def run_training(args: argparse.Namespace) -> dict:
         "critic_batch_size": args.critic_batch_size,
         "target_critic_alpha": args.target_critic_alpha,
         "selection_horizon": args.selection_horizon,
+        "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
         "ant_start_height": env.ant_start_height if args.env == "ant" else None,
         "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
+        "ant_reset_position_scale": env.ant_reset_position_scale if args.env == "ant" else None,
+        "ant_reset_angle_scale": env.ant_reset_angle_scale if args.env == "ant" else None,
+        "ant_reset_joint_scale": env.ant_reset_joint_scale if args.env == "ant" else None,
+        "ant_reset_velocity_scale": env.ant_reset_velocity_scale if args.env == "ant" else None,
+        "ant_density_override": env.ant_density_override if args.env == "ant" else None,
         "ant_height_reward_cap": ANT_HEIGHT_REWARD_CAP if args.env == "ant" else None,
         "ant_invalid_penalty": ANT_INVALID_PENALTY if args.env == "ant" else None,
         "lr_schedule": args.lr_schedule,
@@ -2923,7 +3060,7 @@ def evaluate_policy(
     heading_samples = []
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
-        action = torch.tanh(actor(obs, deterministic=True))
+        action = deterministic_policy_action(actor, obs)
         root_x_before = q[:, 0].clone()
         q, qd = env.step(q, qd, env.action_to_joint_f(action))
         root_x_after = q[:, 0].clone()
@@ -3018,8 +3155,8 @@ def render_rollout(
     with imageio.get_writer(video_path, fps=max(1, int(round(1.0 / env.dt))), codec="libx264", quality=8) as writer:
         with torch.no_grad():
             for frame_idx in range(horizon):
-                follow_camera.update(viewer, q)
                 state = env.make_viewer_state(q, qd)
+                follow_camera.update(viewer, q, state=state, model=env.model)
                 viewer.begin_frame(frame_idx * env.dt)
                 viewer.log_state(state)
                 viewer.end_frame()
@@ -3027,7 +3164,7 @@ def render_rollout(
                 frames.append(frame)
                 writer.append_data(frame)
                 obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
-                action = torch.tanh(actor(obs, deterministic=True))
+                action = deterministic_policy_action(actor, obs)
                 q, qd = env.step(q, qd, env.action_to_joint_f(action))
                 invalid = env.invalid_state(q, qd)
                 fell = torch.logical_and(env.fallen_state(q), ~invalid)
@@ -3114,6 +3251,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
+    parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default="off")
+    parser.add_argument("--mujoco-smooth-friction-viscosity", type=float, default=10.0)
+    parser.add_argument("--mujoco-smooth-friction-scale", type=float, default=0.01)
+    parser.add_argument("--mujoco-smooth-friction-bypass-kf", type=float, default=0.0)
+    parser.add_argument("--mujoco-smooth-penalty-damping-alpha", type=float, default=0.0)
+    parser.add_argument("--mujoco-smooth-friction-surrogate-alpha", type=float, default=0.9)
     parser.add_argument("--lr", type=float, default=2.0e-3)
     parser.add_argument("--min-lr", type=float, default=1.0e-5)
     parser.add_argument("--lr-schedule", choices=["constant", "linear"], default=None)
@@ -3172,7 +3315,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-energy-cost", type=float, default=0.05)
     parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
     parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
+    parser.add_argument("--ant-asset", choices=["diffrl", "nv"], default="diffrl")
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
+    parser.add_argument("--ant-density-override", type=float, default=None)
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-contact-mu", type=float, default=1.0)
@@ -3180,6 +3325,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=ANT_START_HEIGHT)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=list(ANT_ISAACLAB_START_JOINT_Q))
+    parser.add_argument("--ant-reset-position-scale", type=float, default=0.1)
+    parser.add_argument("--ant-reset-angle-scale", type=float, default=math.pi / 24.0)
+    parser.add_argument("--ant-reset-joint-scale", type=float, default=0.2)
+    parser.add_argument("--ant-reset-velocity-scale", type=float, default=0.25)
     parser.add_argument("--ant-termination-height", type=float, default=ANT_ISAACLAB_TERMINATION_HEIGHT)
     parser.add_argument("--ant-max-healthy-height", type=float, default=ANT_MAX_HEALTHY_HEIGHT)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")

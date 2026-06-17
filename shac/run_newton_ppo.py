@@ -72,31 +72,48 @@ class PPOActor(nn.Module):
         *,
         layer_norm: bool,
         initial_log_std: float,
+        action_squash: str = "tanh",
     ):
         super().__init__()
+        if action_squash not in {"tanh", "none"}:
+            raise ValueError(f"unsupported action_squash: {action_squash}")
+        self.action_squash = action_squash
         self.backbone, last_dim = make_mlp(obs_dim, hidden_dims, layer_norm=layer_norm)
         self.mean = nn.Linear(last_dim, action_dim)
         self.log_std = nn.Parameter(torch.full((action_dim,), initial_log_std))
 
-    def forward(self, obs: torch.Tensor, deterministic: bool = False) -> torch.Tensor:
+    def raw_mean(self, obs: torch.Tensor) -> torch.Tensor:
         return self.mean(self.backbone(obs))
 
+    def forward(self, obs: torch.Tensor, deterministic: bool = False) -> torch.Tensor:
+        mean = self.raw_mean(obs)
+        if self.action_squash == "tanh":
+            return torch.tanh(mean)
+        return mean
+
     def distribution(self, obs: torch.Tensor) -> torch.distributions.Normal:
-        mean = self.forward(obs)
+        mean = self.raw_mean(obs)
         std = self.log_std.exp().expand_as(mean)
         return torch.distributions.Normal(mean, std)
 
     def sample(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         dist = self.distribution(obs)
         raw_action = dist.sample()
-        action = torch.tanh(raw_action)
-        log_prob = tanh_normal_log_prob(dist, raw_action, action)
+        if self.action_squash == "tanh":
+            action = torch.tanh(raw_action)
+            log_prob = tanh_normal_log_prob(dist, raw_action, action)
+        else:
+            action = raw_action
+            log_prob = dist.log_prob(raw_action).sum(dim=-1)
         return raw_action, action, log_prob
 
     def evaluate_raw(self, obs: torch.Tensor, raw_action: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         dist = self.distribution(obs)
-        action = torch.tanh(raw_action)
-        log_prob = tanh_normal_log_prob(dist, raw_action, action)
+        if self.action_squash == "tanh":
+            action = torch.tanh(raw_action)
+            log_prob = tanh_normal_log_prob(dist, raw_action, action)
+        else:
+            log_prob = dist.log_prob(raw_action).sum(dim=-1)
         entropy = dist.entropy().sum(dim=-1)
         return log_prob, entropy
 
@@ -109,6 +126,53 @@ class PPOValue(nn.Module):
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         return self.net(obs).squeeze(-1)
+
+
+def load_actor_checkpoint(actor: PPOActor, path: Path, device: torch.device | str) -> None:
+    state = torch.load(path, map_location=device)
+    try:
+        actor.load_state_dict(state)
+        return
+    except RuntimeError:
+        pass
+
+    mapped = {}
+    source_prefix = None
+    for prefix in ("actor.", "mu_net."):
+        if any(key.startswith(prefix) for key in state):
+            source_prefix = prefix
+            break
+    if source_prefix is None:
+        raise RuntimeError(f"unsupported actor checkpoint format: {path}")
+
+    linear_keys = sorted(
+        {
+            key.removeprefix(source_prefix).split(".", 1)[0]
+            for key in state
+            if key.startswith(source_prefix) and key.endswith(".weight")
+        },
+        key=int,
+    )
+    if not linear_keys:
+        raise RuntimeError(f"actor checkpoint has no linear layers: {path}")
+    output_idx = linear_keys[-1]
+    for key, value in state.items():
+        if key in {"logstd", "log_std"}:
+            mapped["log_std"] = value
+            continue
+        if not key.startswith(source_prefix):
+            continue
+        suffix = key.removeprefix(source_prefix)
+        layer_idx, param_name = suffix.split(".", 1)
+        if layer_idx == output_idx:
+            mapped[f"mean.{param_name}"] = value
+        else:
+            mapped[f"backbone.{suffix}"] = value
+    missing, unexpected = actor.load_state_dict(mapped, strict=False)
+    unexpected = [key for key in unexpected if key != "log_std"]
+    missing = [key for key in missing if key != "log_std"]
+    if missing or unexpected:
+        raise RuntimeError(f"actor checkpoint mapping failed for {path}: missing={missing}, unexpected={unexpected}")
 
 
 def tanh_normal_log_prob(
@@ -148,7 +212,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
         mujoco_integrator=args.mujoco_integrator,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
+        ant_density_override=args.ant_density_override,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_contact_mu=args.ant_contact_mu,
@@ -156,6 +222,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
+        ant_reset_position_scale=args.ant_reset_position_scale,
+        ant_reset_angle_scale=args.ant_reset_angle_scale,
+        ant_reset_joint_scale=args.ant_reset_joint_scale,
+        ant_reset_velocity_scale=args.ant_reset_velocity_scale,
         ant_termination_height=args.ant_termination_height,
         ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
@@ -206,10 +276,11 @@ def train_ppo(args: argparse.Namespace) -> dict:
         args.actor_hidden_dims,
         layer_norm=args.layer_norm,
         initial_log_std=args.initial_log_std,
+        action_squash=args.action_squash,
     ).to(env.torch_device)
     critic = PPOValue(obs_dim, args.critic_hidden_dims, layer_norm=args.layer_norm).to(env.torch_device)
     if args.actor_path is not None:
-        actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
+        load_actor_checkpoint(actor, args.actor_path, env.torch_device)
     optimizer = torch.optim.Adam(
         list(actor.parameters()) + list(critic.parameters()),
         lr=args.lr,
@@ -563,7 +634,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 mujoco_integrator=args.mujoco_integrator,
                 force_scale=args.force_scale,
                 contact_backend=args.contact_backend,
+                ant_asset=args.ant_asset,
                 ant_disable_joint_limits=args.ant_disable_joint_limits,
+                ant_density_override=args.ant_density_override,
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_contact_mu=args.ant_contact_mu,
@@ -571,6 +644,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_min_up=args.ant_min_up,
                 ant_start_height=args.ant_start_height,
                 ant_start_joint_q=args.ant_start_joint_q,
+                ant_reset_position_scale=args.ant_reset_position_scale,
+                ant_reset_angle_scale=args.ant_reset_angle_scale,
+                ant_reset_joint_scale=args.ant_reset_joint_scale,
+                ant_reset_velocity_scale=args.ant_reset_velocity_scale,
                 ant_termination_height=args.ant_termination_height,
                 ant_max_healthy_height=args.ant_max_healthy_height,
                 ant_observation_style=args.ant_observation_style,
@@ -660,6 +737,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "critic_hidden_dims": args.critic_hidden_dims,
         "layer_norm": args.layer_norm,
         "initial_log_std": args.initial_log_std,
+        "action_squash": args.action_squash,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
         "hopper_termination_angle": env.hopper_termination_angle if args.env == "hopper" else None,
@@ -676,7 +754,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "hopper_reset_velocity_scale": env.hopper_reset_velocity_scale if args.env == "hopper" else None,
         "cheetah_reward": env.cheetah_reward.__dict__ if args.env == "cheetah" else None,
         "ant_reward": env.ant_reward.__dict__ if args.env == "ant" else None,
+        "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
+        "ant_density_override": env.ant_density_override if args.env == "ant" else None,
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
@@ -684,6 +764,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "ant_start_height": env.ant_start_height if args.env == "ant" else None,
         "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
+        "ant_reset_position_scale": env.ant_reset_position_scale if args.env == "ant" else None,
+        "ant_reset_angle_scale": env.ant_reset_angle_scale if args.env == "ant" else None,
+        "ant_reset_joint_scale": env.ant_reset_joint_scale if args.env == "ant" else None,
+        "ant_reset_velocity_scale": env.ant_reset_velocity_scale if args.env == "ant" else None,
         "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
         "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
@@ -730,6 +814,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--critic-hidden-dims", type=parse_int_list, default=[128, 64])
     parser.add_argument("--layer-norm", dest="layer_norm", action="store_true", default=True)
     parser.add_argument("--no-layer-norm", dest="layer_norm", action="store_false")
+    parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
     parser.add_argument("--initial-log-std", type=float, default=-0.5)
     parser.add_argument("--eval-horizon", type=int, default=None)
     parser.add_argument("--eval-interval", type=int, default=5)
@@ -770,7 +855,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-energy-cost", type=float, default=0.05)
     parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
     parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
+    parser.add_argument("--ant-asset", choices=["diffrl", "nv"], default="diffrl")
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
+    parser.add_argument("--ant-density-override", type=float, default=None)
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-contact-mu", type=float, default=1.0)
@@ -778,6 +865,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=ANT_START_HEIGHT)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=list(ANT_ISAACLAB_START_JOINT_Q))
+    parser.add_argument("--ant-reset-position-scale", type=float, default=0.1)
+    parser.add_argument("--ant-reset-angle-scale", type=float, default=math.pi / 24.0)
+    parser.add_argument("--ant-reset-joint-scale", type=float, default=0.2)
+    parser.add_argument("--ant-reset-velocity-scale", type=float, default=0.25)
     parser.add_argument("--ant-termination-height", type=float, default=ANT_ISAACLAB_TERMINATION_HEIGHT)
     parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")

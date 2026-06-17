@@ -72,8 +72,8 @@ def render(args: argparse.Namespace) -> dict:
     with imageio.get_writer(video_path, fps=max(1, int(round(1.0 / env.dt))), codec="libx264", quality=8) as writer:
         with torch.no_grad():
             for frame_idx in range(horizon):
-                follow_camera.update(viewer, q)
                 state = env.make_viewer_state(q, qd)
+                follow_camera.update(viewer, q, state=state, model=env.model)
                 viewer.begin_frame(frame_idx * env.dt)
                 viewer.log_state(state)
                 viewer.end_frame()

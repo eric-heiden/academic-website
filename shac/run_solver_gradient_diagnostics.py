@@ -979,8 +979,8 @@ def render_scene_video(
     with imageio.get_writer(video_path, fps=fps, codec="libx264", quality=8) as writer:
         with torch.no_grad():
             for frame_idx in range(frame_count):
-                follow_camera.update(viewer, q)
                 state = env.make_viewer_state(q, qd)
+                follow_camera.update(viewer, q, state=state, model=env.model)
                 viewer.begin_frame(frame_idx / float(fps))
                 viewer.log_state(state)
                 viewer.end_frame()

@@ -334,6 +334,10 @@ def run(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        ant_disable_joint_limits=args.ant_disable_joint_limits,
+        ant_contact_margin=args.ant_contact_margin,
+        ant_contact_gap=args.ant_contact_gap,
+        ant_min_up=args.ant_min_up,
     )
     q0, qd0 = env.reset(noise=0.0, stochastic_init=False)
 
@@ -409,6 +413,10 @@ def run(args: argparse.Namespace) -> dict:
         "num_envs": args.num_envs,
         "dt": args.dt,
         "force_scale": args.force_scale,
+        "ant_disable_joint_limits": args.ant_disable_joint_limits,
+        "ant_contact_margin": args.ant_contact_margin,
+        "ant_contact_gap": args.ant_contact_gap,
+        "ant_min_up": args.ant_min_up,
         "epsilon_values": epsilons,
         "directions": args.directions,
         "action0_checks": action0_checks,
@@ -439,6 +447,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--force-scale", type=float, default=100.0)
+    parser.add_argument("--ant-disable-joint-limits", action="store_true")
+    parser.add_argument("--ant-contact-margin", type=float, default=0.0)
+    parser.add_argument("--ant-contact-gap", type=float, default=None)
+    parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--directions", type=int, default=8)
     parser.add_argument("--eps", type=float, nargs="*")
     parser.add_argument("--seed", type=int, default=23)
