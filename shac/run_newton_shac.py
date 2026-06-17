@@ -375,6 +375,10 @@ class NewtonMuJoCoTorchEnv:
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
         ant_min_up: float | None = None,
+        ant_start_height: float | None = None,
+        ant_start_joint_q: list[float] | None = None,
+        ant_termination_height: float = ANT_TERMINATION_HEIGHT,
+        ant_max_healthy_height: float = ANT_MAX_HEALTHY_HEIGHT,
         ant_observation_style: str = "diffrl",
         ant_reward_style: str = "diffrl",
         ant_action_order: str = "joint",
@@ -405,6 +409,10 @@ class NewtonMuJoCoTorchEnv:
         self.ant_contact_margin = ant_contact_margin
         self.ant_contact_gap = ant_contact_gap
         self.ant_min_up = ant_min_up
+        self.ant_start_height = ant_start_height
+        self.ant_start_joint_q = ant_start_joint_q
+        self.ant_termination_height = ant_termination_height
+        self.ant_max_healthy_height = ant_max_healthy_height
         self.ant_observation_style = ant_observation_style
         self.ant_reward_style = ant_reward_style
         self.ant_action_order = ant_action_order
@@ -627,8 +635,14 @@ class NewtonMuJoCoTorchEnv:
         self.ant_joint_limit_upper = torch.tensor(
             source.joint_limit_upper[6:14], dtype=torch.float32, device=self.torch_device
         )
-        source.joint_q[7:15] = ANT_START_JOINT_Q
-        source.joint_target_q[7:15] = ANT_START_JOINT_Q
+        if self.ant_start_height is not None:
+            source.joint_q[1] = self.ant_start_height
+            source.joint_target_q[1] = self.ant_start_height
+        ant_start_joint_q = self.ant_start_joint_q if self.ant_start_joint_q is not None else list(ANT_START_JOINT_Q)
+        if len(ant_start_joint_q) != 8:
+            raise ValueError("ant_start_joint_q must contain 8 values")
+        source.joint_q[7:15] = ant_start_joint_q
+        source.joint_target_q[7:15] = ant_start_joint_q
         source.shape_material_ke = [4.0e4] * len(source.shape_material_ke)
         source.shape_material_kd = [1.0e4] * len(source.shape_material_kd)
         source.shape_material_kf = [3.0e3] * len(source.shape_material_kf)
@@ -1210,7 +1224,7 @@ class NewtonMuJoCoTorchEnv:
             actions_cost = action.square().sum(dim=-1)
             energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
             dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
-            height_reward = torch.clamp(q[:, 1] - ANT_TERMINATION_HEIGHT, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
+            height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
             return (
                 weights.progress * qd[:, 0]
                 + weights.alive
@@ -1224,7 +1238,7 @@ class NewtonMuJoCoTorchEnv:
         progress_reward = obs[:, 5]
         up_reward = self.ant_reward.up * obs[:, 27]
         heading_reward = self.ant_reward.heading * obs[:, 28]
-        height_reward = torch.clamp(obs[:, 0] - ANT_TERMINATION_HEIGHT, max=ANT_HEIGHT_REWARD_CAP)
+        height_reward = torch.clamp(obs[:, 0] - self.ant_termination_height, max=ANT_HEIGHT_REWARD_CAP)
         return (
             self.ant_reward.progress * progress_reward
             + up_reward
@@ -1250,7 +1264,7 @@ class NewtonMuJoCoTorchEnv:
         if self.env_name != "ant":
             return torch.zeros(q.shape[0], dtype=torch.bool, device=q.device)
         finite = torch.isfinite(q).all(dim=-1)
-        fallen = torch.logical_and(finite, q[:, 1] < ANT_TERMINATION_HEIGHT)
+        fallen = torch.logical_and(finite, q[:, 1] < self.ant_termination_height)
         if self.ant_min_up is not None:
             torso_rot = normalize_vec(q[:, 3:7])
             torso_quat = quat_mul(torso_rot, self.ant_inv_start_rotation[: q.shape[0]])
@@ -1261,7 +1275,7 @@ class NewtonMuJoCoTorchEnv:
     def invalid_state(self, q: torch.Tensor, qd: torch.Tensor) -> torch.Tensor:
         invalid = torch.logical_or(~torch.isfinite(q).all(dim=-1), ~torch.isfinite(qd).all(dim=-1))
         if self.env_name == "ant":
-            invalid = torch.logical_or(invalid, q[:, 1] > ANT_MAX_HEALTHY_HEIGHT)
+            invalid = torch.logical_or(invalid, q[:, 1] > self.ant_max_healthy_height)
             invalid = torch.logical_or(invalid, q[:, 0].abs() > 100.0)
             invalid = torch.logical_or(invalid, q[:, 2].abs() > 100.0)
             invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
@@ -1305,10 +1319,17 @@ class NewtonMuJoCoTorchEnv:
         return state
 
 
-def make_actor(env: NewtonMuJoCoTorchEnv, stochastic: bool = False) -> torch.nn.Module:
+def make_actor(
+    env: NewtonMuJoCoTorchEnv,
+    stochastic: bool = False,
+    hidden_dims: list[int] | None = None,
+    actor_logstd_init: float = -1.0,
+) -> torch.nn.Module:
+    if hidden_dims is None:
+        hidden_dims = [128, 64, 32] if is_locomotion_env(env.env_name) else [64, 64]
     cfg = {
-        "actor_mlp": {"units": [128, 64, 32] if is_locomotion_env(env.env_name) else [64, 64], "activation": "elu"},
-        "actor_logstd_init": -1.0,
+        "actor_mlp": {"units": hidden_dims, "activation": "elu"},
+        "actor_logstd_init": actor_logstd_init,
     }
     if stochastic:
         actor = ActorStochasticMLP(env.num_obs, env.num_actions, cfg, device=str(env.torch_device))
@@ -1359,9 +1380,11 @@ def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.devi
         raise RuntimeError(f"could not map PPO actor checkpoint {path}: missing={missing}, unexpected={unexpected}")
 
 
-def make_critic(env: NewtonMuJoCoTorchEnv) -> torch.nn.Module:
+def make_critic(env: NewtonMuJoCoTorchEnv, hidden_dims: list[int] | None = None) -> torch.nn.Module:
+    if hidden_dims is None:
+        hidden_dims = [64, 64]
     cfg = {
-        "critic_mlp": {"units": [64, 64], "activation": "elu"},
+        "critic_mlp": {"units": hidden_dims, "activation": "elu"},
     }
     return CriticMLP(env.num_obs, cfg, device=str(env.torch_device))
 
@@ -1599,6 +1622,10 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        ant_start_height=args.ant_start_height,
+        ant_start_joint_q=args.ant_start_joint_q,
+        ant_termination_height=args.ant_termination_height,
+        ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
@@ -1640,7 +1667,12 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
             action=args.contact_action_weight,
         ),
     )
-    actor = make_actor(env, stochastic=args.stochastic_actor)
+    actor = make_actor(
+        env,
+        stochastic=args.stochastic_actor,
+        hidden_dims=args.actor_hidden_dims,
+        actor_logstd_init=args.actor_logstd_init,
+    )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
     obs_stats = load_obs_rms(args.obs_rms_path, env.torch_device) if args.obs_rms_path is not None else None
@@ -1885,6 +1917,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "disable_eulerdamp": True,
         "force_scale": args.force_scale,
         "stochastic_actor": args.stochastic_actor,
+        "actor_hidden_dims": args.actor_hidden_dims,
+        "actor_logstd_init": args.actor_logstd_init,
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
@@ -1994,6 +2028,10 @@ def run_training(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        ant_start_height=args.ant_start_height,
+        ant_start_joint_q=args.ant_start_joint_q,
+        ant_termination_height=args.ant_termination_height,
+        ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
@@ -2042,7 +2080,12 @@ def run_training(args: argparse.Namespace) -> dict:
             action=args.cartpole_action_penalty,
         ),
     )
-    actor = make_actor(env, stochastic=args.stochastic_actor)
+    actor = make_actor(
+        env,
+        stochastic=args.stochastic_actor,
+        hidden_dims=args.actor_hidden_dims,
+        actor_logstd_init=args.actor_logstd_init,
+    )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
     adam_betas = (args.adam_beta1, args.adam_beta2)
@@ -2051,7 +2094,7 @@ def run_training(args: argparse.Namespace) -> dict:
     target_critic = None
     critic_optimizer = None
     if args.use_critic:
-        critic = make_critic(env)
+        critic = make_critic(env, hidden_dims=args.critic_hidden_dims)
         target_critic = copy.deepcopy(critic)
         for param in target_critic.parameters():
             param.requires_grad_(False)
@@ -2355,6 +2398,10 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                ant_start_height=args.ant_start_height,
+                ant_start_joint_q=args.ant_start_joint_q,
+                ant_termination_height=args.ant_termination_height,
+                ant_max_healthy_height=args.ant_max_healthy_height,
                 ant_observation_style=args.ant_observation_style,
                 ant_reward_style=args.ant_reward_style,
                 ant_action_order=args.ant_action_order,
@@ -2403,6 +2450,9 @@ def run_training(args: argparse.Namespace) -> dict:
         "disable_eulerdamp": True,
         "stochastic_init": args.stochastic_init,
         "stochastic_actor": args.stochastic_actor,
+        "actor_hidden_dims": args.actor_hidden_dims,
+        "actor_logstd_init": args.actor_logstd_init,
+        "critic_hidden_dims": args.critic_hidden_dims,
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
@@ -2427,7 +2477,10 @@ def run_training(args: argparse.Namespace) -> dict:
         "critic_batch_size": args.critic_batch_size,
         "target_critic_alpha": args.target_critic_alpha,
         "selection_horizon": args.selection_horizon,
-        "ant_max_healthy_height": ANT_MAX_HEALTHY_HEIGHT if args.env == "ant" else None,
+        "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
+        "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
+        "ant_start_height": env.ant_start_height if args.env == "ant" else None,
+        "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
         "ant_height_reward_cap": ANT_HEIGHT_REWARD_CAP if args.env == "ant" else None,
         "ant_invalid_penalty": ANT_INVALID_PENALTY if args.env == "ant" else None,
         "lr_schedule": args.lr_schedule,
@@ -2672,6 +2725,10 @@ def parse_float_list(value: str) -> list[float]:
     return [float(item.strip()) for item in value.split(",") if item.strip()]
 
 
+def parse_int_list(value: str) -> list[int]:
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["train", "gradcheck"], default="train")
@@ -2707,6 +2764,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--deterministic-init", dest="stochastic_init", action="store_false")
     parser.add_argument("--stochastic-actor", dest="stochastic_actor", action="store_true", default=None)
     parser.add_argument("--deterministic-actor", dest="stochastic_actor", action="store_false")
+    parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=None)
+    parser.add_argument("--critic-hidden-dims", type=parse_int_list, default=None)
+    parser.add_argument("--actor-logstd-init", type=float, default=-1.0)
     parser.add_argument("--use-critic", dest="use_critic", action="store_true", default=None)
     parser.add_argument("--no-critic", dest="use_critic", action="store_false")
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=None)
@@ -2744,6 +2804,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--ant-start-height", type=float, default=None)
+    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
+    parser.add_argument("--ant-termination-height", type=float, default=ANT_TERMINATION_HEIGHT)
+    parser.add_argument("--ant-max-healthy-height", type=float, default=ANT_MAX_HEALTHY_HEIGHT)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
     parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac"], default="diffrl")
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")

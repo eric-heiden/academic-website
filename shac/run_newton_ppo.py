@@ -146,6 +146,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
         ant_min_up=args.ant_min_up,
+        ant_start_height=args.ant_start_height,
+        ant_start_joint_q=args.ant_start_joint_q,
+        ant_termination_height=args.ant_termination_height,
+        ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
@@ -453,6 +457,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_contact_margin=args.ant_contact_margin,
                 ant_contact_gap=args.ant_contact_gap,
                 ant_min_up=args.ant_min_up,
+                ant_start_height=args.ant_start_height,
+                ant_start_joint_q=args.ant_start_joint_q,
+                ant_termination_height=args.ant_termination_height,
+                ant_max_healthy_height=args.ant_max_healthy_height,
                 ant_observation_style=args.ant_observation_style,
                 ant_reward_style=args.ant_reward_style,
                 ant_action_order=args.ant_action_order,
@@ -527,6 +535,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_contact_margin": env.ant_contact_margin if args.env == "ant" else None,
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
+        "ant_start_height": env.ant_start_height if args.env == "ant" else None,
+        "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
+        "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
+        "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
@@ -606,6 +618,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--ant-start-height", type=float, default=None)
+    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
+    parser.add_argument("--ant-termination-height", type=float, default=0.27)
+    parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="diffrl")
     parser.add_argument("--ant-reward-style", choices=["diffrl", "isaac"], default="diffrl")
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")

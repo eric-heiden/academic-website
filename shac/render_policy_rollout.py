@@ -92,6 +92,10 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_contact_margin=float(result.get("ant_contact_margin") or 0.0),
         ant_contact_gap=result.get("ant_contact_gap"),
         ant_min_up=result.get("ant_min_up"),
+        ant_start_height=result.get("ant_start_height"),
+        ant_start_joint_q=result.get("ant_start_joint_q"),
+        ant_termination_height=float(result.get("ant_termination_height") or 0.27),
+        ant_max_healthy_height=float(result.get("ant_max_healthy_height") or 1.5),
         ant_observation_style=result.get("ant_observation_style") or "diffrl",
         ant_reward_style=result.get("ant_reward_style") or "diffrl",
         ant_action_order=result.get("ant_action_order") or "joint",
@@ -153,7 +157,12 @@ def main() -> None:
     else:
         from run_newton_shac import make_actor
 
-        actor = make_actor(env, stochastic=bool(result.get("stochastic_actor") or False))
+        actor = make_actor(
+            env,
+            stochastic=bool(result.get("stochastic_actor") or False),
+            hidden_dims=result.get("actor_hidden_dims"),
+            actor_logstd_init=float(result.get("actor_logstd_init") or -1.0),
+        )
         load_actor_checkpoint(actor, actor_path, env.torch_device)
     actor.eval()
 

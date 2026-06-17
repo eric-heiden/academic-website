@@ -278,10 +278,12 @@
           history JSON, loads PPO checkpoints into SHAC actors, spaces replicated Newton-contact worlds apart, and renders
           policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
           MuJoCo actuator-order torque mapping, and the report runner now actually applies the advertised
-          <code>ant_height_weight</code> in that Isaac-style reward path. A displacement-biased selector improves PPO to
-          3.99 m over 480 frames with mean up 0.96, but the retained policy still has 7 fall events and moves mostly
-          sideways; the SHAC warm-start reaches 2.96 m with zero falls but regresses to a backward/sideways crawl. Larger
-          IsaacLab-style PPO networks with stricter up-vector selection produce zero falls but almost no forward motion.
+          <code>ant_height_weight</code> in that Isaac-style reward path. The current Ant fix switches the final PPO baseline
+          to IsaacLab-style direct-task settings: 0.5 m reset height, 0.785 rad foot pose, 7.5 Nm effort scale,
+          <code>implicitfast</code> with two substeps, 256/128/64 PPO, and height-only termination at 0.31 m. That run reaches
+          4.07 m over 480 frames with zero falls and mean heading 0.90. Replaying the same actor at force scale 9 reaches
+          5.24 m with zero falls and mean heading 0.90. SHAC can warm-start from this checkpoint and remain stable, but the
+          selected epoch only matches the PPO baseline instead of improving it.
           Hopper remains unresolved: the new Newton
           per-DOF MJCF joint-anchor fix makes the MuJoCo-exported root slides/hinges physically coherent, and SHAC can
           preserve a zero-fall standing policy, but neither PPO nor SHAC has produced reliable hopping yet.
@@ -353,10 +355,10 @@
           noise was previously injecting limit violations; the harness now clamps finite-limit planar joints back inside the
           limits and can start Hopper slightly inside the stops. That fix is necessary but not sufficient: PPO with a
           Gym-style alive/forward reward, PPO curriculum from the upright checkpoint, inside-limit progress-weighted PPO,
-          and the post-anchor-fix SHAC warm-start all fail to produce true hopping. Ant is not solved either: the moving
-          policies still look like low rolling/crawling gaits, while stricter PPO selectors learn stationary tripod stances
-          with zero falls and at most 0.10 m displacement. The newest height-fixed PPO/SHAC probes can trade those
-          stationary stances for real displacement, but they still do not produce clean, reliable forward-facing Ant gaits.
+          and the post-anchor-fix SHAC warm-start all fail to produce true hopping. Ant PPO is now reliable under the
+          IsaacLab-style direct settings, but the gait is still a low crawl rather than a tall natural walk. SHAC currently
+          preserves the PPO warm-start but drifts toward slower policies after the first few epochs, so the remaining Ant
+          work is improving differentiable-policy updates without losing the PPO gait.
         </p>
       </article>
     </section>
@@ -621,6 +623,36 @@
           <figcaption>
             PPO with corrected root joint anchors and DiffRL-style Hopper reward moves 1.51 m, but every eval episode still
             terminates by falling. This is better than the pre-anchor collapse, but not solved locomotion.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel ok">
+        <h2>Ant PPO, IsaacLab Direct</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_direct_force9_replay_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_direct_force9_replay_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current best reliable Ant video. PPO was trained with IsaacLab-style direct-task settings at force scale 7.5,
+            then replayed at force scale 9. The 1024-env eval moves 5.24 m over 480 frames with zero falls/invalids,
+            mean heading 0.90, mean up 0.96, and mean height 0.48. The video is raw <code>ViewerGL.get_frame()</code>
+            through the shared smoothed COM follow camera.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant SHAC, IsaacLab Warm-Start</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_shac_isaaclab_direct_warm_ppo_16env_40ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_isaaclab_direct_warm_ppo_16env_40ep_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            SHAC initialized from the reliable PPO actor uses the same IsaacLab-style Ant setup with MuJoCo contacts and
+            deterministic 256/128/64 actor gradients. It remains stable with zero falls/invalids and 4.11 m displacement,
+            but the best epoch is epoch 2 and does not improve beyond the PPO warm-start.
           </figcaption>
         </figure>
       </article>
@@ -1385,6 +1417,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC height-fixed",
         path: "assets/ant_shac_heightfix_heading2_warm_ppo_16env_24ep_run1/ant_results.json",
         color: colors.blue
+      },
+      {
+        id: "antPpoIsaacDirect",
+        label: "Ant PPO IsaacLab direct",
+        path: "assets/ant_ppo_isaaclab_direct_1024env_160upd_run1/ant_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "antPpoIsaacDirectForce9",
+        label: "Ant PPO force-9 replay",
+        path: "assets/ant_ppo_isaaclab_direct_force9_replay_run1/ant_ppo_results.json",
+        color: colors.teal
+      },
+      {
+        id: "antShacIsaacDirect",
+        label: "Ant SHAC IsaacLab warm",
+        path: "assets/ant_shac_isaaclab_direct_warm_ppo_16env_40ep_run1/ant_results.json",
+        color: colors.violet
       },
       {
         id: "cheetahNewton",
