@@ -38,22 +38,39 @@ from run_newton_shac import (
 from utils.running_mean_std import RunningMeanStd
 
 
+def parse_int_list(value: str) -> list[int]:
+    values = [item.strip() for item in value.split(",") if item.strip()]
+    if not values:
+        raise argparse.ArgumentTypeError("expected comma-separated integer list")
+    return [int(item) for item in values]
+
+
+def make_mlp(input_dim: int, hidden_dims: list[int], *, layer_norm: bool) -> tuple[nn.Sequential, int]:
+    layers: list[nn.Module] = []
+    last_dim = input_dim
+    for hidden_dim in hidden_dims:
+        layers.append(nn.Linear(last_dim, hidden_dim))
+        layers.append(nn.ELU())
+        if layer_norm:
+            layers.append(nn.LayerNorm(hidden_dim))
+        last_dim = hidden_dim
+    return nn.Sequential(*layers), last_dim
+
+
 class PPOActor(nn.Module):
-    def __init__(self, obs_dim: int, action_dim: int):
+    def __init__(
+        self,
+        obs_dim: int,
+        action_dim: int,
+        hidden_dims: list[int],
+        *,
+        layer_norm: bool,
+        initial_log_std: float,
+    ):
         super().__init__()
-        self.backbone = nn.Sequential(
-            nn.Linear(obs_dim, 128),
-            nn.ELU(),
-            nn.LayerNorm(128),
-            nn.Linear(128, 64),
-            nn.ELU(),
-            nn.LayerNorm(64),
-            nn.Linear(64, 32),
-            nn.ELU(),
-            nn.LayerNorm(32),
-        )
-        self.mean = nn.Linear(32, action_dim)
-        self.log_std = nn.Parameter(torch.full((action_dim,), -0.5))
+        self.backbone, last_dim = make_mlp(obs_dim, hidden_dims, layer_norm=layer_norm)
+        self.mean = nn.Linear(last_dim, action_dim)
+        self.log_std = nn.Parameter(torch.full((action_dim,), initial_log_std))
 
     def forward(self, obs: torch.Tensor, deterministic: bool = False) -> torch.Tensor:
         return self.mean(self.backbone(obs))
@@ -79,17 +96,10 @@ class PPOActor(nn.Module):
 
 
 class PPOValue(nn.Module):
-    def __init__(self, obs_dim: int):
+    def __init__(self, obs_dim: int, hidden_dims: list[int], *, layer_norm: bool):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, 128),
-            nn.ELU(),
-            nn.LayerNorm(128),
-            nn.Linear(128, 64),
-            nn.ELU(),
-            nn.LayerNorm(64),
-            nn.Linear(64, 1),
-        )
+        backbone, last_dim = make_mlp(obs_dim, hidden_dims, layer_norm=layer_norm)
+        self.net = nn.Sequential(backbone, nn.Linear(last_dim, 1))
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         return self.net(obs).squeeze(-1)
@@ -168,8 +178,14 @@ def train_ppo(args: argparse.Namespace) -> dict:
     )
 
     obs_dim = env.num_obs
-    actor = PPOActor(obs_dim, env.num_actions).to(env.torch_device)
-    critic = PPOValue(obs_dim).to(env.torch_device)
+    actor = PPOActor(
+        obs_dim,
+        env.num_actions,
+        args.actor_hidden_dims,
+        layer_norm=args.layer_norm,
+        initial_log_std=args.initial_log_std,
+    ).to(env.torch_device)
+    critic = PPOValue(obs_dim, args.critic_hidden_dims, layer_norm=args.layer_norm).to(env.torch_device)
     if args.actor_path is not None:
         actor.load_state_dict(torch.load(args.actor_path, map_location=env.torch_device))
     optimizer = torch.optim.Adam(
@@ -487,6 +503,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "value_coef": args.value_coef,
         "entropy_coef": args.entropy_coef,
         "max_grad_norm": args.max_grad_norm,
+        "actor_hidden_dims": args.actor_hidden_dims,
+        "critic_hidden_dims": args.critic_hidden_dims,
+        "layer_norm": args.layer_norm,
+        "initial_log_std": args.initial_log_std,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
         "hopper_reward_style": env.hopper_reward_style if args.env == "hopper" else None,
@@ -535,6 +555,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rollout-steps", type=int, default=64)
     parser.add_argument("--ppo-epochs", type=int, default=4)
     parser.add_argument("--minibatch-size", type=int, default=4096)
+    parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=[128, 64, 32])
+    parser.add_argument("--critic-hidden-dims", type=parse_int_list, default=[128, 64])
+    parser.add_argument("--layer-norm", dest="layer_norm", action="store_true", default=True)
+    parser.add_argument("--no-layer-norm", dest="layer_norm", action="store_false")
+    parser.add_argument("--initial-log-std", type=float, default=-0.5)
     parser.add_argument("--eval-horizon", type=int, default=None)
     parser.add_argument("--eval-interval", type=int, default=5)
     parser.add_argument("--episode-length", type=int, default=None)

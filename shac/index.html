@@ -278,8 +278,9 @@
           history JSON, loads PPO checkpoints into SHAC actors, spaces replicated Newton-contact worlds apart, and renders
           policy videos through a shared smoothed follow camera. Ant now uses Isaac-style local observations/reward terms and
           MuJoCo actuator-order torque mapping; PPO reaches 5.88 m with 8 falls, SHAC reaches 7.57 m with 2 falls, but
-          visual inspection shows these are still crouched/rolling gaits rather than clean Ant locomotion. A stricter
-          up-vector PPO selector produces zero falls but no forward motion. Hopper remains unresolved: the new Newton
+          visual inspection shows these are still crouched/rolling gaits rather than clean Ant locomotion. Larger
+          IsaacLab-style PPO networks with stricter up-vector selection produce zero falls but almost no forward motion.
+          Hopper remains unresolved: the new Newton
           per-DOF MJCF joint-anchor fix makes the MuJoCo-exported root slides/hinges physically coherent, and SHAC can
           preserve a zero-fall standing policy, but neither PPO nor SHAC has produced reliable hopping yet.
         </p>
@@ -350,8 +351,8 @@
           limits and can start Hopper slightly inside the stops. That fix is necessary but not sufficient: PPO with a
           Gym-style alive/forward reward, PPO curriculum from the upright checkpoint, inside-limit progress-weighted PPO,
           and the post-anchor-fix SHAC warm-start all fail to produce true hopping. Ant is not solved either: the moving
-          policies still look like low rolling/crawling gaits, while a stricter <code>up &gt; 0.85</code> PPO selector
-          learns a stationary tripod stance with zero falls and -0.06 m displacement.
+          policies still look like low rolling/crawling gaits, while stricter PPO selectors learn stationary tripod stances
+          with zero falls and at most 0.10 m displacement.
         </p>
       </article>
     </section>
@@ -616,6 +617,33 @@
           <figcaption>
             PPO with corrected root joint anchors and DiffRL-style Hopper reward moves 1.51 m, but every eval episode still
             terminates by falling. This is better than the pre-anchor collapse, but not solved locomotion.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel warn">
+        <h2>Ant PPO, IsaacLab-Style MLP</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Larger IsaacLab-style PPO networks, no observation RMS, and <code>up &gt; 0.7</code> selection keep the Ant upright:
+            zero falls/invalids, mean up 0.93, but only 0.076 m displacement. This isolates optimizer capacity from locomotion.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant PPO, Progress Warm-Start</h2>
+        <figure>
+          <video controls preload="metadata" poster="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Continuing the larger PPO checkpoint with progress weight 5 improves score to 404.7 and displacement to 0.10 m,
+            while later updates again trade short-horizon reward for worse full-horizon selection.
           </figcaption>
         </figure>
       </article>
@@ -1086,10 +1114,11 @@
           and MuJoCo actuator-order torque mapping. With those, PPO produces a moving but visually suspicious warm-start and
           SHAC can move 7.57 m with 2 falls; the stricter moving SHAC checkpoint has zero falls but still looks like a low crawl.
           A separate <code>up &gt; 0.85</code> PPO selector proves the renderer/reward can reject that posture, but it selects
-          a stationary tripod stance with -0.06 m displacement. Re-running the Isaac-style moving reward with
-          <code>up &gt; 0.85</code> stayed fall-heavy through update 40 and was stopped, so the missing piece is not a single
-          threshold but a curriculum that can keep the body upright while increasing progress. The next bug hunt should target
-          locomotion curriculum and long-horizon contact/limit optimization, not the RNE mass/bias cancellation.
+          a stationary tripod stance with -0.06 m displacement. Matching IsaacLab's larger PPO network family and disabling
+          observation RMS improves long-horizon stability under <code>up &gt; 0.7</code>, but still selects stationary
+          stances; progress warm-start reaches only 0.10 m before later updates regress. The missing piece is not a single
+          threshold but a curriculum/objective that can keep the body upright while increasing progress. The next bug hunt
+          should target locomotion curriculum and long-horizon contact/limit optimization, not the RNE mass/bias cancellation.
         </p>
       </article>
     </section>
@@ -1295,6 +1324,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         id: "antPpoDiffrlStrictUp",
         label: "Ant PPO strict up",
         path: "assets/ant_ppo_diffrl_force200_actuator_minup085_128env_80upd_run1/ant_ppo_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antPpoIsaacLabMlp",
+        label: "Ant PPO IsaacLab MLP",
+        path: "assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_results.json",
+        color: colors.slate
+      },
+      {
+        id: "antPpoIsaacLabWarm",
+        label: "Ant PPO progress warm",
+        path: "assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_results.json",
         color: colors.amber
       },
       {
