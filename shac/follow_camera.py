@@ -25,7 +25,7 @@ PRESETS: dict[str, CameraPreset] = {
     "contact_capsule": CameraPreset(offset=(-2.0, 1.35, 3.4), look_offset=(0.0, 0.12, 0.0), pitch=-18.0, yaw=-145.0, fov=45.0),
     "hopper": CameraPreset(offset=(-2.6, 1.2, 4.0), look_offset=(0.0, 0.25, 0.0), pitch=-15.0, yaw=-120.0, fov=45.0),
     "cheetah": CameraPreset(offset=(-3.6, 1.0, 5.5), look_offset=(0.0, 0.0, 0.0), pitch=-12.0, yaw=-115.0, fov=45.0),
-    "ant": CameraPreset(offset=(-3.8, 2.0, 5.4), look_offset=(0.0, 0.35, 0.0), pitch=-18.0, yaw=-135.0, fov=48.0),
+    "ant": CameraPreset(offset=(-2.45, 1.35, 3.35), look_offset=(0.0, 0.32, 0.0), pitch=-18.0, yaw=-135.0, fov=40.0),
 }
 
 

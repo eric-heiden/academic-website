@@ -302,17 +302,16 @@
           armature, 7.5 effort scale, friction 1.0, 0.31 m termination height, 2 physics substeps per 1/60 s policy step,
           Isaac local observations/reward, and unit joint-limit cost. With those settings, PPO reaches 20.37 m over 480
           deterministic frames. Conservative deterministic SHAC warm-started from that actor reaches 23.34 m on the pure
-          corrected-default reward, but that fastest policy still has 2 rare long-horizon falls in the 1024-env final eval.
-          The best current reliable Ant policy uses the same corrected dynamics and PPO warm start with a stability-shaped
-          Isaac objective: progress weight 2, height weight 1, terminal penalty 50, and 500k fall-gated selection. It reaches
-          23.24 m over 480 frames with 0 falls and 0 invalids. Attempts to enforce a higher 0.55 m torso-height gate or
-          high-force upright gait still make PPO/SHAC worse: they either stand nearly still or enter repeated flips/falls,
-          consistent with the converted MuJoCo Ant's passive rest height near 0.56 m.
-          PPO follow-ups under the same stability reward did not solve the optimizer side: from-scratch PPO selected a
-          zero-fall stationary update, while its final moving checkpoint reached 15.17 m but had 111 falls; a low-std PPO
-          fine-tune with terminal penalty 500 also reverted to a stationary zero-fall policy. Converting the reliable SHAC
-          actor into the PPO actor format reproduces 23.25 m with 0 falls, so the PPO actor/evaluation path is sound and the
-          failure is in PPO optimization under this long-horizon contact task.
+          corrected-default reward, but that fastest policy still has rare long-horizon falls in large 1024-world evals.
+          The latest Ant pass therefore changed the selector rather than the renderer: PPO is now re-evaluated with
+          randomized starts, a 500k fall gate, an explicit heading term, and a moderate terminal penalty. The selected
+          robust physical-objective PPO checkpoint moves 13.05 m with mean heading 0.98 and only 1 fall in a repeated
+          1024-world stochastic eval; a stricter terminal-50 variant reaches 11.43 m with 0 falls but is visibly slower.
+          SHAC warm-started from the robust PPO actor remains stable at 13.07 m with 0 falls, but the differentiable updates
+          did not improve the selected policy; best epoch stayed at 0 and later epochs gradually reduced displacement.
+          The older stability-shaped Ant SHAC reference is still the fastest reliable shaped-control policy in this report:
+          progress weight 2, height weight 1, terminal penalty 50, and 500k deterministic fall-gated selection produce
+          23.24 m over 480 frames with 0 falls and 0 invalids.
           The latest multistep checks show why: reset-state one-step gradients are clean, while H=8/H=16 Ant rollouts enter
           grazing foot contacts where local contact-position gradients and finite differences diverge.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
@@ -337,12 +336,12 @@
       <div class="panel metric">
         <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step deterministic eval from the corrected IsaacLab-default SHAC checkpoint.</p>
+        <p class="note">480-step stochastic-start eval from the robust physical-objective SHAC/PPO warm start.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / Invalids</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Full-horizon eval failures for the selected SHAC policy.</p>
+        <p class="note">Full-horizon failures in the selected 1024-world Ant eval.</p>
       </div>
       <div class="panel metric">
         <div class="label">Hopper SHAC Distance</div>
@@ -689,35 +688,48 @@
 
     <section class="grid two">
       <article class="panel ok">
-        <h2>Ant PPO, RSL-Style Adaptive KL</h2>
+        <h2>Ant PPO, Stochastic-Start Selector</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_rsl_exact_adaptivekl_fall500k_1024env_200upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_rsl_exact_adaptivekl_fall500k_1024env_200upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_ppo_rsl_adaptivekl_stochselect_term20_head1_1024env_120upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_rsl_adaptivekl_stochselect_term20_head1_1024env_120upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            PPO now uses the closer IsaacLab/RSL setup: 400-200-100 ELU actor/critic, no observation RMS, no LayerNorm,
-            32-step rollouts, 5 PPO epochs, value coefficient 1.0, adaptive KL at desired KL 0.01, force scale 7.5, and
-            strict 480-step selection with a 500k fall gate. The selected update 160 actor reaches 1359.7 return,
-            15.37 m displacement, 0 falls, 0 invalids, 0.587 m mean height, 0.992 mean up, and 0.980 mean heading over
-            the final 1024-world deterministic eval. Runtime was 190.3 s at 69.1k sim FPS with 137.8 MB peak allocated
-            CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
+            PPO fine-tuned from the RSL-style adaptive-KL actor using randomized-start 480-step selection, a 500k fall gate,
+            heading-aware selection, terminal penalty 20, and heading reward weight 1.0. The selected update 40 checkpoint
+            had 0 falls during selection; the repeated final 1024-world stochastic eval reports 1466.4 return, 13.05 m
+            displacement, 1 fall, 0 invalids, 0.570 m mean height, 0.993 mean up, and 0.977 mean heading. Runtime was
+            128.9 s at 68.8k sim FPS with 137.8 MB peak allocated CUDA memory. The video is raw
+            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Reliable Stability Reward</h2>
+        <h2>Ant SHAC, Robust PPO Warm-Start</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_rsl_stochppo_term20_head1_warm_physical_16env_24ep_lr1e5_run1/ant_poster.png">
+            <source src="assets/ant_shac_rsl_stochppo_term20_head1_warm_physical_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            SHAC warm-started from the robust PPO actor with the same physical objective, stochastic-start 1024-env
+            selector, H=16, 16 training envs, lr 1e-5, no critic bootstrap, and MuJoCo contacts. The best selected policy
+            stayed at epoch 0; later differentiable updates preserved zero falls but gradually reduced displacement. The
+            final best-policy eval reports 1467.3 return, 13.07 m displacement, 0 falls, 0 invalids, 0.570 m mean height,
+            0.993 mean up, and 0.978 mean heading. Runtime was 143.0 s total, 43.0 sim FPS, with 25.2 MB peak allocated
+            CUDA memory.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant SHAC, Stability-Shaped Reference</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_shac_stability_reward_progress2_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_poster.png">
             <source src="assets/ant_shac_stability_reward_progress2_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Deterministic SHAC initialized from the corrected PPO actor uses MuJoCo contacts, 16 training envs, H=16,
-            lr 1e-5, no critic bootstrap, and 1024-env 480-step selection. This run keeps the corrected Ant dynamics but
-            uses a stability-shaped Isaac reward with progress weight 2, height weight 1, terminal penalty 50, and a 500k
-            fall-gated selection score. The selected epoch 22 policy reaches 3378.8 return, 23.24 m displacement,
-            0 falls, 0 invalids, 0.647 m mean height, 0.991 mean up, and 0.903 mean heading over the final 480-step eval.
-            Runtime was 137.0 s total, 44.9 sim FPS, with 20.7 MB peak allocated CUDA memory. The faster pure
-            corrected-default SHAC reference remains in the plots at 23.34 m, but had 2 rare long-horizon falls.
+            This older shaped-control reference uses progress weight 2, height weight 1, terminal penalty 50, and
+            deterministic 1024-env 480-step selection. It remains the fastest reliable Ant policy in this report at
+            23.24 m with 0 falls and 0 invalids, but it is not the pure physical-objective RSL/IsaacLab reward used in the
+            two stochastic-selector runs above.
           </figcaption>
         </figure>
       </article>
@@ -735,7 +747,10 @@
           return to 1968.5 but selected 22.79 m with 8 falls. Combining the corrected dynamics, PPO warm start, progress
           weight 2, height weight 1, terminal penalty 50, and 500k selection fall gate is the first reliable Ant SHAC
           result in this batch: 23.24 m, 3378.8 return, 0 falls, and 0 invalids. The negative controls remain in the plots
-          to show that reliability required the full objective/selection change, not only a larger fall penalty.
+          to show that reliability required the full objective/selection change, not only a larger fall penalty. The newest
+          physical-objective controls use stochastic-start selection instead: term-50 PPO found a fully zero-fall but slower
+          11.43 m gait, while term-20 plus heading-aware selection kept a more useful 13.05 m gait with only 1 fall in the
+          repeated 1024-world stochastic eval.
         </p>
       </article>
       <article class="panel">
@@ -759,8 +774,10 @@
           converted into the PPO actor format and evaluated through the PPO runner; it reproduced 23.25 m with 0 falls.
           The new RSL-style adaptive-KL run fixes the best PPO checkpoint selection problem for the physical Ant objective:
           the selected policy now moves 15.37 m with 0 falls, although adjacent higher-reward updates still show large
-          late-rollout fall spikes. PPO therefore verifies the evaluation/rendering path and can train a reliable stepping
-          stone, but it is still less robust than the SHAC warm-started stability run.
+          late-rollout fall spikes under repeated stochastic-start evaluation. Fine-tuning that actor with stochastic-start
+          selection and a heading term gives the current PPO stepping stone: 13.05 m, 0.977 heading, 1 fall, and 0 invalids.
+          PPO therefore verifies the evaluation/rendering path and can train a robust physical-objective stepping stone,
+          while the faster 23.24 m result still requires the shaped SHAC objective.
         </p>
       </article>
     </section>
@@ -1666,6 +1683,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.blue
       },
       {
+        id: "antPpoRslStochTerm20Head1",
+        label: "Ant PPO stochastic selector",
+        path: "assets/ant_ppo_rsl_adaptivekl_stochselect_term20_head1_1024env_120upd_run1/ant_ppo_results.json",
+        color: colors.teal
+      },
+      {
         id: "antPpoStabilityReward",
         label: "Ant PPO stability reward",
         path: "assets/ant_ppo_stability_reward_progress2_force75_1024env_240upd_run1/ant_ppo_results.json",
@@ -1694,6 +1717,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC stability reward",
         path: "assets/ant_shac_stability_reward_progress2_force75_warm_ppo_16env_24ep_lr1e5_run1/ant_results.json",
         color: colors.blue
+      },
+      {
+        id: "antShacRslStochTerm20Head1",
+        label: "Ant SHAC stochastic warm",
+        path: "assets/ant_shac_rsl_stochppo_term20_head1_warm_physical_16env_24ep_lr1e5_run1/ant_results.json",
+        color: colors.green
       },
       {
         id: "antShacIsaacExactDefaultsStochastic",
@@ -2263,7 +2292,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacStabilityProgress2Force75")
+      const antLatest = presentRuns.find((run) => run.id === "antShacRslStochTerm20Head1")
+        || presentRuns.find((run) => run.id === "antPpoRslStochTerm20Head1")
+        || presentRuns.find((run) => run.id === "antShacStabilityProgress2Force75")
         || presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
         || presentRuns.find((run) => run.id === "antPpoIsaacExactDefaults")
         || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2NoHeight")
