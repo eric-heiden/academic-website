@@ -518,7 +518,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--obs-rms-path", type=Path, default=None)
     parser.add_argument("--actor-hidden-dims", type=parse_int_list, default=[256, 128, 64])
     parser.add_argument("--actor-logstd-init", type=float, default=0.0)
-    parser.add_argument("--actor-layer-norm", action="store_true", default=True)
+    parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
+    parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--sim-substeps", type=int, default=2)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="implicitfast")
@@ -557,7 +558,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-reset-velocity-scale", type=float, default=0.25)
     parser.add_argument("--ant-termination-height", type=float, default=0.31)
     parser.add_argument("--ant-observation-style", choices=["isaac", "diffrl"], default="isaac")
-    parser.add_argument("--ant-reward-style", choices=["isaac", "diffrl"], default="isaac")
+    parser.add_argument(
+        "--ant-reward-style",
+        choices=["isaac", "isaaclab", "isaac_heading_gated", "diffrl"],
+        default="isaac",
+    )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     return parser.parse_args()
 

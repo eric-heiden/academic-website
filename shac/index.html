@@ -315,10 +315,13 @@
           progress weight 2, height weight 1, terminal penalty 50, and 500k deterministic fall-gated selection produce
           23.24 m over 480 frames with 0 falls and 0 invalids.
           The latest multistep checks show why: reset-state one-step gradients are clean, while H=8/H=16 Ant rollouts enter
-          grazing foot contacts where local contact-position gradients and finite differences diverge. A separate NV MJCF
-          pass is now treated as a negative control rather than a success: with IsaacLab-like 45 degree starts, the local
-          <code>nv_ant.xml</code> passively settles to about 0.30 m, right at the 0.31 m termination threshold, and PPO/SHAC
-          produce thousands of falls. The DiffRL MJCF remains the current reliable Ant basis in this report.
+          grazing foot contacts where local contact-position gradients and finite differences diverge. The latest Ant import
+          pass fixed the local NV MJCF setup: the runner now canonicalizes every Ant free root to Newton's Y-up pose, matching
+          the DiffRL import and Newton's own kinematics test, and ignores the embedded <code>floor</code> geom in
+          <code>nv_ant.xml</code> so Newton does not create duplicate coplanar floor contacts. With that root/floor fix, PPO
+          reaches 31.15 m and a low-lr SHAC warm-start improves it to 33.66 m over 480 deterministic frames on the corrected
+          single-floor NV Ant. The gait is still a low crawl and the large 1024-world replay has rare failures, but this is no
+          longer the asset-import collapse that made PPO fail outright.
           Hopper is now solved as a stepping-stone: a DiffRL-exact PPO run reaches 14.49 m over 480 frames, and SHAC
           warm-started from that no-LayerNorm PPO actor selects a zero-fall 14.49 m rollout before longer short-horizon updates
           drift into falls.
@@ -339,14 +342,14 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Ant Robust SHAC Distance</div>
+        <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step stochastic-start eval from the robust physical-objective warm start.</p>
+        <p class="note">480-step eval from the latest corrected Ant run.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / Invalids</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Full-horizon failures in the selected 1024-world Ant eval.</p>
+        <p class="note">Failures in the selected 1024-world Ant eval.</p>
       </div>
       <div class="panel metric">
         <div class="label">Hopper SHAC Distance</div>
@@ -382,6 +385,9 @@
           now run on a separate large randomized environment batch via <code>--selection-num-envs</code>. The PPO runner now
           mirrors that safeguard for loaded actors by evaluating and saving update 0 before any PPO fine-tune step. SHAC can also use a
           no-LayerNorm actor architecture that exactly matches PPO checkpoints.
+          The newest Ant harness fix canonicalizes the NV MJCF free-root pose to Newton's Y-up convention and drops the
+          embedded NV floor before adding Newton's ground plane; this removes the bad low-sideways import posture and the
+          duplicate coplanar floor contacts that caused the earlier PPO failure and video z-fighting.
           Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
           positions per expanded DOF; this fixes Hopper's root slide/hinge anchors when SolverMuJoCo exports merged Newton
           joints back to MuJoCo and when it refreshes the MJWarp runtime model. Every run records the imported Newton and
@@ -400,9 +406,10 @@
           a compact DiffRL-style crawl rather than a tall natural walk. Stronger fall-gated selection alone, deterministic
           reset-each-epoch H=32, and a weaker height-aware reward were negative controls at 22.73 m/5 falls, 22.12 m/3 falls,
           and 22.79 m/8 falls. PPO is no longer a blanket negative control on Ant: the DiffRL-asset RSL-style PPO run is
-          reliable at 13.08 m with one fall in the fixed 1024-world replay. The NV MJCF Ant remains a negative control,
-          because its passive rest pose collapses to the termination threshold and PPO/SHAC both inherit that low, fall-prone
-          posture.
+          reliable at 13.08 m with one fall in the fixed 1024-world replay. The corrected NV MJCF Ant now trains, which
+          isolates the earlier failure to the import pose and duplicate floor rather than PPO itself: the current PPO replay
+          covers 31.15 m and SHAC improves that to 33.66 m. The remaining issue is qualitative and long-horizon: the policy is
+          still a low crawl and the large eval reports 39 SHAC falls, so it is not yet the reliability-selected Ant gait.
           A replay of the fastest pure-default policy shows the rare flips occur mid-rollout around
           steps 348, 370, 420, 422, and 461, so they are real long-horizon contact/pose failures rather than timeout
           bookkeeping. SHAC still needs strict full-horizon checkpoint selection: a stochastic H=32 continuation and later
@@ -477,22 +484,22 @@
               <td>Newton contacts improve local action rows, but randomized Ant rollouts are not yet stable.</td>
             </tr>
             <tr>
-              <td>Ant NV H=8 PPO policy</td>
-              <td>3.7e-1</td>
-              <td>0.92</td>
-              <td>The low-noise NV PPO seed still has inaccurate H=8 policy gradients.</td>
+              <td>Ant NV root-fixed PPO, one-step actions</td>
+              <td>4.5e-2</td>
+              <td>1.00</td>
+              <td>The corrected single-floor NV setup has clean reset-state action derivatives.</td>
             </tr>
             <tr>
-              <td>Ant NV H=8 fixed actions</td>
-              <td>6.9e-1</td>
-              <td>0.67</td>
-              <td>Hard joint-limit/contact coupling dominates multistep finite differences on the NV asset.</td>
+              <td>Ant NV root-fixed PPO, H=8 policy</td>
+              <td>1.0e+0</td>
+              <td>0.38</td>
+              <td>Full-horizon policy finite differences are still dominated by contact/limit adjoints after the first contact steps.</td>
             </tr>
             <tr>
-              <td>Ant NV H=8 no hard limits</td>
-              <td>2.1e-1</td>
-              <td>0.75</td>
-              <td>Disabling hard limits helps, but root orientation/contact state gradients remain too noisy for SHAC.</td>
+              <td>Ant NV root-fixed PPO, H=8 fixed actions</td>
+              <td>1.0e+0</td>
+              <td>0.25</td>
+              <td>The remaining gradient bug is now isolated to multistep Ant contact/limit propagation, not the root import.</td>
             </tr>
             <tr>
               <td>Hopper no limits, no contact, state/action</td>
@@ -744,31 +751,33 @@
           </figcaption>
         </figure>
       </article>
-      <article class="panel warn">
-        <h2>Ant PPO, NV MJCF Negative Control</h2>
+      <article class="panel ok">
+        <h2>Ant PPO, Root-Fixed NV MJCF</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_nv_stablepose_term027_lownoise_1024env_300upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_nv_stablepose_term027_lownoise_1024env_300upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Same Newton/MJWarp path, but using the local <code>nv_ant.xml</code> asset with IsaacLab-like starts. Passive
-            rollouts settle near 0.30 m, so the trained PPO policy stays in a low, fall-prone posture: the fixed 480-step
-            replay reports 2.78 m deterministic displacement with 4096 falls, and stochastic-start eval reports 1.57 m with
-            4980 falls across 1024 worlds. This is now treated as an asset/import negative control.
+            Same Newton/MJWarp path, now with the NV Ant root pose canonicalized to Newton's Y-up convention and the embedded
+            NV floor ignored before Newton adds the ground plane. Re-evaluating the selected PPO checkpoint in the corrected
+            single-floor environment gives 2220.9 return, 31.15 m displacement, 100 falls, 9 invalids, 0.649 m mean height,
+            0.967 mean up, and 0.911 mean heading across 1024 deterministic worlds. The video is raw
+            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
-      <article class="panel warn">
-        <h2>Ant SHAC, NV MJCF Negative Control</h2>
+      <article class="panel ok">
+        <h2>Ant SHAC, Root-Fixed NV MJCF</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_nv_from_lownoise_ppo_detactor_h16_16env_12ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_nv_from_lownoise_ppo_detactor_h16_16env_12ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_poster.png">
+            <source src="assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            SHAC warm-started from the low-noise NV PPO checkpoint did not recover the gait. The best selected epoch stayed at
-            the initial actor, and later H=16 updates reduced the 480-step score while preserving the same low-contact
-            posture. The matching finite-difference check shows H=8 fixed-action median relative error 0.69 with hard limits
-            and 0.21 without hard limits.
+            SHAC warm-started from the root-fixed NV PPO actor with H=16, 16 training envs, lr 1e-5, no critic bootstrap, and
+            MuJoCo contacts. The best selected epoch was 15; the fixed 1024-world replay reports 2333.4 return, 33.66 m
+            displacement, 39 falls, 6 invalids, 0.649 m mean height, 0.977 mean up, and 0.902 mean heading. Runtime was
+            138.0 s at 44.6 sim FPS with 22.5 MB peak allocated CUDA memory. The gait remains low, but the previous PPO/SHAC
+            collapse was caused by the import and duplicate-floor bugs.
           </figcaption>
         </figure>
       </article>
@@ -868,12 +877,11 @@
         <h2>Ant Strict-Height Finding</h2>
         <p>
           Raising the Ant termination floor to 0.55 m or forcing high-upright selection did not fix the visual gait. The
-          passive DiffRL Ant settles around 0.48-0.56 m without control, while the local NV MJCF Ant settles around 0.30 m
-          and sits directly on the 0.31 m IsaacLab termination threshold. Strict-height/high-force PPO variants either stood
-          nearly still or flipped into repeated fall/invalid resets. The best current PPO/SHAC results therefore use the
-          DiffRL MJCF basis with long-horizon displacement plus fall/invalid selection, while NV remains a negative control.
-          The remaining issue is qualitative: the MuJoCo Ant task supports a fast low crawl, and a taller natural gait will
-          require an explicit curriculum or a different morphology/objective rather than a blanket height gate.
+          old NV-import run settled near 0.30 m because its free root was imported in the wrong orientation and then collided
+          with two coplanar floors. After the root/floor fix, passive NV rollouts stay near the intended 0.5 m start and
+          PPO/SHAC both train. The remaining issue is qualitative: both the DiffRL and corrected NV MuJoCo Ant tasks support
+          fast low crawls, and a taller natural gait will require an explicit curriculum or a different morphology/objective
+          rather than a blanket height gate.
         </p>
       </article>
     </section>
@@ -1871,20 +1879,38 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.amber
       },
       {
+        id: "antPpoNvRootfix",
+        label: "Ant PPO NV root-fixed",
+        path: "assets/ant_ppo_nv_rootfix_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_results.json",
+        color: colors.slate
+      },
+      {
+        id: "antPpoNvRootfixSingleFloor",
+        label: "Ant PPO NV single-floor eval",
+        path: "assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antShacNvRootfix",
+        label: "Ant SHAC NV root-fixed",
+        path: "assets/ant_shac_nv_rootfix_singlefloor_warm_ppo_h16_16env_24ep_lr1e5_run1/ant_results.json",
+        color: colors.coral
+      },
+      {
         id: "antPpoNvLowNoise",
-        label: "Ant PPO NV low-noise",
+        label: "Ant PPO NV old bad-root",
         path: "assets/ant_ppo_nv_stablepose_term027_lownoise_1024env_300upd_run1/ant_ppo_results.json",
         color: colors.slate
       },
       {
         id: "antPpoNvDetHeading",
-        label: "Ant PPO NV det heading",
+        label: "Ant PPO NV old heading",
         path: "assets/ant_ppo_nv_stablepose_term027_detinit_headinggated_1024env_300upd_run1/ant_ppo_results.json",
         color: colors.amber
       },
       {
         id: "antShacNvLowNoise",
-        label: "Ant SHAC NV low-noise",
+        label: "Ant SHAC NV old bad-root",
         path: "assets/ant_shac_nv_from_lownoise_ppo_detactor_h16_16env_12ep_run1/ant_results.json",
         color: colors.coral
       },
@@ -2076,7 +2102,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antLocalH8NoContact: "assets/ant_multistep_grad_local_steps_h8_nocontact_noterm_run1.json",
       antLocalH8Margin002: "assets/ant_multistep_grad_local_components_h8_margin002_run1.json",
       antNvH8Ppo: "assets/ant_multistep_grad_nv_lownoise_ppo_h8_run1.json",
-      antNvH8PpoSoftLimits: "assets/ant_multistep_grad_nv_lownoise_ppo_h8_softlimits_run1.json"
+      antNvH8PpoSoftLimits: "assets/ant_multistep_grad_nv_lownoise_ppo_h8_softlimits_run1.json",
+      antNvRootfixH8Ppo: "assets/ant_multistep_grad_nv_rootfix_singlefloor_ppo_h8_run1.json"
     };
 
     function fmt(value, digits = 2) {
@@ -2261,20 +2288,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
     function runRow(run) {
       const d = run.data;
       const e = d.eval || {};
+      const seconds = d.total_seconds ?? d.runtime_sec;
+      const cudaAllocated = d.max_cuda_memory_allocated_mb ?? d.max_cuda_allocated_mb;
+      const cudaReserved = d.max_cuda_memory_reserved_mb ?? d.max_cuda_reserved_mb;
       return `<tr>
         <td>${run.label}<br><span class="muted">best ${d.best_epoch !== undefined ? `epoch ${d.best_epoch}` : (d.best_update !== undefined ? `update ${d.best_update}` : "n/a")}</span></td>
         <td>${runReward(run)}<br><span class="muted">${d.contact_backend || "n/a"} contacts</span></td>
         <td>${fmt(e.return, 1)}<br><span class="muted">score ${fmt(d.eval_score ?? d.best_eval_score, 1)}</span></td>
         <td>${fmt(e.fall_count, 0)} / ${fmt(e.invalid_count, 0)}<br><span class="muted">alive ${fmt(e.alive_fraction, 3)}</span></td>
         <td>${fmt(e.mean_forward_displacement, 3)} m<br><span class="muted">up ${fmt(e.mean_up, 2)}, heading ${fmt(e.mean_heading, 2)}</span></td>
-        <td>${fmt(d.total_seconds, 1)} s<br><span class="muted">${fmt(d.mean_fps, 0)} fps</span></td>
-        <td>${fmt(d.max_cuda_memory_allocated_mb, 1)} MB<br><span class="muted">${fmt(d.max_cuda_memory_reserved_mb, 1)} MB reserved</span></td>
+        <td>${fmt(seconds, 1)} s<br><span class="muted">${fmt(d.mean_fps, 0)} fps</span></td>
+        <td>${fmt(cudaAllocated, 1)} MB<br><span class="muted">${fmt(cudaReserved, 1)} MB reserved</span></td>
       </tr>`;
     }
 
     async function load() {
       const loadedRuns = await Promise.all(runs.map(async (run) => ({ ...run, data: await safeJson(run.path) })));
-      const presentRuns = loadedRuns.filter((run) => run.data && Array.isArray(run.data.history));
+      const presentRuns = loadedRuns.filter((run) => run.data);
+      const historyRuns = presentRuns.filter((run) => Array.isArray(run.data.history) && run.data.history.length);
       const [
         diagNone,
         diagNewton,
@@ -2323,7 +2354,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antLocalH8NoContact,
         antLocalH8Margin002,
         antNvH8Ppo,
-        antNvH8PpoSoftLimits
+        antNvH8PpoSoftLimits,
+        antNvRootfixH8Ppo
       ] = await Promise.all([
         safeJson(diagPaths.none),
         safeJson(diagPaths.newton),
@@ -2372,7 +2404,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antLocalH8NoContact),
         safeJson(diagPaths.antLocalH8Margin002),
         safeJson(diagPaths.antNvH8Ppo),
-        safeJson(diagPaths.antNvH8PpoSoftLimits)
+        safeJson(diagPaths.antNvH8PpoSoftLimits),
+        safeJson(diagPaths.antNvRootfixH8Ppo)
       ]);
 
       const stable = presentRuns.find((run) => run.id === "cheetahShacSub1")
@@ -2384,7 +2417,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacRslStochTerm20Head1")
+      const antLatest = presentRuns.find((run) => run.id === "antShacNvRootfix")
+        || presentRuns.find((run) => run.id === "antPpoNvRootfixSingleFloor")
+        || presentRuns.find((run) => run.id === "antShacRslStochTerm20Head1")
         || presentRuns.find((run) => run.id === "antPpoRslStochTerm20Head1")
         || presentRuns.find((run) => run.id === "antShacStabilityProgress2Force75")
         || presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
@@ -2441,6 +2476,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antLocalH8Margin002?.timestamp_pacific,
         antNvH8Ppo?.timestamp_pacific,
         antNvH8PpoSoftLimits?.timestamp_pacific,
+        antNvRootfixH8Ppo?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -2456,6 +2492,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ant: presentRuns.filter((run) => run.data?.env === "ant"),
         hopper: presentRuns.filter((run) => run.data?.env === "hopper"),
         cheetah: presentRuns.filter((run) => run.data?.env === "cheetah")
+      };
+      const envHistoryRuns = {
+        ant: historyRuns.filter((run) => run.data?.env === "ant"),
+        hopper: historyRuns.filter((run) => run.data?.env === "hopper"),
+        cheetah: historyRuns.filter((run) => run.data?.env === "cheetah")
       };
 
       function selectionKey(data) {
@@ -2514,12 +2555,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         });
       }
 
-      plotEnvHistory("ant-reward-chart", envRuns.ant, "mean_reward", "Mean step reward");
-      plotEnvSelection("ant-selection-chart", envRuns.ant);
-      plotEnvHistory("hopper-reward-chart", envRuns.hopper, "mean_reward", "Mean step reward");
-      plotEnvSelection("hopper-selection-chart", envRuns.hopper);
-      plotEnvHistory("cheetah-reward-chart", envRuns.cheetah, "mean_reward", "Mean step reward");
-      plotEnvSelection("cheetah-selection-chart", envRuns.cheetah);
+      plotEnvHistory("ant-reward-chart", envHistoryRuns.ant, "mean_reward", "Mean step reward");
+      plotEnvSelection("ant-selection-chart", envHistoryRuns.ant);
+      plotEnvHistory("hopper-reward-chart", envHistoryRuns.hopper, "mean_reward", "Mean step reward");
+      plotEnvSelection("hopper-selection-chart", envHistoryRuns.hopper);
+      plotEnvHistory("cheetah-reward-chart", envHistoryRuns.cheetah, "mean_reward", "Mean step reward");
+      plotEnvSelection("cheetah-selection-chart", envHistoryRuns.cheetah);
       plotEnvEval("ant-eval-chart", envRuns.ant, "falls / eval");
       plotEnvEval("hopper-eval-chart", envRuns.hopper, "falls / eval");
       plotEnvEval("cheetah-eval-chart", envRuns.cheetah, "falls / eval");
@@ -2668,6 +2709,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Ant local H=8 Newton actions", bestSweep(antLocalH8Newton?.fixed_action_sequence)],
         ["Ant local H=8 no-contact actions", bestSweep(antLocalH8NoContact?.fixed_action_sequence)],
         ["Ant local H=8 margin 0.02 actions", bestSweep(antLocalH8Margin002?.fixed_action_sequence)],
+        ["Ant NV root-fixed H=8 PPO policy", bestSweep(antNvRootfixH8Ppo?.policy)],
+        ["Ant NV root-fixed H=8 fixed actions", bestSweep(antNvRootfixH8Ppo?.fixed_action_sequence)],
         ["Ant NV H=8 PPO policy", bestSweep(antNvH8Ppo?.policy)],
         ["Ant NV H=8 PPO fixed actions", bestSweep(antNvH8Ppo?.fixed_action_sequence)],
         ["Ant NV H=8 no hard limits", bestSweep(antNvH8PpoSoftLimits?.fixed_action_sequence)]

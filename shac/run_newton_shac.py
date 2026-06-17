@@ -766,7 +766,8 @@ class NewtonMuJoCoTorchEnv:
                 if "density" in elem.attrib:
                     elem.set("density", f"{self.ant_density_override:g}")
             ant_source = ET.tostring(root, encoding="unicode")
-        source.add_mjcf(ant_source, up_axis=ant_up_axis, armature_scale=armature_scale)
+        ignore_names = ("^floor$",) if self.ant_asset == "nv" else ()
+        source.add_mjcf(ant_source, up_axis=ant_up_axis, armature_scale=armature_scale, ignore_names=ignore_names)
         if self.ant_joint_damping is not None:
             damping_alias = source.custom_attributes.get("mujoco:dof_passive_damping")
             for dof_id in range(6, len(source.joint_damping)):
@@ -797,6 +798,14 @@ class NewtonMuJoCoTorchEnv:
         if self.ant_start_height is not None:
             source.joint_q[1] = self.ant_start_height
             source.joint_target_q[1] = self.ant_start_height
+        # Keep all Ant assets in Newton's Y-up convention.  The NV MJCF imports
+        # with an identity free-root rotation and a lateral z offset, while the
+        # DiffRL MJCF and Newton's own kinematics test use the -90 deg X root
+        # rotation with zero lateral offset.
+        source.joint_q[2] = 0.0
+        source.joint_target_q[2] = 0.0
+        source.joint_q[3:7] = ANT_START_ROT
+        source.joint_target_q[3:7] = ANT_START_ROT
         ant_start_joint_q = self.ant_start_joint_q if self.ant_start_joint_q is not None else list(ANT_START_JOINT_Q)
         if len(ant_start_joint_q) != 8:
             raise ValueError("ant_start_joint_q must contain 8 values")
@@ -2033,7 +2042,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
 
     with torch.no_grad():
         obs0 = normalize_obs(env.observe(q0, qd0, prev0), obs_stats)
-        action0 = torch.tanh(actor(obs0, deterministic=True)).detach()
+        action0 = deterministic_policy_action(actor, obs0).detach()
     action0.requires_grad_(True)
     action_loss, action_metrics = one_step_action_loss(
         env,
