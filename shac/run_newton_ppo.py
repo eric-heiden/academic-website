@@ -322,30 +322,60 @@ def train_ppo(args: argparse.Namespace) -> dict:
         torch.cuda.synchronize(env.torch_device)
 
     t0 = time.perf_counter()
-    if args.actor_path is not None or args.updates == 0:
+
+    def selection_evaluation() -> tuple[dict, float, dict]:
+        worst_selection = None
+        worst_score = float("inf")
+        worst_shortfalls = None
         selection_horizon = args.selection_horizon or args.eval_horizon
-        initial_selection = evaluate_policy(
-            env,
-            actor,
-            selection_horizon,
-            obs_rms=obs_rms,
-            termination_penalty=args.termination_penalty,
-            stochastic_init=args.eval_stochastic_init,
-        )
-        initial_selection_score = rollout_selection_score(
-            initial_selection,
-            num_envs=args.num_envs,
-            fall_penalty=args.selection_fall_penalty,
-            invalid_penalty=args.selection_invalid_penalty,
-            displacement_weight=args.selection_displacement_weight,
-            height_weight=args.selection_height_weight,
-            up_weight=args.selection_up_weight,
-            heading_weight=args.selection_heading_weight,
-            min_height=args.selection_min_height,
-            min_up=args.selection_min_up,
-            min_heading=args.selection_min_heading,
-            posture_penalty=args.selection_posture_penalty,
-        )
+        for _ in range(max(1, int(args.selection_repeats))):
+            if args.selection_uninterrupted:
+                candidate = evaluate_policy_uninterrupted(
+                    env,
+                    actor,
+                    selection_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            else:
+                candidate = evaluate_policy(
+                    env,
+                    actor,
+                    selection_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            candidate_score = rollout_selection_score(
+                candidate,
+                num_envs=args.num_envs,
+                fall_penalty=args.selection_fall_penalty,
+                invalid_penalty=args.selection_invalid_penalty,
+                displacement_weight=args.selection_displacement_weight,
+                height_weight=args.selection_height_weight,
+                up_weight=args.selection_up_weight,
+                heading_weight=args.selection_heading_weight,
+                min_height=args.selection_min_height,
+                min_up=args.selection_min_up,
+                min_heading=args.selection_min_heading,
+                posture_penalty=args.selection_posture_penalty,
+            )
+            if candidate_score < worst_score or worst_selection is None:
+                worst_selection = candidate
+                worst_score = candidate_score
+                worst_shortfalls = rollout_constraint_shortfalls(
+                    candidate,
+                    min_height=args.selection_min_height,
+                    min_up=args.selection_min_up,
+                    min_heading=args.selection_min_heading,
+                )
+        assert worst_selection is not None
+        assert worst_shortfalls is not None
+        return worst_selection, worst_score, worst_shortfalls
+
+    if args.actor_path is not None or args.updates == 0:
+        initial_selection, initial_selection_score, _ = selection_evaluation()
         best_score = initial_selection_score
         best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
         torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
@@ -512,35 +542,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         selection_score = None
         selection_shortfalls = {}
         if should_eval:
-            selection_horizon = args.selection_horizon or args.eval_horizon
-            selection = evaluate_policy(
-                env,
-                actor,
-                selection_horizon,
-                obs_rms=obs_rms,
-                termination_penalty=args.termination_penalty,
-                stochastic_init=args.eval_stochastic_init,
-            )
-            selection_score = rollout_selection_score(
-                selection,
-                num_envs=args.num_envs,
-                fall_penalty=args.selection_fall_penalty,
-                invalid_penalty=args.selection_invalid_penalty,
-                displacement_weight=args.selection_displacement_weight,
-                height_weight=args.selection_height_weight,
-                up_weight=args.selection_up_weight,
-                heading_weight=args.selection_heading_weight,
-                min_height=args.selection_min_height,
-                min_up=args.selection_min_up,
-                min_heading=args.selection_min_heading,
-                posture_penalty=args.selection_posture_penalty,
-            )
-            selection_shortfalls = rollout_constraint_shortfalls(
-                selection,
-                min_height=args.selection_min_height,
-                min_up=args.selection_min_up,
-                min_heading=args.selection_min_heading,
-            )
+            selection, selection_score, selection_shortfalls = selection_evaluation()
             if selection_score > best_score:
                 best_score = selection_score
                 best_update = update + 1
@@ -754,6 +756,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_min_up": args.selection_min_up,
         "selection_min_heading": args.selection_min_heading,
         "selection_posture_penalty": args.selection_posture_penalty,
+        "selection_repeats": args.selection_repeats,
+        "selection_uninterrupted": args.selection_uninterrupted,
         "lr": args.lr,
         "adaptive_kl": args.adaptive_kl,
         "desired_kl": args.desired_kl,
@@ -948,6 +952,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-min-up", type=float, default=None)
     parser.add_argument("--selection-min-heading", type=float, default=None)
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
+    parser.add_argument("--selection-repeats", type=int, default=1)
+    parser.add_argument("--selection-uninterrupted", action="store_true")
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--render-video", action="store_true")

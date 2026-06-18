@@ -961,6 +961,21 @@ class NewtonMuJoCoTorchEnv:
         data.act.zero_()
         data.xfrc_applied.zero_()
 
+    def reset_solver_data(self, env_ids: torch.Tensor | None = None) -> None:
+        if self.contact_backend != "mujoco":
+            return
+        if env_ids is None:
+            mujoco_warp.reset_data(self.solver.mjw_model, self.solver.mjw_data)
+            wp.synchronize()
+            return
+        if env_ids.numel() == 0:
+            return
+        reset_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.torch_device)
+        reset_mask[env_ids] = True
+        reset_mask_wp = wp.from_torch(reset_mask.contiguous(), dtype=wp.bool)
+        mujoco_warp.reset_data(self.solver.mjw_model, self.solver.mjw_data, reset=reset_mask_wp)
+        wp.synchronize()
+
     def step_warp(
         self,
         q: torch.Tensor,
@@ -1035,6 +1050,7 @@ class NewtonMuJoCoTorchEnv:
         return NewtonMuJoCoStep.apply(q, qd, joint_f, self.step_ctx)
 
     def reset(self, noise: float = 0.0, stochastic_init: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+        self.reset_solver_data()
         q = self.start_q.clone()
         qd = self.start_qd.clone()
         if self.env_name == "ant" and stochastic_init:
@@ -1126,6 +1142,7 @@ class NewtonMuJoCoTorchEnv:
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if env_ids.numel() == 0:
             return q, qd
+        self.reset_solver_data(env_ids)
         reset_q = self.start_q[env_ids].clone()
         reset_qd = self.start_qd[env_ids].clone()
         if self.env_name == "ant" and stochastic_init:
@@ -1482,8 +1499,8 @@ class NewtonMuJoCoTorchEnv:
     ) -> torch.Tensor:
         reward = self.reward(q_next, qd_next, action, obs=obs)
         if self.env_name == "ant" and self.ant_reward_style == "isaaclab_potential":
-            physics_dt = max(float(self.dt) / float(self.sim_substeps), 1.0e-8)
-            potential_progress = (q_next[:, 0] - q[:, 0]) / physics_dt
+            control_dt = max(float(self.dt), 1.0e-8)
+            potential_progress = (q_next[:, 0] - q[:, 0]) / control_dt
             reward = reward + self.ant_reward.progress * (potential_progress - qd_next[:, 0])
         return reward
 
@@ -2571,30 +2588,60 @@ def run_training(args: argparse.Namespace) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     live_history_path = out_dir / f"{args.env}_history_live.json"
 
+    def selection_evaluation() -> tuple[dict, float, dict]:
+        worst_rollout = None
+        worst_score = float("inf")
+        worst_shortfalls = None
+        repeat_count = max(1, int(args.selection_repeats))
+        for _ in range(repeat_count):
+            selection_horizon = args.selection_horizon or args.eval_horizon
+            if args.selection_uninterrupted:
+                candidate_rollout = evaluate_policy_uninterrupted(
+                    selection_env,
+                    actor,
+                    selection_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            else:
+                candidate_rollout = evaluate_policy(
+                    selection_env,
+                    actor,
+                    selection_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            candidate_score = rollout_selection_score(
+                candidate_rollout,
+                num_envs=selection_env.num_envs,
+                fall_penalty=args.selection_fall_penalty,
+                invalid_penalty=args.selection_invalid_penalty,
+                displacement_weight=args.selection_displacement_weight,
+                height_weight=args.selection_height_weight,
+                up_weight=args.selection_up_weight,
+                heading_weight=args.selection_heading_weight,
+                min_height=args.selection_min_height,
+                min_up=args.selection_min_up,
+                min_heading=args.selection_min_heading,
+                posture_penalty=args.selection_posture_penalty,
+            )
+            if candidate_score < worst_score or worst_rollout is None:
+                worst_rollout = candidate_rollout
+                worst_score = candidate_score
+                worst_shortfalls = rollout_constraint_shortfalls(
+                    candidate_rollout,
+                    min_height=args.selection_min_height,
+                    min_up=args.selection_min_up,
+                    min_heading=args.selection_min_heading,
+                )
+        assert worst_rollout is not None
+        assert worst_shortfalls is not None
+        return worst_rollout, worst_score, worst_shortfalls
+
     run_t0 = time.perf_counter()
-    initial_selection_horizon = args.selection_horizon or args.eval_horizon
-    initial_selection_rollout = evaluate_policy(
-        selection_env,
-        actor,
-        initial_selection_horizon,
-        obs_rms=obs_rms,
-        termination_penalty=args.termination_penalty,
-        stochastic_init=args.eval_stochastic_init,
-    )
-    initial_selection_score = rollout_selection_score(
-        initial_selection_rollout,
-        num_envs=selection_env.num_envs,
-        fall_penalty=args.selection_fall_penalty,
-        invalid_penalty=args.selection_invalid_penalty,
-        displacement_weight=args.selection_displacement_weight,
-        height_weight=args.selection_height_weight,
-        up_weight=args.selection_up_weight,
-        heading_weight=args.selection_heading_weight,
-        min_height=args.selection_min_height,
-        min_up=args.selection_min_up,
-        min_heading=args.selection_min_heading,
-        posture_penalty=args.selection_posture_penalty,
-    )
+    initial_selection_rollout, initial_selection_score, _ = selection_evaluation()
     best_eval_return = initial_selection_rollout["return"]
     best_eval_score = initial_selection_score
     best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
@@ -2807,35 +2854,7 @@ def run_training(args: argparse.Namespace) -> dict:
         if torch.cuda.is_available():
             torch.cuda.synchronize(env.torch_device)
 
-        selection_horizon = args.selection_horizon or args.eval_horizon
-        selection_rollout = evaluate_policy(
-            selection_env,
-            actor,
-            selection_horizon,
-            obs_rms=obs_rms,
-            termination_penalty=args.termination_penalty,
-            stochastic_init=args.eval_stochastic_init,
-        )
-        selection_score = rollout_selection_score(
-            selection_rollout,
-            num_envs=selection_env.num_envs,
-            fall_penalty=args.selection_fall_penalty,
-            invalid_penalty=args.selection_invalid_penalty,
-            displacement_weight=args.selection_displacement_weight,
-            height_weight=args.selection_height_weight,
-            up_weight=args.selection_up_weight,
-            heading_weight=args.selection_heading_weight,
-            min_height=args.selection_min_height,
-            min_up=args.selection_min_up,
-            min_heading=args.selection_min_heading,
-            posture_penalty=args.selection_posture_penalty,
-        )
-        selection_shortfalls = rollout_constraint_shortfalls(
-            selection_rollout,
-            min_height=args.selection_min_height,
-            min_up=args.selection_min_up,
-            min_heading=args.selection_min_heading,
-        )
+        selection_rollout, selection_score, selection_shortfalls = selection_evaluation()
         if selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
             best_eval_score = selection_score
@@ -3083,6 +3102,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_min_up": args.selection_min_up,
         "selection_min_heading": args.selection_min_heading,
         "selection_posture_penalty": args.selection_posture_penalty,
+        "selection_repeats": args.selection_repeats,
         "lr": args.lr,
         "min_lr": args.min_lr,
         "adam_beta1": args.adam_beta1,
@@ -3094,6 +3114,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "critic_batch_size": args.critic_batch_size,
         "target_critic_alpha": args.target_critic_alpha,
         "selection_horizon": args.selection_horizon,
+        "selection_uninterrupted": args.selection_uninterrupted,
         "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
@@ -3636,6 +3657,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
     parser.add_argument("--selection-horizon", type=int, default=None)
+    parser.add_argument("--selection-uninterrupted", action="store_true")
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
     parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
     parser.add_argument("--selection-displacement-weight", type=float, default=0.0)
@@ -3646,6 +3668,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-min-up", type=float, default=None)
     parser.add_argument("--selection-min-heading", type=float, default=None)
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
+    parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
