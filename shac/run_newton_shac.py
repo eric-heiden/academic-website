@@ -211,7 +211,13 @@ def resolve_ant_defaults(args: argparse.Namespace) -> None:
     if getattr(args, "ant_dof_limit_cost", None) is None:
         args.ant_dof_limit_cost = defaults["dof_limit_cost"]
     if getattr(args, "ant_action_order", None) is None:
-        args.ant_action_order = defaults["action_order"]
+        if args.ant_asset == "diffrl" and getattr(args, "ant_observation_style", None) == "isaac":
+            # The report's Isaac-style DiffRL Ant policies are trained against
+            # Newton's joint-force slice order; using the MJCF actuator order
+            # sends those actions to the wrong hips/ankles and pins the gait.
+            args.ant_action_order = "joint"
+        else:
+            args.ant_action_order = defaults["action_order"]
     if getattr(args, "ant_heading_weight", None) is None:
         args.ant_heading_weight = defaults["heading_weight"]
 
@@ -1982,6 +1988,68 @@ def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.devi
     except RuntimeError:
         pass
 
+    def linear_indices(prefix: str, weights: dict[str, torch.Tensor]) -> list[int]:
+        indices = []
+        for key, value in weights.items():
+            if not key.startswith(prefix) or not key.endswith(".weight"):
+                continue
+            if getattr(value, "ndim", 0) != 2:
+                continue
+            suffix = key.removeprefix(prefix)
+            layer_idx = suffix.split(".", 1)[0]
+            if layer_idx.isdigit():
+                indices.append(int(layer_idx))
+        return sorted(indices)
+
+    def try_map_linear_stack(
+        *,
+        source_prefix: str,
+        source_has_separate_head: bool,
+        target_prefix: str,
+        target_has_separate_head: bool,
+    ) -> bool:
+        target = actor.state_dict()
+        source_linear = linear_indices(source_prefix, state)
+        target_linear = linear_indices(target_prefix, target)
+        if not source_linear or not target_linear:
+            return False
+
+        source_head_weight = "mean.weight" if source_has_separate_head else f"{source_prefix}{source_linear[-1]}.weight"
+        source_head_bias = "mean.bias" if source_has_separate_head else f"{source_prefix}{source_linear[-1]}.bias"
+        target_head_weight = "mean.weight" if target_has_separate_head else f"{target_prefix}{target_linear[-1]}.weight"
+        target_head_bias = "mean.bias" if target_has_separate_head else f"{target_prefix}{target_linear[-1]}.bias"
+        if source_head_weight not in state or target_head_weight not in target:
+            return False
+        if state[source_head_weight].shape != target[target_head_weight].shape:
+            return False
+
+        source_hidden = source_linear if source_has_separate_head else source_linear[:-1]
+        target_hidden = target_linear if target_has_separate_head else target_linear[:-1]
+        if len(source_hidden) != len(target_hidden):
+            return False
+
+        mapped = {}
+        for src_idx, dst_idx in zip(source_hidden, target_hidden):
+            for param_name in ("weight", "bias"):
+                src_key = f"{source_prefix}{src_idx}.{param_name}"
+                dst_key = f"{target_prefix}{dst_idx}.{param_name}"
+                if src_key not in state or dst_key not in target or state[src_key].shape != target[dst_key].shape:
+                    return False
+                mapped[dst_key] = state[src_key]
+        mapped[target_head_weight] = state[source_head_weight]
+        if source_head_bias in state and target_head_bias in target:
+            if state[source_head_bias].shape != target[target_head_bias].shape:
+                return False
+            mapped[target_head_bias] = state[source_head_bias]
+        for src_key, dst_key in (("logstd", "logstd"), ("log_std", "log_std"), ("logstd", "log_std"), ("log_std", "logstd")):
+            if src_key in state and dst_key in target and state[src_key].shape == target[dst_key].shape:
+                mapped[dst_key] = state[src_key]
+                break
+        missing, unexpected = actor.load_state_dict(mapped, strict=False)
+        missing = [key for key in missing if key not in {"logstd", "log_std"}]
+        unexpected = [key for key in unexpected if key not in target]
+        return not missing and not unexpected
+
     source_prefix = None
     for prefix in ("actor.", "mu_net."):
         if any(key.startswith(prefix) for key in state):
@@ -2012,6 +2080,15 @@ def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.devi
             if not unexpected and not missing:
                 return
 
+        if any(key.startswith("backbone.") for key in actor.state_dict()):
+            if try_map_linear_stack(
+                source_prefix=source_prefix,
+                source_has_separate_head=False,
+                target_prefix="backbone.",
+                target_has_separate_head=True,
+            ):
+                return
+
     if "backbone.0.weight" in state and any(key.startswith("backbone.") for key in actor.state_dict()):
         target = actor.state_dict()
         filtered = {key: value for key, value in state.items() if key in target and target[key].shape == value.shape}
@@ -2019,6 +2096,13 @@ def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.devi
         unexpected = [key for key in unexpected if key not in target]
         missing = [key for key in missing if key != "log_std"]
         if not unexpected and not missing:
+            return
+        if try_map_linear_stack(
+            source_prefix="backbone.",
+            source_has_separate_head=True,
+            target_prefix="backbone.",
+            target_has_separate_head=True,
+        ):
             return
 
     if "backbone.0.weight" not in state:
@@ -3645,11 +3729,12 @@ def run_training(args: argparse.Namespace) -> dict:
     poster_path = None
     if args.render_video:
         render_env = make_env_from_args(eval_env_args, args.video_num_envs)
+        video_horizon = args.video_horizon or args.eval_horizon
         video_path, poster_path = render_rollout(
             render_env,
             actor,
             out_dir,
-            args.eval_horizon,
+            video_horizon,
             args.env,
             obs_rms=obs_rms,
         )
@@ -3831,6 +3916,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "eval_uninterrupted_repeats": eval_uninterrupted_repeats,
         "video": video_path.name if video_path else None,
         "poster": poster_path.name if poster_path else None,
+        "video_horizon": args.video_horizon or args.eval_horizon if video_path else None,
         "gpu": query_gpu(),
     }
     write_json(out_dir / f"{args.env}_results.json", result)
@@ -4477,6 +4563,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
+    parser.add_argument("--video-horizon", type=int, default=None)
     parser.add_argument("--final-eval-repeats", type=int, default=1)
     parser.add_argument("--final-eval-num-envs", type=int, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=None)

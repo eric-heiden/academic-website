@@ -910,11 +910,12 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 hopper_reward=env.hopper_reward,
                 cheetah_reward=env.cheetah_reward,
             )
+        video_horizon = args.video_horizon or args.eval_horizon
         video_path, poster_path = render_rollout(
             render_env,
             actor,
             out_dir,
-            args.eval_horizon,
+            video_horizon,
             f"{args.env}_ppo",
             obs_rms=obs_rms,
         )
@@ -1053,6 +1054,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "eval_uninterrupted_repeats": eval_uninterrupted_repeats,
         "video": str(video_path) if video_path is not None else None,
         "poster": str(poster_path) if poster_path is not None else None,
+        "video_horizon": args.video_horizon or args.eval_horizon if video_path is not None else None,
         "gpu": torch.cuda.get_device_name(env.torch_device) if torch.cuda.is_available() else "cpu",
     }
     write_json(out_dir / f"{args.env}_ppo_results.json", result)
@@ -1193,6 +1195,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
+    parser.add_argument("--video-horizon", type=int, default=None)
     return parser.parse_args()
 
 
