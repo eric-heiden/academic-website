@@ -2089,6 +2089,7 @@ def shac_rollout_loss(
     prev_action0: torch.Tensor,
     stochastic_actor: bool,
 ) -> tuple[torch.Tensor, dict]:
+    env.reset_solver_data()
     q = q0.clone()
     qd = qd0.clone()
     prev_action = prev_action0.clone()
@@ -2447,6 +2448,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
+    if args.train_final_layer_only:
+        freeze_actor_backbone(actor)
     obs_stats = load_obs_rms(args.obs_rms_path, env.torch_device) if args.obs_rms_path is not None else None
 
     q0, qd0 = env.reset(noise=0.0, stochastic_init=False)
@@ -3160,6 +3163,7 @@ def run_training(args: argparse.Namespace) -> dict:
         timeout_count = 0
         survival_penalties = []
         survival_penalty_max = []
+        objective_root_x_start = q[:, 0].detach().clone()
 
         for step_idx in range(args.horizon):
             obs_raw = env.observe(q, qd, prev_action, phase=progress)
@@ -3235,15 +3239,16 @@ def run_training(args: argparse.Namespace) -> dict:
                 next_value = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
 
             reward_acc = reward_acc + gamma_vec * scaled_rew
-            if step_idx < args.horizon - 1:
-                loss_mask = done
-            else:
-                loss_mask = torch.ones_like(done)
-            if args.use_critic:
-                segment_return = reward_acc + args.gamma * gamma_vec * next_value
-            else:
-                segment_return = reward_acc
-            actor_loss = actor_loss - segment_return[loss_mask].sum()
+            if args.actor_objective == "reward":
+                if step_idx < args.horizon - 1:
+                    loss_mask = done
+                else:
+                    loss_mask = torch.ones_like(done)
+                if args.use_critic:
+                    segment_return = reward_acc + args.gamma * gamma_vec * next_value
+                else:
+                    segment_return = reward_acc
+                actor_loss = actor_loss - segment_return[loss_mask].sum()
 
             gamma_vec = gamma_vec * args.gamma
             if done.any():
@@ -3258,6 +3263,9 @@ def run_training(args: argparse.Namespace) -> dict:
                 gamma_vec = torch.where(done, torch.ones_like(gamma_vec), gamma_vec)
                 reward_acc = torch.where(done, torch.zeros_like(reward_acc), reward_acc)
             q, qd, prev_action = q_next, qd_next, action
+
+        if args.actor_objective == "displacement":
+            actor_loss = actor_loss - args.displacement_objective_weight * (q[:, 0] - objective_root_x_start).sum()
 
         loss = actor_loss / (args.horizon * args.num_envs)
         loss.backward()
@@ -3383,6 +3391,10 @@ def run_training(args: argparse.Namespace) -> dict:
                 "mean_reward": mean_reward,
                 "final_step_reward": final_reward,
                 "loss": float(loss.detach().cpu()),
+                "actor_objective": args.actor_objective,
+                "displacement_objective_weight": (
+                    args.displacement_objective_weight if args.actor_objective == "displacement" else None
+                ),
                 "grad_norm": grad_norm,
                 "anchor_action_mse": mean_anchor_action_mse,
                 "anchor_action_penalty": args.anchor_action_penalty if anchor_actor is not None else None,
@@ -3624,6 +3636,10 @@ def run_training(args: argparse.Namespace) -> dict:
         "actor_logstd_init": args.actor_logstd_init,
         "actor_layer_norm": args.actor_layer_norm,
         "action_squash": args.action_squash,
+        "actor_objective": args.actor_objective,
+        "displacement_objective_weight": (
+            args.displacement_objective_weight if args.actor_objective == "displacement" else None
+        ),
         "critic_hidden_dims": args.critic_hidden_dims,
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
@@ -4110,19 +4126,37 @@ def pacific_now_iso() -> str:
 
 
 def git_commit_for_imported_module(module: Any) -> str | None:
+    def commit_for_repo(repo: Path) -> str | None:
+        if not (repo / ".git").exists():
+            return None
+        try:
+            return subprocess.check_output(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        except Exception:
+            return None
+
+    if getattr(module, "__name__", "") == "mujoco_warp":
+        for env_name in ("MUJOCO_WARP_REPO", "MJWARP_REPO"):
+            value = os.environ.get(env_name)
+            if value:
+                commit = commit_for_repo(Path(value).expanduser().resolve())
+                if commit is not None:
+                    return commit
+        for repo in (Path.home() / "repos" / "mujoco_warp-differentiability",):
+            commit = commit_for_repo(repo)
+            if commit is not None:
+                return commit
+
     module_path = Path(getattr(module, "__file__", "")).resolve()
     if not module_path:
         return None
     for candidate in [module_path.parent, *module_path.parents]:
-        if (candidate / ".git").exists():
-            try:
-                return subprocess.check_output(
-                    ["git", "-C", str(candidate), "rev-parse", "HEAD"],
-                    text=True,
-                    stderr=subprocess.DEVNULL,
-                ).strip()
-            except Exception:
-                return None
+        commit = commit_for_repo(candidate)
+        if commit is not None:
+            return commit
     return None
 
 
@@ -4189,6 +4223,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
     parser.add_argument("--anchor-actor-path", type=Path, default=None)
     parser.add_argument("--anchor-action-penalty", type=float, default=0.0)
+    parser.add_argument("--actor-objective", choices=["reward", "displacement"], default="reward")
+    parser.add_argument("--displacement-objective-weight", type=float, default=1.0)
     parser.add_argument("--train-final-layer-only", action="store_true")
     parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
     parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
