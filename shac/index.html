@@ -296,7 +296,9 @@
           stepping. The direct MuJoCo-contact SHAC failure was therefore an optimizer scaling problem in the harness:
           clipped Adam steps were far smaller than the useful flat-gradient step. With guarded SGD at lr 1e-4 and no effective
           gradient clipping, the MuJoCo-contact SHAC continuation accepts one update and reaches 8.93 m with 0 falls/invalids
-          across three 1024-world no-reset repeats. The faster Newton-gradient/MuJoCo-eval continuation still reaches 10.77 m,
+          across three 1024-world no-reset repeats. A guard-state rollback patch then fixed a harness bug where rejected SHAC
+          updates restored the actor and optimizer but not the training rollout state; rerunning the same setup accepted two
+          guarded updates and reached 8.89 m with 0 falls/invalids. The faster Newton-gradient/MuJoCo-eval continuation still reaches 10.77 m,
           but with a lower height margin; the strict MuJoCo SGD result is the current raw-contact positive control.
           All promoted clips below are raw
           <code>ViewerGL.get_frame()</code> frames rendered with one shared smoothed COM follow camera and no overlays.
@@ -593,7 +595,10 @@
           thresholds now use recorded minima such as <code>min_up</code> and <code>min_height</code> instead of batch means, so
           rare inverted worlds are penalized instead of hidden by high average uprightness. Training warmup rollouts now run
           under <code>torch.no_grad()</code> and detach their returned state, so late-state probes initialize the differentiable
-          horizon without accidentally backpropagating through hundreds of warmup steps.
+          horizon without accidentally backpropagating through hundreds of warmup steps. Rejected guarded SHAC updates now
+          also restore <code>q</code>, <code>qd</code>, previous action, and progress, not just actor, optimizer, critic, and
+          normalizer state; this prevents a rejected proposal from silently moving the next differentiable horizon to a
+          rejected rollout state.
           The newest Ant harness fix uses the stable -90 degree X free-root start quaternion for both DiffRL and NV Ant
           imports, because this is the pose that matches the configured start joints after Newton exports to the MuJoCo/MJWarp
           runtime. It also drops the embedded NV floor before adding Newton's ground plane; this removes the duplicate
@@ -1141,8 +1146,13 @@
           This separates the current issues. PPO is now a valid dynamics positive control for the Ant setup. Direct
           MuJoCo-contact SHAC from that PPO actor now improves once the optimizer uses a step in the line-search scale:
           guarded SGD at lr 1e-4 accepts epoch 1 and reaches 8.93 m with 0 falls/invalids across three 1024-world no-reset
-          repeats. The previous 12-epoch MuJoCo-contact probe failed because clipped Adam updates were much smaller than the
-          useful flat-gradient step. The faster current SHAC result still uses Newton contacts for differentiable training
+          repeats. After the guard-state rollback patch, the same setup accepts epochs 1 and 5 and audits at 8.89 m with
+          0 falls/invalids; that replication is slightly slower than the earlier best but closes a real training-loop bug.
+          The previous 12-epoch MuJoCo-contact probe failed because clipped Adam updates were much smaller than the
+          useful flat-gradient step. H=16 and H=32 line searches from the same PPO anchor did not improve the selector beyond
+          H=8: their best safe displacements were 8.86 m and 8.74 m, while the H=8 direction reached 8.88 m. A Newton-gradient
+          / MuJoCo-eval H=8 line search matches the MuJoCo-gradient line search at the reset PPO state, so the remaining Ant
+          bottleneck is not a simple contact-backend gradient sign error there. The faster current SHAC result still uses Newton contacts for differentiable training
           and MuJoCo contacts for selection/evaluation; it reaches 10.77 m with 0 falls/invalids but lower height margin.
           The older 30 m-class clips below remain useful debugging artifacts, but they are not promoted as reliable current
           Ant results.
@@ -1536,7 +1546,9 @@
         <p>
           Direct MuJoCo-contact SHAC from the working PPO actor now improves the no-reset physical scorer when the update is
           scaled like the successful line search: 8.93 m, 0 falls/invalids, minimum height 0.565 m, and minimum-up 0.971 over
-          480 steps. The Newton-contact-gradient/MuJoCo-contact-eval continuation remains faster at 10.77 m, but the lower
+          480 steps. The guard-state rollback rerun accepted two updates and verified the same regime at 8.89 m, 0 falls/invalids.
+          H=16/H=32 extensions and a Newton-gradient H=8 line search were also tested; they are now plotted below and do not
+          overturn H=8 guarded SGD as the cleanest strict MuJoCo-contact positive control. The Newton-contact-gradient/MuJoCo-contact-eval continuation remains faster at 10.77 m, but the lower
           height margin makes the strict MuJoCo SGD actor the cleaner raw-contact positive control. Both are still short of
           the older high-speed diagnostic clips; those remain below because repeated audits or action semantics made them
           non-comparable as current promoted results.
@@ -2330,6 +2342,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC MuJoCo SGD strict",
         path: "assets/ant_shac_mujoco_sgd_noclip_from_ppo_h8_16env_8ep_run1/ant_results.json",
         color: colors.blue
+      },
+      {
+        id: "antShacMujocoSgdStateRollback",
+        label: "Ant SHAC MuJoCo SGD rollback-fixed",
+        path: "assets/ant_shac_mujoco_sgd_guard_statefix_from_ppo_h8_16env_8ep_run1/ant_results.json",
+        color: colors.green
       },
       {
         id: "antShacMujocoOffsetReeval",
@@ -3321,6 +3339,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antD6PpoH8Newton: "assets/ant_gradcheck_d6_jointorder_ppo_h8_newton_run1/ant_gradient_check.json",
       antD6PpoH8NoContact: "assets/ant_gradcheck_d6_jointorder_ppo_h8_none_run1/ant_gradient_check.json",
       antD6PpoH8LineSearch: "assets/ant_linesearch_d6_jointorder_ppo_h8_mujoco_run1/ant_linesearch.json",
+      antD6PpoH16LineSearch: "assets/ant_linesearch_d6_jointorder_ppo_h16_mujoco_run1/ant_linesearch.json",
+      antD6PpoH32LineSearch: "assets/ant_linesearch_d6_jointorder_ppo_h32_mujoco_run1/ant_linesearch.json",
+      antD6PpoH8NewtonLineSearch: "assets/ant_linesearch_d6_jointorder_ppo_h8_newtongrad_mujocoeval_run1/ant_linesearch.json",
       antD6PpoH8LineSearchIter2: "assets/ant_linesearch_d6_jointorder_h8_iter2_mujoco_run1/ant_linesearch.json",
       antD6FastStrictLineSearch: "assets/ant_linesearch_d6_currentbest_h8_mujoco_run1/ant_linesearch.json"
     };
@@ -3721,6 +3742,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antD6PpoH8Newton,
         antD6PpoH8NoContact,
         antD6PpoH8LineSearch,
+        antD6PpoH16LineSearch,
+        antD6PpoH32LineSearch,
+        antD6PpoH8NewtonLineSearch,
         antD6PpoH8LineSearchIter2,
         antD6FastStrictLineSearch
       ] = await Promise.all([
@@ -3750,6 +3774,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antD6PpoH8Newton),
         safeJson(diagPaths.antD6PpoH8NoContact),
         safeJson(diagPaths.antD6PpoH8LineSearch),
+        safeJson(diagPaths.antD6PpoH16LineSearch),
+        safeJson(diagPaths.antD6PpoH32LineSearch),
+        safeJson(diagPaths.antD6PpoH8NewtonLineSearch),
         safeJson(diagPaths.antD6PpoH8LineSearchIter2),
         safeJson(diagPaths.antD6FastStrictLineSearch)
       ]);
@@ -4408,6 +4435,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ...lineSearchSeries(antNvActuatorH4SurrogateEval, "NV H=4 surrogate grad", colors.coral),
         ...lineSearchSeries(antNvActuatorH16NoContactEval, "NV H=16 no-contact grad", colors.violet),
         ...lineSearchSeries(antD6PpoH8LineSearch, "d6 PPO H=8 MuJoCo", colors.blue),
+        ...lineSearchSeries(antD6PpoH16LineSearch, "d6 PPO H=16 MuJoCo", colors.teal),
+        ...lineSearchSeries(antD6PpoH32LineSearch, "d6 PPO H=32 MuJoCo", colors.slate),
+        ...lineSearchSeries(antD6PpoH8NewtonLineSearch, "d6 PPO H=8 Newton grad", colors.violet),
         ...lineSearchSeries(antD6PpoH8LineSearchIter2, "d6 H=8 iter 2", colors.green),
         ...lineSearchSeries(antD6FastStrictLineSearch, "fast actor strict gate", colors.amber)
       ], {

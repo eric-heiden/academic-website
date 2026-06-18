@@ -3340,6 +3340,11 @@ def run_training(args: argparse.Namespace) -> dict:
                 stop_up_min=args.training_warmup_stop_up_min,
             )
 
+        guard_q = q.detach().clone() if args.selection_guard_updates else None
+        guard_qd = qd.detach().clone() if args.selection_guard_updates else None
+        guard_prev_action = prev_action.detach().clone() if args.selection_guard_updates else None
+        guard_progress = progress.detach().clone() if args.selection_guard_updates else None
+
         optimizer.zero_grad(set_to_none=True)
         rewards = []
         critic_obs = []
@@ -3551,6 +3556,11 @@ def run_training(args: argparse.Namespace) -> dict:
                 if critic_optimizer is not None and guard_critic_optimizer_state is not None:
                     critic_optimizer.load_state_dict(guard_critic_optimizer_state)
                 restore_obs_rms_state(obs_rms, guard_obs_rms_state)
+                if guard_q is not None and guard_qd is not None and guard_prev_action is not None and guard_progress is not None:
+                    q = guard_q
+                    qd = guard_qd
+                    prev_action = guard_prev_action
+                    progress = guard_progress
 
         if selection_evaluated and update_accepted and selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
