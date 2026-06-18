@@ -986,12 +986,11 @@
       <article class="panel warn">
         <h2>Ant 30 m Diagnostics</h2>
         <p>
-          The older 30 m-class Ant PPO/SHAC clips below are retained to show the debugging path. Some older runs predate the
-          native action clamp and mixed valid environment fixes with invalid unbounded-action control. The fresh morphology
-          audit above is the current SHAC headline because it reloads the saved best actor, rechecks 1024 no-reset worlds,
-          records joint-limit/action saturation metrics, and renders the same actor with the shared follow camera. PPO still
-          needs a high-speed robust checkpoint: the comparable 31 m PPO smoke audit found 2 terminal worlds, while the clean
-          clipped PPO reliability baseline remains 15.18 m with 0/5120 terminal worlds.
+          The older 30 m-class Ant PPO/SHAC clips below are retained to show the debugging path, but they are not promoted
+          under the current repeated selector. The current-code 31 m SHAC replay still has rare bad worlds, and the corrected
+          NV PPO baseline is reliable but slow at about 7.26 m over 960 steps. This leaves Ant unsolved for high-speed SHAC:
+          the environment setup is now consistent with the IsaacLab-style NV asset, but contact branch sensitivity still makes
+          full-horizon policy improvement brittle.
         </p>
       </article>
       <article class="panel warn">
@@ -1011,7 +1010,37 @@
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, 31 m Morphology Audit</h2>
+        <h2>Ant PPO, Frozen-Normalizer Strict Audit</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_nv_abslimit_freezeobs_best_audit_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_nv_abslimit_freezeobs_best_audit_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Re-audit of the best stable NV/IsaacLab PPO actor after freezing the observation normalizer during the attempted
+            continuation. The 3 x 1024 no-reset audit reports 7.26 m mean uninterrupted displacement over 960 steps, 0 terminal
+            worlds, 0 invalid worlds, worst minimum-up 0.865, minimum height 0.444 m, 333.6 s audit/render time, and 39.8 MB
+            peak allocated CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM
+            follow camera, with no overlays.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, 31 m Current-Code Re-Audit</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_upright_candidate_current_audit_run1/ant_poster.png">
+            <source src="assets/ant_shac_upright_candidate_current_audit_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current-code replay of the fast DiffRL-asset SHAC checkpoint with the same strict 3 x 1024-world selector used for
+            new checkpoints. It still moves about 30.9 m over 960 steps, but the selector sees a fall in one repeat and the
+            worst minimum-up drops below zero, so it is kept as a speed diagnostic rather than a reliable Ant result. Runtime
+            was 323.1 s with 40.0 MB peak allocated CUDA memory. The clip is raw <code>ViewerGL.get_frame()</code> through the
+            shared smoothed COM follow camera.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Historical 31 m Morphology Audit</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_shac_upright_best_morph_audit_1024_smoke_run1/ant_poster.png">
             <source src="assets/ant_shac_upright_best_morph_audit_1024_smoke_run1/ant_rollout.mp4" type="video/mp4">
@@ -1022,8 +1051,8 @@
             height 0.459 m, minimum-up 0.863, mean scaled joint magnitude 0.536, max scaled joint magnitude 1.215, mean
             joint-limit fraction 0.141, and max action 0.999. Runtime was 95.9 s with 26.4 MB peak allocated CUDA memory.
             The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera, with no
-            overlays. The earlier 21.03 m surrogate-adjoint checkpoint is retained in plots as a diagnostic but is no longer
-            counted as an accepted update because its actor tensors are identical to the 0.825 scaled baseline.
+            overlays. This remains a historical diagnostic because the current-code repeated selector above exposes a rare
+            failing world from the same fast policy family.
           </figcaption>
         </figure>
       </article>
@@ -1136,10 +1165,10 @@
             reward, IsaacLab's 0.1 limit weight, continuous differentiable limit violation, and unscaled physical energy
             cost. The 3 x 1024 no-reset audit reports 7.19 m mean displacement, 0 terminal worlds, minimum-up 0.845 in the
             worst repeat, maximum scaled joint position 1.16, 338.3 s audit/render time, and 39.8 MB peak allocated CUDA
-            memory. Attempts to fine-tune this checkpoint with PPO under the corrected reward were not promoted: even
-            conservative updates failed the repeated full-horizon selector, consistent with the contact clone-drift
-            diagnostics below. The clip is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow
-            camera, with no overlays.
+            memory. A follow-up with frozen observation statistics improved the strict audit slightly to 7.26 m; a guarded
+            PPO continuation then rolled back all six evaluated updates because each update fell below the starting selector
+            score. The clip is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera, with no
+            overlays.
           </figcaption>
         </figure>
       </article>
@@ -2527,6 +2556,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.green
       },
       {
+        id: "antPpoNvAbsLimitFreezeObsAudit",
+        label: "Ant PPO frozen-normalizer audit",
+        path: "assets/ant_ppo_nv_abslimit_freezeobs_best_audit_run1/ant_ppo_results.json",
+        color: colors.blue
+      },
+      {
+        id: "antPpoNvAbsLimitGuardRollback",
+        label: "Ant PPO guarded rollback trace",
+        path: "assets/ant_ppo_nv_abslimit_guard_freezeobs_lowrl_512env_30upd_run1/ant_ppo_history_live.json",
+        color: colors.coral
+      },
+      {
         id: "antShacUprightCandidateAudit",
         label: "Ant SHAC repeated-audited anchor",
         path: "assets/ant_shac_upright_candidate_repeated_audit_run1/ant_results.json",
@@ -2537,6 +2578,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC 31m 1024 audit",
         path: "assets/ant_shac_upright_candidate_1024world_audit_run1/ant_results.json",
         color: colors.coral
+      },
+      {
+        id: "antShacUprightCandidateCurrentAudit",
+        label: "Ant SHAC 31m current-code audit",
+        path: "assets/ant_shac_upright_candidate_current_audit_run1/ant_results.json",
+        color: colors.violet
       },
       {
         id: "antShacPromotedAnchor512Audit",
@@ -3081,6 +3128,16 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.amber
       },
       {
+        label: "zero, MuJoCo contact, 16 substeps",
+        path: "assets/ant_clone_consistency_zero_mujoco_nv_sub16_run1/clone_consistency.json",
+        color: colors.violet
+      },
+      {
+        label: "zero, Newton contact, 16 substeps",
+        path: "assets/ant_clone_consistency_zero_newton_nv_sub16_run1/clone_consistency.json",
+        color: colors.slate
+      },
+      {
         label: "PPO, no contact",
         path: "assets/ant_clone_consistency_ppo_none_nv_run1/clone_consistency.json",
         color: colors.teal
@@ -3467,7 +3524,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacUprightBestMorphAudit")
+      const antLatest = presentRuns.find((run) => run.id === "antPpoNvAbsLimitFreezeObsAudit")
+        || presentRuns.find((run) => run.id === "antPpoNvAbsLimitAudit")
+        || presentRuns.find((run) => run.id === "antShacUprightCandidateCurrentAudit")
+        || presentRuns.find((run) => run.id === "antShacUprightBestMorphAudit")
         || presentRuns.find((run) => run.id === "antShacSurrogateContinue")
         || presentRuns.find((run) => run.id === "antShacSurrogatePosture")
         || presentRuns.find((run) => run.id === "antShacScaled0825Strict")
@@ -3488,7 +3548,6 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
         || presentRuns.find((run) => run.id === "antShacRslStochTerm20Head1")
         || presentRuns.find((run) => run.id === "antPpoRslStochTerm20Head1")
-        || presentRuns.find((run) => run.id === "antPpoNvAbsLimitAudit")
         || presentRuns.find((run) => run.id === "antPpoIsaacExactDefaults")
         || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2NoHeight")
         || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2NoHeight")

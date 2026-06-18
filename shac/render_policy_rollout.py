@@ -104,6 +104,7 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_contact_gap=result.get("ant_contact_gap"),
         ant_contact_mu=float(result.get("ant_contact_mu") or 0.75),
         ant_joint_damping=result.get("ant_joint_damping"),
+        ant_armature=result.get("ant_armature"),
         ant_min_up=result.get("ant_min_up"),
         ant_start_height=result.get("ant_start_height"),
         ant_start_joint_q=result.get("ant_start_joint_q"),
@@ -117,6 +118,9 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_reward_style=result.get("ant_reward_style") or "diffrl",
         ant_dof_limit_mode=ant_dof_limit_mode or "abs",
         ant_action_order=result.get("ant_action_order") or "joint",
+        ant_smooth_up_reward=bool(result.get("ant_smooth_up_reward") or False),
+        ant_reward_min_up=result.get("ant_reward_min_up"),
+        ant_reward_min_height=result.get("ant_reward_min_height"),
         hopper_reward_style=result.get("hopper_reward_style") or "diffrl",
         hopper_start_joint_q=result.get("hopper_start_joint_q"),
         hopper_contact_mu=json_float(result.get("hopper_contact_mu"), 0.9),
@@ -141,6 +145,14 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         cheetah_reward=dataclass_from_json(CheetahRewardWeights, result.get("cheetah_reward")),
         acrobot_reward=dataclass_from_json(AcrobotRewardWeights, result.get("acrobot_reward")),
         contact_reward=dataclass_from_json(ContactTargetRewardWeights, result.get("contact_reward")),
+        mujoco_smooth_adjoint=result.get("eval_mujoco_smooth_adjoint")
+        or result.get("mujoco_smooth_adjoint")
+        or "off",
+        mujoco_smooth_friction_viscosity=json_float(result.get("mujoco_smooth_friction_viscosity"), 10.0),
+        mujoco_smooth_friction_scale=json_float(result.get("mujoco_smooth_friction_scale"), 0.01),
+        mujoco_smooth_friction_bypass_kf=json_float(result.get("mujoco_smooth_friction_bypass_kf"), 0.0),
+        mujoco_smooth_penalty_damping_alpha=json_float(result.get("mujoco_smooth_penalty_damping_alpha"), 0.0),
+        mujoco_smooth_friction_surrogate_alpha=json_float(result.get("mujoco_smooth_friction_surrogate_alpha"), 0.9),
     )
 
 

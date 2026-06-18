@@ -28,6 +28,9 @@ from run_newton_shac import (
     CheetahRewardWeights,
     HopperRewardWeights,
     NewtonMuJoCoTorchEnv,
+    clone_module_state,
+    clone_obs_rms_state,
+    clone_optimizer_state,
     evaluate_policy,
     evaluate_policy_chunked,
     evaluate_policy_uninterrupted,
@@ -378,6 +381,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
     progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
     best_score = -float("inf")
     best_state = None
+    best_critic_state = None
+    best_optimizer_state = None
     best_obs_rms = None
     best_update = 0
     history = []
@@ -446,15 +451,13 @@ def train_ppo(args: argparse.Namespace) -> dict:
     if args.actor_path is not None or args.updates == 0:
         initial_selection, initial_selection_score, _ = selection_evaluation()
         best_score = initial_selection_score
-        best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+        best_state = clone_module_state(actor)
+        best_critic_state = clone_module_state(critic)
+        best_optimizer_state = clone_optimizer_state(optimizer)
         torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
         torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_best_critic.pt")
         if obs_rms is not None:
-            best_obs_rms = {
-                "mean": obs_rms.mean.detach().clone(),
-                "var": obs_rms.var.detach().clone(),
-                "count": obs_rms.count,
-            }
+            best_obs_rms = clone_obs_rms_state(obs_rms)
             torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
         print(
             f"{args.env} ppo initial: sel={initial_selection_score: .1f} "
@@ -481,7 +484,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         for _ in range(args.rollout_steps):
             with torch.no_grad():
                 obs_raw = env.observe(q, qd, prev_action, phase=progress)
-                if obs_rms is not None:
+                if obs_rms is not None and not args.freeze_obs_rms:
                     obs_rms.update(obs_raw)
                 obs = normalize_obs(obs_raw, obs_rms_snapshot(obs_rms))
                 raw_action, action, log_prob = actor.sample(obs)
@@ -610,21 +613,42 @@ def train_ppo(args: argparse.Namespace) -> dict:
         selection = None
         selection_score = None
         selection_shortfalls = {}
+        selection_update_rolled_back = False
+        guard_reference_score = best_score
+        guard_threshold = best_score - args.selection_guard_max_score_drop
         if should_eval:
             selection, selection_score, selection_shortfalls = selection_evaluation()
             if selection_score > best_score:
                 best_score = selection_score
                 best_update = update + 1
-                best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+                best_state = clone_module_state(actor)
+                best_critic_state = clone_module_state(critic)
+                best_optimizer_state = clone_optimizer_state(optimizer)
                 torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
                 torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_best_critic.pt")
                 if obs_rms is not None:
-                    best_obs_rms = {
-                        "mean": obs_rms.mean.detach().clone(),
-                        "var": obs_rms.var.detach().clone(),
-                        "count": obs_rms.count,
-                    }
+                    best_obs_rms = clone_obs_rms_state(obs_rms)
                     torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
+            elif (
+                args.selection_guard_updates
+                and best_state is not None
+                and selection_score < guard_threshold
+            ):
+                actor.load_state_dict(best_state)
+                if best_critic_state is not None:
+                    critic.load_state_dict(best_critic_state)
+                if best_optimizer_state is not None:
+                    optimizer.load_state_dict(best_optimizer_state)
+                if obs_rms is not None and best_obs_rms is not None:
+                    obs_rms.mean = best_obs_rms["mean"].detach().clone()
+                    obs_rms.var = best_obs_rms["var"].detach().clone()
+                    obs_rms.count = best_obs_rms["count"]
+                q, qd = env.reset(noise=0.0, stochastic_init=args.stochastic_init)
+                prev_action = torch.zeros(
+                    (env.num_envs, env.num_actions), dtype=torch.float32, device=env.torch_device
+                )
+                progress = torch.zeros(env.num_envs, dtype=torch.long, device=env.torch_device)
+                selection_update_rolled_back = True
 
         update_s = time.perf_counter() - update_t0
         mean_reward = float(torch.stack(mean_reward_steps).mean().cpu())
@@ -657,6 +681,10 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "selection_terminal_count": selection.get("terminal_count") if selection is not None else None,
             "selection_fall_count": selection["fall_count"] if selection is not None else None,
             "selection_invalid_count": selection["invalid_count"] if selection is not None else None,
+            "selection_guard_active": args.selection_guard_updates,
+            "selection_guard_reference_score": guard_reference_score if args.selection_guard_updates else None,
+            "selection_guard_acceptance_threshold": guard_threshold if args.selection_guard_updates else None,
+            "selection_update_rolled_back": selection_update_rolled_back,
             "invalid_resets": invalid_count,
             "fall_resets": fall_count,
             "timeout_resets": timeout_count,
@@ -684,6 +712,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
 
     if best_state is not None:
         actor.load_state_dict(best_state)
+    if best_critic_state is not None:
+        critic.load_state_dict(best_critic_state)
     if obs_rms is not None and best_obs_rms is not None:
         obs_rms.mean = best_obs_rms["mean"]
         obs_rms.var = best_obs_rms["var"]
@@ -906,6 +936,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "stochastic_init": args.stochastic_init,
         "eval_stochastic_init": args.eval_stochastic_init,
         "obs_rms": args.obs_rms,
+        "freeze_obs_rms": args.freeze_obs_rms,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
         "critic_path": str(args.critic_path) if args.critic_path is not None else None,
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
@@ -923,6 +954,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_posture_penalty": args.selection_posture_penalty,
         "selection_repeats": args.selection_repeats,
         "selection_uninterrupted": args.selection_uninterrupted,
+        "selection_guard_updates": args.selection_guard_updates,
+        "selection_guard_max_score_drop": args.selection_guard_max_score_drop,
         "final_eval_repeats": args.final_eval_repeats,
         "final_eval_num_envs": final_eval_num_envs,
         "eval_chunk_size": eval_chunk_size if use_chunked_final_eval else None,
@@ -1060,6 +1093,7 @@ def parse_args() -> argparse.Namespace:
     parser.set_defaults(eval_stochastic_init=False)
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=True)
     parser.add_argument("--no-obs-rms", dest="obs_rms", action="store_false")
+    parser.add_argument("--freeze-obs-rms", action="store_true")
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--critic-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
@@ -1139,6 +1173,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--selection-uninterrupted", action="store_true")
+    parser.add_argument("--selection-guard-updates", action="store_true")
+    parser.add_argument("--selection-guard-max-score-drop", type=float, default=0.0)
     parser.add_argument("--final-eval-repeats", type=int, default=1)
     parser.add_argument("--final-eval-num-envs", type=int, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=None)
