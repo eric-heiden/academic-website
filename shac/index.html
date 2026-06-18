@@ -1156,7 +1156,8 @@
           worst audited displacement is 7.89 m, the first full-gradient H=8 step improves it to 8.51 m, and a tiny signed
           corrective step improves it to 8.63 m; all audited worlds stay at 0 falls/invalids. The failed fixed-lr
           continuation is now explained: after the first step, both positive fixed SHAC steps and most anti-gradient steps
-          reduce the robust 480-step score, so continued Ant improvement needs line search or a better long-horizon objective.
+          reduce the robust 480-step score. A fresh H=16 signed line search from the robust actor also selected step 0, so
+          simply increasing the short-horizon gradient horizon did not improve the robust long-horizon objective.
           A Newton-gradient / MuJoCo-eval H=8 line search matches the MuJoCo-gradient line search at the reset PPO state, so
           the remaining Ant bottleneck is not a simple contact-backend gradient sign error there. The faster current SHAC
           result still uses Newton contacts for differentiable training and MuJoCo contacts for selection/evaluation; it
@@ -3360,7 +3361,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antD6PpoH8LineSearchIter2: "assets/ant_linesearch_d6_jointorder_h8_iter2_mujoco_run1/ant_linesearch.json",
       antD6FastStrictLineSearch: "assets/ant_linesearch_d6_currentbest_h8_mujoco_run1/ant_linesearch.json",
       antD6RobustStep1LineSearch: "assets/ant_linesearch_robust_after_fullgrad_step1_h8_run1/ant_linesearch.json",
-      antD6RobustSignedLineSearch: "assets/ant_linesearch_robust_after_fullgrad_step1_h8_signed_run1/ant_linesearch.json"
+      antD6RobustSignedLineSearch: "assets/ant_linesearch_robust_after_fullgrad_step1_h8_signed_run1/ant_linesearch.json",
+      antD6RobustH16SignedLineSearch: "assets/ant_linesearch_robust_after_signed_step2_h16_signed_run1/ant_linesearch.json"
     };
 
     const clonePaths = [
@@ -3765,7 +3767,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antD6PpoH8LineSearchIter2,
         antD6FastStrictLineSearch,
         antD6RobustStep1LineSearch,
-        antD6RobustSignedLineSearch
+        antD6RobustSignedLineSearch,
+        antD6RobustH16SignedLineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3799,7 +3802,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antD6PpoH8LineSearchIter2),
         safeJson(diagPaths.antD6FastStrictLineSearch),
         safeJson(diagPaths.antD6RobustStep1LineSearch),
-        safeJson(diagPaths.antD6RobustSignedLineSearch)
+        safeJson(diagPaths.antD6RobustSignedLineSearch),
+        safeJson(diagPaths.antD6RobustH16SignedLineSearch)
       ]);
       const cloneRuns = await Promise.all(
         clonePaths.map(async (run) => ({ ...run, data: await safeJson(run.path) }))
@@ -3948,6 +3952,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antD6FastStrictLineSearch?.timestamp_pacific,
         antD6RobustStep1LineSearch?.timestamp_pacific,
         antD6RobustSignedLineSearch?.timestamp_pacific,
+        antD6RobustH16SignedLineSearch?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -4465,7 +4470,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ...lineSearchSeries(antD6PpoH8LineSearchIter2, "d6 H=8 iter 2", colors.green),
         ...lineSearchSeries(antD6FastStrictLineSearch, "fast actor strict gate", colors.amber),
         ...lineSearchSeries(antD6RobustStep1LineSearch, "d6 robust step 2 +", colors.coral),
-        ...lineSearchSeries(antD6RobustSignedLineSearch, "d6 robust step 2 signed", colors.teal)
+        ...lineSearchSeries(antD6RobustSignedLineSearch, "d6 robust step 2 signed", colors.teal),
+        ...lineSearchSeries(antD6RobustH16SignedLineSearch, "d6 robust H=16 signed", colors.slate)
       ], {
         ...baseLayout,
         barmode: "group",
