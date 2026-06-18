@@ -318,8 +318,10 @@
           state/action derivatives still match finite differences at 2.1e-3 mean relative error, but policy gradients degrade
           to 8.6e-1 with hard MuJoCo contacts, 3.5e-1 with Newton contacts, and 1.2e-1 with contact disabled. Tiny H=8
           line-search steps can improve a 1024-world selector once, but repeated audits expose rare falls at the same scale,
-          so no new Ant SHAC update is promoted. The newest morphology metrics show when a candidate is using excessive
-          joint-limit posture instead of a robust gait.
+          so no new Ant SHAC update is promoted. Newton contacts are not a drop-in forward fix for the saved actor: one
+          replay found 2/1024 terminal worlds and a direct Newton-contact H=8 line search selected step 0, with every
+          nonzero step producing at least one terminal. The no-contact negative control terminates all 1024 worlds. The
+          newest morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -542,6 +544,24 @@
               <td>1e-7 best in one 1024-world sweep</td>
               <td>not repeat-safe</td>
               <td>1e-6 produces a terminal world; rerunning 1e-7 can also produce a rare terminal, so no candidate is promoted.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, Newton-contact forward replay</td>
+              <td>30.58 m</td>
+              <td>2 / 1024 terminals</td>
+              <td>Newton contacts are not a drop-in reliability fix for the hard-contact actor.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, Newton-contact H=8 line search</td>
+              <td>best step 0</td>
+              <td>nonzero steps fail</td>
+              <td>1e-7, 3e-7, 1e-6, 3e-6, and 1e-5 all produced terminal worlds in the 1024-world selector.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, no-contact forward replay</td>
+              <td>0.03 m</td>
+              <td>1024 / 1024 terminals</td>
+              <td>The policy is contact-dependent; it is not exploiting free-flight dynamics.</td>
             </tr>
             <tr>
               <td>Ant policy H=5, margin 0.002</td>
@@ -897,7 +917,11 @@
           remain sign-consistent, Newton contacts are closer to finite differences than hard MuJoCo contacts, and hard-contact
           policy gradients lose sign on two of six finite-difference directions. A tiny H=8 line search found a nominal
           1e-7 improvement in one 1024-world selector, but the same scale is not repeat-safe and 1e-6 already produces a
-          rare terminal world. The current headline comes from the reloaded 31 m best actor plus a fresh morphology audit;
+          rare terminal world. Trying Newton contacts as the forward backend did not solve it: the same actor had 2/1024
+          terminals in one Newton-contact replay, a second Newton-contact sweep had a terminal-free step 0 but only 0.411
+          minimum-up, and every nonzero H=8 Newton-contact step produced one or more terminal worlds. The no-contact replay
+          terminates all 1024 worlds with only 0.03 m displacement, so the policy is not a free-flight artifact. The current
+          headline comes from the reloaded 31 m best actor plus a fresh morphology audit;
           recovering that speed through new differentiable updates without rare contact failures remains open.
         </p>
       </article>
@@ -2858,6 +2882,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antBestH16Newton: "assets/ant_gradcheck_31m_best_h16_newtoncontacts_run1/ant_gradient_check.json",
       antBestH16NoContact: "assets/ant_gradcheck_31m_best_h16_nocontact_run1/ant_gradient_check.json",
       antGradDirectionLineSearch: "assets/ant_shac_grad_direction_linesearch_h8_31m_strict1024_run1.json",
+      antNewtonContactEval: "assets/ant_shac_31m_contact_backend_eval_newton_run1/ant_linesearch.json",
+      antNoContactEval: "assets/ant_shac_31m_contact_backend_eval_none_run1/ant_linesearch.json",
+      antNewtonContactLineSearch: "assets/ant_shac_31m_newton_contact_linesearch_h8_run1/ant_linesearch.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json",
       planarBranch: "assets/solver_gradient_diagnostics_planar_branch_level_kinematics_run1/solver_gradient_diagnostics.json",
@@ -3219,7 +3246,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antBestH16Hard,
         antBestH16Newton,
         antBestH16NoContact,
-        antGradDirectionLineSearch
+        antGradDirectionLineSearch,
+        antNewtonContactEval,
+        antNoContactEval,
+        antNewtonContactLineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3229,7 +3259,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antBestH16Hard),
         safeJson(diagPaths.antBestH16Newton),
         safeJson(diagPaths.antBestH16NoContact),
-        safeJson(diagPaths.antGradDirectionLineSearch)
+        safeJson(diagPaths.antGradDirectionLineSearch),
+        safeJson(diagPaths.antNewtonContactEval),
+        safeJson(diagPaths.antNoContactEval),
+        safeJson(diagPaths.antNewtonContactLineSearch)
       ]);
 
       const stable = presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
@@ -3314,6 +3347,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antBestH16Newton?.timestamp_pacific,
         antBestH16NoContact?.timestamp_pacific,
         antGradDirectionLineSearch?.timestamp_pacific,
+        antNewtonContactEval?.timestamp_pacific,
+        antNoContactEval?.timestamp_pacific,
+        antNewtonContactLineSearch?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,

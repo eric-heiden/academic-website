@@ -96,6 +96,8 @@ def main() -> None:
     parser.add_argument("--eval-total-envs", type=int, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=None)
     parser.add_argument("--eval-stochastic-init", action="store_true")
+    parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
+    parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=None)
     parser.add_argument("--selection-invalid-penalty", type=float, default=None)
     parser.add_argument("--selection-displacement-weight", type=float, default=None)
@@ -113,6 +115,13 @@ def main() -> None:
     np.random.seed(args.seed)
 
     result = load_result(args.result_json)
+    overrides = {}
+    if args.contact_backend is not None:
+        result["contact_backend"] = args.contact_backend
+        overrides["contact_backend"] = args.contact_backend
+    if args.mujoco_smooth_adjoint is not None:
+        result["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
+        overrides["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
     if args.eval_horizon is None:
         args.eval_horizon = int(result.get("selection_horizon") or result.get("eval_horizon") or 480)
 
@@ -207,6 +216,7 @@ def main() -> None:
         "mode": "shac_gradient_linesearch",
         "timestamp_pacific": pacific_now_iso(),
         "source_result": str(args.result_json),
+        "overrides": overrides,
         "actor_path": str(args.actor_path),
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path else None,
         "env": result.get("env"),
