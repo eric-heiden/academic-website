@@ -1026,9 +1026,10 @@
           current H=16 local SHAC objective provides. Re-auditing the corrected potential-anchor actor with the smaller
           16-world five-repeat evaluator found 0 terminal worlds, 0 invalids, 31.30 m mean displacement, and 0.944 mean
           repeated minimum-up projection, but the dedicated 512-world audit of the same actor found 2 terminal worlds across
-          2560 repeated worlds. Persistent late-state SHAC reduced a different fast checkpoint to 2 terminal worlds across
-          2560 uninterrupted worlds but did not beat the re-audited anchor on displacement. A fresh PPO probe with soft
-          height reward and stronger potential progress selected a robust
+          2560 repeated worlds. A height-only termination audit still found 2 terminal worlds and one repeat dipped to
+          0.284 m torso height, so the remaining failures are not only an overly strict up-projection gate. Persistent
+          late-state SHAC reduced a different fast checkpoint to 2 terminal worlds across 2560 uninterrupted worlds but did
+          not beat the re-audited anchor on displacement. A fresh PPO probe with soft height reward and stronger potential progress selected a robust
           standing policy at update 20: 0 terminal worlds but only 0.25 m displacement. Later updates moved farther but
           immediately reintroduced large fall counts. A follow-up SHAC clearance-anchor probe also failed: potential-height
           reward plus a small differentiable height-margin penalty reached 30.98 m but worsened the five-repeat total to
@@ -1045,9 +1046,10 @@
           up projections after long contact interaction. The current promoted SHAC anchor has 0 terminal worlds in the
           16-world deterministic trace and 16-world repeated audit, but the stricter 512-world repeated audit records
           2 terminal worlds across 2560 repeated worlds, with 30.98 m repeated mean displacement and 0.844 mean repeated
-          minimum-up projection. The remaining weaker point is clearance margin: the stochastic repeats can still dip to
-          about 0.40 m minimum height, so future work should improve gait clearance and rare-branch reliability without
-          collapsing into the standing policy found by the soft-height PPO probe.
+          minimum-up projection. With the extra up gate removed, the same actor still records 2 terminal worlds and reaches
+          a 0.284 m minimum torso height in the worst repeat. The remaining weaker point is therefore true clearance and
+          rare-branch reliability, so future work should improve gait clearance without collapsing into the standing policy
+          found by the soft-height PPO probe.
         </p>
       </article>
       <article class="panel warn">
@@ -2104,6 +2106,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC 512-world audit",
         path: "assets/ant_shac_promoted_anchor_512world_audit_run1/ant_results.json",
         color: colors.green
+      },
+      {
+        id: "antShacPromotedAnchorHeightOnlyAudit",
+        label: "Ant SHAC height-only audit",
+        path: "assets/ant_shac_promoted_anchor_512world_heightonly_audit_run1/ant_results.json",
+        color: colors.amber
       },
       {
         id: "antShacClearanceAnchorNegative",
