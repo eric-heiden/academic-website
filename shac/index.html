@@ -297,17 +297,16 @@
           reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
           reliable 1024-world result after fixing action-squash semantics and checkpoint selection: the tanh-wrapped
           RSL-style PPO warm start improves from 13.04 m to 14.96 m uninterrupted with 0 terminals, 0 invalids, and minimum
-          up projection 0.93. A corrected tanh-semantics PPO continuation from that SHAC actor preserved the selected
-          zero-terminal policy but did not beat it; short-horizon PPO reward rose while full-horizon selection fell. The
-          newest SHAC continuations show the same pattern more directly: progress-2 differentiable updates increase
-          short-horizon reward, but the 1024-world selector keeps the initial 14.96 m actor; min-up logging shows rejected
-          candidates dip toward 0.72-0.84 up projection while height remains healthy.
+          up projection 0.93. The newest anchored SHAC probes can push Ant much faster: a frozen-action anchor continuation
+          reaches 28.43 m in a clean uninterrupted replay, and an upright-weighted anchored continuation reaches 28.26 m in
+          reset-style eval. These faster policies are still not reliable enough for the headline baseline: repeated
+          1024-world no-reset replays expose rare late falls, with up projection dropping to about 0.72 in failing worlds.
           The fast corrected-default PPO policy now replays at 39.66 m in the uninterrupted evaluator, but 88 of 1024 worlds
           terminate by 16 s and minimum up projection goes negative. A deterministic consistency probe confirmed that
           identical replicated worlds diverge from roundoff-level contact differences into different gait branches, so this
-          is an unstable gait rather than a renderer or reset-splicing artifact. The faster shaped Ant SHAC policy still
-          replays at about 23.19 m but has late no-reset terminal events, so it remains a diagnostic speed target rather than
-          the reliable headline policy. The remaining Ant issue is therefore no longer camera rendering or basic environment
+          is an unstable gait rather than a renderer or reset-splicing artifact. The faster anchored Ant SHAC policies now
+          define a 28 m speed target, but they still have late no-reset terminal events in repeated replay, so the 14.96 m
+          tanh-wrapped SHAC policy remains the reliable baseline. The remaining Ant issue is therefore no longer camera rendering or basic environment
           setup; it is reliable long-horizon
           contact-gradient/update quality under replicated MuJoCo Warp worlds.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
@@ -334,7 +333,7 @@
       <div class="panel metric">
         <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">480-step eval from the latest corrected Ant run.</p>
+        <p class="note">Latest anchored probe; no-reset terminals shown next.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / No-Reset Terms</div>
@@ -376,7 +375,9 @@
           mirrors that safeguard for loaded actors by evaluating and saving update 0 before any PPO fine-tune step. SHAC can also use a
           no-LayerNorm actor architecture that exactly matches PPO checkpoints. Shared policy evaluation now preserves
           explicit action semantics: SHAC actors output raw pre-tanh actions when configured with <code>action_squash=tanh</code>,
-          while PPO actors with <code>action_squash=none</code> are evaluated without an accidental second tanh. Ant selection
+          while PPO actors with <code>action_squash=none</code> are evaluated without an accidental second tanh. SHAC can now
+          regularize updates against a frozen reference policy using an optional action-space anchor penalty, which makes the
+          new Ant speed probes reproducible rather than one-off checkpoint edits. Ant selection
           thresholds now use recorded minima such as <code>min_up</code> and <code>min_height</code> instead of batch means, so
           rare inverted worlds are penalized instead of hidden by high average uprightness.
           The newest Ant harness fix uses the stable -90 degree X free-root start quaternion for both DiffRL and NV Ant
@@ -401,14 +402,15 @@
           start is now 0.05 rad inside the two upper joint limits, and the selector uses a large fall gate so 0-fall checkpoints
           beat slightly faster late-fall checkpoints. Ant's reliable SHAC policy now reaches 14.96 m uninterrupted with
           0 no-reset terminals, but the faster policies are still not robust: the corrected-default PPO checkpoint reaches
-          39.66 m in one uninterrupted 1024-world replay but has 88 terminal worlds, and the faster shaped SHAC policy still
-          reaches 23.19 m with late terminal events. A true
+          39.66 m in one uninterrupted 1024-world replay but has 88 terminal worlds, and the new anchored SHAC speed probes
+          reach 28.1-28.4 m while still showing rare late terminal worlds under repeated no-reset replay. A true
           no-squash RSL-style PPO actor replay collapses under corrected action semantics, so no-squash PPO needs a clean
           retrain/evaluation pass instead of being mixed with the tanh-wrapped SHAC actor family. Corrected PPO continuation
           from the 14.96 m SHAC policy selected update 0 and ended with lower 480-step selection scores, so PPO is currently
-          a preservation/diagnostic control rather than an Ant improvement path. New SHAC continuations with progress weight
-          2.0, H=16, and lr 3e-7 or 1e-7 also selected epoch 0; the best safe candidates stayed at 14.79 m or lower, while
-          rejected updates had minimum up projections around 0.72-0.84. Raising the actual termination gate to
+          a preservation/diagnostic control rather than an Ant improvement path. New SHAC continuations with a frozen
+          action-anchor and explicit upright reward improve speed substantially, but the reliable frontier is still unresolved:
+          the best single no-reset replay is clean at 28.43 m, while repeated no-reset evaluation of the same actor can still
+          branch into a few late falls. Raising the actual termination gate to
           <code>ant_min_up=0.8</code> produced a slower 14.58 m reliable gait. Native NV Ant runs move farther, but remain
           fall-prone in 1024-world replay and are not treated as reliable baselines. The latest PPO probes also show that
           IsaacLab potential-difference progress is physically stable but initially learns standing unless progress pressure
@@ -792,6 +794,22 @@
           </figcaption>
         </figure>
       </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Anchored Progress Probe</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_anchor_from_reliable_progress15_penalty1_eval_followcam_run1/ant_poster.png">
+            <source src="assets/ant_shac_anchor_from_reliable_progress15_penalty1_eval_followcam_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            H=16 SHAC continuation from the reliable tanh-wrapped actor with a frozen action-anchor penalty, progress weight
+            1.5, 16 training worlds, and 1024-world selection. The training run selected epoch 11: 28.43 m uninterrupted,
+            0 terminals, 0 invalids, min-up 0.84, 309.3 s runtime, and 28.1 MB peak allocated CUDA memory. The rendered
+            eval directory replays the same actor through the shared follow camera and raw <code>ViewerGL.get_frame()</code>.
+            This is the current SHAC speed target, but not the reliable baseline: repeated 1024-world no-reset replay still
+            produces rare late falls from contact branch sensitivity.
+          </figcaption>
+        </figure>
+      </article>
       <article class="panel ok">
         <h2>Ant PPO, Corrected SHAC Continuation</h2>
         <figure>
@@ -950,20 +968,23 @@
         <p>
           The earlier Ant zero-fall claim came from reset-style evaluation and a shorter/default selector. Replaying the same
           family with the corrected full-horizon selector and an uninterrupted no-reset evaluator exposes late falls: the fast
-          corrected-default PPO actor travels 39.66 m but 88 of 1024 worlds terminate, while the fast shaped SHAC actor still
-          travels about 23.19 m with 3 terminal worlds. The reliable tanh-wrapped PPO control reaches 13.04 m with 0 terminals,
-          and the tanh-wrapped PPO-warm-started SHAC result reaches 14.96 m with 0 terminals. A deterministic consistency
+          corrected-default PPO actor travels 39.66 m but 88 of 1024 worlds terminate. Anchored SHAC now reaches the same
+          broad speed class as the older shaped probes: the progress-anchor run gives a clean single no-reset result at
+          28.43 m, while the upright-weighted anchor run gives 28.26 m reset-style eval but 3 no-reset terminal worlds in
+          its final replay. Repeating the progress-anchor no-reset evaluator five times produced four clean 1024-world
+          replays and one replay with 3 late falls, so the remaining failure is rare but real. The reliable tanh-wrapped PPO
+          control reaches 13.04 m with 0 terminals, and the tanh-wrapped PPO-warm-started SHAC result reaches 14.96 m with
+          0 terminals. A deterministic consistency
           probe using identical starts/actions across 256 separate MuJoCo Warp worlds stayed bit-identical for the first few
           steps, then grew from 1e-6 state differences near step 60 to contact-branch divergence by step 120; 115/256 worlds
           had terminal events by step 960 for the fast PPO actor. The remaining Ant problem is therefore not renderer state,
           reset splicing, or basic reward feasibility; it is pushing reliable progress beyond the 15 m class without entering
-          late contact-instability modes.
-          The newest continuation sweeps add explicit selection-minimum logging. With progress weight 2.0, H=16, and lr
-          3e-7, the best selected update stayed at epoch 0; the best safe update reached 14.79 m with min-up 0.89, while
-          failed updates dipped to min-up 0.73-0.74. Reducing lr to 1e-7 made the same tradeoff slower rather than better:
-          best safe update 14.77 m, later updates again dipped to min-up 0.72-0.84. A stricter <code>ant_min_up=0.8</code>
-          H=32 run selected a slower 14.58 m gait. Height stayed above the 0.42 m safety gate in these probes; uprightness,
-          not torso height, is the first safety constraint hit by progress-seeking SHAC updates.
+          late contact-instability modes. The newest continuation sweeps add explicit selection-minimum logging and anchor
+          action MSE. Pure progress updates rejected candidates with min-up 0.72-0.84. Adding an action-anchor plus upright
+          reward creates many zero-fall selection candidates in the 26-28 m range, but final no-reset replay can still branch
+          into a few late falls. A stricter <code>ant_min_up=0.8</code> H=32 run selected a slower 14.58 m gait. Height stayed
+          above the 0.42 m safety gate in these probes; uprightness, not torso height, is the first safety constraint hit by
+          progress-seeking SHAC updates.
         </p>
       </article>
       <article class="panel">
@@ -972,8 +993,10 @@
           The late-fall no-reset replay records first Ant SHAC terminals near step 458, with a mean terminal step around 465.
           Earlier corrected-default probes also fell late, around steps 348-461. These are not reset splices or camera
           artifacts: the failed worlds have torso heights below the termination threshold and flipped/upside-down up
-          projections after long contact interaction. The latest reliable tanh-wrapped SHAC replay has 0 terminal worlds,
-          minimum up projection 0.93, and minimum forward displacement 13.33 m over the same 1024-world trace.
+          projections after long contact interaction. The reliable tanh-wrapped SHAC baseline has 0 terminal worlds,
+          minimum up projection 0.93, and minimum forward displacement 13.33 m over the same 1024-world trace. The anchored
+          speed probes move the frontier to about 28 m, but their failing repeated replays still bottom out near 0.72 up
+          projection, so they are tracked as speed targets rather than reliable baselines.
         </p>
       </article>
       <article class="panel warn">
@@ -1968,6 +1991,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.teal
       },
       {
+        id: "antShacAnchorProgress15",
+        label: "Ant SHAC anchor progress",
+        path: "assets/ant_shac_anchor_from_reliable_progress15_penalty1_h16_16env_24ep_run1/ant_results.json",
+        color: colors.blue
+      },
+      {
+        id: "antShacAnchorUprightEuler",
+        label: "Ant SHAC anchor upright",
+        path: "assets/ant_shac_anchor_upright_from_fast_euler_up1_progress12_penalty05_h16_16env_20ep_run1/ant_results.json",
+        color: colors.violet
+      },
+      {
         id: "antPpoFromShacTanhMinUp075",
         label: "Ant PPO from SHAC corrected",
         path: "assets/ant_ppo_tanh_from_shac_minup075_1024env_80upd_run1/ant_ppo_results.json",
@@ -2694,7 +2729,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacTanhWrappedMinUp075")
+      const antLatest = presentRuns.find((run) => run.id === "antShacAnchorUprightEuler")
+        || presentRuns.find((run) => run.id === "antShacAnchorProgress15")
+        || presentRuns.find((run) => run.id === "antShacTanhWrappedMinUp075")
         || presentRuns.find((run) => run.id === "antPpoTanhWrappedMinUp075")
         || presentRuns.find((run) => run.id === "antShacReliabilityFineTune")
         || presentRuns.find((run) => run.id === "antShacStabilityProgress2Force75")

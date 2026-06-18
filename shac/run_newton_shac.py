@@ -2516,6 +2516,25 @@ def run_training(args: argparse.Namespace) -> dict:
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
+    anchor_actor = None
+    if args.anchor_action_penalty > 0.0:
+        anchor_actor = make_actor(
+            env,
+            stochastic=args.stochastic_actor,
+            hidden_dims=args.actor_hidden_dims,
+            actor_logstd_init=args.actor_logstd_init,
+            actor_layer_norm=args.actor_layer_norm,
+            action_squash=args.action_squash,
+        )
+        if args.anchor_actor_path is not None:
+            load_actor_checkpoint(anchor_actor, args.anchor_actor_path, env.torch_device)
+        else:
+            anchor_actor.load_state_dict(
+                {name: value.detach().clone() for name, value in actor.state_dict().items()}
+            )
+        anchor_actor.eval()
+        for param in anchor_actor.parameters():
+            param.requires_grad_(False)
     adam_betas = (args.adam_beta1, args.adam_beta2)
     optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
     critic = None
@@ -2645,6 +2664,7 @@ def run_training(args: argparse.Namespace) -> dict:
         gamma_vec = torch.ones(env.num_envs, dtype=torch.float32, device=env.torch_device)
         reward_acc = torch.zeros(env.num_envs, dtype=torch.float32, device=env.torch_device)
         actor_loss = torch.zeros((), dtype=torch.float32, device=env.torch_device)
+        anchor_loss_acc = torch.zeros((), dtype=torch.float32, device=env.torch_device)
         norm_stats = obs_rms_snapshot(obs_rms)
         invalid_count = 0
         fall_count = 0
@@ -2660,6 +2680,13 @@ def run_training(args: argparse.Namespace) -> dict:
                 critic_obs.append(obs.detach())
             raw_action = actor(obs, deterministic=not args.stochastic_actor)
             action = squash_policy_action(actor, raw_action)
+            if anchor_actor is not None:
+                with torch.no_grad():
+                    anchor_raw_action = anchor_actor(obs, deterministic=True)
+                    anchor_action = squash_policy_action(anchor_actor, anchor_raw_action)
+                action_delta = (action - anchor_action).square().sum(dim=-1)
+                actor_loss = actor_loss + args.anchor_action_penalty * action_delta.sum()
+                anchor_loss_acc = anchor_loss_acc + action_delta.mean().detach()
             q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
             invalid = env.invalid_state(q_next, qd_next)
             fell = torch.logical_and(env.fallen_state(q_next), ~invalid)
@@ -2731,6 +2758,9 @@ def run_training(args: argparse.Namespace) -> dict:
         )
         mean_reward = float(torch.stack(rewards).mean().detach().cpu())
         final_reward = float(rewards[-1].detach().cpu())
+        mean_anchor_action_mse = (
+            float((anchor_loss_acc / max(1, args.horizon)).detach().cpu()) if anchor_actor is not None else None
+        )
         optimizer.step()
 
         value_loss = None
@@ -2834,6 +2864,8 @@ def run_training(args: argparse.Namespace) -> dict:
                 "final_step_reward": final_reward,
                 "loss": float(loss.detach().cpu()),
                 "grad_norm": grad_norm,
+                "anchor_action_mse": mean_anchor_action_mse,
+                "anchor_action_penalty": args.anchor_action_penalty if anchor_actor is not None else None,
                 "value_loss": value_loss,
                 "selection_return": selection_rollout["return"],
                 "selection_score": selection_score,
@@ -3032,6 +3064,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
+        "anchor_actor_path": str(args.anchor_actor_path) if args.anchor_actor_path is not None else None,
+        "anchor_action_penalty": args.anchor_action_penalty,
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "critic_method": args.critic_method,
         "td_lambda": args.td_lambda,
@@ -3516,6 +3550,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--critic-hidden-dims", type=parse_int_list, default=None)
     parser.add_argument("--actor-logstd-init", type=float, default=-1.0)
     parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
+    parser.add_argument("--anchor-actor-path", type=Path, default=None)
+    parser.add_argument("--anchor-action-penalty", type=float, default=0.0)
     parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
     parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
     parser.add_argument("--use-critic", dest="use_critic", action="store_true", default=None)
