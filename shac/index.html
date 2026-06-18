@@ -786,6 +786,23 @@
           </figcaption>
         </figure>
       </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Clearance-Anchor Negative Probe</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_clearance_anchor_h16_16env_24ep_eval_best_run1/ant_poster.png">
+            <source src="assets/ant_shac_clearance_anchor_h16_16env_24ep_eval_best_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Conservative continuation from the promoted anchor with an explicit potential-height term, a small differentiable
+            height-margin penalty, the original action anchor, and a stronger 512-world five-repeat no-reset selector. This
+            reduced the initial strong-selector count from 2 terminal worlds to 1 at epoch 2, but later updates drifted and
+            the best checkpoint still finished with 3/2560 repeated terminal worlds, 30.98 m mean displacement, repeated
+            minimum-height mean 0.401 m, and repeated minimum-up mean 0.835. The clip is raw <code>ViewerGL.get_frame()</code>
+            through the shared smoothed COM follow camera. It is a negative diagnostic: simple clearance pressure makes the
+            rare contact branch worse unless the gait objective is redesigned.
+          </figcaption>
+        </figure>
+      </article>
       <article class="panel ok">
         <h2>Ant PPO, Tanh-Wrapped RSL Continuation</h2>
         <figure>
@@ -1009,8 +1026,10 @@
           SHAC reduced a different fast checkpoint to 2 terminal worlds across 2560 uninterrupted worlds but did not beat
           the re-audited anchor. A fresh PPO probe with soft height reward and stronger potential progress selected a robust
           standing policy at update 20: 0 terminal worlds but only 0.25 m displacement. Later updates moved farther but
-          immediately reintroduced large fall counts. This is kept as a negative diagnostic showing that posture shaping
-          alone is not the fix.
+          immediately reintroduced large fall counts. A follow-up SHAC clearance-anchor probe also failed: potential-height
+          reward plus a small differentiable height-margin penalty reached 30.98 m but worsened the five-repeat total to
+          3/2560 terminal worlds and lowered repeated minimum-up to 0.835. These probes are kept as negative diagnostics
+          showing that posture shaping alone is not the fix.
         </p>
       </article>
       <article class="panel">
@@ -2073,6 +2092,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC repeated-audited anchor",
         path: "assets/ant_shac_upright_candidate_repeated_audit_run1/ant_results.json",
         color: colors.teal
+      },
+      {
+        id: "antShacClearanceAnchorNegative",
+        label: "Ant SHAC clearance diagnostic",
+        path: "assets/ant_shac_clearance_anchor_h16_16env_24ep_eval_best_run1/ant_results.json",
+        color: colors.coral
       },
       {
         id: "antShacDtfixPotentialStochStrict",
