@@ -1920,38 +1920,39 @@ def warmup_policy_state(
     invalid_count = 0
     fall_count = 0
     stopped = torch.zeros(q.shape[0], dtype=torch.bool, device=q.device)
-    for _ in range(max(0, steps)):
-        active = ~stopped
-        if not bool(active.any().cpu()):
-            break
-        obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
-        action = deterministic_policy_action(actor, obs)
-        action = torch.where(active.unsqueeze(-1), action, torch.zeros_like(action))
-        q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
-        q_next = torch.where(active.unsqueeze(-1), q_next, q)
-        qd_next = torch.where(active.unsqueeze(-1), qd_next, qd)
-        invalid = torch.logical_and(active, env.invalid_state(q_next, qd_next))
-        fell = torch.logical_and(active, torch.logical_and(env.fallen_state(q_next), ~invalid))
-        done = torch.logical_or(invalid, fell)
-        invalid_count += int(invalid.sum().cpu())
-        fall_count += int(fell.sum().cpu())
-        if done.any():
-            done_ids = done.nonzero(as_tuple=False).squeeze(-1)
-            q_next, qd_next = env.reset_done(q_next, qd_next, done_ids, stochastic_init=stochastic_init)
-            action = torch.where(done.unsqueeze(-1), torch.zeros_like(action), action)
-            progress = torch.where(done, torch.zeros_like(progress), progress)
-        stop = torch.zeros_like(stopped)
-        if env.env_name == "ant" and (stop_height_min is not None or stop_up_min is not None):
-            torso_pos, _, _, _, up_vec, _ = env.ant_pose_terms(q_next, qd_next)
-            if stop_height_min is not None:
-                stop = torch.logical_or(stop, torso_pos[:, 1] < float(stop_height_min))
-            if stop_up_min is not None:
-                stop = torch.logical_or(stop, up_vec[:, 1] < float(stop_up_min))
-            stop = torch.logical_and(active, torch.logical_and(stop, ~done))
-            stopped = torch.logical_or(stopped, stop)
-        q, qd, prev_action = q_next, qd_next, action
-        progress = progress + torch.logical_and(active, ~done).to(dtype=progress.dtype)
-    return q, qd, prev_action, progress, {
+    with torch.no_grad():
+        for _ in range(max(0, steps)):
+            active = ~stopped
+            if not bool(active.any().cpu()):
+                break
+            obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
+            action = deterministic_policy_action(actor, obs)
+            action = torch.where(active.unsqueeze(-1), action, torch.zeros_like(action))
+            q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
+            q_next = torch.where(active.unsqueeze(-1), q_next, q)
+            qd_next = torch.where(active.unsqueeze(-1), qd_next, qd)
+            invalid = torch.logical_and(active, env.invalid_state(q_next, qd_next))
+            fell = torch.logical_and(active, torch.logical_and(env.fallen_state(q_next), ~invalid))
+            done = torch.logical_or(invalid, fell)
+            invalid_count += int(invalid.sum().cpu())
+            fall_count += int(fell.sum().cpu())
+            if done.any():
+                done_ids = done.nonzero(as_tuple=False).squeeze(-1)
+                q_next, qd_next = env.reset_done(q_next, qd_next, done_ids, stochastic_init=stochastic_init)
+                action = torch.where(done.unsqueeze(-1), torch.zeros_like(action), action)
+                progress = torch.where(done, torch.zeros_like(progress), progress)
+            stop = torch.zeros_like(stopped)
+            if env.env_name == "ant" and (stop_height_min is not None or stop_up_min is not None):
+                torso_pos, _, _, _, up_vec, _ = env.ant_pose_terms(q_next, qd_next)
+                if stop_height_min is not None:
+                    stop = torch.logical_or(stop, torso_pos[:, 1] < float(stop_height_min))
+                if stop_up_min is not None:
+                    stop = torch.logical_or(stop, up_vec[:, 1] < float(stop_up_min))
+                stop = torch.logical_and(active, torch.logical_and(stop, ~done))
+                stopped = torch.logical_or(stopped, stop)
+            q, qd, prev_action = q_next, qd_next, action
+            progress = progress + torch.logical_and(active, ~done).to(dtype=progress.dtype)
+    return q.detach(), qd.detach(), prev_action.detach(), progress.detach(), {
         "warmup_steps": int(max(0, steps)),
         "warmup_invalid_resets": invalid_count,
         "warmup_fall_resets": fall_count,

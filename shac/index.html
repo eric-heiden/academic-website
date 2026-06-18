@@ -376,7 +376,9 @@
           regularize updates against a frozen reference policy using an optional action-space anchor penalty, which makes the
           new Ant speed probes reproducible rather than one-off checkpoint edits. Ant selection
           thresholds now use recorded minima such as <code>min_up</code> and <code>min_height</code> instead of batch means, so
-          rare inverted worlds are penalized instead of hidden by high average uprightness.
+          rare inverted worlds are penalized instead of hidden by high average uprightness. Training warmup rollouts now run
+          under <code>torch.no_grad()</code> and detach their returned state, so late-state probes initialize the differentiable
+          horizon without accidentally backpropagating through hundreds of warmup steps.
           The newest Ant harness fix uses the stable -90 degree X free-root start quaternion for both DiffRL and NV Ant
           imports, because this is the pose that matches the configured start joints after Newton exports to the MuJoCo/MJWarp
           runtime. It also drops the embedded NV floor before adding Newton's ground plane; this removes the duplicate
@@ -1034,7 +1036,9 @@
           immediately reintroduced large fall counts. A follow-up SHAC clearance-anchor probe also failed: potential-height
           reward plus a small differentiable height-margin penalty reached 30.98 m but worsened the five-repeat total to
           3/2560 terminal worlds and lowered repeated minimum-up to 0.835. These probes are kept as negative diagnostics
-          showing that posture shaping alone is not the fix.
+          showing that posture shaping alone is not the fix. After fixing warmup to run outside the autograd graph, a
+          620 +/- 160 step late-state warmup with H=32 survival margins still selected the initial actor: the first two
+          evaluated updates worsened the reliability selector from 1 terminal world to 4 and then 3 terminal worlds.
         </p>
       </article>
       <article class="panel">
@@ -2118,6 +2122,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC clearance diagnostic",
         path: "assets/ant_shac_clearance_anchor_h16_16env_24ep_eval_best_run1/ant_results.json",
         color: colors.coral
+      },
+      {
+        id: "antShacLateWarmupNoGrad",
+        label: "Ant SHAC late warmup diagnostic",
+        path: "assets/ant_shac_latewarmup_nograd_survival_h32_32env_16ep_run1/ant_history_live.json",
+        color: colors.slate
       },
       {
         id: "antShacDtfixPotentialStochStrict",
