@@ -1376,6 +1376,7 @@ class NewtonMuJoCoTorchEnv:
         return obs
 
     def action_to_joint_f(self, action: torch.Tensor) -> torch.Tensor:
+        action = torch.clamp(action, -1.0, 1.0)
         joint_f = torch.zeros((self.num_envs, self.qd_dim), dtype=torch.float32, device=self.torch_device)
         if self.env_name == "cartpole":
             joint_f[:, 0] = action[:, 0] * self.force_scale
@@ -1815,7 +1816,7 @@ def deterministic_policy_action(actor: torch.nn.Module, obs: torch.Tensor) -> to
 
 def squash_policy_action(actor: torch.nn.Module, raw_action: torch.Tensor) -> torch.Tensor:
     if getattr(actor, "action_squash", "tanh") == "none":
-        return raw_action
+        return torch.clamp(raw_action, -1.0, 1.0)
     return torch.tanh(raw_action)
 
 

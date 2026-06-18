@@ -92,7 +92,7 @@ class PPOActor(nn.Module):
         mean = self.raw_mean(obs)
         if self.action_squash == "tanh":
             return torch.tanh(mean)
-        return mean
+        return torch.clamp(mean, -1.0, 1.0)
 
     def distribution(self, obs: torch.Tensor) -> torch.distributions.Normal:
         mean = self.raw_mean(obs)
@@ -106,7 +106,7 @@ class PPOActor(nn.Module):
             action = torch.tanh(raw_action)
             log_prob = tanh_normal_log_prob(dist, raw_action, action)
         else:
-            action = raw_action
+            action = torch.clamp(raw_action, -1.0, 1.0)
             log_prob = dist.log_prob(raw_action).sum(dim=-1)
         return raw_action, action, log_prob
 
