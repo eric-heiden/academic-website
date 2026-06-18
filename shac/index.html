@@ -327,7 +327,11 @@
           order, so PPO and SHAC now resolve Ant defaults to <code>ant_action_order=actuator</code>. With that fix, the
           NV/IsaacLab PPO smoke improves from a joint-order 4.93 m actor with 5/3072 repeated-audit falls to a 7.18 m actor
           with 0/3072 falls, minimum-up 0.862, and minimum heading 0.087 across three 1024-world no-reset repeats. The newest
-          morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
+          morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait. The
+          newest SHAC split-backend pass adds separate differentiable-training and physical-evaluation environments: an H=4
+          no-contact gradient step selected at 3e-5 survives a 3 x 1024 MuJoCo-contact no-reset audit, but a guarded 12-epoch
+          SHAC continuation does not beat the corrected PPO baseline. H=16 no-contact directions are stable but still inside
+          the audit noise band.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -965,7 +969,14 @@
           0/3072 repeated-audit terminal worlds. Finite differences around that corrected PPO actor still show the SHAC
           blocker: H=8 policy-gradient error is 4.7e-1 with MuJoCo contacts and 2.7e-1 without contacts, while one-step
           state/action remains at 4.4e-3. An H=4 SHAC direction line search around the corrected actor selected step 0;
-          the first nonzero step caused one terminal world and the safe nonzero steps all scored lower.
+          the first nonzero step caused one terminal world and the safe nonzero steps all scored lower. Splitting the
+          differentiable gradient backend from the physical scorer clarified the failure: H=4 no-contact gradients evaluated
+          under MuJoCo contacts can find a tiny 3e-5 candidate that survives three 1024-world no-reset repeats, but Newton
+          contact and surrogate MuJoCo gradients still score below baseline. A guarded 12-epoch continuation from that
+          candidate accepted only one tiny update and the final 1024-world uninterrupted audit reached 7.02 m, below the
+          corrected PPO baseline. H=16 no-contact directions were stable but did not improve the physical scorer. This makes
+          the current blocker a long-horizon/contact-active-set optimization problem, not a basic Ant dynamics, renderer, or
+          PPO reward setup failure.
         </p>
       </article>
       <article class="panel warn">
@@ -1122,6 +1133,22 @@
             heading 0.087, maximum scaled joint position 1.17, 839.7 s runtime, and 76.9 MB peak allocated CUDA memory.
             The clip is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera, with no
             overlays.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Split Gradient/Eval</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_split_nocontactgrad_mujocoeval_h4_sgd_64env_12ep_besteval_run1/ant_poster.png">
+            <source src="assets/ant_shac_split_nocontactgrad_mujocoeval_h4_sgd_64env_12ep_besteval_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Diagnostic SHAC continuation using no-contact differentiable H=4 gradients while all selection, final audit,
+            and rendering use MuJoCo contacts. The materialized 3e-5 line-search candidate survived a 3 x 1024 no-reset
+            audit, but the guarded 12-epoch continuation did not beat PPO: the full uninterrupted audit reports 7.02 m mean
+            displacement, 0 terminal worlds, minimum-up 0.831 in the worst repeat, 342.2 s audit/render time, and 39.5 MB
+            peak allocated CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM
+            follow camera.
           </figcaption>
         </figure>
       </article>
@@ -2730,6 +2757,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.green
       },
       {
+        id: "antShacSplitNoContactEval",
+        label: "Ant SHAC split no-contact/MJ eval",
+        path: "assets/ant_shac_split_nocontactgrad_mujocoeval_h4_sgd_64env_12ep_besteval_run1/ant_results.json",
+        color: colors.violet
+      },
+      {
+        id: "antShacSplitNoContactTrain",
+        label: "Ant SHAC split training trace",
+        path: "assets/ant_shac_split_nocontactgrad_mujocoeval_h4_sgd_64env_12ep_run1/ant_history_live.json",
+        color: colors.slate
+      },
+      {
         id: "antPpoNvLowNoise",
         label: "Ant PPO NV old bad-root",
         path: "assets/ant_ppo_nv_stablepose_term027_lownoise_1024env_300upd_run1/ant_ppo_results.json",
@@ -2954,6 +2993,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antNvActuatorH8Mujoco: "assets/ant_gradcheck_nv_actuator_ppo_reliable_h8_mujoco_run1/ant_gradient_check.json",
       antNvActuatorH8NoContact: "assets/ant_gradcheck_nv_actuator_ppo_reliable_h8_nocontact_run1/ant_gradient_check.json",
       antNvActuatorH4LineSearch: "assets/ant_shac_linesearch_nv_actuator_ppo_h4_run1/ant_linesearch.json",
+      antNvActuatorH4NoContactEval: "assets/ant_shac_linesearch_nv_actuator_ppo_h4_nocontactgrad_mujocoeval_run1/ant_linesearch.json",
+      antNvActuatorH4NoContactRepeat: "assets/ant_shac_linesearch_nv_actuator_ppo_h4_nocontactgrad_mujocoeval_repeat3_run1/ant_linesearch.json",
+      antNvActuatorH4NewtonEval: "assets/ant_shac_linesearch_nv_actuator_ppo_h4_newtongrad_mujocoeval_run1/ant_linesearch.json",
+      antNvActuatorH4SurrogateEval: "assets/ant_shac_linesearch_nv_actuator_ppo_h4_surrogategrad_mujocoeval_run1/ant_linesearch.json",
+      antNvActuatorH16NoContactEval: "assets/ant_shac_linesearch_nv_actuator_ppo_h16_nocontactgrad_mujocoeval_run1/ant_linesearch.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json",
       planarBranch: "assets/solver_gradient_diagnostics_planar_branch_level_kinematics_run1/solver_gradient_diagnostics.json",
@@ -3323,7 +3367,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNvActuatorH8Newton,
         antNvActuatorH8Mujoco,
         antNvActuatorH8NoContact,
-        antNvActuatorH4LineSearch
+        antNvActuatorH4LineSearch,
+        antNvActuatorH4NoContactEval,
+        antNvActuatorH4NoContactRepeat,
+        antNvActuatorH4NewtonEval,
+        antNvActuatorH4SurrogateEval,
+        antNvActuatorH16NoContactEval
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3341,7 +3390,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antNvActuatorH8Newton),
         safeJson(diagPaths.antNvActuatorH8Mujoco),
         safeJson(diagPaths.antNvActuatorH8NoContact),
-        safeJson(diagPaths.antNvActuatorH4LineSearch)
+        safeJson(diagPaths.antNvActuatorH4LineSearch),
+        safeJson(diagPaths.antNvActuatorH4NoContactEval),
+        safeJson(diagPaths.antNvActuatorH4NoContactRepeat),
+        safeJson(diagPaths.antNvActuatorH4NewtonEval),
+        safeJson(diagPaths.antNvActuatorH4SurrogateEval),
+        safeJson(diagPaths.antNvActuatorH16NoContactEval)
       ]);
 
       const stable = presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
@@ -3434,6 +3488,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNvActuatorH8Mujoco?.timestamp_pacific,
         antNvActuatorH8NoContact?.timestamp_pacific,
         antNvActuatorH4LineSearch?.timestamp_pacific,
+        antNvActuatorH4NoContactEval?.timestamp_pacific,
+        antNvActuatorH4NoContactRepeat?.timestamp_pacific,
+        antNvActuatorH4NewtonEval?.timestamp_pacific,
+        antNvActuatorH4SurrogateEval?.timestamp_pacific,
+        antNvActuatorH16NoContactEval?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,
@@ -3798,7 +3857,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ...lineSearchSeries(antGradDirectionLineSearch, "MuJoCo hard", colors.coral),
         ...lineSearchSeries(antNewtonContactLineSearch, "Newton contacts", colors.teal),
         ...lineSearchSeries(antUpperLimitLineSearch, "upper-limit reward", colors.violet),
-        ...lineSearchSeries(antNvActuatorH4LineSearch, "NV actuator PPO H=4", colors.blue)
+        ...lineSearchSeries(antNvActuatorH4LineSearch, "NV actuator PPO H=4", colors.blue),
+        ...lineSearchSeries(antNvActuatorH4NoContactEval, "NV H=4 no-contact grad", colors.green),
+        ...lineSearchSeries(antNvActuatorH4NoContactRepeat, "NV H=4 no-contact repeat", colors.amber),
+        ...lineSearchSeries(antNvActuatorH4NewtonEval, "NV H=4 Newton grad", colors.slate),
+        ...lineSearchSeries(antNvActuatorH4SurrogateEval, "NV H=4 surrogate grad", colors.coral),
+        ...lineSearchSeries(antNvActuatorH16NoContactEval, "NV H=16 no-contact grad", colors.violet)
       ], {
         ...baseLayout,
         barmode: "group",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import time
 from pathlib import Path
@@ -23,6 +24,7 @@ from run_newton_shac import (
     rollout_constraint_shortfalls,
     rollout_selection_score,
     shac_rollout_loss,
+    summarize_rollout_repeats,
     trainable_parameters,
     write_json,
 )
@@ -95,10 +97,14 @@ def main() -> None:
     parser.add_argument("--eval-num-envs", type=int, default=256)
     parser.add_argument("--eval-total-envs", type=int, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=None)
+    parser.add_argument("--eval-repeats", type=int, default=1)
     parser.add_argument("--eval-stochastic-init", action="store_true")
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)
     parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default=None)
+    parser.add_argument("--eval-contact-backend", choices=["mujoco", "newton", "none"], default=None)
+    parser.add_argument("--eval-mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)
+    parser.add_argument("--eval-ant-dof-limit-mode", choices=["abs", "upper"], default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=None)
     parser.add_argument("--selection-invalid-penalty", type=float, default=None)
     parser.add_argument("--selection-displacement-weight", type=float, default=None)
@@ -115,22 +121,34 @@ def main() -> None:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    result = load_result(args.result_json)
-    overrides = {}
+    base_result = load_result(args.result_json)
+    grad_result = copy.deepcopy(base_result)
+    eval_result = copy.deepcopy(base_result)
+    gradient_overrides = {}
+    eval_overrides = {}
     if args.contact_backend is not None:
-        result["contact_backend"] = args.contact_backend
-        overrides["contact_backend"] = args.contact_backend
+        grad_result["contact_backend"] = args.contact_backend
+        gradient_overrides["contact_backend"] = args.contact_backend
     if args.mujoco_smooth_adjoint is not None:
-        result["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
-        overrides["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
+        grad_result["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
+        gradient_overrides["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
     if args.ant_dof_limit_mode is not None:
-        result["ant_dof_limit_mode"] = args.ant_dof_limit_mode
-        overrides["ant_dof_limit_mode"] = args.ant_dof_limit_mode
+        grad_result["ant_dof_limit_mode"] = args.ant_dof_limit_mode
+        gradient_overrides["ant_dof_limit_mode"] = args.ant_dof_limit_mode
+    if args.eval_contact_backend is not None:
+        eval_result["contact_backend"] = args.eval_contact_backend
+        eval_overrides["contact_backend"] = args.eval_contact_backend
+    if args.eval_mujoco_smooth_adjoint is not None:
+        eval_result["mujoco_smooth_adjoint"] = args.eval_mujoco_smooth_adjoint
+        eval_overrides["mujoco_smooth_adjoint"] = args.eval_mujoco_smooth_adjoint
+    if args.eval_ant_dof_limit_mode is not None:
+        eval_result["ant_dof_limit_mode"] = args.eval_ant_dof_limit_mode
+        eval_overrides["ant_dof_limit_mode"] = args.eval_ant_dof_limit_mode
     if args.eval_horizon is None:
-        args.eval_horizon = int(result.get("selection_horizon") or result.get("eval_horizon") or 480)
+        args.eval_horizon = int(base_result.get("selection_horizon") or base_result.get("eval_horizon") or 480)
 
-    env = build_env(result, argparse.Namespace(video_num_envs=1, device=args.device))
-    actor = actor_from_result(result, env, args.actor_path)
+    env = build_env(grad_result, argparse.Namespace(video_num_envs=1, device=args.device))
+    actor = actor_from_result(grad_result, env, args.actor_path)
     obs_rms = load_obs_rms(args.obs_rms_path, env.torch_device, env.num_obs) if args.obs_rms_path else None
     obs_stats = None if obs_rms is None else (obs_rms.mean.detach().clone(), obs_rms.var.detach().clone())
 
@@ -145,36 +163,30 @@ def main() -> None:
         env,
         actor,
         horizon=args.horizon,
-        gamma=float(args.gamma if args.gamma is not None else result.get("gamma", 0.99)),
-        rew_scale=float(args.rew_scale if args.rew_scale is not None else result.get("rew_scale", 1.0)),
-        termination_penalty=float(result.get("termination_penalty") or 0.0),
+        gamma=float(args.gamma if args.gamma is not None else grad_result.get("gamma", 0.99)),
+        rew_scale=float(args.rew_scale if args.rew_scale is not None else grad_result.get("rew_scale", 1.0)),
+        termination_penalty=float(grad_result.get("termination_penalty") or 0.0),
         obs_stats=obs_stats,
         q0=q0,
         qd0=qd0,
         prev_action0=prev0,
-        stochastic_actor=bool(result.get("stochastic_actor") or False),
+        stochastic_actor=bool(grad_result.get("stochastic_actor") or False),
     )
     loss.backward()
     grad = flatten_gradients(params)
     grad_norm = float(grad.to(torch.float64).norm().detach().cpu())
 
-    fall_penalty = float(args.selection_fall_penalty if args.selection_fall_penalty is not None else result.get("selection_fall_penalty", 500000.0))
-    invalid_penalty = float(args.selection_invalid_penalty if args.selection_invalid_penalty is not None else result.get("selection_invalid_penalty", 500000.0))
-    displacement_weight = float(args.selection_displacement_weight if args.selection_displacement_weight is not None else result.get("selection_displacement_weight", 0.0))
-    posture_penalty = float(args.selection_posture_penalty if args.selection_posture_penalty is not None else result.get("selection_posture_penalty", 0.0))
-    min_height = args.selection_min_height if args.selection_min_height is not None else result.get("selection_min_height")
-    min_up = args.selection_min_up if args.selection_min_up is not None else result.get("selection_min_up")
-    min_heading = args.selection_min_heading if args.selection_min_heading is not None else result.get("selection_min_heading")
-    max_abs_joint = args.selection_max_abs_joint if args.selection_max_abs_joint is not None else result.get("selection_max_abs_joint")
+    fall_penalty = float(args.selection_fall_penalty if args.selection_fall_penalty is not None else base_result.get("selection_fall_penalty", 500000.0))
+    invalid_penalty = float(args.selection_invalid_penalty if args.selection_invalid_penalty is not None else base_result.get("selection_invalid_penalty", 500000.0))
+    displacement_weight = float(args.selection_displacement_weight if args.selection_displacement_weight is not None else base_result.get("selection_displacement_weight", 0.0))
+    posture_penalty = float(args.selection_posture_penalty if args.selection_posture_penalty is not None else base_result.get("selection_posture_penalty", 0.0))
+    min_height = args.selection_min_height if args.selection_min_height is not None else base_result.get("selection_min_height")
+    min_up = args.selection_min_up if args.selection_min_up is not None else base_result.get("selection_min_up")
+    min_heading = args.selection_min_heading if args.selection_min_heading is not None else base_result.get("selection_min_heading")
+    max_abs_joint = args.selection_max_abs_joint if args.selection_max_abs_joint is not None else base_result.get("selection_max_abs_joint")
 
-    base_state = clone_module_state(actor)
-    candidates = []
-    t0 = time.perf_counter()
-    for step in args.steps:
-        actor.load_state_dict(base_state)
-        assign_flat_parameters(params, base_params - float(step) * grad)
-        rollout = evaluate_candidate(result, args, actor, obs_rms)
-        score = rollout_selection_score(
+    def score_rollout(rollout: dict) -> float:
+        return rollout_selection_score(
             rollout,
             num_envs=int(rollout.get("num_envs") or args.eval_num_envs),
             fall_penalty=fall_penalty,
@@ -186,10 +198,26 @@ def main() -> None:
             max_abs_joint=max_abs_joint,
             posture_penalty=posture_penalty,
         )
+
+    base_state = clone_module_state(actor)
+    candidates = []
+    t0 = time.perf_counter()
+    for step in args.steps:
+        actor.load_state_dict(base_state)
+        assign_flat_parameters(params, base_params - float(step) * grad)
+        rollouts = [evaluate_candidate(eval_result, args, actor, obs_rms)]
+        scores = [score_rollout(rollouts[0])]
+        for _ in range(max(0, int(args.eval_repeats) - 1)):
+            rollouts.append(evaluate_candidate(eval_result, args, actor, obs_rms))
+            scores.append(score_rollout(rollouts[-1]))
+        rollout = rollouts[0]
+        score = min(scores)
+        repeat_summary = summarize_rollout_repeats(rollouts, scores) if len(rollouts) > 1 else None
         candidates.append(
             {
                 "step": float(step),
                 "score": score,
+                "scores": scores,
                 "shortfalls": rollout_constraint_shortfalls(
                     rollout,
                     min_height=min_height,
@@ -198,6 +226,7 @@ def main() -> None:
                     max_abs_joint=max_abs_joint,
                 ),
                 "rollout": rollout,
+                "rollout_repeats": repeat_summary,
             }
         )
         print(
@@ -212,7 +241,7 @@ def main() -> None:
     if args.save_best_actor and best is not None:
         actor.load_state_dict(base_state)
         assign_flat_parameters(params, base_params - float(best["step"]) * grad)
-        prefix = args.save_prefix or str(result.get("env") or "policy")
+        prefix = args.save_prefix or str(base_result.get("env") or "policy")
         torch.save(actor.state_dict(), args.out.parent / f"{prefix}_best_actor.pt")
         if args.obs_rms_path is not None:
             obs_state = torch.load(args.obs_rms_path, map_location=env.torch_device)
@@ -222,10 +251,18 @@ def main() -> None:
         "mode": "shac_gradient_linesearch",
         "timestamp_pacific": pacific_now_iso(),
         "source_result": str(args.result_json),
-        "overrides": overrides,
+        "overrides": gradient_overrides,
+        "gradient_overrides": gradient_overrides,
+        "eval_overrides": eval_overrides,
         "actor_path": str(args.actor_path),
         "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path else None,
-        "env": result.get("env"),
+        "env": base_result.get("env"),
+        "gradient_contact_backend": grad_result.get("contact_backend"),
+        "eval_contact_backend": eval_result.get("contact_backend"),
+        "gradient_mujoco_smooth_adjoint": grad_result.get("mujoco_smooth_adjoint"),
+        "eval_mujoco_smooth_adjoint": eval_result.get("mujoco_smooth_adjoint"),
+        "gradient_ant_dof_limit_mode": grad_result.get("ant_dof_limit_mode"),
+        "eval_ant_dof_limit_mode": eval_result.get("ant_dof_limit_mode"),
         "horizon": args.horizon,
         "loss": float(loss.detach().cpu()),
         "loss_metrics": metrics,
@@ -235,6 +272,8 @@ def main() -> None:
         "eval_num_envs": args.eval_num_envs,
         "eval_total_envs": args.eval_total_envs,
         "eval_chunk_size": args.eval_chunk_size,
+        "eval_repeats": args.eval_repeats,
+        "eval_repeat_score_mode": "min",
         "selection": {
             "fall_penalty": fall_penalty,
             "invalid_penalty": invalid_penalty,

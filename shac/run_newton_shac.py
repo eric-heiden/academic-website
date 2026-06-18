@@ -2883,6 +2883,7 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
+        ant_dof_limit_mode=args.ant_dof_limit_mode,
         ant_action_order=args.ant_action_order,
         ant_smooth_up_reward=args.ant_smooth_up_reward,
         ant_reward_min_up=args.ant_reward_min_up,
@@ -2946,6 +2947,21 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
     )
 
 
+def make_eval_args(args: argparse.Namespace) -> tuple[argparse.Namespace, bool]:
+    eval_args = copy.copy(args)
+    has_overrides = False
+    if getattr(args, "eval_contact_backend", None) is not None:
+        eval_args.contact_backend = args.eval_contact_backend
+        has_overrides = True
+    if getattr(args, "eval_mujoco_smooth_adjoint", None) is not None:
+        eval_args.mujoco_smooth_adjoint = args.eval_mujoco_smooth_adjoint
+        has_overrides = True
+    if getattr(args, "eval_ant_dof_limit_mode", None) is not None:
+        eval_args.ant_dof_limit_mode = args.eval_ant_dof_limit_mode
+        has_overrides = True
+    return eval_args, has_overrides
+
+
 def run_training(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco" if is_locomotion_env(args.env) or is_contact_target_env(args.env) else "none"
@@ -2996,9 +3012,11 @@ def run_training(args: argparse.Namespace) -> dict:
     wp.init()
 
     env = make_env_from_args(args, args.num_envs)
+    eval_env_args, has_eval_env_overrides = make_eval_args(args)
+    selection_env_count = args.selection_num_envs or args.num_envs
     selection_env = env
-    if args.selection_num_envs is not None and args.selection_num_envs != args.num_envs:
-        selection_env = make_env_from_args(args, args.selection_num_envs)
+    if has_eval_env_overrides or selection_env_count != args.num_envs:
+        selection_env = make_env_from_args(eval_env_args, selection_env_count)
     actor = make_actor(
         env,
         stochastic=args.stochastic_actor,
@@ -3557,7 +3575,7 @@ def run_training(args: argparse.Namespace) -> dict:
     def final_eval_once(*, uninterrupted: bool) -> dict:
         if use_chunked_final_eval:
             return evaluate_policy_chunked(
-                lambda n: make_env_from_args(args, n),
+                lambda n: make_env_from_args(eval_env_args, n),
                 actor,
                 args.eval_horizon,
                 total_envs=final_eval_num_envs,
@@ -3568,7 +3586,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 uninterrupted=uninterrupted,
             )
         if final_eval_num_envs != selection_env.num_envs:
-            eval_env = make_env_from_args(args, final_eval_num_envs)
+            eval_env = make_env_from_args(eval_env_args, final_eval_num_envs)
         else:
             eval_env = selection_env
         evaluator = evaluate_policy_uninterrupted if uninterrupted else evaluate_policy
@@ -3587,7 +3605,7 @@ def run_training(args: argparse.Namespace) -> dict:
     def score_rollout(candidate: dict) -> float:
         return rollout_selection_score(
             candidate,
-            num_envs=selection_env.num_envs,
+            num_envs=int(candidate.get("num_envs") or selection_env.num_envs),
             fall_penalty=args.selection_fall_penalty,
             invalid_penalty=args.selection_invalid_penalty,
             displacement_weight=args.selection_displacement_weight,
@@ -3618,71 +3636,7 @@ def run_training(args: argparse.Namespace) -> dict:
     video_path = None
     poster_path = None
     if args.render_video:
-        render_env = env
-        if args.video_num_envs != args.num_envs:
-            render_env = NewtonMuJoCoTorchEnv(
-                env_name=args.env,
-                num_envs=args.video_num_envs,
-                device=args.device,
-                dt=args.dt,
-                force_scale=args.force_scale,
-                contact_backend=args.contact_backend,
-                sim_substeps=args.sim_substeps,
-                mujoco_integrator=args.mujoco_integrator,
-                mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
-                mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
-                mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
-                mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
-                mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
-                mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
-                acrobot_actuation=args.acrobot_actuation,
-                ant_asset=args.ant_asset,
-                ant_disable_joint_limits=args.ant_disable_joint_limits,
-                ant_density_override=args.ant_density_override,
-                ant_contact_margin=args.ant_contact_margin,
-                ant_contact_gap=args.ant_contact_gap,
-                ant_contact_mu=args.ant_contact_mu,
-                ant_joint_damping=args.ant_joint_damping,
-                ant_armature=args.ant_armature,
-                ant_min_up=args.ant_min_up,
-                ant_start_height=args.ant_start_height,
-                ant_start_joint_q=args.ant_start_joint_q,
-                ant_reset_position_scale=args.ant_reset_position_scale,
-                ant_reset_angle_scale=args.ant_reset_angle_scale,
-                ant_reset_joint_scale=args.ant_reset_joint_scale,
-                ant_reset_velocity_scale=args.ant_reset_velocity_scale,
-                ant_termination_height=args.ant_termination_height,
-                ant_max_healthy_height=args.ant_max_healthy_height,
-                ant_observation_style=args.ant_observation_style,
-                ant_reward_style=args.ant_reward_style,
-                ant_dof_limit_mode=args.ant_dof_limit_mode,
-                ant_action_order=args.ant_action_order,
-                ant_smooth_up_reward=args.ant_smooth_up_reward,
-                ant_reward_min_up=args.ant_reward_min_up,
-                ant_reward_min_height=args.ant_reward_min_height,
-                hopper_reward_style=args.hopper_reward_style,
-                hopper_start_joint_q=args.hopper_start_joint_q,
-                hopper_contact_mu=args.hopper_contact_mu,
-                hopper_joint_damping=args.hopper_joint_damping,
-                hopper_armature=args.hopper_armature,
-                hopper_termination_height=args.hopper_termination_height,
-                hopper_termination_angle=args.hopper_termination_angle,
-                hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
-                hopper_reset_position_scale=args.hopper_reset_position_scale,
-                hopper_reset_angle_scale=args.hopper_reset_angle_scale,
-                hopper_reset_joint_scale=args.hopper_reset_joint_scale,
-                hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
-                phase_observation=args.phase_observation,
-                phase_period=args.phase_period,
-                hopper_terminate_angle=args.hopper_terminate_angle,
-                locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
-                cartpole_reward=env.cartpole_reward,
-                ant_reward=env.ant_reward,
-                hopper_reward=env.hopper_reward,
-                cheetah_reward=env.cheetah_reward,
-                acrobot_reward=env.acrobot_reward,
-                contact_reward=env.contact_reward,
-            )
+        render_env = make_env_from_args(eval_env_args, args.video_num_envs)
         video_path, poster_path = render_rollout(
             render_env,
             actor,
@@ -3705,12 +3659,14 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_num_envs": selection_env.num_envs,
         "seed": args.seed,
         "contact_backend": args.contact_backend,
+        "eval_contact_backend": eval_env_args.contact_backend,
         "horizon": args.horizon,
         "epochs": args.epochs,
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
         "mujoco_smooth_adjoint": args.mujoco_smooth_adjoint,
+        "eval_mujoco_smooth_adjoint": eval_env_args.mujoco_smooth_adjoint,
         "mujoco_smooth_friction_viscosity": args.mujoco_smooth_friction_viscosity,
         "mujoco_smooth_friction_scale": args.mujoco_smooth_friction_scale,
         "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
@@ -3836,6 +3792,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
         "ant_dof_limit_mode": env.ant_dof_limit_mode if args.env == "ant" else None,
+        "eval_ant_dof_limit_mode": eval_env_args.ant_dof_limit_mode if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "ant_smooth_up_reward": env.ant_smooth_up_reward if args.env == "ant" else None,
         "ant_reward_min_up": env.ant_reward_min_up if args.env == "ant" else None,
@@ -4383,6 +4340,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mujoco-smooth-friction-bypass-kf", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-penalty-damping-alpha", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-friction-surrogate-alpha", type=float, default=0.9)
+    parser.add_argument("--eval-contact-backend", choices=["mujoco", "newton", "none"], default=None)
+    parser.add_argument("--eval-mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)
+    parser.add_argument("--eval-ant-dof-limit-mode", choices=["abs", "upper"], default=None)
     parser.add_argument("--lr", type=float, default=2.0e-3)
     parser.add_argument("--min-lr", type=float, default=1.0e-5)
     parser.add_argument("--lr-schedule", choices=["constant", "linear"], default=None)
