@@ -788,7 +788,11 @@
           SHAC can make small progress but still has a long-horizon reliability problem. The next technical blocker is not
           a root-velocity indexing bug either; a unit-velocity probe confirmed <code>qd[0:3]</code> are linear root velocity
           and <code>qd[3:6]</code> are angular. The remaining failure mode is contact-rich Ant optimization: H=32 surrogate
-          contact adjoints are currently too slow, and H=8 can overfit a local contact branch that later dips or falls.
+          contact adjoints are currently too slow, H=16 strict anchored updates improve nominal reward but fail repeated
+          audits with late falls, and H=8 can overfit a local contact branch that later dips or falls. A 256-world
+          five-repeat selector found a faster H=8 candidate, but re-auditing that actor at 1024 worlds still produced
+          1 terminal world across five repeats; the current headline therefore stays with the terminal-free clipped H=8
+          result despite its posture dip.
         </p>
       </article>
       <article class="panel warn">
@@ -1015,7 +1019,11 @@
           The remaining Ant problem is therefore not renderer overlays, reset splicing, action loader mismatch, or root
           velocity indexing. It is long-horizon optimization through repeated Ant contacts with a bounded-action contract.
           H=32 contact-surrogate SHAC currently runs too slowly to use as the main training loop, while H=8 is fast enough
-          but too local to guarantee posture robustness.
+          but too local to guarantee posture robustness. The latest strict H=16 probe selected epoch 5 at 15.31 m, but
+          its five-repeat audit recorded 2 terminal worlds and minimum-up -0.91. A stricter H=8 repeated-selector probe
+          found a 15.55 m training candidate under 256 worlds times five repeats, but the promoted actor recorded 1 terminal
+          world under the 1024-world five-repeat audit. These negative probes confirm that selection scale, not just nominal
+          rollout quality, is the remaining Ant blocker.
         </p>
       </article>
       <article class="panel">
@@ -2032,6 +2040,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC clipped H=8",
         path: "assets/ant_shac_clipped_potential_anchor_h8_4env_4ep_run1/ant_results.json",
         color: colors.violet
+      },
+      {
+        id: "antShacClippedH16Strict",
+        label: "Ant SHAC clipped H=16 strict",
+        path: "assets/ant_shac_clipped_anchor_h16_4env_6ep_strict_run1/ant_results.json",
+        color: colors.coral
+      },
+      {
+        id: "antShacClippedH8RepeatedSelect",
+        label: "Ant SHAC H=8 repeated selector",
+        path: "assets/ant_shac_clipped_anchor_h8_repeated_select_best_eval_1024_run1/ant_results.json",
+        color: colors.slate
       },
       {
         id: "antPpoPotentialRepeatedAudit",
