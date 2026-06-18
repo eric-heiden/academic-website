@@ -301,12 +301,11 @@
           <code>q_next - q</code> is now divided by the full control timestep, not the physics substep.
           Cheetah is the clean SHAC stepping stone: MuJoCo contacts at substep 1 reach 10.41 m uninterrupted with 0 terminals.
           Hopper SHAC is now clean after moving the deterministic start pose off exact active joint limits and using a
-          reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now preserves
-          the clipped PPO anchor, and a cautious H=8 update improves the deterministic no-reset replay to 15.39 m with
-          0 terminals. Five repeated no-reset audits still expose the open reliability target: PPO has 0 terminals and
-          minimum-up above 0.945, while the H=8 SHAC update has 0 terminals but one repeat dips to 0.485 minimum-up before
-          recovering. A late-state H=32 repair run now keeps a 30.04 m gait over 960 steps with only 1 terminal event across
-          5 x 1024 audited worlds, but that rare late failure is still enough to keep Ant marked unsolved.
+          reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
+          strict reliable policy: a post-hoc 0.825 action-scaled late-state SHAC actor moves 21.02 m over 960 steps with
+          0 terminal worlds across 5 x 1024 strict no-reset audited worlds, minimum height 0.454 m, and worst minimum-up
+          0.856. The faster 30.04 m late-state H=32 repair remains as a speed diagnostic because it still records rare
+          late rollovers under repeated strict audits.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
@@ -331,7 +330,7 @@
       <div class="panel metric">
         <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">Current 960-step SHAC near-miss; no-reset terminals shown next.</p>
+        <p class="note">Strict 960-step scaled-SHAC audit; no-reset terminals shown next.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / No-Reset Terms</div>
@@ -412,8 +411,10 @@
           The current H=8 SHAC update can improve displacement to 15.39 m in the deterministic no-reset replay and stays
           terminal-free across five 1024-world repeats, but the repeated minimum-up dip shows it is not yet the best reliable
           Ant gait. The late-state H=32 repair from the clipped PPO anchor is the strongest speed result so far: it selected a
-          zero-fall 3 x 1024-world checkpoint and audited at 30.04 m over 960 steps, but still had 1 late terminal world in
-          5 x 1024 repeats. Longer SHAC horizons with contact-surrogate adjoints are currently CPU-bound, and later H=8/H=32
+          zero-fall 3 x 1024-world checkpoint and audited at 30.04 m over 960 steps, but still had rare late terminal worlds
+          under repeated strict up-aware audits. The best strict reliable Ant result is therefore the 0.825 action-scaled
+          late-state SHAC actor at 21.02 m with 0/5120 no-reset terminal worlds and worst minimum-up 0.856. Longer SHAC
+          horizons with contact-surrogate adjoints are currently CPU-bound, and later H=8/H=32
           steps can still select a rare contact branch that falls despite better short-horizon reward. Hopper required two harness fixes:
           the default deterministic start is now 0.05 rad inside the two upper joint limits, and the selector uses a large
           fall gate so 0-fall checkpoints beat slightly faster late-fall checkpoints. Ant additionally needed the corrected
@@ -842,6 +843,22 @@
         </figure>
       </article>
       <article class="panel ok">
+        <h2>Ant SHAC, Strict Scaled Reliable Policy</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_scaled0825_strict_5rep_render_run1/ant_ppo_poster.png">
+            <source src="assets/ant_shac_scaled0825_strict_5rep_render_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Post-hoc 0.825 action-scaled version of the late-state SHAC actor, evaluated with <code>ant_min_up=0.8</code>,
+            a 960-step no-reset horizon, 1024 audited worlds split into 256-world chunks, and 5 repeated audits. This is
+            the current strict reliable Ant SHAC result: 21.02 m mean displacement, 0 terminal worlds, 0 invalid worlds,
+            worst minimum height 0.454 m, and worst minimum-up 0.856 across 5120 audited worlds. Runtime was 487.3 s with
+            15.6 MB peak allocated CUDA memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared
+            smoothed COM follow camera, with no overlays.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
         <h2>Ant PPO, Tanh-Wrapped RSL Continuation</h2>
         <figure>
           <video controls preload="none" poster="assets/ant_ppo_rsl_exact_minup075_continue_1024env_100upd_run1/ant_ppo_poster.png">
@@ -1101,7 +1118,8 @@
           not just nominal rollout quality, are the remaining Ant blockers. The latest H=32 late-state SHAC repair is the best
           current compromise: the selector found a zero-fall 30.08 m checkpoint over 3 x 1024 worlds, and the 5 x 1024
           promotion audit moved 30.04 m over 960 steps with only 1 terminal world. That improves the speed target, but the
-          single terminal keeps the reliability target open.
+          single terminal kept the high-speed reliability target open; the scaled 21.02 m policy closes the strict
+          reliability check but leaves the speed/robustness tradeoff as the next target.
         </p>
       </article>
       <article class="panel">
@@ -1112,10 +1130,12 @@
           splices or camera artifacts: failed worlds had torso heights below the termination threshold and flipped/upside-down
           up projections after long contact interaction. The current clipped H=8 SHAC run no longer terminates in the five
           repeated 1024-world audit, but its worst repeated minimum-up is 0.485, much lower than the PPO anchor's 0.945.
-          The late-state H=32 repair raises the speed target to 30.04 m over 960 steps, but the one failing world still flips
-          late after accumulated contact interaction. That posture/fall tail is the remaining warning sign. Future work should
-          improve Ant clearance and contact robustness without reintroducing the old unbounded-torque behavior or collapsing
-          into the standing policies found by earlier soft-height PPO probes.
+          The late-state H=32 repair raises the speed target to 30.04 m over 960 steps, but failing worlds still flip late
+          after accumulated contact interaction. Tightening the evaluator with <code>ant_min_up=0.8</code> exposed why those
+          clips looked wrong even when height-only terminal counts were low. Scaling the late-state SHAC actions to 0.825 is
+          currently the best robust compromise: 21.02 m, 0/5120 strict terminals, and worst minimum-up 0.856. Future work
+          should recover more of the 30 m gait while preserving that up-margin, without reintroducing the old unbounded-torque
+          behavior or collapsing into the standing policies found by earlier soft-height PPO probes.
         </p>
       </article>
       <article class="panel warn">
@@ -2142,6 +2162,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.blue
       },
       {
+        id: "antShacScaled0825Strict",
+        label: "Ant SHAC scaled 0.825 strict",
+        path: "assets/ant_shac_scaled0825_strict_5rep_render_run1/ant_ppo_results.json",
+        color: colors.teal
+      },
+      {
         id: "antShacClippedH16Strict",
         label: "Ant SHAC clipped H=16 strict",
         path: "assets/ant_shac_clipped_anchor_h16_4env_6ep_strict_run1/ant_results.json",
@@ -3018,7 +3044,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacLateStateReliability")
+      const antLatest = presentRuns.find((run) => run.id === "antShacScaled0825Strict")
+        || presentRuns.find((run) => run.id === "antShacLateStateReliability")
         || presentRuns.find((run) => run.id === "antShacClippedH8")
         || presentRuns.find((run) => run.id === "antShacClippedPpoAnchor")
         || presentRuns.find((run) => run.id === "antPpoClippedPotential")

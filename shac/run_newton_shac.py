@@ -12,7 +12,7 @@ import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -361,7 +361,7 @@ def rollout_selection_score(
     posture_penalty: float = 0.0,
 ) -> float:
     del num_envs
-    fall_events = float(rollout.get("fall_count", 0))
+    fall_events = float(rollout.get("terminal_count", rollout.get("fall_count", 0)))
     invalid_events = float(rollout.get("invalid_count", 0))
     displacement = float(rollout.get("mean_forward_displacement") or 0.0)
     height = float(rollout.get("mean_height") or 0.0)
@@ -459,6 +459,77 @@ def summarize_rollout_repeats(rollouts: list[dict], scores: list[float] | None =
             "max": float(np.max(scores)) if scores else None,
         }
     return summary
+
+
+def summarize_rollout_chunks(chunks: list[dict], *, total_envs: int, chunk_size: int) -> dict:
+    if not chunks:
+        return {"chunk_count": 0, "total_num_envs": 0, "chunk_size": chunk_size, "chunks": []}
+
+    weights = np.array([float(item.get("num_envs") or 0) for item in chunks], dtype=np.float64)
+    if float(weights.sum()) <= 0.0:
+        weights = np.ones(len(chunks), dtype=np.float64)
+
+    def weighted_mean(key: str) -> float | None:
+        values = []
+        value_weights = []
+        for item, weight in zip(chunks, weights):
+            value = item.get(key)
+            if value is None:
+                continue
+            values.append(float(value))
+            value_weights.append(float(weight))
+        if not values:
+            return None
+        return float(np.average(np.array(values, dtype=np.float64), weights=np.array(value_weights, dtype=np.float64)))
+
+    def min_value(key: str) -> float | None:
+        values = [float(item[key]) for item in chunks if item.get(key) is not None]
+        return float(np.min(values)) if values else None
+
+    def count_total(key: str) -> int:
+        return int(sum(int(item.get(key) or 0) for item in chunks))
+
+    terminal_env_ids: list[int] = []
+    terminal_steps: list[int] = []
+    env_offset = 0
+    for chunk in chunks:
+        ids = chunk.get("terminal_env_ids") or []
+        steps = chunk.get("terminal_steps") or []
+        terminal_env_ids.extend([int(item) + env_offset for item in ids])
+        terminal_steps.extend([int(item) for item in steps])
+        env_offset += int(chunk.get("num_envs") or 0)
+
+    terminal_count = count_total("terminal_count")
+    return {
+        "chunk_count": len(chunks),
+        "total_num_envs": total_envs,
+        "chunk_size": chunk_size,
+        "num_envs": total_envs,
+        "mean_reward": weighted_mean("mean_reward"),
+        "return": weighted_mean("return"),
+        "alive_fraction": 1.0 - terminal_count / max(1, total_envs),
+        "terminal_count": terminal_count,
+        "fall_count": count_total("fall_count"),
+        "invalid_count": count_total("invalid_count"),
+        "reset_count": count_total("reset_count"),
+        "timeout_count": count_total("timeout_count"),
+        "first_terminal_step": min_value("first_terminal_step"),
+        "mean_terminal_step": weighted_mean("mean_terminal_step"),
+        "terminal_env_ids": terminal_env_ids[:32],
+        "terminal_steps": terminal_steps[:32],
+        "mean_forward_displacement": weighted_mean("mean_forward_displacement"),
+        "mean_completed_return": weighted_mean("mean_completed_return"),
+        "unfinished_mean_return": weighted_mean("unfinished_mean_return"),
+        "unfinished_mean_length": weighted_mean("unfinished_mean_length"),
+        "mean_height": weighted_mean("mean_height"),
+        "min_height": min_value("min_height"),
+        "mean_up": weighted_mean("mean_up"),
+        "min_up": min_value("min_up"),
+        "mean_heading": weighted_mean("mean_heading"),
+        "min_heading": min_value("min_heading"),
+        "horizon": chunks[0].get("horizon"),
+        "chunks": chunks,
+    }
 
 
 def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor, torch.Tensor] | None:
@@ -1702,19 +1773,21 @@ class NewtonMuJoCoTorchEnv:
     def invalid_state(self, q: torch.Tensor, qd: torch.Tensor) -> torch.Tensor:
         invalid = torch.logical_or(~torch.isfinite(q).all(dim=-1), ~torch.isfinite(qd).all(dim=-1))
         if self.env_name == "ant":
+            root_disp = q[:, 0:3] - self.start_q[: q.shape[0], 0:3]
             invalid = torch.logical_or(invalid, q[:, 1] > self.ant_max_healthy_height)
-            invalid = torch.logical_or(invalid, q[:, 0].abs() > 100.0)
-            invalid = torch.logical_or(invalid, q[:, 2].abs() > 100.0)
+            invalid = torch.logical_or(invalid, root_disp[:, 0].abs() > 100.0)
+            invalid = torch.logical_or(invalid, root_disp[:, 2].abs() > 100.0)
             invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
         elif is_planar_locomotion_env(self.env_name):
             invalid = torch.logical_or(invalid, q[:, 0].abs() > 100.0)
             invalid = torch.logical_or(invalid, q[:, 1].abs() > 10.0)
             invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
         elif is_contact_target_env(self.env_name):
+            pos_disp = q[:, 0:3] - self.start_q[: q.shape[0], 0:3]
             invalid = torch.logical_or(invalid, q[:, 1] < 0.02)
             invalid = torch.logical_or(invalid, q[:, 1] > 3.0)
-            invalid = torch.logical_or(invalid, q[:, 0].abs() > 20.0)
-            invalid = torch.logical_or(invalid, q[:, 2].abs() > 20.0)
+            invalid = torch.logical_or(invalid, pos_disp[:, 0].abs() > 20.0)
+            invalid = torch.logical_or(invalid, pos_disp[:, 2].abs() > 20.0)
             invalid = torch.logical_or(invalid, qd.abs().amax(dim=-1) > 100.0)
         else:
             invalid = torch.logical_or(invalid, q.abs().amax(dim=-1) > 1000.0)
@@ -3255,6 +3328,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 "selection_up_shortfall": selection_shortfalls["up_shortfall"],
                 "selection_heading_shortfall": selection_shortfalls["heading_shortfall"],
                 "selection_posture_shortfall": selection_shortfalls["posture_shortfall"],
+                "selection_terminal_count": selection_rollout.get("terminal_count"),
                 "selection_fall_count": selection_rollout["fall_count"],
                 "selection_invalid_count": selection_rollout["invalid_count"],
                 "selection_rollout": selection_rollout,
@@ -3302,22 +3376,39 @@ def run_training(args: argparse.Namespace) -> dict:
             out_dir / f"{args.env}_obs_rms.pt",
         )
 
-    rollout = evaluate_policy(
-        selection_env,
-        actor,
-        args.eval_horizon,
-        obs_rms=obs_rms,
-        termination_penalty=args.termination_penalty,
-        stochastic_init=args.eval_stochastic_init,
-    )
-    rollout_uninterrupted = evaluate_policy_uninterrupted(
-        selection_env,
-        actor,
-        args.eval_horizon,
-        obs_rms=obs_rms,
-        termination_penalty=args.termination_penalty,
-        stochastic_init=args.eval_stochastic_init,
-    )
+    final_eval_num_envs = args.final_eval_num_envs or selection_env.num_envs
+    eval_chunk_size = args.eval_chunk_size or final_eval_num_envs
+    use_chunked_final_eval = eval_chunk_size < final_eval_num_envs
+
+    def final_eval_once(*, uninterrupted: bool) -> dict:
+        if use_chunked_final_eval:
+            return evaluate_policy_chunked(
+                lambda n: make_env_from_args(args, n),
+                actor,
+                args.eval_horizon,
+                total_envs=final_eval_num_envs,
+                chunk_size=eval_chunk_size,
+                obs_rms=obs_rms,
+                termination_penalty=args.termination_penalty,
+                stochastic_init=args.eval_stochastic_init,
+                uninterrupted=uninterrupted,
+            )
+        if final_eval_num_envs != selection_env.num_envs:
+            eval_env = make_env_from_args(args, final_eval_num_envs)
+        else:
+            eval_env = selection_env
+        evaluator = evaluate_policy_uninterrupted if uninterrupted else evaluate_policy
+        return evaluator(
+            eval_env,
+            actor,
+            args.eval_horizon,
+            obs_rms=obs_rms,
+            termination_penalty=args.termination_penalty,
+            stochastic_init=args.eval_stochastic_init,
+        )
+
+    rollout = final_eval_once(uninterrupted=False)
+    rollout_uninterrupted = final_eval_once(uninterrupted=True)
 
     def score_rollout(candidate: dict) -> float:
         return rollout_selection_score(
@@ -3342,26 +3433,8 @@ def run_training(args: argparse.Namespace) -> dict:
         repeated_rollouts = [rollout]
         repeated_uninterrupted = [rollout_uninterrupted]
         for _ in range(args.final_eval_repeats - 1):
-            repeated_rollouts.append(
-                evaluate_policy(
-                    selection_env,
-                    actor,
-                    args.eval_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
-                )
-            )
-            repeated_uninterrupted.append(
-                evaluate_policy_uninterrupted(
-                    selection_env,
-                    actor,
-                    args.eval_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
-                )
-            )
+            repeated_rollouts.append(final_eval_once(uninterrupted=False))
+            repeated_uninterrupted.append(final_eval_once(uninterrupted=True))
         eval_repeats = summarize_rollout_repeats(repeated_rollouts, [score_rollout(item) for item in repeated_rollouts])
         eval_uninterrupted_repeats = summarize_rollout_repeats(
             repeated_uninterrupted,
@@ -3524,6 +3597,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_horizon": args.selection_horizon,
         "selection_uninterrupted": args.selection_uninterrupted,
         "final_eval_repeats": args.final_eval_repeats,
+        "final_eval_num_envs": final_eval_num_envs,
+        "eval_chunk_size": eval_chunk_size if use_chunked_final_eval else None,
         "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
@@ -3691,6 +3766,7 @@ def evaluate_policy(
         prev_action = action
     alive_fraction = 1.0 - float(fall_count + invalid_count) / max(1, horizon * env.num_envs)
     return {
+        "num_envs": env.num_envs,
         "mean_reward": float(torch.stack(rewards).mean().cpu()),
         "return": float(torch.stack(rewards).sum().cpu()),
         "alive_fraction": alive_fraction,
@@ -3793,7 +3869,10 @@ def evaluate_policy_uninterrupted(
     fall_count = int(terminal_fall.sum().cpu())
     invalid_count = int(terminal_invalid.sum().cpu())
     terminal_steps = terminal_step[terminal_step >= 0]
+    terminal_ids = (terminal_step >= 0).nonzero(as_tuple=False).squeeze(-1).detach().cpu().tolist()
+    terminal_step_values = terminal_step[terminal_step >= 0].detach().cpu().tolist()
     return {
+        "num_envs": env.num_envs,
         "mean_reward": float(torch.stack(rewards).mean().cpu()) if rewards else 0.0,
         "return": float(torch.stack(rewards).sum().cpu()) if rewards else 0.0,
         "alive_fraction": 1.0 - terminal_count / max(1, env.num_envs),
@@ -3802,6 +3881,8 @@ def evaluate_policy_uninterrupted(
         "invalid_count": invalid_count,
         "first_terminal_step": int(terminal_steps.min().cpu()) if terminal_steps.numel() else None,
         "mean_terminal_step": float(terminal_steps.to(torch.float32).mean().cpu()) if terminal_steps.numel() else None,
+        "terminal_env_ids": [int(item) for item in terminal_ids[:32]],
+        "terminal_steps": [int(item) for item in terminal_step_values[:32]],
         "mean_forward_displacement": float(forward_displacement.mean().detach().cpu()),
         "mean_completed_return": float(episode_returns.mean().detach().cpu()),
         "mean_height": float(torch.stack(height_samples).mean().cpu()) if height_samples else None,
@@ -3812,6 +3893,41 @@ def evaluate_policy_uninterrupted(
         "min_heading": float(torch.stack(heading_mins).min().cpu()) if heading_mins else None,
         "horizon": horizon,
     }
+
+
+@torch.no_grad()
+def evaluate_policy_chunked(
+    env_factory: Callable[[int], NewtonMuJoCoTorchEnv],
+    actor: torch.nn.Module,
+    horizon: int,
+    *,
+    total_envs: int,
+    chunk_size: int,
+    obs_rms: RunningMeanStd | None = None,
+    termination_penalty: float = 0.0,
+    stochastic_init: bool = False,
+    uninterrupted: bool = False,
+) -> dict:
+    chunks: list[dict] = []
+    remaining = int(total_envs)
+    chunk_size = max(1, int(chunk_size))
+    while remaining > 0:
+        current = min(chunk_size, remaining)
+        chunk_env = env_factory(current)
+        evaluator = evaluate_policy_uninterrupted if uninterrupted else evaluate_policy
+        chunks.append(
+            evaluator(
+                chunk_env,
+                actor,
+                horizon,
+                obs_rms=obs_rms,
+                termination_penalty=termination_penalty,
+                stochastic_init=stochastic_init,
+            )
+        )
+        del chunk_env
+        remaining -= current
+    return summarize_rollout_chunks(chunks, total_envs=total_envs, chunk_size=chunk_size)
 
 
 def render_rollout(
@@ -4082,6 +4198,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
     parser.add_argument("--final-eval-repeats", type=int, default=1)
+    parser.add_argument("--final-eval-num-envs", type=int, default=None)
+    parser.add_argument("--eval-chunk-size", type=int, default=None)
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--selection-uninterrupted", action="store_true")
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)

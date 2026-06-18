@@ -29,6 +29,7 @@ from run_newton_shac import (
     HopperRewardWeights,
     NewtonMuJoCoTorchEnv,
     evaluate_policy,
+    evaluate_policy_chunked,
     evaluate_policy_uninterrupted,
     finalize_terminal_reward,
     git_commit_for_imported_module,
@@ -349,6 +350,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
     critic = PPOValue(obs_dim, args.critic_hidden_dims, layer_norm=args.layer_norm).to(env.torch_device)
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
+    if args.actor_logstd_override is not None:
+        with torch.no_grad():
+            actor.log_std.fill_(args.actor_logstd_override)
     if args.critic_path is not None:
         load_critic_checkpoint(critic, args.critic_path, env.torch_device)
     optimizer = torch.optim.Adam(
@@ -645,6 +649,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "selection_up_shortfall": selection_shortfalls.get("up_shortfall"),
             "selection_heading_shortfall": selection_shortfalls.get("heading_shortfall"),
             "selection_posture_shortfall": selection_shortfalls.get("posture_shortfall"),
+            "selection_terminal_count": selection.get("terminal_count") if selection is not None else None,
             "selection_fall_count": selection["fall_count"] if selection is not None else None,
             "selection_invalid_count": selection["invalid_count"] if selection is not None else None,
             "invalid_resets": invalid_count,
@@ -686,22 +691,92 @@ def train_ppo(args: argparse.Namespace) -> dict:
             out_dir / f"{args.env}_ppo_obs_rms.pt",
         )
 
-    rollout = evaluate_policy(
-        selection_env,
-        actor,
-        args.eval_horizon,
-        obs_rms=obs_rms,
-        termination_penalty=args.termination_penalty,
-        stochastic_init=args.eval_stochastic_init,
-    )
-    rollout_uninterrupted = evaluate_policy_uninterrupted(
-        selection_env,
-        actor,
-        args.eval_horizon,
-        obs_rms=obs_rms,
-        termination_penalty=args.termination_penalty,
-        stochastic_init=args.eval_stochastic_init,
-    )
+    final_eval_num_envs = args.final_eval_num_envs or selection_env.num_envs
+    eval_chunk_size = args.eval_chunk_size or final_eval_num_envs
+    use_chunked_final_eval = eval_chunk_size < final_eval_num_envs
+
+    def make_eval_env(num_envs: int) -> NewtonMuJoCoTorchEnv:
+        return NewtonMuJoCoTorchEnv(
+            env_name=args.env,
+            num_envs=num_envs,
+            device=args.device,
+            dt=args.dt,
+            sim_substeps=args.sim_substeps,
+            mujoco_integrator=args.mujoco_integrator,
+            force_scale=args.force_scale,
+            contact_backend=args.contact_backend,
+            ant_asset=args.ant_asset,
+            ant_disable_joint_limits=args.ant_disable_joint_limits,
+            ant_density_override=args.ant_density_override,
+            ant_contact_margin=args.ant_contact_margin,
+            ant_contact_gap=args.ant_contact_gap,
+            ant_contact_mu=args.ant_contact_mu,
+            ant_joint_damping=args.ant_joint_damping,
+            ant_armature=args.ant_armature,
+            ant_min_up=args.ant_min_up,
+            ant_start_height=args.ant_start_height,
+            ant_start_joint_q=args.ant_start_joint_q,
+            ant_reset_position_scale=args.ant_reset_position_scale,
+            ant_reset_angle_scale=args.ant_reset_angle_scale,
+            ant_reset_joint_scale=args.ant_reset_joint_scale,
+            ant_reset_velocity_scale=args.ant_reset_velocity_scale,
+            ant_termination_height=args.ant_termination_height,
+            ant_max_healthy_height=args.ant_max_healthy_height,
+            ant_observation_style=args.ant_observation_style,
+            ant_reward_style=args.ant_reward_style,
+            ant_action_order=args.ant_action_order,
+            ant_reward_min_up=args.ant_reward_min_up,
+            ant_reward_min_height=args.ant_reward_min_height,
+            hopper_reward_style=args.hopper_reward_style,
+            hopper_start_joint_q=args.hopper_start_joint_q,
+            hopper_contact_mu=args.hopper_contact_mu,
+            hopper_joint_damping=args.hopper_joint_damping,
+            hopper_armature=args.hopper_armature,
+            hopper_termination_height=args.hopper_termination_height,
+            hopper_termination_angle=args.hopper_termination_angle,
+            hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+            hopper_reset_position_scale=args.hopper_reset_position_scale,
+            hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+            hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+            hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
+            phase_observation=args.phase_observation,
+            phase_period=args.phase_period,
+            hopper_terminate_angle=args.hopper_terminate_angle,
+            locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
+            ant_reward=env.ant_reward,
+            hopper_reward=env.hopper_reward,
+            cheetah_reward=env.cheetah_reward,
+        )
+
+    def final_eval_once(*, uninterrupted: bool) -> dict:
+        if use_chunked_final_eval:
+            return evaluate_policy_chunked(
+                make_eval_env,
+                actor,
+                args.eval_horizon,
+                total_envs=final_eval_num_envs,
+                chunk_size=eval_chunk_size,
+                obs_rms=obs_rms,
+                termination_penalty=args.termination_penalty,
+                stochastic_init=args.eval_stochastic_init,
+                uninterrupted=uninterrupted,
+            )
+        if final_eval_num_envs != selection_env.num_envs:
+            eval_env = make_eval_env(final_eval_num_envs)
+        else:
+            eval_env = selection_env
+        evaluator = evaluate_policy_uninterrupted if uninterrupted else evaluate_policy
+        return evaluator(
+            eval_env,
+            actor,
+            args.eval_horizon,
+            obs_rms=obs_rms,
+            termination_penalty=args.termination_penalty,
+            stochastic_init=args.eval_stochastic_init,
+        )
+
+    rollout = final_eval_once(uninterrupted=False)
+    rollout_uninterrupted = final_eval_once(uninterrupted=True)
     def score_rollout(candidate: dict) -> float:
         return rollout_selection_score(
             candidate,
@@ -725,26 +800,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         repeated_rollouts = [rollout]
         repeated_uninterrupted = [rollout_uninterrupted]
         for _ in range(args.final_eval_repeats - 1):
-            repeated_rollouts.append(
-                evaluate_policy(
-                    selection_env,
-                    actor,
-                    args.eval_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
-                )
-            )
-            repeated_uninterrupted.append(
-                evaluate_policy_uninterrupted(
-                    selection_env,
-                    actor,
-                    args.eval_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
-                )
-            )
+            repeated_rollouts.append(final_eval_once(uninterrupted=False))
+            repeated_uninterrupted.append(final_eval_once(uninterrupted=True))
         eval_repeats = summarize_rollout_repeats(repeated_rollouts, [score_rollout(item) for item in repeated_rollouts])
         eval_uninterrupted_repeats = summarize_rollout_repeats(
             repeated_uninterrupted,
@@ -858,6 +915,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_repeats": args.selection_repeats,
         "selection_uninterrupted": args.selection_uninterrupted,
         "final_eval_repeats": args.final_eval_repeats,
+        "final_eval_num_envs": final_eval_num_envs,
+        "eval_chunk_size": eval_chunk_size if use_chunked_final_eval else None,
         "lr": args.lr,
         "adaptive_kl": args.adaptive_kl,
         "desired_kl": args.desired_kl,
@@ -876,6 +935,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "critic_hidden_dims": args.critic_hidden_dims,
         "layer_norm": args.layer_norm,
         "initial_log_std": args.initial_log_std,
+        "actor_logstd_override": args.actor_logstd_override,
         "action_squash": args.action_squash,
         "hopper_reward": env.hopper_reward.__dict__ if args.env == "hopper" else None,
         "hopper_terminate_angle": env.hopper_terminate_angle if args.env == "hopper" else None,
@@ -962,6 +1022,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-layer-norm", dest="layer_norm", action="store_false")
     parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
     parser.add_argument("--initial-log-std", type=float, default=-0.5)
+    parser.add_argument("--actor-logstd-override", type=float, default=None)
     parser.add_argument("--eval-horizon", type=int, default=None)
     parser.add_argument("--eval-interval", type=int, default=5)
     parser.add_argument("--episode-length", type=int, default=None)
@@ -1067,6 +1128,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--selection-uninterrupted", action="store_true")
     parser.add_argument("--final-eval-repeats", type=int, default=1)
+    parser.add_argument("--final-eval-num-envs", type=int, default=None)
+    parser.add_argument("--eval-chunk-size", type=int, default=None)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--render-video", action="store_true")
