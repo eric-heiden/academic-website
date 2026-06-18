@@ -693,6 +693,7 @@ class NewtonMuJoCoTorchEnv:
         ant_max_healthy_height: float = ANT_MAX_HEALTHY_HEIGHT,
         ant_observation_style: str | None = None,
         ant_reward_style: str | None = None,
+        ant_dof_limit_mode: str = "abs",
         ant_action_order: str = "joint",
         ant_smooth_up_reward: bool = False,
         ant_reward_min_up: float | None = None,
@@ -776,6 +777,9 @@ class NewtonMuJoCoTorchEnv:
         self.ant_max_healthy_height = ant_max_healthy_height
         self.ant_observation_style = ant_observation_style
         self.ant_reward_style = ant_reward_style
+        if ant_dof_limit_mode not in {"abs", "upper"}:
+            raise ValueError("ant_dof_limit_mode must be 'abs' or 'upper'")
+        self.ant_dof_limit_mode = ant_dof_limit_mode
         self.ant_action_order = ant_action_order
         self.ant_smooth_up_reward = ant_smooth_up_reward
         self.ant_reward_min_up = ant_reward_min_up
@@ -1736,7 +1740,10 @@ class NewtonMuJoCoTorchEnv:
                 action_dof_vel = qd[:, self.ant_actuator_dof_indices]
             actions_cost = action.square().sum(dim=-1)
             energy_cost = torch.abs(action * action_dof_vel * weights.dof_vel_scale).sum(dim=-1)
-            dof_limit_cost = (dof_pos_scaled.abs() > 0.98).to(torch.float32).sum(dim=-1)
+            if self.ant_dof_limit_mode == "upper":
+                dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
+            else:
+                dof_limit_cost = (dof_pos_scaled.abs() > 0.98).to(torch.float32).sum(dim=-1)
             height_term: torch.Tensor | float = 0.0
             if self.ant_reward_style in {"isaac", "isaaclab_potential_height", "isaac_heading_gated"}:
                 height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
@@ -2439,6 +2446,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
+        ant_dof_limit_mode=args.ant_dof_limit_mode,
         ant_action_order=args.ant_action_order,
         ant_smooth_up_reward=args.ant_smooth_up_reward,
         ant_reward_min_up=args.ant_reward_min_up,
@@ -3632,6 +3640,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_max_healthy_height=args.ant_max_healthy_height,
                 ant_observation_style=args.ant_observation_style,
                 ant_reward_style=args.ant_reward_style,
+                ant_dof_limit_mode=args.ant_dof_limit_mode,
                 ant_action_order=args.ant_action_order,
                 ant_smooth_up_reward=args.ant_smooth_up_reward,
                 ant_reward_min_up=args.ant_reward_min_up,
@@ -3811,6 +3820,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
+        "ant_dof_limit_mode": env.ant_dof_limit_mode if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "ant_smooth_up_reward": env.ant_smooth_up_reward if args.env == "ant" else None,
         "ant_reward_min_up": env.ant_reward_min_up if args.env == "ant" else None,
@@ -4452,6 +4462,7 @@ def parse_args() -> argparse.Namespace:
         choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
         default=None,
     )
+    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default="abs")
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--ant-smooth-up-reward", action="store_true")
     parser.add_argument("--ant-reward-min-up", type=float, default=None)

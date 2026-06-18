@@ -318,7 +318,9 @@
           state/action derivatives still match finite differences at 2.1e-3 mean relative error, but policy gradients degrade
           to 8.6e-1 with hard MuJoCo contacts, 3.5e-1 with Newton contacts, and 1.2e-1 with contact disabled. Tiny H=8
           line-search steps can improve a 1024-world selector once, but repeated audits expose rare falls at the same scale,
-          so no new Ant SHAC update is promoted. Newton contacts are not a drop-in forward fix for the saved actor: one
+          so no new Ant SHAC update is promoted. Replaying the same H=8 direction with exact IsaacLab upper-only joint-limit
+          penalties gives a less destructive sweep than the two-sided limit penalty, but the nominal 1e-7 step still fails
+          a repeat audit and is kept as a diagnostic. Newton contacts are not a drop-in forward fix for the saved actor: one
           replay found 2/1024 terminal worlds and a direct Newton-contact H=8 line search selected step 0, with every
           nonzero step producing at least one terminal. The no-contact negative control terminates all 1024 worlds. The
           newest morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
@@ -441,7 +443,9 @@
           hard-contact update probes rejected Adam, SGD, H=8, H=16, H=32, and final-layer-only candidates from the 0.825
           scaled actor because the 960-step selector slowed down or found a terminal. A new direct H=8 gradient line search
           around the 31 m actor found that steps as small as 1e-7 can improve one strict 1024-world selector, while 1e-6
-          already creates a rare fall and rerunning 1e-7 can also produce one terminal world. The remaining failure is
+          already creates a rare fall and rerunning 1e-7 can also produce one terminal world. An exact IsaacLab upper-only
+          joint-limit penalty makes the same direction look less brittle in one sweep, but a repeat at 1e-7 still terminates
+          one world, so the two-sided limit cost is not the sole cause. The remaining failure is
           therefore not a single reset-state AD bug; it is long-horizon contact-rich Ant optimization near grazing
           active-set boundaries, where the reliable step size is narrower than the contact-branch noise.
         </p>
@@ -544,6 +548,12 @@
               <td>1e-7 best in one 1024-world sweep</td>
               <td>not repeat-safe</td>
               <td>1e-6 produces a terminal world; rerunning 1e-7 can also produce a rare terminal, so no candidate is promoted.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, upper-only limit H=8 line search</td>
+              <td>1e-7 best in one sweep</td>
+              <td>not repeat-safe</td>
+              <td>Exact IsaacLab limit semantics reduce the immediate penalty cliff in one sweep, but a repeated 1e-7 audit still found one terminal world.</td>
             </tr>
             <tr>
               <td>Ant 31 m actor, Newton-contact forward replay</td>
@@ -744,6 +754,10 @@
       <div class="panel">
         <h2>Solver Drilldown</h2>
         <div id="solver-chart" class="chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Ant H=8 Line Search</h2>
+        <div id="ant-linesearch-chart" class="chart"></div>
       </div>
     </section>
 
@@ -2885,6 +2899,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antNewtonContactEval: "assets/ant_shac_31m_contact_backend_eval_newton_run1/ant_linesearch.json",
       antNoContactEval: "assets/ant_shac_31m_contact_backend_eval_none_run1/ant_linesearch.json",
       antNewtonContactLineSearch: "assets/ant_shac_31m_newton_contact_linesearch_h8_run1/ant_linesearch.json",
+      antUpperLimitLineSearch: "assets/ant_shac_31m_upperlimit_linesearch_h8_run1/ant_linesearch.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json",
       planarBranch: "assets/solver_gradient_diagnostics_planar_branch_level_kinematics_run1/solver_gradient_diagnostics.json",
@@ -3249,7 +3264,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antGradDirectionLineSearch,
         antNewtonContactEval,
         antNoContactEval,
-        antNewtonContactLineSearch
+        antNewtonContactLineSearch,
+        antUpperLimitLineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3262,7 +3278,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antGradDirectionLineSearch),
         safeJson(diagPaths.antNewtonContactEval),
         safeJson(diagPaths.antNoContactEval),
-        safeJson(diagPaths.antNewtonContactLineSearch)
+        safeJson(diagPaths.antNewtonContactLineSearch),
+        safeJson(diagPaths.antUpperLimitLineSearch)
       ]);
 
       const stable = presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
@@ -3350,6 +3367,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNewtonContactEval?.timestamp_pacific,
         antNoContactEval?.timestamp_pacific,
         antNewtonContactLineSearch?.timestamp_pacific,
+        antUpperLimitLineSearch?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,
@@ -3666,6 +3684,58 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         xaxis: { ...baseLayout.xaxis, title: "", type: "category", tickangle: -25 },
         yaxis: { ...baseLayout.yaxis, title: "Best median relative error", type: "log" },
         margin: { t: 18, r: 18, b: 112, l: 68 }
+      });
+
+      function lineSearchSeries(data, label, color) {
+        const rows = data?.candidates || [];
+        const x = rows.map((row) => `${Number(row.step).toExponential(0)}`);
+        const hover = rows.map((row) => {
+          const rollout = row.rollout || {};
+          return [
+            `${label}`,
+            `step ${row.step}`,
+            `score ${fmt(row.score, 1)}`,
+            `dx ${fmt(rollout.mean_forward_displacement, 2)} m`,
+            `terminals ${fmt(rollout.terminal_count, 0)}`,
+            `max |q| scaled ${fmt(rollout.max_abs_joint_pos_scaled, 2)}`
+          ].join("<br>");
+        });
+        return [
+          {
+            type: "scatter",
+            mode: "lines+markers",
+            name: `${label} score`,
+            x,
+            y: rows.map((row) => row.score),
+            text: hover,
+            hovertemplate: "%{text}<extra></extra>",
+            marker: { color, size: 8 },
+            line: { color, width: 2 }
+          },
+          {
+            type: "bar",
+            name: `${label} terminals`,
+            x,
+            y: rows.map((row) => row.rollout?.terminal_count ?? null),
+            yaxis: "y2",
+            marker: { color, opacity: 0.28 },
+            hovertemplate: `${label}<br>step %{x}<br>terminals %{y}<extra></extra>`
+          }
+        ];
+      }
+
+      plotOrMessage("ant-linesearch-chart", [
+        ...lineSearchSeries(antGradDirectionLineSearch, "MuJoCo hard", colors.coral),
+        ...lineSearchSeries(antNewtonContactLineSearch, "Newton contacts", colors.teal),
+        ...lineSearchSeries(antUpperLimitLineSearch, "upper-limit reward", colors.violet)
+      ], {
+        ...baseLayout,
+        barmode: "group",
+        xaxis: { ...baseLayout.xaxis, title: "Step along -SHAC gradient", type: "category" },
+        yaxis: { ...baseLayout.yaxis, title: "Selector score" },
+        yaxis2: { title: "Terminal worlds", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false },
+        legend: { orientation: "h", y: -0.34 },
+        margin: { t: 18, r: 64, b: 84, l: 72 }
       });
 
       const componentNames = ["root_quat_q_normalized", "joint_q", "root_qd", "joint_qd"];

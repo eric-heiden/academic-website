@@ -113,6 +113,7 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_max_healthy_height=float(result.get("ant_max_healthy_height") or 1.5),
         ant_observation_style=result.get("ant_observation_style") or "diffrl",
         ant_reward_style=result.get("ant_reward_style") or "diffrl",
+        ant_dof_limit_mode=result.get("ant_dof_limit_mode") or "abs",
         ant_action_order=result.get("ant_action_order") or "joint",
         hopper_reward_style=result.get("hopper_reward_style") or "diffrl",
         hopper_start_joint_q=result.get("hopper_start_joint_q"),

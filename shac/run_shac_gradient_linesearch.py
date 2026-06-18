@@ -98,6 +98,7 @@ def main() -> None:
     parser.add_argument("--eval-stochastic-init", action="store_true")
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)
+    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=None)
     parser.add_argument("--selection-invalid-penalty", type=float, default=None)
     parser.add_argument("--selection-displacement-weight", type=float, default=None)
@@ -122,6 +123,9 @@ def main() -> None:
     if args.mujoco_smooth_adjoint is not None:
         result["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
         overrides["mujoco_smooth_adjoint"] = args.mujoco_smooth_adjoint
+    if args.ant_dof_limit_mode is not None:
+        result["ant_dof_limit_mode"] = args.ant_dof_limit_mode
+        overrides["ant_dof_limit_mode"] = args.ant_dof_limit_mode
     if args.eval_horizon is None:
         args.eval_horizon = int(result.get("selection_horizon") or result.get("eval_horizon") or 480)
 
@@ -202,6 +206,8 @@ def main() -> None:
             flush=True,
         )
 
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+
     best = max(candidates, key=lambda item: item["score"]) if candidates else None
     if args.save_best_actor and best is not None:
         actor.load_state_dict(base_state)
@@ -244,7 +250,6 @@ def main() -> None:
         "candidates": candidates,
         "total_seconds": time.perf_counter() - t0,
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
     write_json(args.out, output)
     print(f"wrote {args.out}")
 
