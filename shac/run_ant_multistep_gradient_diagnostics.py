@@ -415,6 +415,7 @@ def run(args: argparse.Namespace) -> dict:
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_density_override=args.ant_density_override,
         ant_joint_damping=args.ant_joint_damping,
+        ant_armature=args.ant_armature,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
         ant_reset_position_scale=args.ant_reset_position_scale,
@@ -422,8 +423,10 @@ def run(args: argparse.Namespace) -> dict:
         ant_reset_joint_scale=args.ant_reset_joint_scale,
         ant_reset_velocity_scale=args.ant_reset_velocity_scale,
         ant_termination_height=args.ant_termination_height,
+        ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
+        ant_dof_limit_mode=args.ant_dof_limit_mode,
         ant_action_order=args.ant_action_order,
         mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
         mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
@@ -479,6 +482,13 @@ def run(args: argparse.Namespace) -> dict:
         "ant_contact_gap": args.ant_contact_gap,
         "ant_disable_joint_limits": args.ant_disable_joint_limits,
         "ant_density_override": args.ant_density_override,
+        "ant_joint_damping": args.ant_joint_damping,
+        "ant_armature": args.ant_armature,
+        "ant_max_healthy_height": args.ant_max_healthy_height,
+        "ant_dof_limit_mode": args.ant_dof_limit_mode,
+        "ant_observation_style": args.ant_observation_style,
+        "ant_reward_style": args.ant_reward_style,
+        "ant_action_order": args.ant_action_order,
         "ant_reset_position_scale": args.ant_reset_position_scale,
         "ant_reset_angle_scale": args.ant_reset_angle_scale,
         "ant_reset_joint_scale": args.ant_reset_joint_scale,
@@ -552,6 +562,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
     parser.add_argument("--ant-density-override", type=float, default=None)
     parser.add_argument("--ant-joint-damping", type=float, default=0.1)
+    parser.add_argument("--ant-armature", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=0.5)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=(0, 0.785398, 0, -0.785398, 0, -0.785398, 0, 0.785398))
     parser.add_argument("--ant-reset-position-scale", type=float, default=0.1)
@@ -559,12 +570,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-reset-joint-scale", type=float, default=0.2)
     parser.add_argument("--ant-reset-velocity-scale", type=float, default=0.25)
     parser.add_argument("--ant-termination-height", type=float, default=0.31)
+    parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
     parser.add_argument("--ant-observation-style", choices=["isaac", "diffrl"], default="isaac")
     parser.add_argument(
         "--ant-reward-style",
         choices=["isaac", "isaaclab", "isaac_heading_gated", "diffrl"],
         default="isaac",
     )
+    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default="abs")
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     return parser.parse_args()
 
