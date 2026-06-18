@@ -732,6 +732,10 @@
         <h2>Ant PPO Action Delta</h2>
         <div id="ant-action-delta-chart" class="chart"></div>
       </article>
+      <article class="panel">
+        <h2>Ant Torque Scale Replay</h2>
+        <div id="ant-force-scale-chart" class="chart"></div>
+      </article>
     </section>
 
     <section class="grid two">
@@ -3070,6 +3074,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       cartpole: "assets/cartpole_results.json",
       antActionPerturb: "assets/ant_ppo_nv_action_perturb_sweep_run1/action_perturb_sweep.json",
       antActionDelta: "assets/ant_ppo_nv_action_delta_probe_run1/action_delta_probe.json",
+      antForceScale: "assets/ant_ppo_nv_force_scale_eval_sweep_run1/force_scale_sweep.json",
       acrobot: "assets/acrobot_both_gradcheck_current_run1/acrobot_gradient_check.json",
       contactSphereNoContact: "assets/contact_sphere_nocontact_gradcheck_force500_after_applyft_run1/contact_sphere_gradient_check.json",
       contactSphere: "assets/contact_sphere_gradcheck_after_cinert_record_run1/contact_sphere_gradient_check.json",
@@ -3391,6 +3396,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         cartpole,
         antActionPerturb,
         antActionDelta,
+        antForceScale,
         acrobot,
         contactSphereNoContact,
         contactSphere,
@@ -3449,6 +3455,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.cartpole),
         safeJson(diagPaths.antActionPerturb),
         safeJson(diagPaths.antActionDelta),
+        safeJson(diagPaths.antForceScale),
         safeJson(diagPaths.acrobot),
         safeJson(diagPaths.contactSphereNoContact),
         safeJson(diagPaths.contactSphere),
@@ -3650,6 +3657,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNvActuatorH16NoContactEval?.timestamp_pacific,
         antActionPerturb?.timestamp_pacific,
         antActionDelta?.timestamp_pacific,
+        antForceScale?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,
@@ -4077,6 +4085,32 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         yaxis: { ...baseLayout.yaxis, title: "Mean abs action delta" },
         yaxis2: { title: "Max abs delta", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false },
         margin: { t: 18, r: 72, b: 92, l: 68 }
+      });
+
+      const forceRows = antForceScale?.rows || [];
+      plotOrMessage("ant-force-scale-chart", [
+        {
+          type: "scatter",
+          mode: "lines+markers",
+          name: "displacement",
+          x: forceRows.map((row) => row.force_scale),
+          y: forceRows.map((row) => row.rollout?.mean_forward_displacement ?? null),
+          marker: { color: colors.green, size: 9 },
+          line: { color: colors.green, width: 2 }
+        },
+        {
+          type: "bar",
+          name: "terminal worlds",
+          x: forceRows.map((row) => row.force_scale),
+          y: forceRows.map((row) => row.rollout?.terminal_count ?? null),
+          yaxis: "y2",
+          marker: { color: colors.coral }
+        }
+      ], {
+        ...baseLayout,
+        xaxis: { ...baseLayout.xaxis, title: "Force scale" },
+        yaxis: { ...baseLayout.yaxis, title: "Displacement (m)" },
+        yaxis2: { title: "Terminal worlds", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false }
       });
 
       function lineSearchSeries(data, label, color) {
