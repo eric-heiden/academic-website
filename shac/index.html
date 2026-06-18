@@ -309,8 +309,11 @@
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
-          and Newton MJCF per-DOF joint-anchor preservation. Reset-state one-step gradients are now clean; the remaining
-          gradient mismatch appears in multi-step grazing contacts, especially Ant foot contacts over H=8/H=16 horizons.
+          and Newton MJCF per-DOF joint-anchor preservation. Reset-state one-step gradients are now clean. A new
+          finite-difference pass around the strict scaled Ant actor shows H=1/H=4 policy gradients are accurate and H=8
+          remains sign-consistent, while guarded SHAC updates reveal the current blocker: the local differentiable objective
+          can still propose steps that reduce the 960-step no-reset selector. The runner now supports selection-guarded
+          rollback and SGD updates for this diagnosis.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -420,9 +423,12 @@
           fall gate so 0-fall checkpoints beat slightly faster late-fall checkpoints. Ant additionally needed the corrected
           potential-progress timestep, action clamping, IsaacLab-style bounded effort, and no-reset selection to avoid
           reporting reset-spliced reliability.
-          The latest fixed-action checks explain the SHAC side of the pattern: reset-state one-step gradients are clean, but
-          H=8/H=16 Ant rollouts enter grazing foot contacts where contact-position and orientation derivatives diverge from
-          finite differences.
+          The latest scaled-actor finite-difference checks sharpen the SHAC diagnosis: one-step action error is 5.4e-3,
+          one-step state/action error is 1.8e-2, and H=1/H=4 policy gradients stay at 3.9e-3/2.8e-2 mean relative error.
+          H=8 policy directions remain sign-consistent but noisier at 1.36e-1 mean relative error. Guarded update probes
+          then rejected every Adam, SGD, H=8, and H=16 candidate from the 0.825 scaled actor because the 960-step selector
+          slowed down or found a terminal. The remaining failure is therefore not a single reset-state AD bug; it is the
+          mismatch between short differentiable Ant objectives and the long reliability selector.
         </p>
       </article>
     </section>
@@ -469,6 +475,24 @@
               <td>8.1e-5</td>
               <td>1.00</td>
               <td>H=5 state/action derivatives remain clean after the RNE <code>qfrc_bias</code> fix.</td>
+            </tr>
+            <tr>
+              <td>Ant scaled reliable actor, policy H=1</td>
+              <td>3.9e-3 mean rel.</td>
+              <td>1.00</td>
+              <td>Finite differences around the strict 0.825 actor validate the local policy gradient.</td>
+            </tr>
+            <tr>
+              <td>Ant scaled reliable actor, policy H=8</td>
+              <td>1.36e-1 mean rel.</td>
+              <td>1.00</td>
+              <td>Longer local rollouts are noisier but still sign-consistent; rejected updates come from objective horizon mismatch.</td>
+            </tr>
+            <tr>
+              <td>Ant scaled actor, guarded SHAC updates</td>
+              <td>0 / 22 accepted</td>
+              <td>n/a</td>
+              <td>Adam, SGD, H=8, and H=16 probes all reduced the 960-step selector or hit a terminal, then rolled back.</td>
             </tr>
             <tr>
               <td>Ant policy H=5, margin 0.002</td>
@@ -811,9 +835,13 @@
           then uses late-state SHAC warmups to train directly from 640-step PPO states. That selected a 30 m checkpoint with
           0 terminals in a 3 x 1024-world selector, but the promoted 5 x 1024 audit still found 1 late failure. Stricter
           five-repeat selection, explicit <code>min_up</code> termination, action scaling, and tanh evaluation did not remove
-          that last rare contact failure.
-          The current headline therefore stays cautious: Ant can now move fast under SHAC, but the best 960-step policy is
-          still a near miss rather than a reliable gait.
+          that last rare contact failure. The latest deterministic SHAC-wrapper check reproduces the strict scaled policy
+          cleanly: 21.03 m mean displacement, 0 terminal worlds, and worst minimum-up 0.869 over three 1024-world no-reset
+          repeats. The new selection guard then rolls back candidate updates that fail the long selector. This prevents
+          regression, but it also exposed the current blocker: 22 completed guarded candidates from the scaled actor were
+          all rejected, including Adam H=8, SGD H=16, and no-anchor/no-survival H=16 probes. The current headline therefore
+          stays cautious: Ant has a strict reliable scaled SHAC policy, but direct SHAC improvement from that policy still
+          needs a longer-horizon or better-aligned objective.
         </p>
       </article>
       <article class="panel warn">
@@ -1119,7 +1147,11 @@
           current compromise: the selector found a zero-fall 30.08 m checkpoint over 3 x 1024 worlds, and the 5 x 1024
           promotion audit moved 30.04 m over 960 steps with only 1 terminal world. That improves the speed target, but the
           single terminal kept the high-speed reliability target open; the scaled 21.02 m policy closes the strict
-          reliability check but leaves the speed/robustness tradeoff as the next target.
+          reliability check but leaves the speed/robustness tradeoff as the next target. The newest guarded-update probes
+          make that tradeoff explicit: deterministic SHAC evaluation of the scaled actor is clean, but every attempted local
+          SHAC update either slows the 960-step selector or introduces a fall. The report runner now records
+          <code>selection_update_accepted</code> and rolls back rejected candidates, so future Ant runs can search without
+          silently drifting away from the reliable checkpoint.
         </p>
       </article>
       <article class="panel">
@@ -1773,13 +1805,15 @@
           headline result.
           The remaining problem is qualitative and algorithmic: Hopper SHAC needed the start-pose active-set fix and a much
           stronger fall gate before it became reliable, while Ant SHAC now needs a long-horizon update that improves the
-          bounded-action PPO gait without exploiting a fragile contact branch. Contact finite differences still degrade once
-          Ant feet sit on grazing active-set boundaries. The missing piece is now a curriculum/objective that preserves more
-          natural height and heading while increasing progress, plus a contact adjoint or smoothing strategy that remains
-          useful across long horizons and active-set boundaries. The current no-reset matrix is Cheetah SHAC at 10.41 m,
-          Hopper SHAC at 13.65 m, and Ant SHAC at 15.39 m under the clipped-action contract; the open target is improving
-          the Ant gait beyond low-clearance crawling while preserving the zero-terminal repeated audits. It no longer looks
-          like a single RNE mass/bias cancellation bug.
+          bounded-action gait without exploiting a fragile contact branch. Contact finite differences still degrade once Ant
+          feet sit on grazing active-set boundaries, but the strict scaled actor also shows that local derivatives can be
+          sign-consistent while candidate updates remain bad for 960-step reliability. Adam was not the whole explanation:
+          guarded SGD probes also rolled back every H=16 candidate, and removing anchor/survival shaping made candidates
+          less reliable rather than faster. The missing piece is now a curriculum/objective that preserves more natural
+          height and heading while increasing progress, plus a contact adjoint or smoothing strategy that remains useful
+          across long horizons and active-set boundaries. The current no-reset matrix is Cheetah SHAC at 10.41 m, Hopper
+          SHAC at 13.65 m, and strict scaled Ant SHAC at 21.02 m; the open target is recovering more of the 30 m Ant gait
+          while preserving the zero-terminal repeated audits. It no longer looks like a single RNE mass/bias cancellation bug.
         </p>
       </article>
     </section>
@@ -2166,6 +2200,30 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC scaled 0.825 strict",
         path: "assets/ant_shac_scaled0825_strict_5rep_render_run1/ant_ppo_results.json",
         color: colors.teal
+      },
+      {
+        id: "antShacScaled0825RunnerCheck",
+        label: "Ant SHAC scaled wrapper check",
+        path: "assets/ant_shac_scaled0825_runner_check_det_run1/ant_results.json",
+        color: colors.green
+      },
+      {
+        id: "antShacGuardedAdamH8",
+        label: "Ant SHAC guarded Adam H=8",
+        path: "assets/ant_shac_guarded_det_from_scaled0825_h8_8env_12ep_probe_run1/ant_results.json",
+        color: colors.violet
+      },
+      {
+        id: "antShacGuardedSgdH16",
+        label: "Ant SHAC guarded SGD H=16",
+        path: "assets/ant_shac_guarded_sgd_det_from_scaled0825_h16_8env_4ep_probe_run1/ant_results.json",
+        color: colors.coral
+      },
+      {
+        id: "antShacGuardedSgdH16NoAnchor",
+        label: "Ant SHAC guarded SGD no anchor",
+        path: "assets/ant_shac_guarded_sgd_det_from_scaled0825_h16_noanchor_8env_6ep_probe_run1/ant_results.json",
+        color: colors.amber
       },
       {
         id: "antShacClippedH16Strict",
@@ -2689,6 +2747,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antH5Margin: "assets/ant_mujoco_gradcheck_h5_after_cinert_record_forced_run1/ant_gradient_check.json",
       antH8Margin: "assets/ant_mujoco_gradcheck_h8_after_cinert_record_forced_run1/ant_gradient_check.json",
       antH8NoMargin: "assets/ant_mujoco_gradcheck_after_contact_fix_run1/ant_gradient_check.json",
+      antScaledH1: "assets/ant_gradcheck_scaled0825_strict_h1_run1/ant_gradient_check.json",
+      antScaledH2: "assets/ant_gradcheck_scaled0825_strict_h2_run1/ant_gradient_check.json",
+      antScaledH4: "assets/ant_gradcheck_scaled0825_strict_h4_run1/ant_gradient_check.json",
+      antScaledH8: "assets/ant_gradcheck_scaled0825_strict_h8_run1/ant_gradient_check.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json",
       planarBranch: "assets/solver_gradient_diagnostics_planar_branch_level_kinematics_run1/solver_gradient_diagnostics.json",
@@ -2944,6 +3006,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antH5Margin,
         antH8Margin,
         antH8NoMargin,
+        antScaledH1,
+        antScaledH2,
+        antScaledH4,
+        antScaledH8,
         contactSphereTrain,
         contactCapsuleTrain,
         planarBranch,
@@ -2996,6 +3062,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antH5Margin),
         safeJson(diagPaths.antH8Margin),
         safeJson(diagPaths.antH8NoMargin),
+        safeJson(diagPaths.antScaledH1),
+        safeJson(diagPaths.antScaledH2),
+        safeJson(diagPaths.antScaledH4),
+        safeJson(diagPaths.antScaledH8),
         safeJson(diagPaths.contactSphereTrain),
         safeJson(diagPaths.contactCapsuleTrain),
         safeJson(diagPaths.planarBranch),
@@ -3100,6 +3170,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antH2Cinert?.timestamp_pacific,
         antH8Margin?.timestamp_pacific,
         antH5Margin?.timestamp_pacific,
+        antScaledH1?.timestamp_pacific,
+        antScaledH2?.timestamp_pacific,
+        antScaledH4?.timestamp_pacific,
+        antScaledH8?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,
@@ -3366,6 +3440,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Ant H=5 margin + cinert", bestSweep(antH5Margin?.policy)],
         ["Ant H=8 margin + cinert", bestSweep(antH8Margin?.policy)],
         ["Ant H=8 no margin", bestSweep(antH8NoMargin?.policy)],
+        ["Ant scaled actor H=1 policy", bestSweep(antScaledH1?.policy, "mean_relative_error")],
+        ["Ant scaled actor H=2 policy", bestSweep(antScaledH2?.policy, "mean_relative_error")],
+        ["Ant scaled actor H=4 policy", bestSweep(antScaledH4?.policy, "mean_relative_error")],
+        ["Ant scaled actor H=8 policy", bestSweep(antScaledH8?.policy, "mean_relative_error")],
+        ["Ant scaled actor one-step action", bestSweep(antScaledH1?.one_step_action, "mean_relative_error")],
+        ["Ant scaled actor one-step state", bestSweep(antScaledH1?.one_step_state_action, "mean_relative_error")],
         ["Ant local H=8 MuJoCo actions", bestSweep(antLocalH8Mujoco?.fixed_action_sequence)],
         ["Ant local H=8 Newton actions", bestSweep(antLocalH8Newton?.fixed_action_sequence)],
         ["Ant local H=8 no-contact actions", bestSweep(antLocalH8NoContact?.fixed_action_sequence)],

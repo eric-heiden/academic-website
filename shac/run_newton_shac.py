@@ -1982,6 +1982,36 @@ def obs_rms_snapshot(obs_rms: RunningMeanStd | None) -> tuple[torch.Tensor, torc
     return obs_rms.mean.clone(), obs_rms.var.clone()
 
 
+def clone_module_state(module: torch.nn.Module | None) -> dict[str, torch.Tensor] | None:
+    if module is None:
+        return None
+    return {name: value.detach().clone() for name, value in module.state_dict().items()}
+
+
+def clone_optimizer_state(optimizer: torch.optim.Optimizer | None) -> dict[str, Any] | None:
+    if optimizer is None:
+        return None
+    return copy.deepcopy(optimizer.state_dict())
+
+
+def clone_obs_rms_state(obs_rms: RunningMeanStd | None) -> dict[str, Any] | None:
+    if obs_rms is None:
+        return None
+    return {
+        "mean": obs_rms.mean.detach().clone(),
+        "var": obs_rms.var.detach().clone(),
+        "count": obs_rms.count,
+    }
+
+
+def restore_obs_rms_state(obs_rms: RunningMeanStd | None, state: dict[str, Any] | None) -> None:
+    if obs_rms is None or state is None:
+        return
+    obs_rms.mean = state["mean"].detach().clone()
+    obs_rms.var = state["var"].detach().clone()
+    obs_rms.count = state["count"]
+
+
 def normalize_obs(obs: torch.Tensor, stats: tuple[torch.Tensor, torch.Tensor] | RunningMeanStd | None) -> torch.Tensor:
     if stats is None:
         return obs
@@ -2911,7 +2941,10 @@ def run_training(args: argparse.Namespace) -> dict:
         for param in anchor_actor.parameters():
             param.requires_grad_(False)
     adam_betas = (args.adam_beta1, args.adam_beta2)
-    optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
+    if args.optimizer == "sgd":
+        optimizer = torch.optim.SGD(actor.parameters(), lr=args.lr, momentum=args.sgd_momentum)
+    else:
+        optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
     critic = None
     target_critic = None
     critic_optimizer = None
@@ -2920,7 +2953,10 @@ def run_training(args: argparse.Namespace) -> dict:
         target_critic = copy.deepcopy(critic)
         for param in target_critic.parameters():
             param.requires_grad_(False)
-        critic_optimizer = torch.optim.Adam(critic.parameters(), lr=args.critic_lr, betas=adam_betas)
+        if args.optimizer == "sgd":
+            critic_optimizer = torch.optim.SGD(critic.parameters(), lr=args.critic_lr, momentum=args.sgd_momentum)
+        else:
+            critic_optimizer = torch.optim.Adam(critic.parameters(), lr=args.critic_lr, betas=adam_betas)
     obs_rms = RunningMeanStd(shape=(env.num_obs,), device=env.torch_device) if args.obs_rms else None
     if obs_rms is not None and args.obs_rms_path is not None:
         obs_data = torch.load(args.obs_rms_path, map_location=env.torch_device)
@@ -3002,19 +3038,16 @@ def run_training(args: argparse.Namespace) -> dict:
     initial_selection_rollout, initial_selection_score, _ = selection_evaluation()
     best_eval_return = initial_selection_rollout["return"]
     best_eval_score = initial_selection_score
-    best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+    accepted_selection_score = initial_selection_score
+    best_state = clone_module_state(actor)
     torch.save(best_state, out_dir / f"{args.env}_best_actor.pt")
     if critic is not None:
         torch.save(
-            {name: value.detach().clone() for name, value in critic.state_dict().items()},
+            clone_module_state(critic),
             out_dir / f"{args.env}_best_critic.pt",
         )
     if obs_rms is not None:
-        best_obs_rms = {
-            "mean": obs_rms.mean.detach().clone(),
-            "var": obs_rms.var.detach().clone(),
-            "count": obs_rms.count,
-        }
+        best_obs_rms = clone_obs_rms_state(obs_rms)
         torch.save(best_obs_rms, out_dir / f"{args.env}_best_obs_rms.pt")
     write_json(
         live_history_path,
@@ -3050,6 +3083,22 @@ def run_training(args: argparse.Namespace) -> dict:
             if critic_optimizer is not None:
                 for param_group in critic_optimizer.param_groups:
                     param_group["lr"] = critic_lr
+
+        guard_actor_state = clone_module_state(actor) if args.selection_guard_updates else None
+        guard_optimizer_state = clone_optimizer_state(optimizer) if args.selection_guard_updates else None
+        guard_critic_state = clone_module_state(critic) if args.selection_guard_updates else None
+        guard_critic_optimizer_state = (
+            clone_optimizer_state(critic_optimizer) if args.selection_guard_updates else None
+        )
+        guard_obs_rms_state = clone_obs_rms_state(obs_rms) if args.selection_guard_updates else None
+        guard_reference_score = accepted_selection_score
+        guard_acceptance_threshold = (
+            accepted_selection_score - args.selection_guard_max_score_drop
+            if args.selection_guard_updates
+            else None
+        )
+        update_accepted = True
+        update_rolled_back = False
 
         if args.reset_each_epoch:
             q, qd = env.reset(noise=args.reset_noise, stochastic_init=args.stochastic_init)
@@ -3275,24 +3324,37 @@ def run_training(args: argparse.Namespace) -> dict:
                 min_up=args.selection_min_up,
                 min_heading=args.selection_min_heading,
             )
-        if selection_evaluated and selection_score > best_eval_score:
+        if args.selection_guard_updates and selection_evaluated:
+            assert guard_acceptance_threshold is not None
+            update_accepted = selection_score >= guard_acceptance_threshold
+            if update_accepted:
+                accepted_selection_score = selection_score
+            else:
+                update_rolled_back = True
+                assert guard_actor_state is not None
+                assert guard_optimizer_state is not None
+                actor.load_state_dict(guard_actor_state)
+                optimizer.load_state_dict(guard_optimizer_state)
+                if critic is not None and guard_critic_state is not None:
+                    critic.load_state_dict(guard_critic_state)
+                if critic_optimizer is not None and guard_critic_optimizer_state is not None:
+                    critic_optimizer.load_state_dict(guard_critic_optimizer_state)
+                restore_obs_rms_state(obs_rms, guard_obs_rms_state)
+
+        if selection_evaluated and update_accepted and selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
             best_eval_score = selection_score
             best_train_reward = mean_reward
             best_epoch = epoch + 1
-            best_state = {name: value.detach().clone() for name, value in actor.state_dict().items()}
+            best_state = clone_module_state(actor)
             torch.save(best_state, out_dir / f"{args.env}_best_actor.pt")
             if critic is not None:
                 torch.save(
-                    {name: value.detach().clone() for name, value in critic.state_dict().items()},
+                    clone_module_state(critic),
                     out_dir / f"{args.env}_best_critic.pt",
                 )
             if obs_rms is not None:
-                best_obs_rms = {
-                    "mean": obs_rms.mean.detach().clone(),
-                    "var": obs_rms.var.detach().clone(),
-                    "count": obs_rms.count,
-                }
+                best_obs_rms = clone_obs_rms_state(obs_rms)
                 torch.save(best_obs_rms, out_dir / f"{args.env}_best_obs_rms.pt")
 
         epoch_s = time.perf_counter() - epoch_t0
@@ -3300,6 +3362,11 @@ def run_training(args: argparse.Namespace) -> dict:
             {
                 "epoch": epoch + 1,
                 "selection_evaluated": selection_evaluated,
+                "selection_guard_active": args.selection_guard_updates,
+                "selection_guard_reference_score": guard_reference_score if args.selection_guard_updates else None,
+                "selection_guard_acceptance_threshold": guard_acceptance_threshold,
+                "selection_update_accepted": update_accepted,
+                "selection_update_rolled_back": update_rolled_back,
                 "training_warmup_steps": warmup_metrics["warmup_steps"],
                 "training_warmup_invalid_resets": warmup_metrics["warmup_invalid_resets"],
                 "training_warmup_fall_resets": warmup_metrics["warmup_fall_resets"],
@@ -3356,6 +3423,7 @@ def run_training(args: argparse.Namespace) -> dict:
             f"{args.env} epoch {epoch + 1:03d}: reward={mean_reward: .4f} "
             f"loss={float(loss.detach().cpu()): .4f} sel={selection_score: .1f}"
             f"{'' if selection_evaluated else ' (cached)'} "
+            f"{'accepted' if update_accepted else 'rolled_back'} "
             f"ret={selection_rollout['return']: .1f} dx={selection_rollout['mean_forward_displacement']: .2f} "
             f"falls={selection_rollout['fall_count']} invalid={selection_rollout['invalid_count']} "
             f"fps={history[-1]['fps']: .1f}"
@@ -3576,6 +3644,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_posture_penalty": args.selection_posture_penalty,
         "selection_repeats": args.selection_repeats,
         "selection_interval": args.selection_interval,
+        "selection_guard_updates": args.selection_guard_updates,
+        "selection_guard_max_score_drop": args.selection_guard_max_score_drop,
         "survival_height_min": args.survival_height_min,
         "survival_height_penalty": args.survival_height_penalty,
         "survival_up_min": args.survival_up_min,
@@ -3586,6 +3656,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "survival_angle_penalty": args.survival_angle_penalty,
         "lr": args.lr,
         "min_lr": args.min_lr,
+        "optimizer": args.optimizer,
+        "sgd_momentum": args.sgd_momentum if args.optimizer == "sgd" else None,
         "adam_beta1": args.adam_beta1,
         "adam_beta2": args.adam_beta2,
         "grad_clip": args.grad_clip,
@@ -4120,6 +4192,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--critic-method", choices=["one-step", "td-lambda"], default=None)
     parser.add_argument("--td-lambda", type=float, default=0.95)
     parser.add_argument("--target-critic-alpha", type=float, default=0.2)
+    parser.add_argument("--optimizer", choices=["adam", "sgd"], default="adam")
+    parser.add_argument("--sgd-momentum", type=float, default=0.0)
     parser.add_argument("--cartpole-pole-angle-penalty", type=float, default=1.0)
     parser.add_argument("--cartpole-pole-velocity-penalty", type=float, default=0.1)
     parser.add_argument("--cartpole-cart-position-penalty", type=float, default=0.05)
@@ -4214,6 +4288,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--selection-interval", type=int, default=1)
+    parser.add_argument("--selection-guard-updates", action="store_true")
+    parser.add_argument("--selection-guard-max-score-drop", type=float, default=0.0)
     parser.add_argument("--survival-height-min", type=float, default=None)
     parser.add_argument("--survival-height-penalty", type=float, default=0.0)
     parser.add_argument("--survival-up-min", type=float, default=None)
