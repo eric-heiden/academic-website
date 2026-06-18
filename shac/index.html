@@ -284,6 +284,11 @@
       <div>
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
+          Latest current-branch refresh, June 18 2026 Pacific time: the Ant PPO failure was traced to the deterministic
+          MJWarp contact-row ordering patch overwriting pre-existing non-contact EFC rows. Contact rows are now offset by
+          each world's pre-contact <code>nefc</code>, preserving joint-limit rows while keeping clone worlds deterministic.
+          With that fix, PPO is again a clean dynamics sanity check and the current SHAC/PPO rollouts below use raw
+          <code>ViewerGL.get_frame()</code> frames through the shared smoothed COM follow camera.
           Newton experiments coupling SHAC-style differentiable policy optimization to the MuJoCo Warp differentiability branch.
           The current report uses full-horizon checkpoint selection for locomotion, raw <code>ViewerGL.get_frame()</code>
           videos through one shared smoothed COM follow camera, and a new uninterrupted no-reset evaluator so terminal states
@@ -349,25 +354,176 @@
 
     <section class="grid four" aria-label="headline metrics">
       <div class="panel metric">
-        <div class="label">Ant SHAC Distance</div>
+        <div class="label">Ant PPO Current</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">Fresh 1024-world no-reset morphology audit; no-reset terminals shown next.</p>
+        <p class="note">Offset-fixed MJWarp replay, 480 steps, 1024 eval worlds.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Ant Falls / No-Reset Terms</div>
+        <div class="label">Ant Falls, PPO / SHAC</div>
         <div class="value" id="stable-falls">...</div>
-        <p class="note">Reset-style eval falls and uninterrupted terminal events.</p>
+        <p class="note">Current offset-fixed evals; both raw ViewerGL videos are shown below.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Hopper SHAC Distance</div>
+        <div class="label">Hopper SHAC Current</div>
         <div class="value" id="p5-displacement">...</div>
-        <p class="note">Inside-limit start with 1024-world fall-gated selection.</p>
+        <p class="note">Offset-fixed MJWarp replay, 240 steps.</p>
       </div>
       <div class="panel metric">
-        <div class="label">Cheetah SHAC Distance</div>
+        <div class="label">Cheetah SHAC Current</div>
         <div class="value" id="stable-fps">...</div>
-        <p class="note">MuJoCo-contact substep-1 stepping-stone result.</p>
+        <p class="note">Offset-fixed MJWarp replay, 240 steps.</p>
       </div>
+    </section>
+
+    <section class="panel ok">
+      <h2>Current Offset-Fixed MJWarp Results</h2>
+      <p>
+        The old deterministic contact-row patch made clone worlds deterministic but started contact EFC rows at zero. That
+        overwrote existing non-contact rows, most visibly Ant joint-limit rows, and broke both PPO and SHAC rollouts. The
+        current MJWarp branch snapshots the pre-contact <code>nefc</code> per world and assigns deterministic contact rows
+        after that offset. Zero-action Ant clone consistency is still bitwise stable for 256 worlds over 240 steps, and the
+        same offset-fixed branch restores the PPO positive controls for Ant, Hopper, and Cheetah.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Environment</th>
+            <th>Method</th>
+            <th>Eval horizon</th>
+            <th>Forward displacement</th>
+            <th>Falls / invalid</th>
+            <th>Runtime</th>
+            <th>Peak CUDA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ant</td>
+            <td>PPO</td>
+            <td>480 steps, 1024 worlds</td>
+            <td>19.50 m</td>
+            <td>0 / 0</td>
+            <td>62.36 s</td>
+            <td>17.90 MB</td>
+          </tr>
+          <tr>
+            <td>Ant</td>
+            <td>SHAC</td>
+            <td>240 steps, 128 worlds</td>
+            <td>6.87 m</td>
+            <td>0 / 0</td>
+            <td>17.36 s</td>
+            <td>12.11 MB</td>
+          </tr>
+          <tr>
+            <td>Hopper</td>
+            <td>PPO</td>
+            <td>240 steps, 128 worlds</td>
+            <td>5.63 m</td>
+            <td>0 / 0</td>
+            <td>50.61 s</td>
+            <td>9.62 MB</td>
+          </tr>
+          <tr>
+            <td>Hopper</td>
+            <td>SHAC</td>
+            <td>240 steps, 128 worlds</td>
+            <td>5.66 m</td>
+            <td>0 / 0</td>
+            <td>50.87 s</td>
+            <td>9.57 MB</td>
+          </tr>
+          <tr>
+            <td>Cheetah</td>
+            <td>PPO</td>
+            <td>240 steps, 128 worlds</td>
+            <td>8.27 m</td>
+            <td>0 / 0</td>
+            <td>52.69 s</td>
+            <td>9.65 MB</td>
+          </tr>
+          <tr>
+            <td>Cheetah</td>
+            <td>SHAC</td>
+            <td>240 steps, 128 worlds</td>
+            <td>7.50 m</td>
+            <td>0 / 0</td>
+            <td>12.19 s</td>
+            <td>9.60 MB</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid three">
+      <article class="panel ok">
+        <h2>Ant PPO, Offset Fix</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_exact_defaults_current_mjwarp_offset_reeval_240video_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_exact_defaults_current_mjwarp_offset_reeval_240video_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Four-second render of the exact-default PPO actor on the current MJWarp branch: 10.41 m over 240 steps, 0/128
+            falls, minimum height 0.499 m, and minimum up 0.962. The table reports the matching 480-step, 1024-world audit.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Hopper PPO, Offset Fix</h2>
+        <figure>
+          <video controls preload="none" poster="assets/hopper_ppo_current_mjwarp_offset_reeval_followcam_240step_run1/hopper_ppo_poster.png">
+            <source src="assets/hopper_ppo_current_mjwarp_offset_reeval_followcam_240step_run1/hopper_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current-branch PPO sanity check: 5.63 m over 240 steps with 0 falls and 0 invalid worlds.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Cheetah PPO, Offset Fix</h2>
+        <figure>
+          <video controls preload="none" poster="assets/cheetah_ppo_current_mjwarp_offset_reeval_followcam_240step_run1/cheetah_ppo_poster.png">
+            <source src="assets/cheetah_ppo_current_mjwarp_offset_reeval_followcam_240step_run1/cheetah_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current-branch PPO sanity check: 8.27 m over 240 steps with 0 falls and 0 invalid worlds.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant SHAC, Offset Fix</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_poster.png">
+            <source src="assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current SHAC actor replay on the fixed branch: 6.87 m over 240 steps, 0/128 falls, minimum height 0.498 m, and
+            minimum up 0.981.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Hopper SHAC, Offset Fix</h2>
+        <figure>
+          <video controls preload="none" poster="assets/hopper_shac_current_mjwarp_offset_reeval_followcam_240step_run1/hopper_poster.png">
+            <source src="assets/hopper_shac_current_mjwarp_offset_reeval_followcam_240step_run1/hopper_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current SHAC actor replay: 5.66 m over 240 steps with 0 falls and 0 invalid worlds.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Cheetah SHAC, Offset Fix</h2>
+        <figure>
+          <video controls preload="none" poster="assets/cheetah_shac_current_mjwarp_offset_reeval_followcam_240step_run1/cheetah_poster.png">
+            <source src="assets/cheetah_shac_current_mjwarp_offset_reeval_followcam_240step_run1/cheetah_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Current SHAC actor replay: 7.50 m over 240 steps with 0 falls and 0 invalid worlds.
+          </figcaption>
+        </figure>
+      </article>
     </section>
 
     <section class="grid two">
@@ -2194,6 +2350,42 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
 
     const runs = [
       {
+        id: "antPpoOffsetCurrent",
+        label: "Ant PPO current offset fix",
+        path: "assets/ant_ppo_exact_defaults_current_mjwarp_offset_reeval_run1/ant_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "antShacOffsetCurrent",
+        label: "Ant SHAC current offset fix",
+        path: "assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_results.json",
+        color: colors.teal
+      },
+      {
+        id: "hopperPpoOffsetCurrent",
+        label: "Hopper PPO current offset fix",
+        path: "assets/hopper_ppo_current_mjwarp_offset_reeval_followcam_240step_run1/hopper_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "hopperShacOffsetCurrent",
+        label: "Hopper SHAC current offset fix",
+        path: "assets/hopper_shac_current_mjwarp_offset_reeval_followcam_240step_run1/hopper_results.json",
+        color: colors.teal
+      },
+      {
+        id: "cheetahPpoOffsetCurrent",
+        label: "Cheetah PPO current offset fix",
+        path: "assets/cheetah_ppo_current_mjwarp_offset_reeval_followcam_240step_run1/cheetah_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "cheetahShacOffsetCurrent",
+        label: "Cheetah SHAC current offset fix",
+        path: "assets/cheetah_shac_current_mjwarp_offset_reeval_followcam_240step_run1/cheetah_results.json",
+        color: colors.teal
+      },
+      {
         id: "preFix",
         label: "pre-fix exploit",
         path: "assets/ant_newton_comvel_force200_term5_run1/ant_results.json",
@@ -3183,6 +3375,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "PPO, MuJoCo contact",
         path: "assets/ant_clone_consistency_ppo_mujoco_nv_run1/clone_consistency.json",
         color: colors.coral
+      },
+      {
+        label: "zero, MuJoCo deterministic offset",
+        path: "assets/ant_clone_consistency_zero_mujoco_nv_deterministic_offset_256env_run1/clone_consistency.json",
+        color: colors.green
       }
     ];
 
@@ -3557,7 +3754,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         clonePaths.map(async (run) => ({ ...run, data: await safeJson(run.path) }))
       );
 
-      const stable = presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
+      const stable = presentRuns.find((run) => run.id === "cheetahShacOffsetCurrent")
+        || presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
         || presentRuns.find((run) => run.id === "cheetahShacSub1")
         || presentRuns.find((run) => run.id === "cheetahPpo16")
         || presentRuns.find((run) => run.id === "cheetahNewtonCinert")
@@ -3567,7 +3765,13 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antPpoNvAbsLimitFreezeObsAudit")
+      const currentAntPpo = presentRuns.find((run) => run.id === "antPpoOffsetCurrent");
+      const currentAntShac = presentRuns.find((run) => run.id === "antShacOffsetCurrent");
+      const currentHopperShac = presentRuns.find((run) => run.id === "hopperShacOffsetCurrent");
+      const currentCheetahShac = presentRuns.find((run) => run.id === "cheetahShacOffsetCurrent");
+      const antLatest = currentAntShac
+        || currentAntPpo
+        || presentRuns.find((run) => run.id === "antPpoNvAbsLimitFreezeObsAudit")
         || presentRuns.find((run) => run.id === "antPpoNvAbsLimitAudit")
         || presentRuns.find((run) => run.id === "antShacUprightCandidateCurrentAudit")
         || presentRuns.find((run) => run.id === "antShacUprightBestMorphAudit")
@@ -3599,7 +3803,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "antShacHeightStochasticSel1024LowLR")
         || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2")
         || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2");
-      const hopperLatest = presentRuns.find((run) => run.id === "hopperShacInsideLimits")
+      const hopperLatest = currentHopperShac
+        || presentRuns.find((run) => run.id === "hopperShacInsideLimits")
         || presentRuns.find((run) => run.id === "hopperPpo1024NoReset")
         || presentRuns.find((run) => run.id === "hopperShacPpoPreserve")
         || presentRuns.find((run) => run.id === "hopperShacDiffrlExact")
@@ -3688,11 +3893,13 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       const repeatedDisplacement = (data) => data?.eval_uninterrupted_repeats?.forward_displacement?.mean;
       const repeatedTerminals = (data) => data?.eval_uninterrupted_repeats?.terminal_count_total;
       const antPrimaryEval = primaryEval(antHeadline);
+      const antPpoEval = primaryEval(currentAntPpo?.data) || antPrimaryEval;
+      const antShacEval = primaryEval(currentAntShac?.data) || antPrimaryEval;
       document.getElementById("report-stamp").textContent = stamp(latestStamp);
-      document.getElementById("stable-return").textContent = `${fmt(repeatedDisplacement(antHeadline) ?? antPrimaryEval.mean_forward_displacement, 2)} m`;
-      document.getElementById("stable-falls").textContent = `${fmt(antHeadline?.eval?.fall_count, 0)} / ${fmt(repeatedTerminals(antHeadline) ?? antPrimaryEval.terminal_count, 0)}`;
+      document.getElementById("stable-return").textContent = `${fmt(antPpoEval.mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-falls").textContent = `${fmt(antPpoEval.fall_count, 0)} / ${fmt(antShacEval.fall_count, 0)}`;
       document.getElementById("p5-displacement").textContent = `${fmt(primaryEval(hopperLatest?.data).mean_forward_displacement, 2)} m`;
-      document.getElementById("stable-fps").textContent = `${fmt(primaryEval(stable?.data).mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-fps").textContent = `${fmt(primaryEval((currentCheetahShac || stable)?.data).mean_forward_displacement, 2)} m`;
 
       const envRuns = {
         ant: presentRuns.filter((run) => run.data?.env === "ant"),
