@@ -3227,7 +3227,7 @@ def run_training(args: argparse.Namespace) -> dict:
 
         for step_idx in range(args.horizon):
             obs_raw = env.observe(q, qd, prev_action, phase=progress)
-            if obs_rms is not None:
+            if obs_rms is not None and not args.freeze_obs_rms:
                 with torch.no_grad():
                     obs_rms.update(obs_raw.detach())
             obs = normalize_obs(obs_raw, norm_stats)
@@ -3713,6 +3713,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "critic_hidden_dims": args.critic_hidden_dims,
         "use_critic": args.use_critic,
         "obs_rms": args.obs_rms,
+        "freeze_obs_rms": args.freeze_obs_rms,
         "actor_path": str(args.actor_path) if args.actor_path is not None else None,
         "anchor_actor_path": str(args.anchor_actor_path) if args.anchor_actor_path is not None else None,
         "anchor_action_penalty": args.anchor_action_penalty,
@@ -4396,6 +4397,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-critic", dest="use_critic", action="store_false")
     parser.add_argument("--obs-rms", dest="obs_rms", action="store_true", default=None)
     parser.add_argument("--no-obs-rms", dest="obs_rms", action="store_false")
+    parser.add_argument("--freeze-obs-rms", action="store_true")
     parser.add_argument("--critic-lr", type=float, default=None)
     parser.add_argument("--critic-iterations", type=int, default=None)
     parser.add_argument("--critic-batch-size", type=int, default=1024)

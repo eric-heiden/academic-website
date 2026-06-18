@@ -314,10 +314,12 @@
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
           and Newton MJCF per-DOF joint-anchor preservation. Reset-state one-step gradients are now clean. A new
           finite-difference pass around the strict scaled Ant actor shows H=1/H=4 policy gradients are accurate and H=8
-          remains sign-consistent. Longer head-only policy checks expose the hard-contact issue: MuJoCo-contact H=32/H=128
-          finite differences are dominated by grazing active-set changes, while no-contact variants retain sign agreement.
-          Hard-contact guarded SHAC updates from the scaled actor still regress the 960-step selector, and the newest
-          morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
+          remains sign-consistent. A new H=16 check around the 31 m Ant actor isolates the remaining blocker: one-step
+          state/action derivatives still match finite differences at 2.1e-3 mean relative error, but policy gradients degrade
+          to 8.6e-1 with hard MuJoCo contacts, 3.5e-1 with Newton contacts, and 1.2e-1 with contact disabled. Tiny H=8
+          line-search steps can improve a 1024-world selector once, but repeated audits expose rare falls at the same scale,
+          so no new Ant SHAC update is promoted. The newest morphology metrics show when a candidate is using excessive
+          joint-limit posture instead of a robust gait.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -413,8 +415,9 @@
         <p>
           PPO now works as an environment sanity check for all three locomotion tasks, and SHAC has clean stepping-stone
           results for Cheetah and Hopper. For Ant, the old visual failure was partly a harness bug: native no-squash actions
-          were not clipped before torque mapping. After the clamp fix, the PPO positive control is upright and repeatable
-          at 15.18 m with 0/5120 no-reset terminal worlds, 0 invalid worlds, and 0.945 minimum-up in the worst repeat.
+          were not clipped before torque mapping. After the clamp fix, the PPO positive control is terminal-free enough for
+          environment sanity checks at 15.18 m with 0/5120 no-reset terminal worlds, 0 invalid worlds, and 0.945 minimum-up
+          in the worst repeat, but it is still not a final healthy high-speed Ant gait.
           The current H=8 SHAC update can improve displacement to 15.39 m in the deterministic no-reset replay and stays
           terminal-free across five 1024-world repeats, but the repeated minimum-up dip shows it is not yet the best reliable
           Ant gait. The previous 21.03 m surrogate-adjoint entry is no longer counted as an accepted SHAC improvement because
@@ -429,14 +432,16 @@
           reporting reset-spliced reliability.
           The latest scaled-actor finite-difference checks sharpen the SHAC diagnosis: one-step action error is 5.4e-3,
           one-step state/action error is 1.8e-2, and H=1/H=4 policy gradients stay at 3.9e-3/2.8e-2 mean relative error.
-          H=8 policy directions remain sign-consistent but noisier at 1.36e-1 mean relative error. Head-only H=32/H=128
-          checks show the remaining gap is contact-specific: no-contact checks keep sign agreement, while hard MuJoCo-contact
-          finite differences jump across active sets. Guarded hard-contact update probes rejected Adam, SGD, H=8, H=16,
-          H=32, and final-layer-only candidates from the 0.825 scaled actor because the 960-step selector slowed down or
-          found a terminal. Switching the backward pass to MJWarp's surrogate contact adjoint and scoring min-up shortfall
-          in selection finally produced accepted updates, but the improvement is still modest. The remaining failure is
+          H=8 policy directions remain sign-consistent but noisier at 1.36e-1 mean relative error. The new H=16 pass around
+          the 31 m actor shows the same pattern more clearly: one-step state/action remains clean at 2.1e-3 mean relative
+          error, no-contact H=16 policy gradients are usable at 1.2e-1 with full sign agreement, Newton contacts are
+          intermediate at 3.5e-1, and hard MuJoCo contacts degrade to 8.6e-1 with only 0.67 sign agreement. Guarded
+          hard-contact update probes rejected Adam, SGD, H=8, H=16, H=32, and final-layer-only candidates from the 0.825
+          scaled actor because the 960-step selector slowed down or found a terminal. A new direct H=8 gradient line search
+          around the 31 m actor found that steps as small as 1e-7 can improve one strict 1024-world selector, while 1e-6
+          already creates a rare fall and rerunning 1e-7 can also produce one terminal world. The remaining failure is
           therefore not a single reset-state AD bug; it is long-horizon contact-rich Ant optimization near grazing
-          active-set boundaries.
+          active-set boundaries, where the reliable step size is narrower than the contact-branch noise.
         </p>
       </article>
     </section>
@@ -513,6 +518,30 @@
               <td>31.35 m</td>
               <td>0 / 1024 terminals</td>
               <td>Saved best actor reloaded and audited with joint-limit/action saturation metrics; the old 21.03 m surrogate entry is tensor-identical to the scaled baseline.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, H=16 policy, hard MuJoCo contacts</td>
+              <td>8.6e-1 mean rel.</td>
+              <td>0.67</td>
+              <td>Policy finite differences disagree even though the same reset state's one-step state/action check is 2.1e-3.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, H=16 policy, Newton contacts</td>
+              <td>3.5e-1 mean rel.</td>
+              <td>1.00</td>
+              <td>Newton contacts reduce the policy-gradient mismatch but are still too noisy for robust SHAC updates.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, H=16 policy, no contact</td>
+              <td>1.2e-1 mean rel.</td>
+              <td>1.00</td>
+              <td>Removing contact leaves the same policy and reward much closer to finite differences, isolating the active-set contact path.</td>
+            </tr>
+            <tr>
+              <td>Ant 31 m actor, H=8 gradient line search</td>
+              <td>1e-7 best in one 1024-world sweep</td>
+              <td>not repeat-safe</td>
+              <td>1e-6 produces a terminal world; rerunning 1e-7 can also produce a rare terminal, so no candidate is promoted.</td>
             </tr>
             <tr>
               <td>Ant policy H=5, margin 0.002</td>
@@ -838,8 +867,9 @@
           The bad-looking Ant PPO/SHAC videos were not caused by renderer overlays: every new clip is raw
           <code>ViewerGL.get_frame()</code>. The main harness bug was action magnitude. DiffRL and IsaacLab clamp actions
           before applying actuator effort; the Newton report runners previously trusted native no-squash policy outputs and
-          could feed out-of-range torques into the Ant. After clamping, PPO becomes repeatable and visually plausible, while
-          SHAC can make small progress but still has a long-horizon reliability problem. The next technical blocker is not
+          could feed out-of-range torques into the Ant. After clamping, PPO becomes repeatable enough to use as a dynamics
+          sanity check, but the high-speed Ant gait is still not solved visually; SHAC can make small progress but still has
+          a long-horizon reliability problem. The next technical blocker is not
           a root-velocity indexing bug either; a unit-velocity probe confirmed <code>qd[0:3]</code> are linear root velocity
           and <code>qd[3:6]</code> are angular. The remaining failure mode is contact-rich Ant optimization: H=32 surrogate
           contact adjoints are currently too slow, H=16 strict anchored updates improve nominal reward but fail repeated
@@ -862,7 +892,12 @@
           including Adam H=8, SGD H=16/H=32, no-anchor/no-survival H=16, and final-layer-only H=32 probes. The follow-up
           displacement-objective probes also regressed under hard contacts. The follow-up tensor comparison showed the
           apparent 21.03 m surrogate continuation did not actually change the actor, so it is now treated as a diagnostic
-          for evaluation noise. The current headline comes from the reloaded 31 m best actor plus a fresh morphology audit;
+          for evaluation noise. The newest H=16 contact comparison around the reloaded 31 m actor confirms that this is not
+          a renderer or policy-loader issue: one-step state/action gradients are still accurate, no-contact policy gradients
+          remain sign-consistent, Newton contacts are closer to finite differences than hard MuJoCo contacts, and hard-contact
+          policy gradients lose sign on two of six finite-difference directions. A tiny H=8 line search found a nominal
+          1e-7 improvement in one 1024-world selector, but the same scale is not repeat-safe and 1e-6 already produces a
+          rare terminal world. The current headline comes from the reloaded 31 m best actor plus a fresh morphology audit;
           recovering that speed through new differentiable updates without rare contact failures remains open.
         </p>
       </article>
@@ -2819,7 +2854,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antScaledHeadH128: "assets/ant_gradcheck_scaled0825_headonly_h128_reward_run1/ant_gradient_check.json",
       antScaledHeadH32NoContact: "assets/ant_gradcheck_scaled0825_headonly_h32_nocontact_run1/ant_gradient_check.json",
       antScaledHeadH128NoContact: "assets/ant_gradcheck_scaled0825_headonly_h128_nocontact_run1/ant_gradient_check.json",
-      antGradDirectionLineSearch: "assets/ant_shac_grad_direction_linesearch_h128_reset_run1.json",
+      antBestH16Hard: "assets/ant_gradcheck_31m_best_h16_hard_rerun_run1/ant_gradient_check.json",
+      antBestH16Newton: "assets/ant_gradcheck_31m_best_h16_newtoncontacts_run1/ant_gradient_check.json",
+      antBestH16NoContact: "assets/ant_gradcheck_31m_best_h16_nocontact_run1/ant_gradient_check.json",
+      antGradDirectionLineSearch: "assets/ant_shac_grad_direction_linesearch_h8_31m_strict1024_run1.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json",
       planarBranch: "assets/solver_gradient_diagnostics_planar_branch_level_kinematics_run1/solver_gradient_diagnostics.json",
@@ -3178,6 +3216,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antScaledHeadH128,
         antScaledHeadH32NoContact,
         antScaledHeadH128NoContact,
+        antBestH16Hard,
+        antBestH16Newton,
+        antBestH16NoContact,
         antGradDirectionLineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
@@ -3185,6 +3226,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antScaledHeadH128),
         safeJson(diagPaths.antScaledHeadH32NoContact),
         safeJson(diagPaths.antScaledHeadH128NoContact),
+        safeJson(diagPaths.antBestH16Hard),
+        safeJson(diagPaths.antBestH16Newton),
+        safeJson(diagPaths.antBestH16NoContact),
         safeJson(diagPaths.antGradDirectionLineSearch)
       ]);
 
@@ -3266,6 +3310,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antScaledHeadH128?.timestamp_pacific,
         antScaledHeadH32NoContact?.timestamp_pacific,
         antScaledHeadH128NoContact?.timestamp_pacific,
+        antBestH16Hard?.timestamp_pacific,
+        antBestH16Newton?.timestamp_pacific,
+        antBestH16NoContact?.timestamp_pacific,
         antGradDirectionLineSearch?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
@@ -3542,6 +3589,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Ant head-only H=128 hard contact", bestSweep(antScaledHeadH128?.policy, "mean_relative_error")],
         ["Ant head-only H=32 no contact", bestSweep(antScaledHeadH32NoContact?.policy, "mean_relative_error")],
         ["Ant head-only H=128 no contact", bestSweep(antScaledHeadH128NoContact?.policy, "mean_relative_error")],
+        ["Ant 31m H=16 hard contact policy", bestSweep(antBestH16Hard?.policy, "mean_relative_error")],
+        ["Ant 31m H=16 Newton contact policy", bestSweep(antBestH16Newton?.policy, "mean_relative_error")],
+        ["Ant 31m H=16 no-contact policy", bestSweep(antBestH16NoContact?.policy, "mean_relative_error")],
+        ["Ant 31m one-step state/action", bestSweep(antBestH16Hard?.one_step_state_action, "mean_relative_error")],
         ["Ant scaled actor one-step action", bestSweep(antScaledH1?.one_step_action, "mean_relative_error")],
         ["Ant scaled actor one-step state", bestSweep(antScaledH1?.one_step_state_action, "mean_relative_error")],
         ["Ant local H=8 MuJoCo actions", bestSweep(antLocalH8Mujoco?.fixed_action_sequence)],
