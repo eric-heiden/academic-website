@@ -634,6 +634,15 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 and best_state is not None
                 and selection_score < guard_threshold
             ):
+                if args.save_rejected_updates:
+                    rejected_prefix = out_dir / f"{args.env}_ppo_rejected_update_{update + 1:03d}"
+                    torch.save(actor.state_dict(), rejected_prefix.with_name(f"{rejected_prefix.name}_actor.pt"))
+                    torch.save(critic.state_dict(), rejected_prefix.with_name(f"{rejected_prefix.name}_critic.pt"))
+                    if obs_rms is not None:
+                        torch.save(
+                            {"mean": obs_rms.mean, "var": obs_rms.var, "count": obs_rms.count},
+                            rejected_prefix.with_name(f"{rejected_prefix.name}_obs_rms.pt"),
+                        )
                 actor.load_state_dict(best_state)
                 if best_critic_state is not None:
                     critic.load_state_dict(best_critic_state)
@@ -956,6 +965,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_uninterrupted": args.selection_uninterrupted,
         "selection_guard_updates": args.selection_guard_updates,
         "selection_guard_max_score_drop": args.selection_guard_max_score_drop,
+        "save_rejected_updates": args.save_rejected_updates,
         "final_eval_repeats": args.final_eval_repeats,
         "final_eval_num_envs": final_eval_num_envs,
         "eval_chunk_size": eval_chunk_size if use_chunked_final_eval else None,
@@ -1175,6 +1185,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-uninterrupted", action="store_true")
     parser.add_argument("--selection-guard-updates", action="store_true")
     parser.add_argument("--selection-guard-max-score-drop", type=float, default=0.0)
+    parser.add_argument("--save-rejected-updates", action="store_true")
     parser.add_argument("--final-eval-repeats", type=int, default=1)
     parser.add_argument("--final-eval-num-envs", type=int, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=None)

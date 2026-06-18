@@ -724,6 +724,14 @@
         <h2>Ant Contact Clone Drift</h2>
         <div id="ant-clone-drift-chart" class="chart"></div>
       </article>
+      <article class="panel">
+        <h2>Ant PPO Update Sensitivity</h2>
+        <div id="ant-action-perturb-chart" class="chart"></div>
+      </article>
+      <article class="panel">
+        <h2>Ant PPO Action Delta</h2>
+        <div id="ant-action-delta-chart" class="chart"></div>
+      </article>
     </section>
 
     <section class="grid two">
@@ -1036,6 +1044,22 @@
             worst minimum-up drops below zero, so it is kept as a speed diagnostic rather than a reliable Ant result. Runtime
             was 323.1 s with 40.0 MB peak allocated CUDA memory. The clip is raw <code>ViewerGL.get_frame()</code> through the
             shared smoothed COM follow camera.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel warn">
+        <h2>Ant PPO, Guarded Continuation Diagnostic</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_nv_guard_margin100_from_probe_512env_20upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_nv_guard_margin100_from_probe_512env_20upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            PPO continued from the stable frozen-normalizer checkpoint with a 150-point selector guard and rejected checkpoint
+            snapshots enabled. The guard accepted 7 of 20 updates and improved the reset-enabled audit to 7.70 m, but the
+            strict 3 x 1024 no-reset audit still found 2 terminal worlds, so this remains a diagnostic rather than a promoted
+            Ant result. Rejected actors changed deterministic actions by only 0.002-0.006 mean absolute action on the baseline
+            trajectory, while random unstructured action noise up to 0.02 stayed stable across 512 worlds. The video is raw
+            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
@@ -2568,6 +2592,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.coral
       },
       {
+        id: "antPpoNvGuardMargin100",
+        label: "Ant PPO guarded continuation",
+        path: "assets/ant_ppo_nv_guard_margin100_from_probe_512env_20upd_run1/ant_ppo_results.json",
+        color: colors.violet
+      },
+      {
         id: "antShacUprightCandidateAudit",
         label: "Ant SHAC repeated-audited anchor",
         path: "assets/ant_shac_upright_candidate_repeated_audit_run1/ant_results.json",
@@ -3038,6 +3068,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       solver: "assets/solver_gradient_diagnostics_mass_diag_current_run1/solver_gradient_diagnostics.json",
       bug: "assets/solver_gradient_bug_drilldown_current_rne_clone_removed_run1/solver_gradient_bug_drilldown.json",
       cartpole: "assets/cartpole_results.json",
+      antActionPerturb: "assets/ant_ppo_nv_action_perturb_sweep_run1/action_perturb_sweep.json",
+      antActionDelta: "assets/ant_ppo_nv_action_delta_probe_run1/action_delta_probe.json",
       acrobot: "assets/acrobot_both_gradcheck_current_run1/acrobot_gradient_check.json",
       contactSphereNoContact: "assets/contact_sphere_nocontact_gradcheck_force500_after_applyft_run1/contact_sphere_gradient_check.json",
       contactSphere: "assets/contact_sphere_gradcheck_after_cinert_record_run1/contact_sphere_gradient_check.json",
@@ -3357,6 +3389,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         solver,
         bug,
         cartpole,
+        antActionPerturb,
+        antActionDelta,
         acrobot,
         contactSphereNoContact,
         contactSphere,
@@ -3413,6 +3447,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.solver),
         safeJson(diagPaths.bug),
         safeJson(diagPaths.cartpole),
+        safeJson(diagPaths.antActionPerturb),
+        safeJson(diagPaths.antActionDelta),
         safeJson(diagPaths.acrobot),
         safeJson(diagPaths.contactSphereNoContact),
         safeJson(diagPaths.contactSphere),
@@ -3612,6 +3648,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNvActuatorH4NewtonEval?.timestamp_pacific,
         antNvActuatorH4SurrogateEval?.timestamp_pacific,
         antNvActuatorH16NoContactEval?.timestamp_pacific,
+        antActionPerturb?.timestamp_pacific,
+        antActionDelta?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,
@@ -3979,6 +4017,67 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       } else {
         plotMessage("ant-clone-drift-chart", "No Ant clone-consistency JSON loaded for this report build.");
       }
+
+      const perturbRows = antActionPerturb?.rows || [];
+      plotOrMessage("ant-action-perturb-chart", [
+        {
+          type: "scatter",
+          mode: "lines+markers",
+          name: "displacement",
+          x: perturbRows.map((row) => row.noise_std),
+          y: perturbRows.map((row) => row.rollout?.mean_forward_displacement ?? null),
+          customdata: perturbRows.map((row) => [
+            row.rollout?.terminal_count ?? 0,
+            row.rollout?.fall_count ?? 0,
+            row.score
+          ]),
+          hovertemplate: "noise %{x}<br>dx %{y:.3f} m<br>term %{customdata[0]}<br>falls %{customdata[1]}<br>score %{customdata[2]:.1f}<extra></extra>",
+          marker: { color: colors.blue, size: 9 },
+          line: { color: colors.blue, width: 2 }
+        },
+        {
+          type: "scatter",
+          mode: "lines+markers",
+          name: "minimum up",
+          x: perturbRows.map((row) => row.noise_std),
+          y: perturbRows.map((row) => row.rollout?.min_up ?? null),
+          yaxis: "y2",
+          marker: { color: colors.coral, size: 9, symbol: "diamond" },
+          line: { color: colors.coral, width: 2 }
+        }
+      ], {
+        ...baseLayout,
+        xaxis: { ...baseLayout.xaxis, title: "Random action noise std", type: "linear" },
+        yaxis: { ...baseLayout.yaxis, title: "Displacement (m)" },
+        yaxis2: { title: "Minimum up", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false }
+      });
+
+      const actionDeltaRows = antActionDelta?.rows || [];
+      const deltaColors = actionDeltaRows.map((row) => row.name?.startsWith("rejected") ? colors.coral : colors.green);
+      plotOrMessage("ant-action-delta-chart", [
+        {
+          type: "bar",
+          name: "mean abs delta",
+          x: actionDeltaRows.map((row) => row.name),
+          y: actionDeltaRows.map((row) => row.mean_abs_action_delta),
+          marker: { color: deltaColors }
+        },
+        {
+          type: "scatter",
+          mode: "markers",
+          name: "max abs delta",
+          x: actionDeltaRows.map((row) => row.name),
+          y: actionDeltaRows.map((row) => row.max_abs_action_delta),
+          yaxis: "y2",
+          marker: { color: colors.violet, size: 10, symbol: "diamond" }
+        }
+      ], {
+        ...baseLayout,
+        xaxis: { ...baseLayout.xaxis, title: "", type: "category", tickangle: -25 },
+        yaxis: { ...baseLayout.yaxis, title: "Mean abs action delta" },
+        yaxis2: { title: "Max abs delta", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false },
+        margin: { t: 18, r: 72, b: 92, l: 68 }
+      });
 
       function lineSearchSeries(data, label, color) {
         const rows = data?.candidates || [];
