@@ -349,6 +349,51 @@ def rollout_constraint_shortfalls(
     }
 
 
+def summarize_rollout_repeats(rollouts: list[dict], scores: list[float] | None = None) -> dict:
+    if not rollouts:
+        return {"count": 0, "samples": []}
+
+    def numeric_values(key: str) -> list[float]:
+        return [float(item[key]) for item in rollouts if item.get(key) is not None]
+
+    def extrema(key: str) -> dict[str, float | None]:
+        values = numeric_values(key)
+        if not values:
+            return {"mean": None, "min": None, "max": None}
+        return {
+            "mean": float(np.mean(values)),
+            "min": float(np.min(values)),
+            "max": float(np.max(values)),
+        }
+
+    def count_total(key: str) -> int:
+        return int(sum(int(item.get(key) or 0) for item in rollouts))
+
+    summary = {
+        "count": len(rollouts),
+        "fall_count_total": count_total("fall_count"),
+        "fall_count_max": max(int(item.get("fall_count") or 0) for item in rollouts),
+        "invalid_count_total": count_total("invalid_count"),
+        "invalid_count_max": max(int(item.get("invalid_count") or 0) for item in rollouts),
+        "terminal_count_total": count_total("terminal_count"),
+        "terminal_count_max": max(int(item.get("terminal_count") or 0) for item in rollouts),
+        "forward_displacement": extrema("mean_forward_displacement"),
+        "return": extrema("return"),
+        "min_height": extrema("min_height"),
+        "min_up": extrema("min_up"),
+        "min_heading": extrema("min_heading"),
+        "samples": rollouts,
+    }
+    if scores is not None:
+        summary["scores"] = scores
+        summary["score"] = {
+            "mean": float(np.mean(scores)) if scores else None,
+            "min": float(np.min(scores)) if scores else None,
+            "max": float(np.max(scores)) if scores else None,
+        }
+    return summary
+
+
 def load_obs_rms(path: Path | None, device: torch.device) -> tuple[torch.Tensor, torch.Tensor] | None:
     if path is None:
         return None
@@ -1851,6 +1896,105 @@ def shac_rollout_loss(
     }
 
 
+@torch.no_grad()
+def warmup_policy_state(
+    env: NewtonMuJoCoTorchEnv,
+    actor: torch.nn.Module,
+    q: torch.Tensor,
+    qd: torch.Tensor,
+    prev_action: torch.Tensor,
+    progress: torch.Tensor,
+    *,
+    steps: int,
+    obs_rms: RunningMeanStd | None,
+    stochastic_init: bool,
+    stop_height_min: float | None = None,
+    stop_up_min: float | None = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict]:
+    invalid_count = 0
+    fall_count = 0
+    stopped = torch.zeros(q.shape[0], dtype=torch.bool, device=q.device)
+    for _ in range(max(0, steps)):
+        active = ~stopped
+        if not bool(active.any().cpu()):
+            break
+        obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
+        action = deterministic_policy_action(actor, obs)
+        action = torch.where(active.unsqueeze(-1), action, torch.zeros_like(action))
+        q_next, qd_next = env.step(q, qd, env.action_to_joint_f(action))
+        q_next = torch.where(active.unsqueeze(-1), q_next, q)
+        qd_next = torch.where(active.unsqueeze(-1), qd_next, qd)
+        invalid = torch.logical_and(active, env.invalid_state(q_next, qd_next))
+        fell = torch.logical_and(active, torch.logical_and(env.fallen_state(q_next), ~invalid))
+        done = torch.logical_or(invalid, fell)
+        invalid_count += int(invalid.sum().cpu())
+        fall_count += int(fell.sum().cpu())
+        if done.any():
+            done_ids = done.nonzero(as_tuple=False).squeeze(-1)
+            q_next, qd_next = env.reset_done(q_next, qd_next, done_ids, stochastic_init=stochastic_init)
+            action = torch.where(done.unsqueeze(-1), torch.zeros_like(action), action)
+            progress = torch.where(done, torch.zeros_like(progress), progress)
+        stop = torch.zeros_like(stopped)
+        if env.env_name == "ant" and (stop_height_min is not None or stop_up_min is not None):
+            torso_pos, _, _, _, up_vec, _ = env.ant_pose_terms(q_next, qd_next)
+            if stop_height_min is not None:
+                stop = torch.logical_or(stop, torso_pos[:, 1] < float(stop_height_min))
+            if stop_up_min is not None:
+                stop = torch.logical_or(stop, up_vec[:, 1] < float(stop_up_min))
+            stop = torch.logical_and(active, torch.logical_and(stop, ~done))
+            stopped = torch.logical_or(stopped, stop)
+        q, qd, prev_action = q_next, qd_next, action
+        progress = progress + torch.logical_and(active, ~done).to(dtype=progress.dtype)
+    return q, qd, prev_action, progress, {
+        "warmup_steps": int(max(0, steps)),
+        "warmup_invalid_resets": invalid_count,
+        "warmup_fall_resets": fall_count,
+        "warmup_stop_count": int(stopped.sum().cpu()),
+    }
+
+
+def differentiable_survival_margin(
+    env: NewtonMuJoCoTorchEnv,
+    q: torch.Tensor,
+    qd: torch.Tensor,
+    *,
+    height_min: float | None,
+    height_weight: float,
+    up_min: float | None,
+    up_weight: float,
+    heading_min: float | None,
+    heading_weight: float,
+    angle_max: float | None,
+    angle_weight: float,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    penalty = torch.zeros(q.shape[0], dtype=torch.float32, device=q.device)
+    metrics: dict[str, torch.Tensor] = {}
+
+    if height_min is not None and height_weight > 0.0:
+        height = q[:, 1]
+        height_shortfall = torch.relu(float(height_min) - height)
+        penalty = penalty + float(height_weight) * height_shortfall.square()
+        metrics["height_shortfall"] = height_shortfall.detach()
+
+    if env.env_name == "ant":
+        _, _, _, _, up_vec, heading_alignment = env.ant_pose_terms(q, qd)
+        if up_min is not None and up_weight > 0.0:
+            up_shortfall = torch.relu(float(up_min) - up_vec[:, 1])
+            penalty = penalty + float(up_weight) * up_shortfall.square()
+            metrics["up_shortfall"] = up_shortfall.detach()
+        if heading_min is not None and heading_weight > 0.0:
+            heading_shortfall = torch.relu(float(heading_min) - heading_alignment.squeeze(-1))
+            penalty = penalty + float(heading_weight) * heading_shortfall.square()
+            metrics["heading_shortfall"] = heading_shortfall.detach()
+    elif env.env_name == "hopper" and angle_max is not None and angle_weight > 0.0:
+        angle_excess = torch.relu(q[:, 2].abs() - float(angle_max))
+        penalty = penalty + float(angle_weight) * angle_excess.square()
+        metrics["angle_excess"] = angle_excess.detach()
+
+    metrics["penalty"] = penalty.detach()
+    return penalty, metrics
+
+
 def one_step_action_loss(
     env: NewtonMuJoCoTorchEnv,
     *,
@@ -2709,6 +2853,32 @@ def run_training(args: argparse.Namespace) -> dict:
             qd = qd.detach().clone()
             prev_action = prev_action.detach().clone()
 
+        warmup_metrics = {
+            "warmup_steps": 0,
+            "warmup_invalid_resets": 0,
+            "warmup_fall_resets": 0,
+            "warmup_stop_count": 0,
+        }
+        if args.training_warmup_steps > 0:
+            warmup_steps = int(args.training_warmup_steps)
+            if args.training_warmup_jitter > 0:
+                low = max(0, warmup_steps - int(args.training_warmup_jitter))
+                high = warmup_steps + int(args.training_warmup_jitter)
+                warmup_steps = int(np.random.randint(low, high + 1))
+            q, qd, prev_action, progress, warmup_metrics = warmup_policy_state(
+                env,
+                actor,
+                q,
+                qd,
+                prev_action,
+                progress,
+                steps=warmup_steps,
+                obs_rms=obs_rms,
+                stochastic_init=args.stochastic_init,
+                stop_height_min=args.training_warmup_stop_height_min,
+                stop_up_min=args.training_warmup_stop_up_min,
+            )
+
         optimizer.zero_grad(set_to_none=True)
         rewards = []
         critic_obs = []
@@ -2723,6 +2893,8 @@ def run_training(args: argparse.Namespace) -> dict:
         invalid_count = 0
         fall_count = 0
         timeout_count = 0
+        survival_penalties = []
+        survival_penalty_max = []
 
         for step_idx in range(args.horizon):
             obs_raw = env.observe(q, qd, prev_action, phase=progress)
@@ -2755,6 +2927,23 @@ def run_training(args: argparse.Namespace) -> dict:
                 fell=fell,
                 termination_penalty=args.termination_penalty,
             )
+            survival_penalty, survival_metrics = differentiable_survival_margin(
+                env,
+                q_next,
+                qd_next,
+                height_min=args.survival_height_min,
+                height_weight=args.survival_height_penalty,
+                up_min=args.survival_up_min,
+                up_weight=args.survival_up_penalty,
+                heading_min=args.survival_heading_min,
+                heading_weight=args.survival_heading_penalty,
+                angle_max=args.survival_angle_max,
+                angle_weight=args.survival_angle_penalty,
+            )
+            if bool((survival_penalty > 0.0).detach().any().cpu()):
+                actor_loss = actor_loss + (gamma_vec * survival_penalty).sum()
+            survival_penalties.append(survival_metrics["penalty"].mean())
+            survival_penalty_max.append(survival_metrics["penalty"].max())
             scaled_rew = rew * args.rew_scale
             rewards.append(rew.detach().mean())
             if args.use_critic:
@@ -2815,6 +3004,12 @@ def run_training(args: argparse.Namespace) -> dict:
         mean_anchor_action_mse = (
             float((anchor_loss_acc / max(1, args.horizon)).detach().cpu()) if anchor_actor is not None else None
         )
+        mean_survival_penalty = (
+            float(torch.stack(survival_penalties).mean().detach().cpu()) if survival_penalties else 0.0
+        )
+        max_survival_penalty = (
+            float(torch.stack(survival_penalty_max).max().detach().cpu()) if survival_penalty_max else 0.0
+        )
         optimizer.step()
 
         value_loss = None
@@ -2861,8 +3056,19 @@ def run_training(args: argparse.Namespace) -> dict:
         if torch.cuda.is_available():
             torch.cuda.synchronize(env.torch_device)
 
-        selection_rollout, selection_score, selection_shortfalls = selection_evaluation()
-        if selection_score > best_eval_score:
+        selection_evaluated = (epoch + 1) % max(1, args.selection_interval) == 0 or epoch == args.epochs - 1
+        if selection_evaluated:
+            selection_rollout, selection_score, selection_shortfalls = selection_evaluation()
+        else:
+            selection_rollout = history[-1]["selection_rollout"] if history and "selection_rollout" in history[-1] else initial_selection_rollout
+            selection_score = history[-1]["selection_score"] if history else initial_selection_score
+            selection_shortfalls = rollout_constraint_shortfalls(
+                selection_rollout,
+                min_height=args.selection_min_height,
+                min_up=args.selection_min_up,
+                min_heading=args.selection_min_heading,
+            )
+        if selection_evaluated and selection_score > best_eval_score:
             best_eval_return = selection_rollout["return"]
             best_eval_score = selection_score
             best_train_reward = mean_reward
@@ -2886,12 +3092,19 @@ def run_training(args: argparse.Namespace) -> dict:
         history.append(
             {
                 "epoch": epoch + 1,
+                "selection_evaluated": selection_evaluated,
+                "training_warmup_steps": warmup_metrics["warmup_steps"],
+                "training_warmup_invalid_resets": warmup_metrics["warmup_invalid_resets"],
+                "training_warmup_fall_resets": warmup_metrics["warmup_fall_resets"],
+                "training_warmup_stop_count": warmup_metrics["warmup_stop_count"],
                 "mean_reward": mean_reward,
                 "final_step_reward": final_reward,
                 "loss": float(loss.detach().cpu()),
                 "grad_norm": grad_norm,
                 "anchor_action_mse": mean_anchor_action_mse,
                 "anchor_action_penalty": args.anchor_action_penalty if anchor_actor is not None else None,
+                "survival_margin_penalty": mean_survival_penalty,
+                "survival_margin_penalty_max": max_survival_penalty,
                 "value_loss": value_loss,
                 "selection_return": selection_rollout["return"],
                 "selection_score": selection_score,
@@ -2910,6 +3123,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 "selection_posture_shortfall": selection_shortfalls["posture_shortfall"],
                 "selection_fall_count": selection_rollout["fall_count"],
                 "selection_invalid_count": selection_rollout["invalid_count"],
+                "selection_rollout": selection_rollout,
                 "invalid_resets": invalid_count,
                 "fall_resets": fall_count,
                 "timeout_resets": timeout_count,
@@ -2932,7 +3146,8 @@ def run_training(args: argparse.Namespace) -> dict:
         )
         print(
             f"{args.env} epoch {epoch + 1:03d}: reward={mean_reward: .4f} "
-            f"loss={float(loss.detach().cpu()): .4f} sel={selection_score: .1f} "
+            f"loss={float(loss.detach().cpu()): .4f} sel={selection_score: .1f}"
+            f"{'' if selection_evaluated else ' (cached)'} "
             f"ret={selection_rollout['return']: .1f} dx={selection_rollout['mean_forward_displacement']: .2f} "
             f"falls={selection_rollout['fall_count']} invalid={selection_rollout['invalid_count']} "
             f"fps={history[-1]['fps']: .1f}"
@@ -2969,20 +3184,55 @@ def run_training(args: argparse.Namespace) -> dict:
         termination_penalty=args.termination_penalty,
         stochastic_init=args.eval_stochastic_init,
     )
-    eval_score = rollout_selection_score(
-        rollout,
-        num_envs=selection_env.num_envs,
-        fall_penalty=args.selection_fall_penalty,
-        invalid_penalty=args.selection_invalid_penalty,
-        displacement_weight=args.selection_displacement_weight,
-        height_weight=args.selection_height_weight,
-        up_weight=args.selection_up_weight,
-        heading_weight=args.selection_heading_weight,
-        min_height=args.selection_min_height,
-        min_up=args.selection_min_up,
-        min_heading=args.selection_min_heading,
-        posture_penalty=args.selection_posture_penalty,
-    )
+
+    def score_rollout(candidate: dict) -> float:
+        return rollout_selection_score(
+            candidate,
+            num_envs=selection_env.num_envs,
+            fall_penalty=args.selection_fall_penalty,
+            invalid_penalty=args.selection_invalid_penalty,
+            displacement_weight=args.selection_displacement_weight,
+            height_weight=args.selection_height_weight,
+            up_weight=args.selection_up_weight,
+            heading_weight=args.selection_heading_weight,
+            min_height=args.selection_min_height,
+            min_up=args.selection_min_up,
+            min_heading=args.selection_min_heading,
+            posture_penalty=args.selection_posture_penalty,
+        )
+
+    eval_score = score_rollout(rollout)
+    eval_repeats = None
+    eval_uninterrupted_repeats = None
+    if args.final_eval_repeats > 1:
+        repeated_rollouts = [rollout]
+        repeated_uninterrupted = [rollout_uninterrupted]
+        for _ in range(args.final_eval_repeats - 1):
+            repeated_rollouts.append(
+                evaluate_policy(
+                    selection_env,
+                    actor,
+                    args.eval_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            )
+            repeated_uninterrupted.append(
+                evaluate_policy_uninterrupted(
+                    selection_env,
+                    actor,
+                    args.eval_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            )
+        eval_repeats = summarize_rollout_repeats(repeated_rollouts, [score_rollout(item) for item in repeated_rollouts])
+        eval_uninterrupted_repeats = summarize_rollout_repeats(
+            repeated_uninterrupted,
+            [score_rollout(item) for item in repeated_uninterrupted],
+        )
     video_path = None
     poster_path = None
     if args.render_video:
@@ -3098,6 +3348,10 @@ def run_training(args: argparse.Namespace) -> dict:
         "td_lambda": args.td_lambda,
         "rew_scale": args.rew_scale,
         "reset_each_epoch": args.reset_each_epoch,
+        "training_warmup_steps": args.training_warmup_steps,
+        "training_warmup_jitter": args.training_warmup_jitter,
+        "training_warmup_stop_height_min": args.training_warmup_stop_height_min,
+        "training_warmup_stop_up_min": args.training_warmup_stop_up_min,
         "termination_penalty": args.termination_penalty,
         "terminal_fall_reward": -args.termination_penalty if args.termination_penalty > 0.0 else None,
         "selection_fall_penalty": args.selection_fall_penalty,
@@ -3111,6 +3365,15 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_min_heading": args.selection_min_heading,
         "selection_posture_penalty": args.selection_posture_penalty,
         "selection_repeats": args.selection_repeats,
+        "selection_interval": args.selection_interval,
+        "survival_height_min": args.survival_height_min,
+        "survival_height_penalty": args.survival_height_penalty,
+        "survival_up_min": args.survival_up_min,
+        "survival_up_penalty": args.survival_up_penalty,
+        "survival_heading_min": args.survival_heading_min,
+        "survival_heading_penalty": args.survival_heading_penalty,
+        "survival_angle_max": args.survival_angle_max,
+        "survival_angle_penalty": args.survival_angle_penalty,
         "lr": args.lr,
         "min_lr": args.min_lr,
         "adam_beta1": args.adam_beta1,
@@ -3123,6 +3386,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "target_critic_alpha": args.target_critic_alpha,
         "selection_horizon": args.selection_horizon,
         "selection_uninterrupted": args.selection_uninterrupted,
+        "final_eval_repeats": args.final_eval_repeats,
         "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
@@ -3188,6 +3452,8 @@ def run_training(args: argparse.Namespace) -> dict:
         "history": history,
         "eval": rollout,
         "eval_uninterrupted": rollout_uninterrupted,
+        "eval_repeats": eval_repeats,
+        "eval_uninterrupted_repeats": eval_uninterrupted_repeats,
         "video": video_path.name if video_path else None,
         "poster": poster_path.name if poster_path else None,
         "gpu": query_gpu(),
@@ -3569,6 +3835,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reset-noise", type=float, default=None)
     parser.add_argument("--termination-penalty", type=float, default=None)
     parser.add_argument("--reset-each-epoch", action="store_true")
+    parser.add_argument("--training-warmup-steps", type=int, default=0)
+    parser.add_argument("--training-warmup-jitter", type=int, default=0)
+    parser.add_argument("--training-warmup-stop-height-min", type=float, default=None)
+    parser.add_argument("--training-warmup-stop-up-min", type=float, default=None)
     parser.add_argument("--stochastic-init", dest="stochastic_init", action="store_true", default=None)
     parser.add_argument("--deterministic-init", dest="stochastic_init", action="store_false")
     parser.add_argument("--eval-stochastic-init", dest="eval_stochastic_init", action="store_true")
@@ -3666,6 +3936,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--render-video", action="store_true")
     parser.add_argument("--video-num-envs", type=int, default=1)
+    parser.add_argument("--final-eval-repeats", type=int, default=1)
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--selection-uninterrupted", action="store_true")
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
@@ -3679,6 +3950,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-min-heading", type=float, default=None)
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--selection-repeats", type=int, default=1)
+    parser.add_argument("--selection-interval", type=int, default=1)
+    parser.add_argument("--survival-height-min", type=float, default=None)
+    parser.add_argument("--survival-height-penalty", type=float, default=0.0)
+    parser.add_argument("--survival-up-min", type=float, default=None)
+    parser.add_argument("--survival-up-penalty", type=float, default=0.0)
+    parser.add_argument("--survival-heading-min", type=float, default=None)
+    parser.add_argument("--survival-heading-penalty", type=float, default=0.0)
+    parser.add_argument("--survival-angle-max", type=float, default=None)
+    parser.add_argument("--survival-angle-penalty", type=float, default=0.0)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)

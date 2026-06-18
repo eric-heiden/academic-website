@@ -299,8 +299,11 @@
           fast clean deterministic result after the reward fix and an uninterrupted selector: a PPO-warm-started, anchored
           H=16 SHAC run selects epoch 8 and reaches 30.72 m over 960 no-reset steps with 0 terminals, 0 invalids, minimum
           up projection 0.91, and 25.4 MB peak allocated CUDA memory. Stochastic-reset audits still expose rare terminal
-          worlds in fresh no-reset samples, so the report distinguishes deterministic full-horizon solves from stochastic
-          reset robustness. A deterministic consistency probe confirmed that identical replicated worlds diverge from
+          worlds in fresh no-reset samples: a five-repeat stochastic audit of the same checkpoint produced 4 terminal worlds
+          across 2560 uninterrupted worlds. Long persistent SHAC streams and endangered-state warmups now expose those
+          late states during training; persistent survival-margin training reduced the five-repeat uninterrupted total to
+          2 terminals, but full-horizon selection still rejects most direct low-up updates. The report therefore distinguishes
+          deterministic full-horizon solves from stochastic reset robustness. A deterministic consistency probe confirmed that identical replicated worlds diverge from
           roundoff-level contact differences into different gait branches, so repeated large-batch variation is contact-branch
           sensitivity rather than renderer or overlay state.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
@@ -396,7 +399,11 @@
           anchored SHAC policy reaches 30.72 m with zero terminals in the deterministic 512-world no-reset eval, but fresh
           stochastic reset audits still sample rare terminal worlds. Adding an uninterrupted selector and a stricter
           <code>min_up</code> gate finds zero-fall selection samples, but separate fresh stochastic no-reset evals can still
-          branch into one or two terminal worlds. That points to long-horizon contact active-set sensitivity rather than a
+          branch into one or two terminal worlds. The newest late-state training diagnostics make the failure more specific:
+          H=16 training from ordinary stochastic starts does not see the late low-up branch; persistent streams eventually
+          hit it and improve repeated uninterrupted terminals from 4 to 2 out of five 512-world audits; freezing 64 warmup
+          worlds at an up-projection danger band produced 214 low-up starts and nonzero survival gradients, but every SHAC
+          update was worse under the full-horizon selector. That points to long-horizon contact active-set sensitivity rather than a
           renderer, overlay, or basic environment bug. Hopper required two harness fixes: the default deterministic start is
           now 0.05 rad inside the two upper joint limits, and the selector uses a large fall gate so 0-fall checkpoints beat
           slightly faster late-fall checkpoints. Ant additionally needed the corrected potential-progress timestep and
@@ -993,24 +1000,31 @@
           steps, then grew from 1e-6 state differences near step 60 to contact-branch divergence by step 120; 115/256 worlds
           had terminal events by step 960 for an older fast PPO actor. The remaining Ant problem is therefore not renderer
           state, reset splicing, or basic reward feasibility; it is stochastic robustness across long contact-rich rollouts.
-          The newest continuation sweeps add explicit selection-minimum logging, no-reset selection, and anchor action MSE.
+          The newest continuation sweeps add explicit selection-minimum logging, no-reset selection, repeated final audits,
+          late-state warmup, and endangered-state warmup stops.
           Pure progress updates rejected candidates with min-up 0.72-0.84. Adding an action-anchor plus upright reward creates
           zero-fall selection candidates near 31 m, but stochastic reset replays still need stronger robustness than the
-          current H=16 local SHAC objective provides. A smooth differentiable upright reward was also tested; it improved the
-          gradient signal in principle, but this run still failed the repeated stochastic no-reset selector and is kept as a
-          diagnostic rather than the promoted Ant result.
+          current H=16 local SHAC objective provides. A five-repeat stochastic audit of the promoted checkpoint measured
+          4 terminal worlds across 2560 uninterrupted worlds. Persistent late-state SHAC reduced that repeated uninterrupted
+          count to 2 terminals, but did not remove it. A 64-world endangered-state run stopped 214 warmup worlds in the
+          low-up band and produced nonzero survival-margin gradients; every evaluated update was nevertheless worse than
+          the loaded checkpoint under the full-horizon selector. A smooth differentiable upright reward was also tested; it
+          improved the gradient signal in principle, but this run still failed the repeated stochastic no-reset selector and
+          is kept as a diagnostic rather than the promoted Ant result.
         </p>
       </article>
       <article class="panel">
         <h2>Ant Fall Timing</h2>
         <p>
-          The late-fall no-reset replay records first Ant SHAC terminals near step 458, with a mean terminal step around 465.
-          Earlier corrected-default probes also fell late, around steps 348-461. These are not reset splices or camera
+          The late-fall no-reset replay records first Ant SHAC terminals across roughly steps 430-770 depending on the
+          stochastic reset batch. Earlier corrected-default probes also fell late, around steps 348-461. These are not reset splices or camera
           artifacts: the failed worlds have torso heights below the termination threshold and flipped/upside-down up
           projections after long contact interaction. The corrected deterministic Ant SHAC result has 0 terminal worlds,
           minimum up projection 0.91, and about 30.7 m forward displacement in its final 512-world no-reset trace. Stochastic
-          reset stress tests still bottom out around 0.73-0.76 up projection in failing worlds, so stochastic robustness is
-          tracked separately from the deterministic headline metric.
+          reset stress tests still bottom out around 0.71-0.76 up projection in failing worlds. The new repeated audits
+          report 4/2560 uninterrupted terminal worlds for the promoted checkpoint, 2/2560 after persistent late-state
+          survival-margin training, and 3/2560 after the 64-world endangered-state run, so stochastic robustness is tracked
+          separately from the deterministic headline metric.
         </p>
       </article>
       <article class="panel warn">
@@ -2034,6 +2048,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         id: "antShacDtfixSmoothUpStoch",
         label: "Ant SHAC smooth-up diagnostic",
         path: "assets/ant_shac_dtfix_smoothup_unintr_stoch_h16_16env_16ep_run2/ant_results.json",
+        color: colors.coral
+      },
+      {
+        id: "antShacDtfixRepeatedAudit",
+        label: "Ant SHAC repeated audit",
+        path: "assets/ant_shac_dtfix_anchor_repeated_stoch_audit_run1/ant_results.json",
+        color: colors.slate
+      },
+      {
+        id: "antShacPersistentSurvival",
+        label: "Ant SHAC persistent late-state",
+        path: "assets/ant_shac_persistent_survival_stoch_h16_16env_64ep_run1/ant_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antShacLateWarmupStop",
+        label: "Ant SHAC endangered-state",
+        path: "assets/ant_shac_latewarmup_stop_survival_64env_24ep_run1/ant_results.json",
         color: colors.coral
       },
       {
