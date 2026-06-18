@@ -159,6 +159,7 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
             "dof_limit_mode": "abs",
             "dof_limit_cost": 1.0,
             "action_order": "joint",
+            "progress_weight": 1.0,
             "heading_weight": 1.0,
         }
     return {
@@ -176,14 +177,53 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
         "dof_limit_mode": "abs",
         "dof_limit_cost": 0.1,
         "action_order": "actuator",
+        "progress_weight": 1.0,
         "heading_weight": 0.5,
     }
+
+
+def ant_defaults_for_request(args: argparse.Namespace) -> dict[str, Any]:
+    defaults = copy.deepcopy(ant_defaults_for_asset(args.ant_asset))
+    requested_obs = getattr(args, "ant_observation_style", None)
+    requested_reward = getattr(args, "ant_reward_style", None)
+    isaac_reward_styles = {
+        "isaac",
+        "isaaclab",
+        "isaaclab_potential",
+        "isaaclab_potential_height",
+        "isaac_heading_gated",
+    }
+    uses_isaac_style = requested_obs == "isaac" or requested_reward in isaac_reward_styles
+    if args.ant_asset == "diffrl" and uses_isaac_style:
+        defaults.update(
+            {
+                "sim_substeps": 2,
+                "force_scale": 7.5,
+                "contact_mu": 1.0,
+                "joint_damping": 0.1,
+                "start_height": ANT_ISAACLAB_START_HEIGHT,
+                "start_joint_q": list(ANT_ISAACLAB_START_JOINT_Q),
+                "observation_style": requested_obs or "isaac",
+                "reward_style": requested_reward or "isaac",
+                "dof_limit_mode": "abs",
+                "action_order": "joint",
+                "progress_weight": 2.0 if requested_reward == "isaac" else 1.0,
+                "heading_weight": 0.5,
+            }
+        )
+        if requested_reward in {"isaaclab", "isaaclab_potential", "isaaclab_potential_height"}:
+            defaults["termination_height"] = ANT_ISAACLAB_TERMINATION_HEIGHT
+            defaults["dof_limit_cost"] = 0.1
+        else:
+            defaults["termination_height"] = ANT_TERMINATION_HEIGHT
+            defaults["dof_limit_cost"] = 1.0
+    return defaults
 
 
 def resolve_ant_defaults(args: argparse.Namespace) -> None:
     if getattr(args, "env", None) != "ant":
         return
-    defaults = ant_defaults_for_asset(args.ant_asset)
+    defaults = ant_defaults_for_request(args)
     if getattr(args, "sim_substeps", None) is None:
         args.sim_substeps = defaults["sim_substeps"]
     if getattr(args, "force_scale", None) is None:
@@ -215,6 +255,8 @@ def resolve_ant_defaults(args: argparse.Namespace) -> None:
         # coordinate order.  The MJCF actuator block has a different ordering,
         # so using actuator order sends learned torques to the wrong hips/ankles.
         args.ant_action_order = defaults["action_order"]
+    if getattr(args, "ant_progress_weight", None) is None:
+        args.ant_progress_weight = defaults["progress_weight"]
     if getattr(args, "ant_heading_weight", None) is None:
         args.ant_heading_weight = defaults["heading_weight"]
 
@@ -735,6 +777,7 @@ class NewtonMuJoCoTorchEnv:
         mujoco_smooth_friction_bypass_kf: float = 0.0,
         mujoco_smooth_penalty_damping_alpha: float = 0.0,
         mujoco_smooth_friction_surrogate_alpha: float = 0.9,
+        mujoco_world_spacing_z: float | None = None,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -823,6 +866,7 @@ class NewtonMuJoCoTorchEnv:
         self.mujoco_smooth_friction_bypass_kf = mujoco_smooth_friction_bypass_kf
         self.mujoco_smooth_penalty_damping_alpha = mujoco_smooth_penalty_damping_alpha
         self.mujoco_smooth_friction_surrogate_alpha = mujoco_smooth_friction_surrogate_alpha
+        self.mujoco_world_spacing_z = mujoco_world_spacing_z
         self.acrobot_link_length = 1.0
         self.contact_body_radius = 0.22
         self.contact_target_offset = torch.tensor([1.5, 0.0, 0.0], dtype=torch.float32, device=self.torch_device)
@@ -1109,7 +1153,7 @@ class NewtonMuJoCoTorchEnv:
 
         builder = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(builder)
-        self.world_spacing = (0.0, 0.0, 4.0) if self.contact_backend == "newton" else (0.0, 0.0, 0.0)
+        self.world_spacing = self._locomotion_world_spacing()
         builder.replicate(source, self.num_envs, spacing=self.world_spacing)
         ground_cfg = newton.ModelBuilder.ShapeConfig(
             ke=4.0e4,
@@ -1185,7 +1229,7 @@ class NewtonMuJoCoTorchEnv:
 
         builder = newton.ModelBuilder(up_axis="Y")
         SolverMuJoCo.register_custom_attributes(builder)
-        self.world_spacing = (0.0, 0.0, 4.0) if self.contact_backend == "newton" else (0.0, 0.0, 0.0)
+        self.world_spacing = self._locomotion_world_spacing()
         builder.replicate(source, self.num_envs, spacing=self.world_spacing)
         ground_cfg = newton.ModelBuilder.ShapeConfig(ke=2.0e4, kd=1.0e3, kf=1.0e3, mu=contact_mu)
         builder.add_ground_plane(cfg=ground_cfg)
@@ -1212,6 +1256,13 @@ class NewtonMuJoCoTorchEnv:
             armature=0.1,
             ignore_inertial_definitions=True,
         )
+
+    def _locomotion_world_spacing(self) -> tuple[float, float, float]:
+        if self.contact_backend == "newton":
+            return (0.0, 0.0, 4.0)
+        if self.mujoco_world_spacing_z is not None:
+            return (0.0, 0.0, float(self.mujoco_world_spacing_z))
+        return (0.0, 0.0, 0.0)
 
     def zero_solver_buffers(self) -> None:
         data = self.solver.mjw_data
@@ -1807,7 +1858,17 @@ class NewtonMuJoCoTorchEnv:
         reward = self.reward(q_next, qd_next, action, obs=obs)
         if self.env_name == "ant" and self.ant_reward_style in {"isaaclab_potential", "isaaclab_potential_height"}:
             control_dt = max(float(self.dt), 1.0e-8)
-            potential_progress = (q_next[:, 0] - q[:, 0]) / control_dt
+            target = self.ant_targets[: q.shape[0]] + self.start_q[: q.shape[0], 0:3]
+            to_target_prev = target - q[:, 0:3]
+            to_target_next = target - q_next[:, 0:3]
+            to_target_prev = to_target_prev.clone()
+            to_target_next = to_target_next.clone()
+            to_target_prev[:, 1] = 0.0
+            to_target_next[:, 1] = 0.0
+            potential_progress = (
+                -torch.linalg.vector_norm(to_target_next, dim=-1)
+                + torch.linalg.vector_norm(to_target_prev, dim=-1)
+            ) / control_dt
             reward = reward + self.ant_reward.progress * (potential_progress - qd_next[:, 0])
         return reward
 
@@ -2533,6 +2594,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
         mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
         mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
+        mujoco_world_spacing_z=args.mujoco_world_spacing_z,
         acrobot_actuation=args.acrobot_actuation,
         ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
@@ -2862,6 +2924,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
         "mujoco_smooth_penalty_damping_alpha": args.mujoco_smooth_penalty_damping_alpha,
         "mujoco_smooth_friction_surrogate_alpha": args.mujoco_smooth_friction_surrogate_alpha,
+        "mujoco_world_spacing_z": args.mujoco_world_spacing_z,
         "nconmax": env.nconmax,
         "njmax": env.njmax,
         "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
@@ -2962,6 +3025,7 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
         mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
         mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
+        mujoco_world_spacing_z=args.mujoco_world_spacing_z,
         acrobot_actuation=args.acrobot_actuation,
         ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
@@ -3843,6 +3907,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
         "mujoco_smooth_penalty_damping_alpha": args.mujoco_smooth_penalty_damping_alpha,
         "mujoco_smooth_friction_surrogate_alpha": args.mujoco_smooth_friction_surrogate_alpha,
+        "mujoco_world_spacing_z": args.mujoco_world_spacing_z,
         "nconmax": env.nconmax,
         "njmax": env.njmax,
         "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
@@ -4513,6 +4578,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mujoco-smooth-friction-bypass-kf", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-penalty-damping-alpha", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-friction-surrogate-alpha", type=float, default=0.9)
+    parser.add_argument("--mujoco-world-spacing-z", type=float, default=None)
     parser.add_argument("--eval-contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--eval-mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)
     parser.add_argument("--eval-ant-dof-limit-mode", choices=["abs", "upper"], default=None)
@@ -4577,7 +4643,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contact-velocity-weight", type=float, default=0.05)
     parser.add_argument("--contact-height-weight", type=float, default=1.0)
     parser.add_argument("--contact-action-weight", type=float, default=0.002)
-    parser.add_argument("--ant-progress-weight", type=float, default=1.0)
+    parser.add_argument("--ant-progress-weight", type=float, default=None)
     parser.add_argument("--ant-heading-weight", type=float, default=None)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)

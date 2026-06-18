@@ -225,6 +225,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         dt=args.dt,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_world_spacing_z=args.mujoco_world_spacing_z,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
         ant_asset=args.ant_asset,
@@ -307,6 +308,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 dt=args.dt,
                 sim_substeps=args.sim_substeps,
                 mujoco_integrator=args.mujoco_integrator,
+                mujoco_world_spacing_z=args.mujoco_world_spacing_z,
                 force_scale=args.force_scale,
                 contact_backend=args.contact_backend,
                 ant_asset=args.ant_asset,
@@ -384,6 +386,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             dt=args.dt,
             sim_substeps=args.sim_substeps,
             mujoco_integrator=args.mujoco_integrator,
+            mujoco_world_spacing_z=args.mujoco_world_spacing_z,
             force_scale=args.force_scale,
             contact_backend=args.contact_backend,
             ant_asset=args.ant_asset,
@@ -475,6 +478,15 @@ def train_ppo(args: argparse.Namespace) -> dict:
     history = []
     initial_selection = None
     initial_selection_score = None
+
+    def save_best_checkpoint() -> None:
+        if best_state is None:
+            return
+        torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
+        if best_critic_state is not None:
+            torch.save(best_critic_state, out_dir / f"{args.env}_ppo_best_critic.pt")
+        if obs_rms is not None and best_obs_rms is not None:
+            torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
 
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats(env.torch_device)
@@ -568,11 +580,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
         best_state = clone_module_state(actor)
         best_critic_state = clone_module_state(critic)
         best_optimizer_state = clone_optimizer_state(optimizer)
-        torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
-        torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_best_critic.pt")
         if obs_rms is not None:
             best_obs_rms = clone_obs_rms_state(obs_rms)
-            torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
+        save_best_checkpoint()
         print(
             f"{args.env} ppo initial: sel={initial_selection_score: .1f} "
             f"ret={initial_selection['return']: .1f} "
@@ -738,11 +748,9 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 best_state = clone_module_state(actor)
                 best_critic_state = clone_module_state(critic)
                 best_optimizer_state = clone_optimizer_state(optimizer)
-                torch.save(best_state, out_dir / f"{args.env}_ppo_best_actor.pt")
-                torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_best_critic.pt")
                 if obs_rms is not None:
                     best_obs_rms = clone_obs_rms_state(obs_rms)
-                    torch.save(best_obs_rms, out_dir / f"{args.env}_ppo_best_obs_rms.pt")
+                save_best_checkpoint()
             elif (
                 args.selection_guard_updates
                 and best_state is not None
@@ -843,6 +851,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         obs_rms.mean = best_obs_rms["mean"]
         obs_rms.var = best_obs_rms["var"]
         obs_rms.count = best_obs_rms["count"]
+    save_best_checkpoint()
     torch.save(actor.state_dict(), out_dir / f"{args.env}_ppo_actor.pt")
     torch.save(critic.state_dict(), out_dir / f"{args.env}_ppo_critic.pt")
     if obs_rms is not None:
@@ -947,6 +956,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "mujoco_world_spacing_z": args.mujoco_world_spacing_z,
         "nconmax": env.nconmax,
         "njmax": env.njmax,
         "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
@@ -1094,6 +1104,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
+    parser.add_argument("--mujoco-world-spacing-z", type=float, default=None)
     parser.add_argument("--lr", type=float, default=3.0e-4)
     parser.add_argument("--adaptive-kl", action="store_true")
     parser.add_argument("--desired-kl", type=float, default=0.01)
@@ -1119,7 +1130,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--actor-path", type=Path, default=None)
     parser.add_argument("--critic-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
-    parser.add_argument("--ant-progress-weight", type=float, default=1.0)
+    parser.add_argument("--ant-progress-weight", type=float, default=None)
     parser.add_argument("--ant-heading-weight", type=float, default=None)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)

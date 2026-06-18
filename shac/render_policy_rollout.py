@@ -153,6 +153,7 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         mujoco_smooth_friction_bypass_kf=json_float(result.get("mujoco_smooth_friction_bypass_kf"), 0.0),
         mujoco_smooth_penalty_damping_alpha=json_float(result.get("mujoco_smooth_penalty_damping_alpha"), 0.0),
         mujoco_smooth_friction_surrogate_alpha=json_float(result.get("mujoco_smooth_friction_surrogate_alpha"), 0.9),
+        mujoco_world_spacing_z=result.get("mujoco_world_spacing_z"),
     )
 
 

@@ -284,14 +284,16 @@
       <div>
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
-          Latest current-branch refresh, June 18 2026 Pacific time: the bad-looking Ant replay was traced to a report
-          harness action-order regression plus stale low-speed artifacts, not a renderer overlay or a basic
-          Newton/MJWarp dynamics failure. The Isaac-style DiffRL Ant policy used here applies torques in Newton's
-          joint-coordinate slice order; sending those actions in MJCF actuator order pins the wrong hips/ankles and
-          produces the stuck right-leaning gait. The runners now default the DiffRL Ant path to
-          <code>ant_action_order=joint</code>, while still allowing explicit actuator-order probes for older diagnostics.
-          With the corrected mapping and IsaacLab-style low-force Ant settings, the robust PPO positive control reaches
-          22.84 m over 480 MuJoCo-contact steps with 0/1024 falls and 0 invalid worlds across three no-reset repeats.
+          Latest current-branch refresh, June 18 2026 Pacific time: the bad-looking Ant replay was traced to two report
+          harness issues, not a renderer overlay or a basic Newton/MJWarp dynamics failure. First, the Isaac-style DiffRL
+          Ant policy applies torques in Newton's joint-coordinate slice order; MJCF actuator order sends learned torques
+          to the wrong hips/ankles. Second, a later default-resolution change mixed the DiffRL high-damping start pose
+          with the old Isaac-style low-force policy, dropping the same actor from 22.84 m to 7.88 m without falling. The
+          runners now resolve explicit Isaac-style DiffRL Ant runs to the verified low-force preset:
+          <code>ant_action_order=joint</code>, start height 0.5 m, pi/4 joint pose, contact friction 1.0, joint damping
+          0.1, force scale 7.5, and progress/heading weights 2.0 / 0.5 unless overridden. With that corrected mapping and
+          physics preset, the robust PPO positive control reaches 22.84 m over 480 MuJoCo-contact steps with 0/1024 falls
+          and 0 invalid worlds across three no-reset repeats.
           The current promoted SHAC step is selected by the worst guarded score across 1, 16, 256, 512, and 1024
           MuJoCo-contact worlds. A signed H=16 MuJoCo-gradient line search accepts a single <code>1e-7</code> update from
           the high-speed PPO actor, improving the guarded worst-count score from 7625.7 to 7778.7 and the 1024-world
@@ -350,12 +352,13 @@
     <section class="panel ok">
       <h2>Current MJWarp Results</h2>
       <p>
-        The Ant PPO sanity check now uses the d6 MJWarp branch and the joint-order action mapping required by the
-        Isaac-style DiffRL actor. The old actuator-order replay is retained only as a negative diagnostic because it sends
-        learned actions to the wrong joints. The latest promoted Ant SHAC line uses MuJoCo contacts for both the
-        differentiable update and physical selector, and selects by the worst guarded score across 1, 16, 256, 512, and
-        1024 cloned worlds. The older Newton-gradient/MuJoCo-eval line is retained because it is faster, but it has less
-        posture margin and did not use the robust clone-count selector.
+        The Ant PPO sanity check now uses the d6 MJWarp branch, the joint-order action mapping required by the
+        Isaac-style DiffRL actor, and explicit low-force Ant physics. The old actuator-order replay is retained only as a
+        negative diagnostic because it sends learned actions to the wrong joints; the high-damping DiffRL-pose replay is
+        retained as a configuration-drift diagnostic because it is stable but slow. The latest promoted Ant SHAC line uses
+        MuJoCo contacts for both the differentiable update and physical selector, and selects by the worst guarded score
+        across 1, 16, 256, 512, and 1024 cloned worlds. The older Newton-gradient/MuJoCo-eval line is retained because it
+        is faster, but it has less posture margin and did not use the robust clone-count selector.
       </p>
       <table>
         <thead>
@@ -376,7 +379,7 @@
             <td>480 steps, 1024 worlds</td>
             <td>22.84 m</td>
             <td>0 / 0</td>
-            <td>76.11 s</td>
+            <td>57.35 s</td>
             <td>26.59 MB</td>
           </tr>
           <tr>
@@ -437,16 +440,55 @@
       </table>
     </section>
 
+    <section class="panel warn">
+      <h2>Ant Configuration Drift Check</h2>
+      <p>
+        The slow Ant replay that triggered this refresh was not PPO failing under the verified setup. It was the same
+        actor evaluated with a mismatched default preset: DiffRL start height 0.75 m, joint pose +/-1.0 rad, friction
+        0.75, damping 1.0, and progress/heading weights 1.0 / 1.0. That stable-but-slow setup moves only 7.88 m over
+        480 steps. Restoring the intended Isaac-style DiffRL preset gives the audited 22.84 m rollout. The resolver now
+        selects the verified preset automatically whenever the DiffRL Ant asset is explicitly run with Isaac-style
+        observations or rewards, while still allowing exact DiffRL probes by leaving those style flags unset.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Replay</th>
+            <th>Start / damping / friction</th>
+            <th>Reward weights</th>
+            <th>Forward displacement</th>
+            <th>Falls / invalid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Mismatched DiffRL-default physics</td>
+            <td>0.75 m, +/-1.0 rad, damping 1.0, mu 0.75</td>
+            <td>progress 1.0, heading 1.0</td>
+            <td>7.88 m</td>
+            <td>0 / 0</td>
+          </tr>
+          <tr>
+            <td>Verified Isaac-style DiffRL preset</td>
+            <td>0.50 m, +/-pi/4 rad, damping 0.1, mu 1.0</td>
+            <td>progress 2.0, heading 0.5</td>
+            <td>22.84 m</td>
+            <td>0 / 0</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <section class="grid three">
       <article class="panel ok">
         <h2>Ant PPO, High-Speed Audit</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_highspeed_shacseed_robust_counts_audit_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_highspeed_shacseed_robust_counts_audit_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_ppo_highspeed_reaudit_legacyphys_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_highspeed_reaudit_legacyphys_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
             Raw <code>ViewerGL.get_frame()</code> render of the high-speed PPO actor using joint-order Ant actions and
-            IsaacLab-style low-force settings. The 480-step 3 x 1024-world audit reaches 22.84 m with 0 falls, 0 invalid
+            the verified low-force Ant physics preset. The 480-step 3 x 1024-world audit reaches 22.84 m with 0 falls, 0 invalid
             worlds, minimum height 0.499 m, minimum up 0.943, and worst-count guarded score 7625.7.
           </figcaption>
         </figure>
@@ -2337,7 +2379,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       {
         id: "antPpoOffsetCurrent",
         label: "Ant PPO high-speed robust audit",
-        path: "assets/ant_ppo_highspeed_shacseed_robust_counts_audit_run1/ant_ppo_results.json",
+        path: "assets/ant_ppo_highspeed_reaudit_legacyphys_run1/ant_ppo_results.json",
         color: colors.green
       },
       {
