@@ -300,16 +300,12 @@
           Cheetah is the clean SHAC stepping stone: MuJoCo contacts at substep 1 reach 10.41 m uninterrupted with 0 terminals.
           Hopper SHAC is now clean after moving the deterministic start pose off exact active joint limits and using a
           reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
-          fast clean deterministic result after the reward fix and an uninterrupted selector: a PPO-warm-started, anchored
-          H=16 SHAC run selects epoch 8 and reaches 30.72 m over 960 no-reset steps with 0 terminals, 0 invalids, minimum
-          up projection 0.91, and 25.4 MB peak allocated CUDA memory. Stochastic-reset audits still expose rare terminal
-          worlds in fresh no-reset samples: a five-repeat stochastic audit of the same checkpoint produced 4 terminal worlds
-          across 2560 uninterrupted worlds. Long persistent SHAC streams and endangered-state warmups now expose those
-          late states during training; persistent survival-margin training reduced the five-repeat uninterrupted total to
-          2 terminals, but full-horizon selection still rejects most direct low-up updates. The report therefore distinguishes
-          deterministic full-horizon solves from stochastic reset robustness. A deterministic consistency probe confirmed that identical replicated worlds diverge from
-          roundoff-level contact differences into different gait branches, so repeated large-batch variation is contact-branch
-          sensitivity rather than renderer or overlay state.
+          fast clean result after the reward fix and an uninterrupted selector: re-auditing the PPO-warm-started, anchored
+          H=16 SHAC policy under the current five-repeat no-reset evaluator gives 31.35 m in the deterministic rollout and
+          31.30 m mean displacement across stochastic repeats, with 0 terminals, 0 invalids, mean up projection 0.994, and
+          repeated minimum-up mean 0.944. The remaining Ant gap is gait quality rather than basic trainability: the policy is
+          fast and reliable in this audit, but the lowest repeated torso height is still near 0.40 m, so the next target is
+          more clearance without collapsing into the standing solution found by height-heavy PPO.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
@@ -399,15 +395,12 @@
         <h2>What Is Not Fixed</h2>
         <p>
           PPO now works as an environment sanity check for all three locomotion tasks, and SHAC has clean stepping-stone
-          results for Cheetah, Hopper, and Ant. The important remaining Ant gap is stochastic-reset robustness: the corrected
-          anchored SHAC policy reaches 30.72 m with zero terminals in the deterministic 512-world no-reset eval, but fresh
-          stochastic reset audits still sample rare terminal worlds. Adding an uninterrupted selector and a stricter
-          <code>min_up</code> gate finds zero-fall selection samples, but separate fresh stochastic no-reset evals can still
-          branch into one or two terminal worlds. The newest late-state training diagnostics make the failure more specific:
-          H=16 training from ordinary stochastic starts does not see the late low-up branch; persistent streams eventually
-          hit it and improve repeated uninterrupted terminals from 4 to 2 out of five 512-world audits; freezing 64 warmup
-          worlds at an up-projection danger band produced 214 low-up starts and nonzero survival gradients, but every SHAC
-          update was worse under the full-horizon selector. That points to long-horizon contact active-set sensitivity rather than a
+          results for Cheetah, Hopper, and Ant. The important remaining Ant gap is gait quality: the corrected anchored
+          SHAC policy reaches 31.35 m with zero terminals in the deterministic no-reset eval and 31.30 m mean displacement
+          across five stochastic repeats, but the fresh-repeat minimum height can still approach 0.40 m. Adding an
+          uninterrupted selector and stricter <code>min_up</code> gate finds zero-fall selection samples, while a height-heavy
+          PPO probe shows the tradeoff: it selects a standing policy with 0 terminals and only 0.25 m displacement. That
+          points to long-horizon contact active-set sensitivity and reward tradeoffs rather than a
           renderer, overlay, or basic environment bug. Hopper required two harness fixes: the default deterministic start is
           now 0.05 rad inside the two upper joint limits, and the selector uses a large fall gate so 0-fall checkpoints beat
           slightly faster late-fall checkpoints. Ant additionally needed the corrected potential-progress timestep and
@@ -999,14 +992,13 @@
         <p>
           The earlier Ant zero-fall claim came from reset-style evaluation and a shorter/default selector. The harness now
           has an uninterrupted no-reset selector, and the IsaacLab-potential reward uses the full control timestep. With
-          those fixes, the corrected anchored SHAC run reaches 30.72 m in the deterministic 512-world no-reset replay with
-          0 terminals, 0 invalids, minimum up 0.91, and minimum height 0.46 m. Stochastic reset audits remain harder:
-          repeated no-reset selection can find zero-fall samples, but fresh stochastic no-reset evals can still branch into
-          one or two terminal worlds. A deterministic consistency
+          those fixes, the corrected anchored SHAC run reaches 31.35 m in the deterministic no-reset replay with
+          0 terminals, 0 invalids, minimum up 0.938, and minimum height 0.414 m. Five fresh stochastic repeats stay at
+          0 terminal worlds with 31.30 m mean displacement, although their lowest height is still close to 0.40 m. A deterministic consistency
           probe using identical starts/actions across 256 separate MuJoCo Warp worlds stayed bit-identical for the first few
           steps, then grew from 1e-6 state differences near step 60 to contact-branch divergence by step 120; 115/256 worlds
           had terminal events by step 960 for an older fast PPO actor. The remaining Ant problem is therefore not renderer
-          state, reset splicing, or basic reward feasibility; it is stochastic robustness across long contact-rich rollouts.
+          state, reset splicing, or basic reward feasibility; it is improving gait clearance across long contact-rich rollouts.
           The newest continuation sweeps add explicit selection-minimum logging, no-reset selection, repeated final audits,
           late-state warmup, and endangered-state warmup stops.
           Pure progress updates rejected candidates with min-up 0.72-0.84. Adding an action-anchor plus upright reward creates
@@ -1662,11 +1654,10 @@
           continuation was only reliable under the tanh wrapper used by the SHAC actor; true no-squash replay collapses and
           must be treated as a separate retraining target. With the wrapper made explicit, H=16 SHAC fine-tuning improves the
           reliable Ant gait to 14.96 m uninterrupted with 0 terminals. After fixing the IsaacLab-potential timestep and adding
-          uninterrupted checkpoint selection, an anchored H=16 SHAC continuation from the PPO gait reaches 30.72 m over 960
-          deterministic no-reset steps with 0 terminal worlds, 0 invalids, and min-up 0.91. A stricter stochastic-reset
-          variant with <code>ant_min_up=0.8</code> and <code>selection_min_up=0.9</code> finds zero-fall selection samples,
-          but fresh stochastic no-reset evals can still expose one or two terminal worlds. This makes PPO a genuine Ant
-          environment sanity check and narrows the remaining blocker to stochastic-robust differentiable long-horizon updates.
+          uninterrupted checkpoint selection, an anchored H=16 SHAC continuation from the PPO gait reaches 31.35 m over 960
+          deterministic no-reset steps with 0 terminal worlds, 0 invalids, and min-up 0.938. Five stochastic no-reset repeats
+          of the promoted anchor stay terminal-free at 31.30 m mean displacement. This makes PPO a genuine Ant environment
+          sanity check and narrows the remaining blocker to cleaner-height differentiable long-horizon updates.
           The newest SHAC instrumentation records selection minima and posture
           shortfalls in every history row. Progress-2 SHAC continuation did not beat the selected actor: safe updates stayed
           below 14.79 m, while updates that chased more progress first lost uprightness, with min-up falling to roughly
@@ -1676,13 +1667,13 @@
           reduced those failures but still ended at 14 falls/3 invalids, so NV remains a diagnostic asset rather than the
           headline result.
           The remaining problem is qualitative and algorithmic: Hopper SHAC needed the start-pose active-set fix and a much
-          stronger fall gate before it became reliable, while Ant SHAC now has a fast deterministic 30.72 m gait but still loses
-          stochastic reset reliability in rare contact branches. Contact finite differences still degrade once Ant feet sit on grazing
+          stronger fall gate before it became reliable, while Ant SHAC now has a fast repeated-audited 31.30 m gait with
+          zero stochastic-repeat terminals but a low clearance margin. Contact finite differences still degrade once Ant feet sit on grazing
           active-set boundaries. The missing piece is now a curriculum/objective that preserves more natural height and
           heading while increasing progress, plus a contact adjoint or smoothing strategy that remains useful across long
-          horizons and active-set boundaries. The current deterministic no-reset matrix is Cheetah SHAC at 10.41 m, Hopper SHAC at
-          13.65 m, and Ant SHAC at 30.72 m; the open target is removing the rare stochastic-reset terminal modes, and
-          retraining/evaluating a true no-squash RSL-style PPO actor under corrected semantics. It no longer
+          horizons and active-set boundaries. The current no-reset matrix is Cheetah SHAC at 10.41 m, Hopper SHAC at
+          13.65 m, and Ant SHAC at 31.30 m repeated-audited mean displacement; the open target is improving the Ant gait
+          beyond low-clearance crawling while preserving the zero-terminal stochastic-repeat result. It no longer
           looks like a single RNE mass/bias cancellation bug.
         </p>
       </article>
@@ -2858,7 +2849,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacDtfixPotentialAnchor")
+      const antLatest = presentRuns.find((run) => run.id === "antShacUprightCandidateAudit")
+        || presentRuns.find((run) => run.id === "antShacDtfixPotentialAnchor")
         || presentRuns.find((run) => run.id === "antShacDtfixPotentialStochStrict")
         || presentRuns.find((run) => run.id === "antShacAnchorUprightEuler")
         || presentRuns.find((run) => run.id === "antShacAnchorProgress15")
@@ -2933,11 +2925,13 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         cartpole?.timestamp_pacific
       ]);
 
+      const primaryEval = (data) => data?.eval_uninterrupted || data?.eval || {};
+      const antPrimaryEval = primaryEval(antHeadline);
       document.getElementById("report-stamp").textContent = stamp(latestStamp);
-      document.getElementById("stable-return").textContent = `${fmt(antHeadline?.eval?.mean_forward_displacement, 2)} m`;
-      document.getElementById("stable-falls").textContent = `${fmt(antHeadline?.eval?.fall_count, 0)} / ${fmt(antHeadline?.eval_uninterrupted?.terminal_count, 0)}`;
-      document.getElementById("p5-displacement").textContent = `${fmt(hopperLatest?.data?.eval?.mean_forward_displacement, 2)} m`;
-      document.getElementById("stable-fps").textContent = `${fmt(stable?.data?.eval?.mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-return").textContent = `${fmt(antPrimaryEval.mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-falls").textContent = `${fmt(antHeadline?.eval?.fall_count, 0)} / ${fmt(antPrimaryEval.terminal_count, 0)}`;
+      document.getElementById("p5-displacement").textContent = `${fmt(primaryEval(hopperLatest?.data).mean_forward_displacement, 2)} m`;
+      document.getElementById("stable-fps").textContent = `${fmt(primaryEval(stable?.data).mean_forward_displacement, 2)} m`;
 
       const envRuns = {
         ant: presentRuns.filter((run) => run.data?.env === "ant"),
