@@ -1019,7 +1019,7 @@ def render_diagnostic_videos(args: argparse.Namespace) -> list[dict]:
     videos = []
     viewer = newton.viewer.ViewerGL(width=args.video_width, height=args.video_height, headless=True)
     viewer.show_static = True
-    viewer.show_collision = True
+    viewer.show_collision = False
     try:
         for scene in scenes:
             env = MinimalSolverEnv(

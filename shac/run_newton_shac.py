@@ -158,7 +158,7 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
             "reward_style": "diffrl",
             "dof_limit_mode": "abs",
             "dof_limit_cost": 1.0,
-            "action_order": "actuator",
+            "action_order": "joint",
             "heading_weight": 1.0,
         }
     return {
@@ -211,13 +211,10 @@ def resolve_ant_defaults(args: argparse.Namespace) -> None:
     if getattr(args, "ant_dof_limit_cost", None) is None:
         args.ant_dof_limit_cost = defaults["dof_limit_cost"]
     if getattr(args, "ant_action_order", None) is None:
-        if args.ant_asset == "diffrl" and getattr(args, "ant_observation_style", None) == "isaac":
-            # The report's Isaac-style DiffRL Ant policies are trained against
-            # Newton's joint-force slice order; using the MJCF actuator order
-            # sends those actions to the wrong hips/ankles and pins the gait.
-            args.ant_action_order = "joint"
-        else:
-            args.ant_action_order = defaults["action_order"]
+        # DiffRL applies Ant actions directly to joint_act[:, 6:] in joint
+        # coordinate order.  The MJCF actuator block has a different ordering,
+        # so using actuator order sends learned torques to the wrong hips/ankles.
+        args.ant_action_order = defaults["action_order"]
     if getattr(args, "ant_heading_weight", None) is None:
         args.ant_heading_weight = defaults["heading_weight"]
 

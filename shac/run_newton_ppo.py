@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import time
@@ -288,11 +289,97 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ),
         cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
     )
-    selection_env = env
-    if args.selection_num_envs is not None and args.selection_num_envs != args.num_envs:
-        selection_env = NewtonMuJoCoTorchEnv(
+    if args.selection_env_counts is not None:
+        selection_env_counts = list(dict.fromkeys(int(item) for item in args.selection_env_counts))
+    else:
+        selection_env_counts = [int(args.selection_num_envs or args.num_envs)]
+    if not selection_env_counts or any(item <= 0 for item in selection_env_counts):
+        raise ValueError("--selection-env-counts must contain positive integers")
+    selection_env_cache: dict[int, NewtonMuJoCoTorchEnv] = {int(args.num_envs): env}
+
+    def get_selection_env(num_envs: int) -> NewtonMuJoCoTorchEnv:
+        num_envs = int(num_envs)
+        if num_envs not in selection_env_cache:
+            selection_env_cache[num_envs] = NewtonMuJoCoTorchEnv(
+                env_name=args.env,
+                num_envs=num_envs,
+                device=args.device,
+                dt=args.dt,
+                sim_substeps=args.sim_substeps,
+                mujoco_integrator=args.mujoco_integrator,
+                force_scale=args.force_scale,
+                contact_backend=args.contact_backend,
+                ant_asset=args.ant_asset,
+                ant_disable_joint_limits=args.ant_disable_joint_limits,
+                ant_density_override=args.ant_density_override,
+                ant_contact_margin=args.ant_contact_margin,
+                ant_contact_gap=args.ant_contact_gap,
+                ant_contact_mu=args.ant_contact_mu,
+                ant_joint_damping=args.ant_joint_damping,
+                ant_armature=args.ant_armature,
+                ant_min_up=args.ant_min_up,
+                ant_start_height=args.ant_start_height,
+                ant_start_joint_q=args.ant_start_joint_q,
+                ant_reset_position_scale=args.ant_reset_position_scale,
+                ant_reset_angle_scale=args.ant_reset_angle_scale,
+                ant_reset_joint_scale=args.ant_reset_joint_scale,
+                ant_reset_velocity_scale=args.ant_reset_velocity_scale,
+                ant_termination_height=args.ant_termination_height,
+                ant_max_healthy_height=args.ant_max_healthy_height,
+                ant_observation_style=args.ant_observation_style,
+                ant_reward_style=args.ant_reward_style,
+                ant_dof_limit_mode=args.ant_dof_limit_mode,
+                ant_action_order=args.ant_action_order,
+                ant_reward_min_up=args.ant_reward_min_up,
+                ant_reward_min_height=args.ant_reward_min_height,
+                hopper_reward_style=args.hopper_reward_style,
+                hopper_start_joint_q=args.hopper_start_joint_q,
+                hopper_contact_mu=args.hopper_contact_mu,
+                hopper_joint_damping=args.hopper_joint_damping,
+                hopper_armature=args.hopper_armature,
+                hopper_termination_height=args.hopper_termination_height,
+                hopper_termination_angle=args.hopper_termination_angle,
+                hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+                hopper_reset_position_scale=args.hopper_reset_position_scale,
+                hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+                hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+                hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
+                phase_observation=args.phase_observation,
+                phase_period=args.phase_period,
+                hopper_terminate_angle=args.hopper_terminate_angle,
+                locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
+                ant_reward=env.ant_reward,
+                hopper_reward=env.hopper_reward,
+                cheetah_reward=env.cheetah_reward,
+            )
+        return selection_env_cache[num_envs]
+
+    selection_env = get_selection_env(selection_env_counts[0])
+
+    def compact_selection_rollout(candidate: dict) -> dict:
+        return {
+            "num_envs": candidate.get("num_envs"),
+            "return": candidate.get("return"),
+            "mean_reward": candidate.get("mean_reward"),
+            "alive_fraction": candidate.get("alive_fraction"),
+            "mean_forward_displacement": candidate.get("mean_forward_displacement"),
+            "min_forward_displacement": candidate.get("min_forward_displacement"),
+            "max_forward_displacement": candidate.get("max_forward_displacement"),
+            "mean_height": candidate.get("mean_height"),
+            "min_height": candidate.get("min_height"),
+            "mean_up": candidate.get("mean_up"),
+            "min_up": candidate.get("min_up"),
+            "mean_heading": candidate.get("mean_heading"),
+            "min_heading": candidate.get("min_heading"),
+            "terminal_count": candidate.get("terminal_count"),
+            "fall_count": candidate.get("fall_count"),
+            "invalid_count": candidate.get("invalid_count"),
+        }
+
+    def make_eval_env(num_envs: int) -> NewtonMuJoCoTorchEnv:
+        return NewtonMuJoCoTorchEnv(
             env_name=args.env,
-            num_envs=args.selection_num_envs,
+            num_envs=num_envs,
             device=args.device,
             dt=args.dt,
             sim_substeps=args.sim_substeps,
@@ -399,53 +486,80 @@ def train_ppo(args: argparse.Namespace) -> dict:
         worst_selection = None
         worst_score = float("inf")
         worst_shortfalls = None
+        worst_env_count = None
+        robust_entries = []
+        repeat_count = max(1, int(args.selection_repeats))
         selection_horizon = args.selection_horizon or args.eval_horizon
-        for _ in range(max(1, int(args.selection_repeats))):
-            if args.selection_uninterrupted:
-                candidate = evaluate_policy_uninterrupted(
-                    selection_env,
-                    actor,
-                    selection_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
+        for env_count in selection_env_counts:
+            current_selection_env = get_selection_env(env_count)
+            for repeat_idx in range(repeat_count):
+                if args.selection_uninterrupted:
+                    candidate = evaluate_policy_uninterrupted(
+                        current_selection_env,
+                        actor,
+                        selection_horizon,
+                        obs_rms=obs_rms,
+                        termination_penalty=args.termination_penalty,
+                        stochastic_init=args.eval_stochastic_init,
+                    )
+                else:
+                    candidate = evaluate_policy(
+                        current_selection_env,
+                        actor,
+                        selection_horizon,
+                        obs_rms=obs_rms,
+                        termination_penalty=args.termination_penalty,
+                        stochastic_init=args.eval_stochastic_init,
+                    )
+                candidate_score = rollout_selection_score(
+                    candidate,
+                    num_envs=current_selection_env.num_envs,
+                    fall_penalty=args.selection_fall_penalty,
+                    invalid_penalty=args.selection_invalid_penalty,
+                    displacement_weight=args.selection_displacement_weight,
+                    height_weight=args.selection_height_weight,
+                    up_weight=args.selection_up_weight,
+                    heading_weight=args.selection_heading_weight,
+                    min_height=args.selection_min_height,
+                    min_up=args.selection_min_up,
+                    min_heading=args.selection_min_heading,
+                    max_abs_joint=args.selection_max_abs_joint,
+                    posture_penalty=args.selection_posture_penalty,
                 )
-            else:
-                candidate = evaluate_policy(
-                    selection_env,
-                    actor,
-                    selection_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
-                )
-            candidate_score = rollout_selection_score(
-                candidate,
-                num_envs=selection_env.num_envs,
-                fall_penalty=args.selection_fall_penalty,
-                invalid_penalty=args.selection_invalid_penalty,
-                displacement_weight=args.selection_displacement_weight,
-                height_weight=args.selection_height_weight,
-                up_weight=args.selection_up_weight,
-                heading_weight=args.selection_heading_weight,
-                min_height=args.selection_min_height,
-                min_up=args.selection_min_up,
-                min_heading=args.selection_min_heading,
-                max_abs_joint=args.selection_max_abs_joint,
-                posture_penalty=args.selection_posture_penalty,
-            )
-            if candidate_score < worst_score or worst_selection is None:
-                worst_selection = candidate
-                worst_score = candidate_score
-                worst_shortfalls = rollout_constraint_shortfalls(
+                candidate_shortfalls = rollout_constraint_shortfalls(
                     candidate,
                     min_height=args.selection_min_height,
                     min_up=args.selection_min_up,
                     min_heading=args.selection_min_heading,
                     max_abs_joint=args.selection_max_abs_joint,
                 )
+                robust_entries.append(
+                    {
+                        "env_count": env_count,
+                        "repeat": repeat_idx + 1,
+                        "score": candidate_score,
+                        "shortfalls": candidate_shortfalls,
+                        "rollout": compact_selection_rollout(candidate),
+                    }
+                )
+                if candidate_score < worst_score or worst_selection is None:
+                    worst_selection = candidate
+                    worst_score = candidate_score
+                    worst_shortfalls = candidate_shortfalls
+                    worst_env_count = env_count
         assert worst_selection is not None
         assert worst_shortfalls is not None
+        worst_selection = copy.deepcopy(worst_selection)
+        worst_selection["selection_env_count"] = worst_env_count
+        if len(selection_env_counts) > 1 or repeat_count > 1:
+            worst_selection["robust_selection"] = {
+                "mode": "worst_score",
+                "env_counts": selection_env_counts,
+                "repeats": repeat_count,
+                "worst_env_count": worst_env_count,
+                "worst_score": worst_score,
+                "entries": robust_entries,
+            }
         return worst_selection, worst_score, worst_shortfalls
 
     if args.actor_path is not None or args.updates == 0:
@@ -675,6 +789,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "selection_forward_displacement": (
                 selection["mean_forward_displacement"] if selection is not None else None
             ),
+            "selection_env_count": selection.get("selection_env_count") if selection is not None else None,
             "selection_alive_fraction": selection["alive_fraction"] if selection is not None else None,
             "selection_mean_height": selection["mean_height"] if selection is not None else None,
             "selection_min_height": selection.get("min_height") if selection is not None else None,
@@ -708,6 +823,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 "algo": "ppo",
                 "timestamp_pacific": pacific_now_iso(),
                 "history": history,
+                "selection_env_counts": selection_env_counts,
                 "best_update": best_update,
                 "best_eval_score": best_score,
             },
@@ -738,60 +854,6 @@ def train_ppo(args: argparse.Namespace) -> dict:
     final_eval_num_envs = args.final_eval_num_envs or selection_env.num_envs
     eval_chunk_size = args.eval_chunk_size or final_eval_num_envs
     use_chunked_final_eval = eval_chunk_size < final_eval_num_envs
-
-    def make_eval_env(num_envs: int) -> NewtonMuJoCoTorchEnv:
-        return NewtonMuJoCoTorchEnv(
-            env_name=args.env,
-            num_envs=num_envs,
-            device=args.device,
-            dt=args.dt,
-            sim_substeps=args.sim_substeps,
-            mujoco_integrator=args.mujoco_integrator,
-            force_scale=args.force_scale,
-            contact_backend=args.contact_backend,
-            ant_asset=args.ant_asset,
-            ant_disable_joint_limits=args.ant_disable_joint_limits,
-            ant_density_override=args.ant_density_override,
-            ant_contact_margin=args.ant_contact_margin,
-            ant_contact_gap=args.ant_contact_gap,
-            ant_contact_mu=args.ant_contact_mu,
-            ant_joint_damping=args.ant_joint_damping,
-            ant_armature=args.ant_armature,
-            ant_min_up=args.ant_min_up,
-            ant_start_height=args.ant_start_height,
-            ant_start_joint_q=args.ant_start_joint_q,
-            ant_reset_position_scale=args.ant_reset_position_scale,
-            ant_reset_angle_scale=args.ant_reset_angle_scale,
-            ant_reset_joint_scale=args.ant_reset_joint_scale,
-            ant_reset_velocity_scale=args.ant_reset_velocity_scale,
-            ant_termination_height=args.ant_termination_height,
-            ant_max_healthy_height=args.ant_max_healthy_height,
-            ant_observation_style=args.ant_observation_style,
-            ant_reward_style=args.ant_reward_style,
-            ant_dof_limit_mode=args.ant_dof_limit_mode,
-            ant_action_order=args.ant_action_order,
-            ant_reward_min_up=args.ant_reward_min_up,
-            ant_reward_min_height=args.ant_reward_min_height,
-            hopper_reward_style=args.hopper_reward_style,
-            hopper_start_joint_q=args.hopper_start_joint_q,
-            hopper_contact_mu=args.hopper_contact_mu,
-            hopper_joint_damping=args.hopper_joint_damping,
-            hopper_armature=args.hopper_armature,
-            hopper_termination_height=args.hopper_termination_height,
-            hopper_termination_angle=args.hopper_termination_angle,
-            hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
-            hopper_reset_position_scale=args.hopper_reset_position_scale,
-            hopper_reset_angle_scale=args.hopper_reset_angle_scale,
-            hopper_reset_joint_scale=args.hopper_reset_joint_scale,
-            hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
-            phase_observation=args.phase_observation,
-            phase_period=args.phase_period,
-            hopper_terminate_angle=args.hopper_terminate_angle,
-            locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
-            ant_reward=env.ant_reward,
-            hopper_reward=env.hopper_reward,
-            cheetah_reward=env.cheetah_reward,
-        )
 
     def final_eval_once(*, uninterrupted: bool) -> dict:
         if use_chunked_final_eval:
@@ -825,7 +887,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
     def score_rollout(candidate: dict) -> float:
         return rollout_selection_score(
             candidate,
-            num_envs=selection_env.num_envs,
+            num_envs=int(candidate.get("num_envs") or selection_env.num_envs),
             fall_penalty=args.selection_fall_penalty,
             invalid_penalty=args.selection_invalid_penalty,
             displacement_weight=args.selection_displacement_weight,
@@ -856,60 +918,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
     video_path = None
     poster_path = None
     if args.render_video:
-        render_env = env
-        if args.video_num_envs != args.num_envs:
-            render_env = NewtonMuJoCoTorchEnv(
-                env_name=args.env,
-                num_envs=args.video_num_envs,
-                device=args.device,
-                dt=args.dt,
-                sim_substeps=args.sim_substeps,
-                mujoco_integrator=args.mujoco_integrator,
-                force_scale=args.force_scale,
-                contact_backend=args.contact_backend,
-                ant_asset=args.ant_asset,
-                ant_disable_joint_limits=args.ant_disable_joint_limits,
-                ant_density_override=args.ant_density_override,
-                ant_contact_margin=args.ant_contact_margin,
-                ant_contact_gap=args.ant_contact_gap,
-                ant_contact_mu=args.ant_contact_mu,
-                ant_joint_damping=args.ant_joint_damping,
-                ant_armature=args.ant_armature,
-                ant_min_up=args.ant_min_up,
-                ant_start_height=args.ant_start_height,
-                ant_start_joint_q=args.ant_start_joint_q,
-                ant_reset_position_scale=args.ant_reset_position_scale,
-                ant_reset_angle_scale=args.ant_reset_angle_scale,
-                ant_reset_joint_scale=args.ant_reset_joint_scale,
-                ant_reset_velocity_scale=args.ant_reset_velocity_scale,
-                ant_termination_height=args.ant_termination_height,
-                ant_max_healthy_height=args.ant_max_healthy_height,
-                ant_observation_style=args.ant_observation_style,
-                ant_reward_style=args.ant_reward_style,
-                ant_dof_limit_mode=args.ant_dof_limit_mode,
-                ant_action_order=args.ant_action_order,
-                ant_reward_min_up=args.ant_reward_min_up,
-                ant_reward_min_height=args.ant_reward_min_height,
-                hopper_reward_style=args.hopper_reward_style,
-                hopper_start_joint_q=args.hopper_start_joint_q,
-                hopper_contact_mu=args.hopper_contact_mu,
-                hopper_joint_damping=args.hopper_joint_damping,
-                hopper_armature=args.hopper_armature,
-                hopper_termination_height=args.hopper_termination_height,
-                hopper_termination_angle=args.hopper_termination_angle,
-                hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
-                hopper_reset_position_scale=args.hopper_reset_position_scale,
-                hopper_reset_angle_scale=args.hopper_reset_angle_scale,
-                hopper_reset_joint_scale=args.hopper_reset_joint_scale,
-                hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
-                phase_observation=args.phase_observation,
-                phase_period=args.phase_period,
-                hopper_terminate_angle=args.hopper_terminate_angle,
-                locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
-                ant_reward=env.ant_reward,
-                hopper_reward=env.hopper_reward,
-                cheetah_reward=env.cheetah_reward,
-            )
+        render_env = env if args.video_num_envs == args.num_envs else make_eval_env(args.video_num_envs)
         video_horizon = args.video_horizon or args.eval_horizon
         video_path, poster_path = render_rollout(
             render_env,
@@ -1033,6 +1042,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "selection_num_envs": selection_env.num_envs,
+        "selection_env_counts": selection_env_counts,
         "total_seconds": total_s,
         "mean_update_seconds": float(np.mean([h["update_seconds"] for h in history])) if history else None,
         "mean_fps": float(np.mean([h["fps"] for h in history])) if history else None,
@@ -1171,6 +1181,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")
     parser.add_argument("--selection-num-envs", type=int, default=None)
+    parser.add_argument("--selection-env-counts", type=parse_int_list, default=None)
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
     parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
