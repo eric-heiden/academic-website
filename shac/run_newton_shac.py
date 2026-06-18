@@ -94,7 +94,9 @@ class ContactTargetRewardWeights:
     action: float = 0.002
 
 
-ANT_START_HEIGHT = 0.5
+ANT_DIFFRL_START_HEIGHT = 0.75
+ANT_ISAACLAB_START_HEIGHT = 0.5
+ANT_START_HEIGHT = ANT_DIFFRL_START_HEIGHT
 ANT_START_JOINT_Q = (0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0)
 ANT_ISAACLAB_START_JOINT_Q = (
     0.0,
@@ -136,6 +138,64 @@ def is_planar_locomotion_env(env_name: str) -> bool:
 
 def is_locomotion_env(env_name: str) -> bool:
     return env_name == "ant" or is_planar_locomotion_env(env_name)
+
+
+def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
+    if ant_asset == "diffrl":
+        return {
+            "sim_substeps": 16,
+            "force_scale": 200.0,
+            "density_override": None,
+            "contact_mu": 0.75,
+            "joint_damping": 1.0,
+            "start_height": ANT_DIFFRL_START_HEIGHT,
+            "start_joint_q": list(ANT_START_JOINT_Q),
+            "termination_height": ANT_TERMINATION_HEIGHT,
+            "observation_style": "diffrl",
+            "reward_style": "diffrl",
+            "heading_weight": 1.0,
+        }
+    return {
+        "sim_substeps": 2,
+        "force_scale": 7.5,
+        "density_override": None,
+        "contact_mu": 1.0,
+        "joint_damping": 0.1,
+        "start_height": ANT_ISAACLAB_START_HEIGHT,
+        "start_joint_q": list(ANT_ISAACLAB_START_JOINT_Q),
+        "termination_height": ANT_ISAACLAB_TERMINATION_HEIGHT,
+        "observation_style": "isaac",
+        "reward_style": "isaaclab_potential",
+        "heading_weight": 0.5,
+    }
+
+
+def resolve_ant_defaults(args: argparse.Namespace) -> None:
+    if getattr(args, "env", None) != "ant":
+        return
+    defaults = ant_defaults_for_asset(args.ant_asset)
+    if getattr(args, "sim_substeps", None) is None:
+        args.sim_substeps = defaults["sim_substeps"]
+    if getattr(args, "force_scale", None) is None:
+        args.force_scale = defaults["force_scale"]
+    if getattr(args, "ant_density_override", None) is None:
+        args.ant_density_override = defaults["density_override"]
+    if getattr(args, "ant_contact_mu", None) is None:
+        args.ant_contact_mu = defaults["contact_mu"]
+    if getattr(args, "ant_joint_damping", None) is None:
+        args.ant_joint_damping = defaults["joint_damping"]
+    if getattr(args, "ant_start_height", None) is None:
+        args.ant_start_height = defaults["start_height"]
+    if getattr(args, "ant_start_joint_q", None) is None:
+        args.ant_start_joint_q = list(defaults["start_joint_q"])
+    if getattr(args, "ant_termination_height", None) is None:
+        args.ant_termination_height = defaults["termination_height"]
+    if getattr(args, "ant_observation_style", None) is None:
+        args.ant_observation_style = defaults["observation_style"]
+    if getattr(args, "ant_reward_style", None) is None:
+        args.ant_reward_style = defaults["reward_style"]
+    if getattr(args, "ant_heading_weight", None) is None:
+        args.ant_heading_weight = defaults["heading_weight"]
 
 
 def normalize_vec(x: torch.Tensor, eps: float = 1.0e-9) -> torch.Tensor:
@@ -294,8 +354,9 @@ def rollout_selection_score(
     min_heading: float | None = None,
     posture_penalty: float = 0.0,
 ) -> float:
-    fall_events = float(rollout.get("fall_count", 0)) / max(1, num_envs)
-    invalid_events = float(rollout.get("invalid_count", 0)) / max(1, num_envs)
+    del num_envs
+    fall_events = float(rollout.get("fall_count", 0))
+    invalid_events = float(rollout.get("invalid_count", 0))
     displacement = float(rollout.get("mean_forward_displacement") or 0.0)
     height = float(rollout.get("mean_height") or 0.0)
     up = float(rollout.get("mean_up") or 0.0)
@@ -517,7 +578,7 @@ class NewtonMuJoCoTorchEnv:
         ant_density_override: float | None = None,
         ant_contact_margin: float = 0.0,
         ant_contact_gap: float | None = None,
-        ant_contact_mu: float = 0.75,
+        ant_contact_mu: float | None = None,
         ant_joint_damping: float | None = None,
         ant_min_up: float | None = None,
         ant_start_height: float | None = None,
@@ -526,10 +587,10 @@ class NewtonMuJoCoTorchEnv:
         ant_reset_angle_scale: float = math.pi / 24.0,
         ant_reset_joint_scale: float = 0.2,
         ant_reset_velocity_scale: float = 0.25,
-        ant_termination_height: float = ANT_TERMINATION_HEIGHT,
+        ant_termination_height: float | None = None,
         ant_max_healthy_height: float = ANT_MAX_HEALTHY_HEIGHT,
-        ant_observation_style: str = "diffrl",
-        ant_reward_style: str = "diffrl",
+        ant_observation_style: str | None = None,
+        ant_reward_style: str | None = None,
         ant_action_order: str = "joint",
         ant_smooth_up_reward: bool = False,
         hopper_reward_style: str = "diffrl",
@@ -571,6 +632,25 @@ class NewtonMuJoCoTorchEnv:
         self.acrobot_reward = acrobot_reward or AcrobotRewardWeights()
         self.contact_reward = contact_reward or ContactTargetRewardWeights()
         self.acrobot_actuation = acrobot_actuation
+        if env_name == "ant":
+            ant_defaults = ant_defaults_for_asset(ant_asset)
+            if ant_density_override is None:
+                ant_density_override = ant_defaults["density_override"]
+            if ant_contact_mu is None:
+                ant_contact_mu = ant_defaults["contact_mu"]
+            if ant_joint_damping is None:
+                ant_joint_damping = ant_defaults["joint_damping"]
+            if ant_start_height is None:
+                ant_start_height = ant_defaults["start_height"]
+            if ant_start_joint_q is None:
+                ant_start_joint_q = list(ant_defaults["start_joint_q"])
+            if ant_termination_height is None:
+                ant_termination_height = ant_defaults["termination_height"]
+            if ant_observation_style is None:
+                ant_observation_style = ant_defaults["observation_style"]
+            if ant_reward_style is None:
+                ant_reward_style = ant_defaults["reward_style"]
+
         self.ant_asset = ant_asset
         self.ant_disable_joint_limits = ant_disable_joint_limits
         self.ant_density_override = ant_density_override
@@ -2102,6 +2182,7 @@ def masked_random_directions(
 def run_gradient_check(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "newton" if args.env == "ant" else ("mujoco" if is_planar_locomotion_env(args.env) or is_contact_target_env(args.env) else "none")
+    resolve_ant_defaults(args)
     if args.sim_substeps is None:
         args.sim_substeps = 2 if args.env == "ant" else (16 if is_locomotion_env(args.env) else 1)
     if args.horizon is None:
@@ -2633,6 +2714,7 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
 def run_training(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco" if is_locomotion_env(args.env) or is_contact_target_env(args.env) else "none"
+    resolve_ant_defaults(args)
     if args.sim_substeps is None:
         args.sim_substeps = 2 if args.env == "ant" else (16 if is_locomotion_env(args.env) else 1)
     if args.horizon is None:
@@ -3886,7 +3968,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contact-height-weight", type=float, default=1.0)
     parser.add_argument("--contact-action-weight", type=float, default=0.002)
     parser.add_argument("--ant-progress-weight", type=float, default=1.0)
-    parser.add_argument("--ant-heading-weight", type=float, default=0.5)
+    parser.add_argument("--ant-heading-weight", type=float, default=None)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
@@ -3900,22 +3982,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-density-override", type=float, default=None)
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
-    parser.add_argument("--ant-contact-mu", type=float, default=1.0)
-    parser.add_argument("--ant-joint-damping", type=float, default=0.1)
+    parser.add_argument("--ant-contact-mu", type=float, default=None)
+    parser.add_argument("--ant-joint-damping", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
-    parser.add_argument("--ant-start-height", type=float, default=ANT_START_HEIGHT)
-    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=list(ANT_ISAACLAB_START_JOINT_Q))
+    parser.add_argument("--ant-start-height", type=float, default=None)
+    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
     parser.add_argument("--ant-reset-position-scale", type=float, default=0.1)
     parser.add_argument("--ant-reset-angle-scale", type=float, default=math.pi / 24.0)
     parser.add_argument("--ant-reset-joint-scale", type=float, default=0.2)
     parser.add_argument("--ant-reset-velocity-scale", type=float, default=0.25)
-    parser.add_argument("--ant-termination-height", type=float, default=ANT_ISAACLAB_TERMINATION_HEIGHT)
+    parser.add_argument("--ant-termination-height", type=float, default=None)
     parser.add_argument("--ant-max-healthy-height", type=float, default=ANT_MAX_HEALTHY_HEIGHT)
-    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
+    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default=None)
     parser.add_argument(
         "--ant-reward-style",
         choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
-        default="isaaclab",
+        default=None,
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--ant-smooth-up-reward", action="store_true")

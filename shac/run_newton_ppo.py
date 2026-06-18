@@ -39,6 +39,7 @@ from run_newton_shac import (
     pacific_now_iso,
     parse_float_list,
     render_rollout,
+    resolve_ant_defaults,
     rollout_constraint_shortfalls,
     rollout_selection_score,
     summarize_rollout_repeats,
@@ -194,6 +195,7 @@ def tanh_normal_log_prob(
 def train_ppo(args: argparse.Namespace) -> dict:
     if args.contact_backend is None:
         args.contact_backend = "mujoco"
+    resolve_ant_defaults(args)
     if args.sim_substeps is None:
         args.sim_substeps = 2 if args.env == "ant" else (16 if is_locomotion_env(args.env) else 1)
     if args.eval_horizon is None:
@@ -926,7 +928,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--critic-path", type=Path, default=None)
     parser.add_argument("--obs-rms-path", type=Path, default=None)
     parser.add_argument("--ant-progress-weight", type=float, default=1.0)
-    parser.add_argument("--ant-heading-weight", type=float, default=0.5)
+    parser.add_argument("--ant-heading-weight", type=float, default=None)
     parser.add_argument("--ant-up-weight", type=float, default=0.1)
     parser.add_argument("--ant-height-weight", type=float, default=1.0)
     parser.add_argument("--ant-action-penalty", type=float, default=0.0)
@@ -940,22 +942,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-density-override", type=float, default=None)
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
-    parser.add_argument("--ant-contact-mu", type=float, default=1.0)
-    parser.add_argument("--ant-joint-damping", type=float, default=0.1)
+    parser.add_argument("--ant-contact-mu", type=float, default=None)
+    parser.add_argument("--ant-joint-damping", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
-    parser.add_argument("--ant-start-height", type=float, default=ANT_START_HEIGHT)
-    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=list(ANT_ISAACLAB_START_JOINT_Q))
+    parser.add_argument("--ant-start-height", type=float, default=None)
+    parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
     parser.add_argument("--ant-reset-position-scale", type=float, default=0.1)
     parser.add_argument("--ant-reset-angle-scale", type=float, default=math.pi / 24.0)
     parser.add_argument("--ant-reset-joint-scale", type=float, default=0.2)
     parser.add_argument("--ant-reset-velocity-scale", type=float, default=0.25)
-    parser.add_argument("--ant-termination-height", type=float, default=ANT_ISAACLAB_TERMINATION_HEIGHT)
+    parser.add_argument("--ant-termination-height", type=float, default=None)
     parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
-    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
+    parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default=None)
     parser.add_argument(
         "--ant-reward-style",
         choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
-        default="isaaclab",
+        default=None,
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--phase-observation", action="store_true")
