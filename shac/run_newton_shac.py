@@ -2247,13 +2247,18 @@ def shac_rollout_loss(
     qd0: torch.Tensor,
     prev_action0: torch.Tensor,
     stochastic_actor: bool,
+    loss_objective: str = "reward",
+    displacement_objective_weight: float = 1.0,
 ) -> tuple[torch.Tensor, dict]:
+    if loss_objective not in {"reward", "displacement"}:
+        raise ValueError(f"unknown SHAC rollout loss objective: {loss_objective}")
     env.reset_solver_data()
     q = q0.clone()
     qd = qd0.clone()
     prev_action = prev_action0.clone()
     gamma_vec = torch.ones(env.num_envs, dtype=torch.float32, device=env.torch_device)
     loss = torch.zeros((), dtype=torch.float32, device=env.torch_device)
+    root_x_start = q[:, 0].detach().clone()
     rewards = []
     invalid_count = 0
     fall_count = 0
@@ -2269,7 +2274,8 @@ def shac_rollout_loss(
         rew = env.transition_reward(q, qd, q_next, qd_next, action, obs=next_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.detach().mean())
-        loss = loss - (gamma_vec * rew * rew_scale).sum()
+        if loss_objective == "reward":
+            loss = loss - (gamma_vec * rew * rew_scale).sum()
         done = torch.logical_or(invalid, fell)
         invalid_count += int(invalid.detach().sum().cpu())
         fall_count += int(fell.detach().sum().cpu())
@@ -2277,9 +2283,13 @@ def shac_rollout_loss(
         q, qd = q_next, qd_next
         prev_action = action
         progress = torch.where(done, torch.zeros_like(progress), progress + 1)
+    if loss_objective == "displacement":
+        loss = -float(displacement_objective_weight) * (q[:, 0] - root_x_start).sum()
     denom = max(1, horizon * env.num_envs)
     return loss / denom, {
+        "loss_objective": loss_objective,
         "mean_reward": float(torch.stack(rewards).mean().detach().cpu()) if rewards else None,
+        "mean_displacement": float((q[:, 0] - root_x_start).mean().detach().cpu()),
         "invalid_count": invalid_count,
         "fall_count": fall_count,
     }

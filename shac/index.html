@@ -296,8 +296,9 @@
           MuJoCo-contact worlds. A signed H=16 MuJoCo-gradient line search accepts a single <code>1e-7</code> update from
           the high-speed PPO actor, improving the guarded worst-count score from 7625.7 to 7778.7 and the 1024-world
           replay displacement from 22.84 m to 23.45 m, with 0 falls/invalids and minimum height/up of
-          0.499 m / 0.957. A second H=16 signed line search from that actor selects step 0, so the report promotes the
-          one-step guarded update and keeps the rejected second step as a diagnostic. The corrected H=8 finite-difference
+          0.499 m / 0.957. Follow-up H=16 reward, H=32 reward, H=32 displacement-only, and H=16 no-contact-gradient /
+          MuJoCo-eval line searches from that updated actor all select step 0 under the strict long-horizon guard, so the
+          report promotes the one-step guarded update and keeps the rejected directions as diagnostics. The corrected H=8 finite-difference
           check around the earlier d6 PPO actor still has about 4.1e-4 mean relative policy-gradient error with perfect
           sign agreement for MuJoCo, Newton, and no-contact stepping. The remaining Ant lesson is selector and objective
           robustness: older 30 m-class policies are retained as diagnostics only because strict posture/fall gates reject
@@ -1153,9 +1154,12 @@
           MuJoCo-contact SHAC from that PPO actor improves when the optimizer uses a line-search-scale step instead of tiny
           clipped Adam updates. The current selector audits each candidate at 1, 16, 256, 512, and 1024 worlds and keeps the
           worst score. Under that stricter rule, the high-speed PPO anchor's worst guarded score is 7625.7; a signed H=16
-          step of <code>1e-7</code> improves it to 7778.7 and raises the 1024-world replay displacement to 23.45 m. A second
-          H=16 signed line search from that updated actor selected step 0, so further fixed updates are currently rejected
-          by the long-horizon guard. The faster older Newton-gradient / MuJoCo-eval result reaches 10.77 m with
+          step of <code>1e-7</code> improves it to 7778.7 and raises the 1024-world replay displacement to 23.45 m. Follow-up
+          probes from that updated actor are now broader: H=16 reward, H=32 reward, H=32 displacement-only, and H=16
+          no-contact-gradient / MuJoCo-eval line searches all select step 0. Several nonzero candidates still walk, but
+          none improve the guarded score and a few trigger clone-count-wide falls. That weakens the hypothesis of a remaining
+          simple MuJoCo hard-contact VJP sign bug at this policy; the current blocker is escaping this guarded local basin
+          with a differentiable objective and trust-region update that the 480-step physical selector accepts. The faster older Newton-gradient / MuJoCo-eval result reaches 10.77 m with
           0 falls/invalids but lower height margin and without the robust count selector.
           The older 30 m-class clips below remain useful debugging artifacts, but they are not promoted as reliable current
           Ant results.
@@ -3359,7 +3363,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antD6RobustSignedLineSearch: "assets/ant_linesearch_robust_after_fullgrad_step1_h8_signed_run1/ant_linesearch.json",
       antD6RobustH16SignedLineSearch: "assets/ant_linesearch_robust_after_signed_step2_h16_signed_run1/ant_linesearch.json",
       antHighspeedH16LineSearch: "assets/ant_linesearch_highspeed_ppo_h16_robust_signed_run1/ant_linesearch.json",
-      antHighspeedAfterStep1H16LineSearch: "assets/ant_linesearch_highspeed_after_step1_h16_robust_signed_run1/ant_linesearch.json"
+      antHighspeedAfterStep1H16LineSearch: "assets/ant_linesearch_highspeed_after_step1_h16_robust_signed_run1/ant_linesearch.json",
+      antHighspeedAfterStep1H32LineSearch: "assets/ant_linesearch_highspeed_after_step1_h32_robust_signed_run1/ant_linesearch.json",
+      antHighspeedAfterStep1H32DisplacementLineSearch: "assets/ant_linesearch_highspeed_after_step1_h32_displacement_run1/ant_linesearch.json",
+      antHighspeedAfterStep1H16NoContactLineSearch: "assets/ant_linesearch_highspeed_after_step1_h16_nocontactgrad_mujocoeval_run1/ant_linesearch.json"
     };
 
     const clonePaths = [
@@ -3767,7 +3774,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antD6RobustSignedLineSearch,
         antD6RobustH16SignedLineSearch,
         antHighspeedH16LineSearch,
-        antHighspeedAfterStep1H16LineSearch
+        antHighspeedAfterStep1H16LineSearch,
+        antHighspeedAfterStep1H32LineSearch,
+        antHighspeedAfterStep1H32DisplacementLineSearch,
+        antHighspeedAfterStep1H16NoContactLineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3804,7 +3814,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antD6RobustSignedLineSearch),
         safeJson(diagPaths.antD6RobustH16SignedLineSearch),
         safeJson(diagPaths.antHighspeedH16LineSearch),
-        safeJson(diagPaths.antHighspeedAfterStep1H16LineSearch)
+        safeJson(diagPaths.antHighspeedAfterStep1H16LineSearch),
+        safeJson(diagPaths.antHighspeedAfterStep1H32LineSearch),
+        safeJson(diagPaths.antHighspeedAfterStep1H32DisplacementLineSearch),
+        safeJson(diagPaths.antHighspeedAfterStep1H16NoContactLineSearch)
       ]);
       const cloneRuns = await Promise.all(
         clonePaths.map(async (run) => ({ ...run, data: await safeJson(run.path) }))
@@ -3956,6 +3969,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antD6RobustH16SignedLineSearch?.timestamp_pacific,
         antHighspeedH16LineSearch?.timestamp_pacific,
         antHighspeedAfterStep1H16LineSearch?.timestamp_pacific,
+        antHighspeedAfterStep1H32LineSearch?.timestamp_pacific,
+        antHighspeedAfterStep1H32DisplacementLineSearch?.timestamp_pacific,
+        antHighspeedAfterStep1H16NoContactLineSearch?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -4476,7 +4492,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ...lineSearchSeries(antD6RobustSignedLineSearch, "d6 robust step 2 signed", colors.teal),
         ...lineSearchSeries(antD6RobustH16SignedLineSearch, "d6 robust H=16 signed", colors.slate),
         ...lineSearchSeries(antHighspeedH16LineSearch, "high-speed PPO H=16 signed", colors.green),
-        ...lineSearchSeries(antHighspeedAfterStep1H16LineSearch, "after SHAC step H=16 signed", colors.amber)
+        ...lineSearchSeries(antHighspeedAfterStep1H16LineSearch, "after SHAC step H=16 reward", colors.amber),
+        ...lineSearchSeries(antHighspeedAfterStep1H32LineSearch, "after SHAC step H=32 reward", colors.blue),
+        ...lineSearchSeries(antHighspeedAfterStep1H32DisplacementLineSearch, "after SHAC step H=32 dx", colors.teal),
+        ...lineSearchSeries(antHighspeedAfterStep1H16NoContactLineSearch, "after SHAC step H=16 no-contact grad", colors.slate)
       ], {
         ...baseLayout,
         barmode: "group",

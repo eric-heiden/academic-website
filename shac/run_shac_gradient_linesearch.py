@@ -108,6 +108,8 @@ def main() -> None:
     parser.add_argument("--horizon", type=int, default=8)
     parser.add_argument("--gamma", type=float, default=None)
     parser.add_argument("--rew-scale", type=float, default=None)
+    parser.add_argument("--loss-objective", choices=["reward", "displacement"], default="reward")
+    parser.add_argument("--displacement-objective-weight", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--steps", type=parse_float_list, default=[0.0, 1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3])
     parser.add_argument("--eval-horizon", type=int, default=None)
@@ -189,6 +191,8 @@ def main() -> None:
         qd0=qd0,
         prev_action0=prev0,
         stochastic_actor=bool(grad_result.get("stochastic_actor") or False),
+        loss_objective=args.loss_objective,
+        displacement_objective_weight=args.displacement_objective_weight,
     )
     loss.backward()
     grad = flatten_gradients(params)
@@ -313,6 +317,10 @@ def main() -> None:
         "gradient_ant_dof_limit_mode": grad_result.get("ant_dof_limit_mode"),
         "eval_ant_dof_limit_mode": eval_result.get("ant_dof_limit_mode"),
         "horizon": args.horizon,
+        "loss_objective": args.loss_objective,
+        "displacement_objective_weight": args.displacement_objective_weight
+        if args.loss_objective == "displacement"
+        else None,
         "loss": float(loss.detach().cpu()),
         "loss_metrics": metrics,
         "grad_norm": grad_norm,
