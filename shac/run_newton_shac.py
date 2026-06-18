@@ -358,6 +358,7 @@ def rollout_selection_score(
     min_height: float | None = None,
     min_up: float | None = None,
     min_heading: float | None = None,
+    max_abs_joint: float | None = None,
     posture_penalty: float = 0.0,
 ) -> float:
     del num_envs
@@ -372,6 +373,7 @@ def rollout_selection_score(
         min_height=min_height,
         min_up=min_up,
         min_heading=min_heading,
+        max_abs_joint=max_abs_joint,
     )["posture_shortfall"]
     return (
         float(rollout["return"])
@@ -391,6 +393,7 @@ def rollout_constraint_shortfalls(
     min_height: float | None = None,
     min_up: float | None = None,
     min_heading: float | None = None,
+    max_abs_joint: float | None = None,
 ) -> dict[str, float | None]:
     def metric_value(mean_key: str, min_key: str) -> float:
         value = rollout.get(min_key)
@@ -401,17 +404,23 @@ def rollout_constraint_shortfalls(
     height_value = metric_value("mean_height", "min_height")
     up_value = metric_value("mean_up", "min_up")
     heading_value = metric_value("mean_heading", "min_heading")
+    joint_value = metric_value("mean_abs_joint_pos_scaled", "max_abs_joint_pos_scaled")
     height_shortfall = None if min_height is None else max(0.0, float(min_height) - height_value)
     up_shortfall = None if min_up is None else max(0.0, float(min_up) - up_value)
     heading_shortfall = None if min_heading is None else max(0.0, float(min_heading) - heading_value)
-    posture_shortfall = sum(v for v in (height_shortfall, up_shortfall, heading_shortfall) if v is not None)
+    joint_shortfall = None if max_abs_joint is None else max(0.0, joint_value - float(max_abs_joint))
+    posture_shortfall = sum(
+        v for v in (height_shortfall, up_shortfall, heading_shortfall, joint_shortfall) if v is not None
+    )
     return {
         "height_threshold_value": height_value,
         "up_threshold_value": up_value,
         "heading_threshold_value": heading_value,
+        "joint_threshold_value": joint_value,
         "height_shortfall": height_shortfall,
         "up_shortfall": up_shortfall,
         "heading_shortfall": heading_shortfall,
+        "joint_shortfall": joint_shortfall,
         "posture_shortfall": posture_shortfall,
     }
 
@@ -449,6 +458,10 @@ def summarize_rollout_repeats(rollouts: list[dict], scores: list[float] | None =
         "min_height": extrema("min_height"),
         "min_up": extrema("min_up"),
         "min_heading": extrema("min_heading"),
+        "max_abs_joint_pos_scaled": extrema("max_abs_joint_pos_scaled"),
+        "mean_joint_limit_fraction": extrema("mean_joint_limit_fraction"),
+        "max_joint_limit_fraction": extrema("max_joint_limit_fraction"),
+        "max_abs_action": extrema("max_abs_action"),
         "samples": rollouts,
     }
     if scores is not None:
@@ -485,6 +498,10 @@ def summarize_rollout_chunks(chunks: list[dict], *, total_envs: int, chunk_size:
     def min_value(key: str) -> float | None:
         values = [float(item[key]) for item in chunks if item.get(key) is not None]
         return float(np.min(values)) if values else None
+
+    def max_value(key: str) -> float | None:
+        values = [float(item[key]) for item in chunks if item.get(key) is not None]
+        return float(np.max(values)) if values else None
 
     def count_total(key: str) -> int:
         return int(sum(int(item.get(key) or 0) for item in chunks))
@@ -527,6 +544,13 @@ def summarize_rollout_chunks(chunks: list[dict], *, total_envs: int, chunk_size:
         "min_up": min_value("min_up"),
         "mean_heading": weighted_mean("mean_heading"),
         "min_heading": min_value("min_heading"),
+        "mean_abs_joint_pos_scaled": weighted_mean("mean_abs_joint_pos_scaled"),
+        "max_abs_joint_pos_scaled": max_value("max_abs_joint_pos_scaled"),
+        "mean_joint_limit_fraction": weighted_mean("mean_joint_limit_fraction"),
+        "max_joint_limit_fraction": max_value("max_joint_limit_fraction"),
+        "mean_abs_action": weighted_mean("mean_abs_action"),
+        "max_abs_action": max_value("max_abs_action"),
+        "mean_abs_joint_velocity": weighted_mean("mean_abs_joint_velocity"),
         "horizon": chunks[0].get("horizon"),
         "chunks": chunks,
     }
@@ -1414,6 +1438,22 @@ class NewtonMuJoCoTorchEnv:
         half_range = 0.5 * (upper - lower).clamp(min=1.0e-6)
         return ((q[:, 7:] - center) / half_range).clamp(-5.0, 5.0)
 
+    def ant_morphology_metrics(
+        self, q: torch.Tensor, qd: torch.Tensor, action: torch.Tensor
+    ) -> dict[str, torch.Tensor]:
+        if self.env_name != "ant":
+            raise ValueError("ant_morphology_metrics is only valid for Ant")
+        abs_joint = self.ant_dof_pos_scaled(q).abs()
+        abs_action = action.abs()
+        return {
+            "mean_abs_joint_pos_scaled": abs_joint.mean(dim=-1),
+            "max_abs_joint_pos_scaled": abs_joint.max(dim=-1).values,
+            "mean_joint_limit_fraction": (abs_joint > 0.98).to(torch.float32).mean(dim=-1),
+            "mean_abs_action": abs_action.mean(dim=-1),
+            "max_abs_action": abs_action.max(dim=-1).values,
+            "mean_abs_joint_velocity": qd[:, 6:].abs().mean(dim=-1),
+        }
+
     def ant_pose_terms(
         self, q: torch.Tensor, qd: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -1891,9 +1931,24 @@ def make_actor(
 
 
 def freeze_actor_backbone(actor: torch.nn.Module) -> None:
-    head_names = ("mean.", "log_std", "logstd")
+    head_prefixes = []
+    for module_name in ("mean", "actor", "mu_net"):
+        module = getattr(actor, module_name, None)
+        if isinstance(module, torch.nn.Linear):
+            head_prefixes.append(f"{module_name}.")
+        elif isinstance(module, torch.nn.Sequential):
+            for idx in range(len(module) - 1, -1, -1):
+                if isinstance(module[idx], torch.nn.Linear):
+                    head_prefixes.append(f"{module_name}.{idx}.")
+                    break
+    head_names = tuple(head_prefixes) + ("log_std", "logstd")
+    trainable = 0
     for name, param in actor.named_parameters():
-        param.requires_grad_(name.startswith(head_names))
+        is_head = name.startswith(head_names)
+        param.requires_grad_(is_head)
+        trainable += int(is_head)
+    if trainable == 0:
+        raise RuntimeError(f"could not identify actor head parameters in {type(actor).__name__}")
 
 
 def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.device) -> None:
@@ -2953,10 +3008,13 @@ def run_training(args: argparse.Namespace) -> dict:
         for param in anchor_actor.parameters():
             param.requires_grad_(False)
     adam_betas = (args.adam_beta1, args.adam_beta2)
+    actor_params = trainable_parameters(actor)
+    if not actor_params:
+        raise RuntimeError("actor has no trainable parameters")
     if args.optimizer == "sgd":
-        optimizer = torch.optim.SGD(actor.parameters(), lr=args.lr, momentum=args.sgd_momentum)
+        optimizer = torch.optim.SGD(actor_params, lr=args.lr, momentum=args.sgd_momentum)
     else:
-        optimizer = torch.optim.Adam(actor.parameters(), lr=args.lr, betas=adam_betas)
+        optimizer = torch.optim.Adam(actor_params, lr=args.lr, betas=adam_betas)
     critic = None
     target_critic = None
     critic_optimizer = None
@@ -3031,6 +3089,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 min_height=args.selection_min_height,
                 min_up=args.selection_min_up,
                 min_heading=args.selection_min_heading,
+                max_abs_joint=args.selection_max_abs_joint,
                 posture_penalty=args.selection_posture_penalty,
             )
             if candidate_score < worst_score or worst_rollout is None:
@@ -3041,6 +3100,7 @@ def run_training(args: argparse.Namespace) -> dict:
                     min_height=args.selection_min_height,
                     min_up=args.selection_min_up,
                     min_heading=args.selection_min_heading,
+                    max_abs_joint=args.selection_max_abs_joint,
                 )
         assert worst_rollout is not None
         assert worst_shortfalls is not None
@@ -3340,6 +3400,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 min_height=args.selection_min_height,
                 min_up=args.selection_min_up,
                 min_heading=args.selection_min_heading,
+                max_abs_joint=args.selection_max_abs_joint,
             )
         if args.selection_guard_updates and selection_evaluated:
             assert guard_acceptance_threshold is not None
@@ -3415,6 +3476,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 "selection_height_shortfall": selection_shortfalls["height_shortfall"],
                 "selection_up_shortfall": selection_shortfalls["up_shortfall"],
                 "selection_heading_shortfall": selection_shortfalls["heading_shortfall"],
+                "selection_joint_shortfall": selection_shortfalls["joint_shortfall"],
                 "selection_posture_shortfall": selection_shortfalls["posture_shortfall"],
                 "selection_terminal_count": selection_rollout.get("terminal_count"),
                 "selection_fall_count": selection_rollout["fall_count"],
@@ -3512,6 +3574,7 @@ def run_training(args: argparse.Namespace) -> dict:
             min_height=args.selection_min_height,
             min_up=args.selection_min_up,
             min_heading=args.selection_min_heading,
+            max_abs_joint=args.selection_max_abs_joint,
             posture_penalty=args.selection_posture_penalty,
         )
 
@@ -3623,6 +3686,12 @@ def run_training(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "mujoco_smooth_adjoint": args.mujoco_smooth_adjoint,
+        "mujoco_smooth_friction_viscosity": args.mujoco_smooth_friction_viscosity,
+        "mujoco_smooth_friction_scale": args.mujoco_smooth_friction_scale,
+        "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
+        "mujoco_smooth_penalty_damping_alpha": args.mujoco_smooth_penalty_damping_alpha,
+        "mujoco_smooth_friction_surrogate_alpha": args.mujoco_smooth_friction_surrogate_alpha,
         "nconmax": env.nconmax,
         "njmax": env.njmax,
         "world_spacing": list(env.world_spacing) if env.world_spacing is not None else None,
@@ -3636,6 +3705,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "actor_logstd_init": args.actor_logstd_init,
         "actor_layer_norm": args.actor_layer_norm,
         "action_squash": args.action_squash,
+        "train_final_layer_only": args.train_final_layer_only,
         "actor_objective": args.actor_objective,
         "displacement_objective_weight": (
             args.displacement_objective_weight if args.actor_objective == "displacement" else None
@@ -3666,6 +3736,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_min_height": args.selection_min_height,
         "selection_min_up": args.selection_min_up,
         "selection_min_heading": args.selection_min_heading,
+        "selection_max_abs_joint": args.selection_max_abs_joint,
         "selection_posture_penalty": args.selection_posture_penalty,
         "selection_repeats": args.selection_repeats,
         "selection_interval": args.selection_interval,
@@ -3690,6 +3761,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "critic_lr": args.critic_lr,
         "critic_iterations": args.critic_iterations,
         "critic_batch_size": args.critic_batch_size,
+        "gamma": args.gamma,
         "target_critic_alpha": args.target_critic_alpha,
         "selection_horizon": args.selection_horizon,
         "selection_uninterrupted": args.selection_uninterrupted,
@@ -3805,6 +3877,14 @@ def evaluate_policy(
     up_mins = []
     heading_samples = []
     heading_mins = []
+    ant_metric_samples: dict[str, list[torch.Tensor]] = {
+        "mean_abs_joint_pos_scaled": [],
+        "max_abs_joint_pos_scaled": [],
+        "mean_joint_limit_fraction": [],
+        "mean_abs_action": [],
+        "max_abs_action": [],
+        "mean_abs_joint_velocity": [],
+    }
     for _ in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
         action = deterministic_policy_action(actor, obs)
@@ -3833,6 +3913,9 @@ def evaluate_policy(
             up_mins.append(ups.min())
             heading_samples.append(headings.mean())
             heading_mins.append(headings.min())
+            morphology = env.ant_morphology_metrics(q, qd, action)
+            for key, value in morphology.items():
+                ant_metric_samples[key].append(value.detach())
         rew = env.transition_reward(q_prev, qd_prev, q, qd, action, obs=final_obs)
         rew = finalize_terminal_reward(rew, invalid=invalid, fell=fell, termination_penalty=termination_penalty)
         rewards.append(rew.mean())
@@ -3881,6 +3964,41 @@ def evaluate_policy(
         "min_up": float(torch.stack(up_mins).min().cpu()) if up_mins else None,
         "mean_heading": float(torch.stack(heading_samples).mean().cpu()) if heading_samples else None,
         "min_heading": float(torch.stack(heading_mins).min().cpu()) if heading_mins else None,
+        "mean_abs_joint_pos_scaled": (
+            float(torch.cat(ant_metric_samples["mean_abs_joint_pos_scaled"]).mean().cpu())
+            if ant_metric_samples["mean_abs_joint_pos_scaled"]
+            else None
+        ),
+        "max_abs_joint_pos_scaled": (
+            float(torch.cat(ant_metric_samples["max_abs_joint_pos_scaled"]).max().cpu())
+            if ant_metric_samples["max_abs_joint_pos_scaled"]
+            else None
+        ),
+        "mean_joint_limit_fraction": (
+            float(torch.cat(ant_metric_samples["mean_joint_limit_fraction"]).mean().cpu())
+            if ant_metric_samples["mean_joint_limit_fraction"]
+            else None
+        ),
+        "max_joint_limit_fraction": (
+            float(torch.cat(ant_metric_samples["mean_joint_limit_fraction"]).max().cpu())
+            if ant_metric_samples["mean_joint_limit_fraction"]
+            else None
+        ),
+        "mean_abs_action": (
+            float(torch.cat(ant_metric_samples["mean_abs_action"]).mean().cpu())
+            if ant_metric_samples["mean_abs_action"]
+            else None
+        ),
+        "max_abs_action": (
+            float(torch.cat(ant_metric_samples["max_abs_action"]).max().cpu())
+            if ant_metric_samples["max_abs_action"]
+            else None
+        ),
+        "mean_abs_joint_velocity": (
+            float(torch.cat(ant_metric_samples["mean_abs_joint_velocity"]).mean().cpu())
+            if ant_metric_samples["mean_abs_joint_velocity"]
+            else None
+        ),
         "unfinished_mean_return": float(episode_returns.mean().detach().cpu()),
         "unfinished_mean_length": float(episode_lengths.to(torch.float32).mean().detach().cpu()),
         "final_obs_mean": [float(x) for x in final_obs.mean(dim=0).cpu().tolist()],
@@ -3914,6 +4032,14 @@ def evaluate_policy_uninterrupted(
     up_mins = []
     heading_samples = []
     heading_mins = []
+    ant_metric_samples: dict[str, list[torch.Tensor]] = {
+        "mean_abs_joint_pos_scaled": [],
+        "max_abs_joint_pos_scaled": [],
+        "mean_joint_limit_fraction": [],
+        "mean_abs_action": [],
+        "max_abs_action": [],
+        "mean_abs_joint_velocity": [],
+    }
     for step_idx in range(horizon):
         obs = normalize_obs(env.observe(q, qd, prev_action, phase=progress), obs_rms)
         action = deterministic_policy_action(actor, obs)
@@ -3951,6 +4077,9 @@ def evaluate_policy_uninterrupted(
                 up_mins.append(ups.min())
                 heading_samples.append(headings.mean())
                 heading_mins.append(headings.min())
+                morphology = env.ant_morphology_metrics(q_next, qd_next, action)
+                for key, value in morphology.items():
+                    ant_metric_samples[key].append(value[sample_mask].detach())
 
         terminal_step = torch.where(new_terminal, torch.full_like(terminal_step, step_idx + 1), terminal_step)
         terminal_fall = torch.logical_or(terminal_fall, torch.logical_and(active, fell))
@@ -3988,6 +4117,41 @@ def evaluate_policy_uninterrupted(
         "min_up": float(torch.stack(up_mins).min().cpu()) if up_mins else None,
         "mean_heading": float(torch.stack(heading_samples).mean().cpu()) if heading_samples else None,
         "min_heading": float(torch.stack(heading_mins).min().cpu()) if heading_mins else None,
+        "mean_abs_joint_pos_scaled": (
+            float(torch.cat(ant_metric_samples["mean_abs_joint_pos_scaled"]).mean().cpu())
+            if ant_metric_samples["mean_abs_joint_pos_scaled"]
+            else None
+        ),
+        "max_abs_joint_pos_scaled": (
+            float(torch.cat(ant_metric_samples["max_abs_joint_pos_scaled"]).max().cpu())
+            if ant_metric_samples["max_abs_joint_pos_scaled"]
+            else None
+        ),
+        "mean_joint_limit_fraction": (
+            float(torch.cat(ant_metric_samples["mean_joint_limit_fraction"]).mean().cpu())
+            if ant_metric_samples["mean_joint_limit_fraction"]
+            else None
+        ),
+        "max_joint_limit_fraction": (
+            float(torch.cat(ant_metric_samples["mean_joint_limit_fraction"]).max().cpu())
+            if ant_metric_samples["mean_joint_limit_fraction"]
+            else None
+        ),
+        "mean_abs_action": (
+            float(torch.cat(ant_metric_samples["mean_abs_action"]).mean().cpu())
+            if ant_metric_samples["mean_abs_action"]
+            else None
+        ),
+        "max_abs_action": (
+            float(torch.cat(ant_metric_samples["max_abs_action"]).max().cpu())
+            if ant_metric_samples["max_abs_action"]
+            else None
+        ),
+        "mean_abs_joint_velocity": (
+            float(torch.cat(ant_metric_samples["mean_abs_joint_velocity"]).mean().cpu())
+            if ant_metric_samples["mean_abs_joint_velocity"]
+            else None
+        ),
         "horizon": horizon,
     }
 
@@ -4331,6 +4495,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-min-height", type=float, default=None)
     parser.add_argument("--selection-min-up", type=float, default=None)
     parser.add_argument("--selection-min-heading", type=float, default=None)
+    parser.add_argument("--selection-max-abs-joint", type=float, default=None)
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--selection-interval", type=int, default=1)

@@ -301,13 +301,14 @@
           <code>q_next - q</code> is now divided by the full control timestep, not the physics substep.
           Cheetah is the clean SHAC stepping stone: MuJoCo contacts at substep 1 reach 10.41 m uninterrupted with 0 terminals.
           Hopper SHAC is now clean after moving the deterministic start pose off exact active joint limits and using a
-          reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. Ant SHAC now has a
-          reliable accepted-update result: surrogate contact adjoints plus a posture-scored selection guard improve the
-          strict scaled actor to 21.03 m over 960 steps with 0 terminal worlds across 5 x 1024 no-reset audited worlds,
-          mean return 416.6, worst minimum height 0.451 m, and worst minimum-up 0.830. The previous post-hoc 0.825
-          action-scaled actor remains a strong baseline at 21.02 m with a larger worst minimum-up margin of 0.856. The
-          faster 30.04 m late-state H=32 repair remains as a speed diagnostic because it still records rare late rollovers
-          under repeated strict audits.
+          reliability-scale 1024-world selector: it reaches 13.65 m uninterrupted with 0 terminals. The latest Ant cleanup
+          demotes the earlier 21.03 m surrogate-adjoint entry: tensor comparison showed that checkpoint was identical to the
+          0.825 action-scaled actor, so the tiny delta was evaluation noise rather than a real SHAC update. The current
+          promoted Ant SHAC artifact is the saved best 31 m actor re-audited with morphology diagnostics: 31.35 m over
+          960 steps in a 1024-world no-reset audit, 0 terminal worlds, 0 invalid worlds, minimum-up 0.863, mean scaled joint
+          magnitude 0.536, max scaled joint magnitude 1.215, and 26.4 MB peak allocated CUDA memory. A matching PPO 31 m
+          smoke audit still records 2 terminal worlds, while the clipped 15.18 m PPO control remains the clean PPO
+          reliability baseline.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
@@ -315,8 +316,8 @@
           finite-difference pass around the strict scaled Ant actor shows H=1/H=4 policy gradients are accurate and H=8
           remains sign-consistent. Longer head-only policy checks expose the hard-contact issue: MuJoCo-contact H=32/H=128
           finite differences are dominated by grazing active-set changes, while no-contact variants retain sign agreement.
-          Hard-contact guarded SHAC updates still regress the 960-step selector, but the surrogate contact adjoint plus a
-          min-up posture score now gives accepted, auditable Ant SHAC updates.
+          Hard-contact guarded SHAC updates from the scaled actor still regress the 960-step selector, and the newest
+          morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -336,7 +337,7 @@
       <div class="panel metric">
         <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">Strict 960-step surrogate-adjoint SHAC audit; no-reset terminals shown next.</p>
+        <p class="note">Fresh 1024-world no-reset morphology audit; no-reset terminals shown next.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / No-Reset Terms</div>
@@ -416,12 +417,10 @@
           at 15.18 m with 0/5120 no-reset terminal worlds, 0 invalid worlds, and 0.945 minimum-up in the worst repeat.
           The current H=8 SHAC update can improve displacement to 15.39 m in the deterministic no-reset replay and stays
           terminal-free across five 1024-world repeats, but the repeated minimum-up dip shows it is not yet the best reliable
-          Ant gait. The late-state H=32 repair from the clipped PPO anchor is the strongest speed result so far: it selected a
-          zero-fall 3 x 1024-world checkpoint and audited at 30.04 m over 960 steps, but still had rare late terminal worlds
-          under repeated strict up-aware audits. The best strict reliable Ant result is now the surrogate-adjoint,
-          posture-guarded continuation from the 0.825 action-scaled actor: 21.03 m with 0/5120 no-reset terminal worlds,
-          mean return 416.6, and worst minimum-up 0.830. This is only a small improvement over the 0.825 scaled baseline
-          at 21.02 m, and it gives up some posture margin, so Ant is not fully solved. Longer SHAC
+          Ant gait. The previous 21.03 m surrogate-adjoint entry is no longer counted as an accepted SHAC improvement because
+          the saved actor tensors match the 0.825 action-scaled baseline exactly. The current best strict Ant SHAC artifact
+          is instead the 31 m saved best actor re-audited after adding morphology metrics: 31.35 m in a fresh 1024-world
+          no-reset audit with 0 terminals, 0 invalids, minimum-up 0.863, and max scaled joint position 1.215. Longer SHAC
           horizons with hard contact adjoints are still brittle, and later H=8/H=32
           steps can still select a rare contact branch that falls despite better short-horizon reward. Hopper required two harness fixes:
           the default deterministic start is now 0.05 rad inside the two upper joint limits, and the selector uses a large
@@ -510,10 +509,10 @@
               <td>Adam, SGD, H=8/H=16/H=32, and final-layer-only probes all reduced the 960-step selector or hit a terminal, then rolled back.</td>
             </tr>
             <tr>
-              <td>Ant surrogate-adjoint guarded SHAC continuation</td>
-              <td>21.03 m</td>
-              <td>0 / 5120 terminals</td>
-              <td>Reset-aligned H=128 head-only SGD with surrogate contact adjoints and min-up posture scoring produces accepted reliable updates.</td>
+              <td>Ant best SHAC morphology audit</td>
+              <td>31.35 m</td>
+              <td>0 / 1024 terminals</td>
+              <td>Saved best actor reloaded and audited with joint-limit/action saturation metrics; the old 21.03 m surrogate entry is tensor-identical to the scaled baseline.</td>
             </tr>
             <tr>
               <td>Ant policy H=5, margin 0.002</td>
@@ -861,21 +860,21 @@
           repeats. The new selection guard then rolls back candidate updates that fail the long selector. With hard contact
           adjoints this exposed the blocker: 31 completed guarded candidates from the scaled actor were all rejected,
           including Adam H=8, SGD H=16/H=32, no-anchor/no-survival H=16, and final-layer-only H=32 probes. The follow-up
-          displacement-objective probes also regressed under hard contacts. The first accepted path uses MJWarp's surrogate
-          contact adjoint, reset-aligned H=128 head-only SGD, and a posture-scored selector. A strict continuation audit
-          reaches 21.03 m with 0/5120 terminals. The current headline therefore stays cautious but no longer says direct
-          SHAC improvement is impossible: surrogate contact smoothing can improve the reliable Ant policy slightly, while
-          recovering the faster 30 m gait without rare late falls remains open.
+          displacement-objective probes also regressed under hard contacts. The follow-up tensor comparison showed the
+          apparent 21.03 m surrogate continuation did not actually change the actor, so it is now treated as a diagnostic
+          for evaluation noise. The current headline comes from the reloaded 31 m best actor plus a fresh morphology audit;
+          recovering that speed through new differentiable updates without rare contact failures remains open.
         </p>
       </article>
       <article class="panel warn">
         <h2>Ant 30 m Diagnostics</h2>
         <p>
-          The 30 m-class Ant PPO/SHAC clips below are retained to show the debugging path, not as current baselines. Some
-          older runs predate the native action clamp and mixed valid environment fixes with invalid unbounded-action control.
-          The latest tanh-wrapped 31 m actor is action-valid, but fails repeated 1024-world no-reset audits with rare late
-          falls. These runs are useful for comparing contact-gradient behavior and selector design, but the current report
-          headline uses the clipped 15 m PPO/SHAC runs above.
+          The older 30 m-class Ant PPO/SHAC clips below are retained to show the debugging path. Some older runs predate the
+          native action clamp and mixed valid environment fixes with invalid unbounded-action control. The fresh morphology
+          audit above is the current SHAC headline because it reloads the saved best actor, rechecks 1024 no-reset worlds,
+          records joint-limit/action saturation metrics, and renders the same actor with the shared follow camera. PPO still
+          needs a high-speed robust checkpoint: the comparable 31 m PPO smoke audit found 2 terminal worlds, while the clean
+          clipped PPO reliability baseline remains 15.18 m with 0/5120 terminal worlds.
         </p>
       </article>
       <article class="panel warn">
@@ -895,19 +894,19 @@
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Surrogate-Adjoint Continuation</h2>
+        <h2>Ant SHAC, 31 m Morphology Audit</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_surrogate_guardposture_continue_audit_1024_run1/ant_poster.png">
-            <source src="assets/ant_shac_surrogate_guardposture_continue_audit_1024_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_upright_best_morph_audit_1024_smoke_run1/ant_poster.png">
+            <source src="assets/ant_shac_upright_best_morph_audit_1024_smoke_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Reset-aligned H=128 head-only SHAC continuation from the 0.825 scaled actor, using MJWarp surrogate contact
-            adjoints, SGD, selection rollback, and a posture-scored <code>min_up</code> guard. The strict 5 x 1024-world
-            no-reset audit reaches 21.03 m mean displacement, 416.6 mean return, 0 terminal worlds, 0 invalid worlds,
-            worst minimum height 0.451 m, and worst minimum-up 0.830. Runtime was 530.2 s with 15.6 MB peak allocated CUDA
-            memory. The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera, with
-            no overlays. The previous post-hoc 0.825 scaled actor remains a useful margin baseline at 21.02 m and worst
-            minimum-up 0.856.
+            Saved best SHAC Ant actor reloaded through the shared evaluator after adding morphology diagnostics. The fresh
+            1024-world no-reset audit reaches 31.35 m over 960 steps with 0 terminal worlds, 0 invalid worlds, minimum
+            height 0.459 m, minimum-up 0.863, mean scaled joint magnitude 0.536, max scaled joint magnitude 1.215, mean
+            joint-limit fraction 0.141, and max action 0.999. Runtime was 95.9 s with 26.4 MB peak allocated CUDA memory.
+            The video is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera, with no
+            overlays. The earlier 21.03 m surrogate-adjoint checkpoint is retained in plots as a diagnostic but is no longer
+            counted as an accepted update because its actor tensors are identical to the 0.825 scaled baseline.
           </figcaption>
         </figure>
       </article>
@@ -1172,11 +1171,11 @@
           the fastest diagnostic: the selector found a zero-fall 30.08 m checkpoint over 3 x 1024 worlds, and the 5 x 1024
           promotion audit moved 30.04 m over 960 steps with only 1 terminal world. That improves the speed target, but the
           single terminal keeps the high-speed reliability target open. The scaled 21.02 m policy closes the strict
-          reliability check, and the new surrogate-adjoint continuation improves it slightly to 21.03 m with 0/5120 no-reset
-          terminal worlds, but the lower posture margin keeps the speed/robustness tradeoff open. The newest guarded-update
-          probes make that tradeoff explicit: deterministic SHAC evaluation of the scaled actor is clean, hard-contact local
-          SHAC updates either slow the 960-step selector or introduce a fall, and surrogate contact smoothing is the first
-          backward pass that produces accepted reliable updates. The report runner now records
+          fallback reliability check, but the apparent 21.03 m surrogate continuation is now demoted because it did not
+          change the actor tensors. The newest guarded-update probes make the tradeoff explicit: deterministic SHAC
+          evaluation of the scaled actor is clean, hard-contact local SHAC updates either slow the 960-step selector or
+          introduce a fall, and the 31 m saved best actor needs strict morphology-aware re-audits before promotion. The
+          report runner now records
           <code>selection_update_accepted</code> and rolls back rejected candidates, so future Ant runs can search without
           silently drifting away from the reliable checkpoint.
         </p>
@@ -1192,11 +1191,11 @@
           The late-state H=32 repair raises the speed target to 30.04 m over 960 steps, but failing worlds still flip late
           after accumulated contact interaction. Tightening the evaluator with <code>ant_min_up=0.8</code> exposed why those
           clips looked wrong even when height-only terminal counts were low. Scaling the late-state SHAC actions to 0.825
-          remains the posture-margin baseline: 21.02 m, 0/5120 strict terminals, and worst minimum-up 0.856. The
-          surrogate-adjoint continuation is the best accepted SHAC update so far at 21.03 m and 0/5120 strict terminals, but
-          its worst minimum-up drops to 0.830. Future work should recover more of the 30 m gait while preserving the stronger
-          up-margin, without reintroducing the old unbounded-torque behavior or collapsing into the standing policies found by
-          earlier soft-height PPO probes.
+          remains the fallback posture-margin baseline: 21.02 m, 0/5120 strict terminals, and worst minimum-up 0.856. The
+          current promoted SHAC artifact is the reloaded 31 m best actor with a fresh 1024-world morphology audit; future
+          work should reproduce that quality through new differentiable updates while preserving the stronger up-margin,
+          without reintroducing the old unbounded-torque behavior or collapsing into the standing policies found by earlier
+          soft-height PPO probes.
         </p>
       </article>
       <article class="panel warn">
@@ -1838,12 +1837,10 @@
           feet sit on grazing active-set boundaries, but the strict scaled actor also shows that local derivatives can be
           sign-consistent while candidate updates remain bad for 960-step reliability. Adam was not the whole explanation:
           guarded SGD probes also rolled back every H=16/H=32 candidate, and removing anchor/survival shaping or freezing
-          the actor backbone did not produce an accepted hard-contact update. The missing piece was partly contact smoothing:
-          MJWarp's surrogate contact adjoint plus a reset-aligned displacement objective and posture-scored selector now
-          produce accepted Ant SHAC updates. The current no-reset matrix is Cheetah SHAC at 10.41 m, Hopper SHAC at
-          13.65 m, and surrogate-adjoint Ant SHAC at 21.03 m; the open target is recovering more of the 30 m Ant gait while
-          preserving the zero-terminal repeated audits and stronger posture margin. It no longer looks like a single RNE
-          mass/bias cancellation bug.
+          the actor backbone did not produce an accepted hard-contact update. The current no-reset matrix is Cheetah SHAC at
+          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 31.35 m in the fresh morphology audit; the open target is
+          reproducing that Ant quality with new SHAC updates while preserving zero-terminal repeated audits and stronger
+          posture margin. It no longer looks like a single RNE mass/bias cancellation bug.
         </p>
       </article>
     </section>
@@ -2338,6 +2335,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC corrected potential",
         path: "assets/ant_shac_dtfix_from_potential_ppo_anchor_h16_16env_12ep_run1/ant_results.json",
         color: colors.green
+      },
+      {
+        id: "antShacUprightBestMorphAudit",
+        label: "Ant SHAC 31m morphology audit",
+        path: "assets/ant_shac_upright_best_morph_audit_1024_smoke_run1/ant_results.json",
+        color: colors.green
+      },
+      {
+        id: "antPpo31mMorphAudit",
+        label: "Ant PPO 31m morphology smoke",
+        path: "assets/ant_ppo_31m_morph_audit_1024_smoke_run1/ant_ppo_results.json",
+        color: colors.coral
       },
       {
         id: "antShacUprightCandidateAudit",
@@ -3189,7 +3198,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacSurrogateContinue")
+      const antLatest = presentRuns.find((run) => run.id === "antShacUprightBestMorphAudit")
+        || presentRuns.find((run) => run.id === "antShacSurrogateContinue")
         || presentRuns.find((run) => run.id === "antShacSurrogatePosture")
         || presentRuns.find((run) => run.id === "antShacScaled0825Strict")
         || presentRuns.find((run) => run.id === "antShacLateStateReliability")

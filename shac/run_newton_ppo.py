@@ -424,6 +424,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 min_height=args.selection_min_height,
                 min_up=args.selection_min_up,
                 min_heading=args.selection_min_heading,
+                max_abs_joint=args.selection_max_abs_joint,
                 posture_penalty=args.selection_posture_penalty,
             )
             if candidate_score < worst_score or worst_selection is None:
@@ -434,6 +435,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                     min_height=args.selection_min_height,
                     min_up=args.selection_min_up,
                     min_heading=args.selection_min_heading,
+                    max_abs_joint=args.selection_max_abs_joint,
                 )
         assert worst_selection is not None
         assert worst_shortfalls is not None
@@ -648,6 +650,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             "selection_height_shortfall": selection_shortfalls.get("height_shortfall"),
             "selection_up_shortfall": selection_shortfalls.get("up_shortfall"),
             "selection_heading_shortfall": selection_shortfalls.get("heading_shortfall"),
+            "selection_joint_shortfall": selection_shortfalls.get("joint_shortfall"),
             "selection_posture_shortfall": selection_shortfalls.get("posture_shortfall"),
             "selection_terminal_count": selection.get("terminal_count") if selection is not None else None,
             "selection_fall_count": selection["fall_count"] if selection is not None else None,
@@ -790,6 +793,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             min_height=args.selection_min_height,
             min_up=args.selection_min_up,
             min_heading=args.selection_min_heading,
+            max_abs_joint=args.selection_max_abs_joint,
             posture_penalty=args.selection_posture_penalty,
         )
 
@@ -911,6 +915,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_min_height": args.selection_min_height,
         "selection_min_up": args.selection_min_up,
         "selection_min_heading": args.selection_min_heading,
+        "selection_max_abs_joint": args.selection_max_abs_joint,
         "selection_posture_penalty": args.selection_posture_penalty,
         "selection_repeats": args.selection_repeats,
         "selection_uninterrupted": args.selection_uninterrupted,
@@ -1124,6 +1129,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-min-height", type=float, default=None)
     parser.add_argument("--selection-min-up", type=float, default=None)
     parser.add_argument("--selection-min-heading", type=float, default=None)
+    parser.add_argument("--selection-max-abs-joint", type=float, default=None)
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--selection-uninterrupted", action="store_true")
