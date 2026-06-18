@@ -323,7 +323,11 @@
           a repeat audit and is kept as a diagnostic. Newton contacts are not a drop-in forward fix for the saved actor: one
           replay found 2/1024 terminal worlds and a direct Newton-contact H=8 line search selected step 0, with every
           nonzero step producing at least one terminal. The no-contact negative control terminates all 1024 worlds. The
-          newest morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
+          newest harness fix is Ant action semantics: both DiffRL and NV MJCFs order motors as actuator entries, not joint
+          order, so PPO and SHAC now resolve Ant defaults to <code>ant_action_order=actuator</code>. With that fix, the
+          NV/IsaacLab PPO smoke improves from a joint-order 4.93 m actor with 5/3072 repeated-audit falls to a 7.18 m actor
+          with 0/3072 falls, minimum-up 0.862, and minimum heading 0.087 across three 1024-world no-reset repeats. The newest
+          morphology metrics show when a candidate is using excessive joint-limit posture instead of a robust gait.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -524,6 +528,24 @@
               <td>31.35 m</td>
               <td>0 / 1024 terminals</td>
               <td>Saved best actor reloaded and audited with joint-limit/action saturation metrics; the old 21.03 m surrogate entry is tensor-identical to the scaled baseline.</td>
+            </tr>
+            <tr>
+              <td>Ant PPO, corrected actuator order</td>
+              <td>7.18 m</td>
+              <td>0 / 3072 terminals</td>
+              <td>Ant defaults now use MJCF actuator-order torques; the comparable joint-order PPO smoke had 5/3072 repeated-audit falls.</td>
+            </tr>
+            <tr>
+              <td>Ant corrected PPO actor, H=8 policy</td>
+              <td>4.7e-1 MuJoCo / 2.7e-1 no contact</td>
+              <td>0.88 / 0.88</td>
+              <td>Action-order semantics are fixed, but long-horizon policy gradients remain contact sensitive.</td>
+            </tr>
+            <tr>
+              <td>Ant corrected PPO actor, H=4 SHAC line search</td>
+              <td>best step 0</td>
+              <td>nonzero steps fail or regress</td>
+              <td>1e-6 causes one terminal world; 3e-6, 1e-5, 3e-5, and 1e-4 stay terminal-free but score below baseline.</td>
             </tr>
             <tr>
               <td>Ant 31 m actor, H=16 policy, hard MuJoCo contacts</td>
@@ -756,7 +778,7 @@
         <div id="solver-chart" class="chart"></div>
       </div>
       <div class="panel">
-        <h2>Ant H=8 Line Search</h2>
+        <h2>Ant SHAC Line Search</h2>
         <div id="ant-linesearch-chart" class="chart"></div>
       </div>
     </section>
@@ -937,6 +959,13 @@
           terminates all 1024 worlds with only 0.03 m displacement, so the policy is not a free-flight artifact. The current
           headline comes from the reloaded 31 m best actor plus a fresh morphology audit;
           recovering that speed through new differentiable updates without rare contact failures remains open.
+          A new PPO harness pass found a separate Ant action-order bug: both the DiffRL and NV Ant MJCFs list motors in
+          actuator order, but the runners previously defaulted to joint-order torques unless explicitly overridden. After
+          resolving Ant defaults to actuator order, the NV/IsaacLab PPO smoke produces a reliable 7.18 m baseline with
+          0/3072 repeated-audit terminal worlds. Finite differences around that corrected PPO actor still show the SHAC
+          blocker: H=8 policy-gradient error is 4.7e-1 with MuJoCo contacts and 2.7e-1 without contacts, while one-step
+          state/action remains at 4.4e-3. An H=4 SHAC direction line search around the corrected actor selected step 0;
+          the first nonzero step caused one terminal world and the safe nonzero steps all scored lower.
         </p>
       </article>
       <article class="panel warn">
@@ -1078,6 +1107,21 @@
             reward but dropped full-horizon selection to lower 10-12 m gaits. Runtime was 148.1 s with 86.7 MB peak allocated
             CUDA memory. The video is the selected best actor, rendered from raw <code>ViewerGL.get_frame()</code> with the
             shared smoothed COM follow camera and no overlays.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant PPO, Corrected Actuator Order</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_nv_actuator_upper_reliable_continue_512env_120upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_nv_actuator_upper_reliable_continue_512env_120upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            NV/IsaacLab PPO after fixing Ant's default torque mapping to MJCF actuator order. The saved best checkpoint
+            reaches 7.18 m over 960 steps with 0 terminal worlds in a 3 x 1024 no-reset audit, minimum-up 0.862, minimum
+            heading 0.087, maximum scaled joint position 1.17, 839.7 s runtime, and 76.9 MB peak allocated CUDA memory.
+            The clip is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera, with no
+            overlays.
           </figcaption>
         </figure>
       </article>
@@ -2422,6 +2466,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.coral
       },
       {
+        id: "antPpoNvActuatorReliable",
+        label: "Ant PPO actuator-order reliable",
+        path: "assets/ant_ppo_nv_actuator_upper_reliable_continue_512env_120upd_run1/ant_ppo_results.json",
+        color: colors.blue
+      },
+      {
         id: "antShacUprightCandidateAudit",
         label: "Ant SHAC repeated-audited anchor",
         path: "assets/ant_shac_upright_candidate_repeated_audit_run1/ant_results.json",
@@ -2900,6 +2950,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antNoContactEval: "assets/ant_shac_31m_contact_backend_eval_none_run1/ant_linesearch.json",
       antNewtonContactLineSearch: "assets/ant_shac_31m_newton_contact_linesearch_h8_run1/ant_linesearch.json",
       antUpperLimitLineSearch: "assets/ant_shac_31m_upperlimit_linesearch_h8_run1/ant_linesearch.json",
+      antNvActuatorH8Newton: "assets/ant_gradcheck_nv_actuator_ppo_reliable_h8_run1/ant_gradient_check.json",
+      antNvActuatorH8Mujoco: "assets/ant_gradcheck_nv_actuator_ppo_reliable_h8_mujoco_run1/ant_gradient_check.json",
+      antNvActuatorH8NoContact: "assets/ant_gradcheck_nv_actuator_ppo_reliable_h8_nocontact_run1/ant_gradient_check.json",
+      antNvActuatorH4LineSearch: "assets/ant_shac_linesearch_nv_actuator_ppo_h4_run1/ant_linesearch.json",
       contactSphereTrain: "assets/contact_sphere_train_after_applyft_run1/contact_sphere_results.json",
       contactCapsuleTrain: "assets/contact_capsule_train_after_applyft_run1/contact_capsule_results.json",
       planarBranch: "assets/solver_gradient_diagnostics_planar_branch_level_kinematics_run1/solver_gradient_diagnostics.json",
@@ -3265,7 +3319,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNewtonContactEval,
         antNoContactEval,
         antNewtonContactLineSearch,
-        antUpperLimitLineSearch
+        antUpperLimitLineSearch,
+        antNvActuatorH8Newton,
+        antNvActuatorH8Mujoco,
+        antNvActuatorH8NoContact,
+        antNvActuatorH4LineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3279,7 +3337,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antNewtonContactEval),
         safeJson(diagPaths.antNoContactEval),
         safeJson(diagPaths.antNewtonContactLineSearch),
-        safeJson(diagPaths.antUpperLimitLineSearch)
+        safeJson(diagPaths.antUpperLimitLineSearch),
+        safeJson(diagPaths.antNvActuatorH8Newton),
+        safeJson(diagPaths.antNvActuatorH8Mujoco),
+        safeJson(diagPaths.antNvActuatorH8NoContact),
+        safeJson(diagPaths.antNvActuatorH4LineSearch)
       ]);
 
       const stable = presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
@@ -3368,6 +3430,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNoContactEval?.timestamp_pacific,
         antNewtonContactLineSearch?.timestamp_pacific,
         antUpperLimitLineSearch?.timestamp_pacific,
+        antNvActuatorH8Newton?.timestamp_pacific,
+        antNvActuatorH8Mujoco?.timestamp_pacific,
+        antNvActuatorH8NoContact?.timestamp_pacific,
+        antNvActuatorH4LineSearch?.timestamp_pacific,
         hopperTrainNoLimits?.timestamp_pacific,
         hopperPpoFaithful?.timestamp_pacific,
         hopperPpoNoLimitsSubsteps?.timestamp_pacific,
@@ -3646,7 +3712,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Ant 31m H=16 hard contact policy", bestSweep(antBestH16Hard?.policy, "mean_relative_error")],
         ["Ant 31m H=16 Newton contact policy", bestSweep(antBestH16Newton?.policy, "mean_relative_error")],
         ["Ant 31m H=16 no-contact policy", bestSweep(antBestH16NoContact?.policy, "mean_relative_error")],
+        ["Ant NV actuator PPO H=8 Newton contact", bestSweep(antNvActuatorH8Newton?.policy, "mean_relative_error")],
+        ["Ant NV actuator PPO H=8 MuJoCo contact", bestSweep(antNvActuatorH8Mujoco?.policy, "mean_relative_error")],
+        ["Ant NV actuator PPO H=8 no contact", bestSweep(antNvActuatorH8NoContact?.policy, "mean_relative_error")],
         ["Ant 31m one-step state/action", bestSweep(antBestH16Hard?.one_step_state_action, "mean_relative_error")],
+        ["Ant NV actuator PPO one-step state/action", bestSweep(antNvActuatorH8Mujoco?.one_step_state_action, "mean_relative_error")],
         ["Ant scaled actor one-step action", bestSweep(antScaledH1?.one_step_action, "mean_relative_error")],
         ["Ant scaled actor one-step state", bestSweep(antScaledH1?.one_step_state_action, "mean_relative_error")],
         ["Ant local H=8 MuJoCo actions", bestSweep(antLocalH8Mujoco?.fixed_action_sequence)],
@@ -3727,7 +3797,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       plotOrMessage("ant-linesearch-chart", [
         ...lineSearchSeries(antGradDirectionLineSearch, "MuJoCo hard", colors.coral),
         ...lineSearchSeries(antNewtonContactLineSearch, "Newton contacts", colors.teal),
-        ...lineSearchSeries(antUpperLimitLineSearch, "upper-limit reward", colors.violet)
+        ...lineSearchSeries(antUpperLimitLineSearch, "upper-limit reward", colors.violet),
+        ...lineSearchSeries(antNvActuatorH4LineSearch, "NV actuator PPO H=4", colors.blue)
       ], {
         ...baseLayout,
         barmode: "group",

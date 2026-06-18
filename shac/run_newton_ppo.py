@@ -242,6 +242,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_max_healthy_height=args.ant_max_healthy_height,
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
+        ant_dof_limit_mode=args.ant_dof_limit_mode,
         ant_action_order=args.ant_action_order,
         ant_reward_min_up=args.ant_reward_min_up,
         ant_reward_min_height=args.ant_reward_min_height,
@@ -314,6 +315,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             ant_max_healthy_height=args.ant_max_healthy_height,
             ant_observation_style=args.ant_observation_style,
             ant_reward_style=args.ant_reward_style,
+            ant_dof_limit_mode=args.ant_dof_limit_mode,
             ant_action_order=args.ant_action_order,
             ant_reward_min_up=args.ant_reward_min_up,
             ant_reward_min_height=args.ant_reward_min_height,
@@ -727,6 +729,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             ant_max_healthy_height=args.ant_max_healthy_height,
             ant_observation_style=args.ant_observation_style,
             ant_reward_style=args.ant_reward_style,
+            ant_dof_limit_mode=args.ant_dof_limit_mode,
             ant_action_order=args.ant_action_order,
             ant_reward_min_up=args.ant_reward_min_up,
             ant_reward_min_height=args.ant_reward_min_height,
@@ -844,6 +847,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_max_healthy_height=args.ant_max_healthy_height,
                 ant_observation_style=args.ant_observation_style,
                 ant_reward_style=args.ant_reward_style,
+                ant_dof_limit_mode=args.ant_dof_limit_mode,
                 ant_action_order=args.ant_action_order,
                 ant_reward_min_up=args.ant_reward_min_up,
                 ant_reward_min_height=args.ant_reward_min_height,
@@ -977,6 +981,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_max_healthy_height": env.ant_max_healthy_height if args.env == "ant" else None,
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
+        "ant_dof_limit_mode": env.ant_dof_limit_mode if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "ant_reward_min_up": env.ant_reward_min_up if args.env == "ant" else None,
         "ant_reward_min_height": env.ant_reward_min_height if args.env == "ant" else None,
@@ -1091,7 +1096,8 @@ def parse_args() -> argparse.Namespace:
         choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
         default=None,
     )
-    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
+    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default=None)
+    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default=None)
     parser.add_argument("--ant-reward-min-up", type=float, default=None)
     parser.add_argument("--ant-reward-min-height", type=float, default=None)
     parser.add_argument("--ant-up-margin-penalty", type=float, default=0.0)

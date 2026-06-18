@@ -156,6 +156,8 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
             "termination_height": ANT_TERMINATION_HEIGHT,
             "observation_style": "diffrl",
             "reward_style": "diffrl",
+            "dof_limit_mode": "abs",
+            "action_order": "actuator",
             "heading_weight": 1.0,
         }
     return {
@@ -170,6 +172,8 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
         "termination_height": ANT_ISAACLAB_TERMINATION_HEIGHT,
         "observation_style": "isaac",
         "reward_style": "isaaclab_potential",
+        "dof_limit_mode": "upper",
+        "action_order": "actuator",
         "heading_weight": 0.5,
     }
 
@@ -200,6 +204,10 @@ def resolve_ant_defaults(args: argparse.Namespace) -> None:
         args.ant_observation_style = defaults["observation_style"]
     if getattr(args, "ant_reward_style", None) is None:
         args.ant_reward_style = defaults["reward_style"]
+    if getattr(args, "ant_dof_limit_mode", None) is None:
+        args.ant_dof_limit_mode = defaults["dof_limit_mode"]
+    if getattr(args, "ant_action_order", None) is None:
+        args.ant_action_order = defaults["action_order"]
     if getattr(args, "ant_heading_weight", None) is None:
         args.ant_heading_weight = defaults["heading_weight"]
 
@@ -2770,6 +2778,13 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "ant_asset": env.ant_asset if args.env == "ant" else None,
         "ant_disable_joint_limits": env.ant_disable_joint_limits if args.env == "ant" else None,
         "ant_density_override": env.ant_density_override if args.env == "ant" else None,
+        "ant_start_height": env.ant_start_height if args.env == "ant" else None,
+        "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
+        "ant_termination_height": env.ant_termination_height if args.env == "ant" else None,
+        "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
+        "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
+        "ant_dof_limit_mode": env.ant_dof_limit_mode if args.env == "ant" else None,
+        "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "ant_reset_position_scale": env.ant_reset_position_scale if args.env == "ant" else None,
         "ant_reset_angle_scale": env.ant_reset_angle_scale if args.env == "ant" else None,
         "ant_reset_joint_scale": env.ant_reset_joint_scale if args.env == "ant" else None,
@@ -4462,8 +4477,8 @@ def parse_args() -> argparse.Namespace:
         choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
         default=None,
     )
-    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default="abs")
-    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
+    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default=None)
+    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default=None)
     parser.add_argument("--ant-smooth-up-reward", action="store_true")
     parser.add_argument("--ant-reward-min-up", type=float, default=None)
     parser.add_argument("--ant-reward-min-height", type=float, default=None)
