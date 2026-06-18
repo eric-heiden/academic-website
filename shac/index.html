@@ -336,7 +336,13 @@
           newest SHAC split-backend pass adds separate differentiable-training and physical-evaluation environments: an H=4
           no-contact gradient step selected at 3e-5 survives a 3 x 1024 MuJoCo-contact no-reset audit, but a guarded 12-epoch
           SHAC continuation does not beat the corrected PPO baseline. H=16 no-contact directions are stable but still inside
-          the audit noise band.
+          the audit noise band. The June 18 continuation moved Ant SHAC onto the backend split that the diagnostics support:
+          Newton contacts for differentiable training and MuJoCo contacts for physical selection/evaluation. A deterministic
+          H=8 SHAC continuation from the strong PPO actor accepted two guarded updates and now reaches 10.77 m over 240
+          MuJoCo-contact steps with 0/256 falls, while stochastic SHAC and a direct displacement objective were rejected by
+          the guard. The remaining MuJoCo-contact finite-difference mismatch is an active-set issue: millimeter vertical
+          root perturbations switch Ant foot contacts between one and two active capsule-plane rows, so the local adjoint is
+          correct for the current row set but finite differences can cross a nonsmooth contact activation boundary.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1423">MJWarp PR #1423</a>
@@ -383,6 +389,8 @@
         current MJWarp branch snapshots the pre-contact <code>nefc</code> per world and assigns deterministic contact rows
         after that offset. Zero-action Ant clone consistency is still bitwise stable for 256 worlds over 240 steps, and the
         same offset-fixed branch restores the PPO positive controls for Ant, Hopper, and Cheetah.
+        The latest Ant SHAC line uses Newton contacts for the differentiable update and MuJoCo contacts for selection,
+        because the hard MuJoCo contact finite differences cross active-set changes around grazing feet.
       </p>
       <table>
         <thead>
@@ -408,12 +416,12 @@
           </tr>
           <tr>
             <td>Ant</td>
-            <td>SHAC</td>
-            <td>240 steps, 128 worlds</td>
-            <td>6.87 m</td>
+            <td>SHAC, Newton gradients / MuJoCo eval</td>
+            <td>240 steps, 256 worlds</td>
+            <td>10.77 m</td>
             <td>0 / 0</td>
-            <td>17.36 s</td>
-            <td>12.11 MB</td>
+            <td>117.52 s</td>
+            <td>20.81 MB</td>
           </tr>
           <tr>
             <td>Hopper</td>
@@ -493,12 +501,13 @@
       <article class="panel ok">
         <h2>Ant SHAC, Offset Fix</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_poster.png">
-            <source src="assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_newton_det_mujoco_select_from_ppo_h8_16env_32ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_newton_det_mujoco_select_from_ppo_h8_16env_32ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Current SHAC actor replay on the fixed branch: 6.87 m over 240 steps, 0/128 falls, minimum height 0.498 m, and
-            minimum up 0.981.
+            Deterministic SHAC continuation using Newton-contact gradients and MuJoCo-contact selection: 10.77 m over
+            240 steps, 0/256 falls, minimum height 0.499 m, and minimum up 0.953. Frames are raw
+            <code>ViewerGL.get_frame()</code> output with the shared smoothed follow camera.
           </figcaption>
         </figure>
       </article>
@@ -524,6 +533,52 @@
           </figcaption>
         </figure>
       </article>
+    </section>
+
+    <section class="panel warn">
+      <h2>Ant Contact Gradient Split</h2>
+      <p>
+        The latest finite-difference drilldown separates solver-gradient bugs from hard-contact nonsmoothness. With contacts
+        disabled, H=4 Ant policy and fixed-action gradients around the PPO actor match finite differences to about 3e-3
+        mean relative error. Newton contacts keep fixed-action and state gradients at the same level. MuJoCo contacts are
+        sign-consistent for policy/action directions, but direct state perturbations can cross contact activation boundaries:
+        a 0.6 mm vertical root shift changed active capsule-plane rows from two contacts to one in the step-1 Ant state.
+        That is why the current SHAC recipe trains through Newton contacts and scores through MuJoCo contacts.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Backend</th>
+            <th>Policy grad error</th>
+            <th>Fixed-action grad error</th>
+            <th>State grad error</th>
+            <th>Sign agreement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No contact</td>
+            <td>3.44e-3</td>
+            <td>3.54e-3</td>
+            <td>7.52e-4</td>
+            <td>1.00 / 1.00 / 1.00</td>
+          </tr>
+          <tr>
+            <td>Newton contacts</td>
+            <td>3.60e-1</td>
+            <td>3.05e-3</td>
+            <td>7.31e-4</td>
+            <td>1.00 / 1.00 / 1.00</td>
+          </tr>
+          <tr>
+            <td>MuJoCo contacts</td>
+            <td>1.57e-1</td>
+            <td>2.10e-1</td>
+            <td>9.31e-1</td>
+            <td>1.00 / 1.00 / 0.50</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     <section class="grid two">
@@ -2357,9 +2412,15 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       },
       {
         id: "antShacOffsetCurrent",
-        label: "Ant SHAC current offset fix",
-        path: "assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_results.json",
+        label: "Ant SHAC Newton-grad current",
+        path: "assets/ant_shac_newton_det_mujoco_select_from_ppo_h8_16env_32ep_run1/ant_results.json",
         color: colors.teal
+      },
+      {
+        id: "antShacMujocoOffsetReeval",
+        label: "Ant SHAC MuJoCo-contact replay",
+        path: "assets/ant_shac_current_mjwarp_offset_reeval_followcam_240step_run1/ant_results.json",
+        color: colors.amber
       },
       {
         id: "hopperPpoOffsetCurrent",
@@ -3337,7 +3398,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antLocalH8Margin002: "assets/ant_multistep_grad_local_components_h8_margin002_run1.json",
       antNvH8Ppo: "assets/ant_multistep_grad_nv_lownoise_ppo_h8_run1.json",
       antNvH8PpoSoftLimits: "assets/ant_multistep_grad_nv_lownoise_ppo_h8_softlimits_run1.json",
-      antNvRootfixH8Ppo: "assets/ant_multistep_grad_nv_rootfix_singlefloor_ppo_h8_run1.json"
+      antNvRootfixH8Ppo: "assets/ant_multistep_grad_nv_rootfix_singlefloor_ppo_h8_run1.json",
+      antOffsetH4Mujoco: "assets/ant_gradcheck_offsetfix_exactppo_h4_mujoco_run1/ant_gradient_check.json",
+      antOffsetH4Newton: "assets/ant_gradcheck_offsetfix_exactppo_h4_newton_run1/ant_gradient_check.json",
+      antOffsetH4NoContact: "assets/ant_gradcheck_offsetfix_exactppo_h4_nocontact_run1/ant_gradient_check.json"
     };
 
     const clonePaths = [
@@ -3642,7 +3706,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antLocalH8Margin002,
         antNvH8Ppo,
         antNvH8PpoSoftLimits,
-        antNvRootfixH8Ppo
+        antNvRootfixH8Ppo,
+        antOffsetH4Mujoco,
+        antOffsetH4Newton,
+        antOffsetH4NoContact
       ] = await Promise.all([
         safeJson(diagPaths.none),
         safeJson(diagPaths.newton),
@@ -3701,7 +3768,10 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antLocalH8Margin002),
         safeJson(diagPaths.antNvH8Ppo),
         safeJson(diagPaths.antNvH8PpoSoftLimits),
-        safeJson(diagPaths.antNvRootfixH8Ppo)
+        safeJson(diagPaths.antNvRootfixH8Ppo),
+        safeJson(diagPaths.antOffsetH4Mujoco),
+        safeJson(diagPaths.antOffsetH4Newton),
+        safeJson(diagPaths.antOffsetH4NoContact)
       ]);
       const [
         antScaledHeadH16,
@@ -3884,6 +3954,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antNvH8Ppo?.timestamp_pacific,
         antNvH8PpoSoftLimits?.timestamp_pacific,
         antNvRootfixH8Ppo?.timestamp_pacific,
+        antOffsetH4Mujoco?.timestamp_pacific,
+        antOffsetH4Newton?.timestamp_pacific,
+        antOffsetH4NoContact?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -4158,7 +4231,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["Ant NV stable-root H=8 fixed actions", bestSweep(antNvRootfixH8Ppo?.fixed_action_sequence)],
         ["Ant NV H=8 PPO policy", bestSweep(antNvH8Ppo?.policy)],
         ["Ant NV H=8 PPO fixed actions", bestSweep(antNvH8Ppo?.fixed_action_sequence)],
-        ["Ant NV H=8 no hard limits", bestSweep(antNvH8PpoSoftLimits?.fixed_action_sequence)]
+        ["Ant NV H=8 no hard limits", bestSweep(antNvH8PpoSoftLimits?.fixed_action_sequence)],
+        ["Ant offset H=4 no-contact policy", bestSweep(antOffsetH4NoContact?.policy)],
+        ["Ant offset H=4 no-contact fixed actions", bestSweep(antOffsetH4NoContact?.fixed_action_sequence)],
+        ["Ant offset H=4 Newton fixed actions", bestSweep(antOffsetH4Newton?.fixed_action_sequence)],
+        ["Ant offset H=4 MuJoCo policy", bestSweep(antOffsetH4Mujoco?.policy)],
+        ["Ant offset H=4 MuJoCo fixed actions", bestSweep(antOffsetH4Mujoco?.fixed_action_sequence)]
       ].filter(([, row]) => positiveMetric(row) !== null);
 
       plotOrMessage("contact-horizon-chart", [
