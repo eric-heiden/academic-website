@@ -1485,7 +1485,13 @@ class NewtonMuJoCoTorchEnv:
 
         if obs is None:
             obs = self.observe(q, qd, action)
-        if self.ant_reward_style in {"isaac", "isaaclab", "isaaclab_potential", "isaac_heading_gated"}:
+        if self.ant_reward_style in {
+            "isaac",
+            "isaaclab",
+            "isaaclab_potential",
+            "isaaclab_potential_height",
+            "isaac_heading_gated",
+        }:
             if self.ant_observation_style == "isaac":
                 up_proj = obs[:, 10]
                 heading_proj = obs[:, 11]
@@ -1510,7 +1516,7 @@ class NewtonMuJoCoTorchEnv:
             energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
             dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
             height_term: torch.Tensor | float = 0.0
-            if self.ant_reward_style in {"isaac", "isaac_heading_gated"}:
+            if self.ant_reward_style in {"isaac", "isaaclab_potential_height", "isaac_heading_gated"}:
                 height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
                 height_term = weights.height * height_reward
             progress = qd[:, 0]
@@ -1548,7 +1554,7 @@ class NewtonMuJoCoTorchEnv:
         obs: torch.Tensor | None = None,
     ) -> torch.Tensor:
         reward = self.reward(q_next, qd_next, action, obs=obs)
-        if self.env_name == "ant" and self.ant_reward_style == "isaaclab_potential":
+        if self.env_name == "ant" and self.ant_reward_style in {"isaaclab_potential", "isaaclab_potential_height"}:
             control_dt = max(float(self.dt), 1.0e-8)
             potential_progress = (q_next[:, 0] - q[:, 0]) / control_dt
             reward = reward + self.ant_reward.progress * (potential_progress - qd_next[:, 0])
@@ -3906,7 +3912,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
     parser.add_argument(
         "--ant-reward-style",
-        choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaac_heading_gated"],
+        choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
         default="isaaclab",
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")

@@ -954,7 +954,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-observation-style", choices=["diffrl", "isaac"], default="isaac")
     parser.add_argument(
         "--ant-reward-style",
-        choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaac_heading_gated"],
+        choices=["diffrl", "isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated"],
         default="isaaclab",
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")

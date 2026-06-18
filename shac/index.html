@@ -763,31 +763,33 @@
       <article class="panel ok">
         <h2>Ant PPO, IsaacLab Potential Control</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_potential_dtfix_best_eval_render_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_potential_dtfix_best_eval_render_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_ppo_potential_minup82_continue_512env_80upd_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_potential_minup82_continue_512env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
             PPO continuation from the reliable tanh-wrapped actor using corrected IsaacLab-style potential progress,
-            death cost 2, stochastic resets, and a repeated full-horizon selector. The corrected-reward eval reaches
-            about 31 m in the 512-world stochastic no-reset replay. The newest five-repeat uninterrupted audit of this
-            checkpoint records 3 terminal worlds across 2560 worlds; a stricter min-up continuation keeps the same 31 m
-            speed class but does not reduce that total. This remains the PPO positive control proving the environment
-            supports fast Ant locomotion, not a SHAC result.
+            stochastic resets, and a repeated full-horizon selector. The promoted checkpoint is the stricter min-up
+            continuation: five uninterrupted stochastic-repeat audits measure 31.20 m mean displacement, 3 terminal worlds
+            across 2560 worlds, 0 invalids, 0.571 m mean height, and 0.993 mean up projection. Deterministic trace probes
+            show non-static motion with 0.64-1.23 rad joint ranges and large joint velocities; the clip is raw
+            <code>ViewerGL.get_frame()</code> with the shared smoothed COM follow camera and no overlays.
           </figcaption>
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, Corrected Potential Anchor</h2>
+        <h2>Ant SHAC, Repeated-Audited Potential Anchor</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_dtfix_from_potential_ppo_anchor_h16_16env_12ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_dtfix_from_potential_ppo_anchor_h16_16env_12ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_upright_candidate_repeated_audit_run1/ant_poster.png">
+            <source src="assets/ant_shac_upright_candidate_repeated_audit_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
             H=16 SHAC continuation from the corrected PPO gait with the fixed potential-progress timestep, a frozen
-            action-space anchor, 16 training worlds, and full-horizon selection. The selected epoch 8 policy reaches
-            30.72 m over 960 deterministic no-reset steps with 0 terminals, 0 invalids, minimum up projection 0.91,
-            479.1 s runtime, and 25.4 MB peak allocated CUDA memory. The video is raw
-            <code>ViewerGL.get_frame()</code> with the shared smoothed COM follow camera and no overlays.
+            action-space anchor, 16 training worlds, and full-horizon selection, re-audited with the current no-reset
+            evaluator. Across five uninterrupted stochastic repeats it records 31.30 m mean displacement, 0 terminal
+            worlds, 0 invalids, 0.568 m deterministic mean height, 0.994 deterministic mean up projection, and repeated
+            minimum-up mean 0.944. The deterministic trace has 0.64-1.18 rad joint ranges, so this is moving locomotion
+            rather than a frozen slide. The video is raw <code>ViewerGL.get_frame()</code> with the shared smoothed COM
+            follow camera and no overlays.
           </figcaption>
         </figure>
       </article>
@@ -1009,27 +1011,27 @@
           late-state warmup, and endangered-state warmup stops.
           Pure progress updates rejected candidates with min-up 0.72-0.84. Adding an action-anchor plus upright reward creates
           zero-fall selection candidates near 31 m, but stochastic reset replays still need stronger robustness than the
-          current H=16 local SHAC objective provides. A five-repeat stochastic audit of the promoted checkpoint measured
-          4 terminal worlds across 2560 uninterrupted worlds. Persistent late-state SHAC reduced that repeated uninterrupted
-          count to 2 terminals, but did not remove it. A 64-world endangered-state run stopped 214 warmup worlds in the
-          low-up band and produced nonzero survival-margin gradients; every evaluated update was nevertheless worse than
-          the loaded checkpoint under the full-horizon selector. A smooth differentiable upright reward was also tested; it
-          improved the gradient signal in principle, but this run still failed the repeated stochastic no-reset selector and
-          is kept as a diagnostic rather than the promoted Ant result.
+          current H=16 local SHAC objective provides. Re-auditing the corrected potential-anchor actor with the current
+          five-repeat uninterrupted stochastic evaluator found 0 terminal worlds, 0 invalids, 31.30 m mean displacement,
+          and 0.944 mean repeated minimum-up projection, so that run is now the promoted SHAC result. Persistent late-state
+          SHAC reduced a different fast checkpoint to 2 terminal worlds across 2560 uninterrupted worlds but did not beat
+          the re-audited anchor. A fresh PPO probe with soft height reward and stronger potential progress selected a robust
+          standing policy at update 20: 0 terminal worlds but only 0.25 m displacement. Later updates moved farther but
+          immediately reintroduced large fall counts. This is kept as a negative diagnostic showing that posture shaping
+          alone is not the fix.
         </p>
       </article>
       <article class="panel">
         <h2>Ant Fall Timing</h2>
         <p>
-          The late-fall no-reset replay records first Ant SHAC terminals across roughly steps 430-770 depending on the
-          stochastic reset batch. Earlier corrected-default probes also fell late, around steps 348-461. These are not reset splices or camera
-          artifacts: the failed worlds have torso heights below the termination threshold and flipped/upside-down up
-          projections after long contact interaction. The corrected deterministic Ant SHAC result has 0 terminal worlds,
-          minimum up projection 0.91, and about 30.7 m forward displacement in its final 512-world no-reset trace. Stochastic
-          reset stress tests still bottom out around 0.71-0.76 up projection in failing worlds. The new repeated audits
-          report 4/2560 uninterrupted terminal worlds for the promoted checkpoint, 2/2560 after persistent late-state
-          survival-margin training, and 3/2560 after the 64-world endangered-state run, so stochastic robustness is tracked
-          separately from the deterministic headline metric.
+          Older late-fall no-reset replays recorded first Ant SHAC terminals around steps 430-770 depending on the
+          stochastic reset batch, and corrected-default probes also fell late around steps 348-461. These were not reset
+          splices or camera artifacts: failed worlds had torso heights below the termination threshold and flipped/upside-down
+          up projections after long contact interaction. The current promoted SHAC anchor has 0 terminal worlds in the
+          deterministic trace and 0 terminal worlds across five uninterrupted stochastic repeats, with 31.30 m repeated mean
+          displacement and 0.944 mean repeated minimum-up projection. The remaining weaker point is clearance margin: the
+          stochastic repeats can still dip to about 0.40 m minimum height, so future work should improve gait clearance
+          without collapsing into the standing policy found by the soft-height PPO probe.
         </p>
       </article>
       <article class="panel warn">
@@ -1042,6 +1044,9 @@
           30.96 m mean displacement, while an 80-update stricter min-up continuation selects update 1 and remains at
           3/2560 terminals with 31.20 m mean displacement. The much faster NV IsaacLab-style PPO is not a valid reliability
           baseline under the same audit: it records 955/2560 uninterrupted terminal worlds despite 56.45 m mean displacement.
+          A height-margin PPO retrain was also negative: the selector chose a 0-fall policy that moved only 0.25 m, and
+          later faster updates had hundreds of falls. That rules out a simple missing-height-reward explanation for the
+          bad-looking Ant clips.
           This is still an important positive control: it proves Newton plus MJWarp can produce fast Ant locomotion with the
           current assets and reward. The SHAC result now reaches the same speed class on the nominal no-reset eval; the open
           issue is making both methods robust to stochastic reset samples.
@@ -2037,6 +2042,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.amber
       },
       {
+        id: "antPpoHeightProgressProbe",
+        label: "Ant PPO height/progress probe",
+        path: "assets/ant_ppo_potential_height_progress2p5_1024env_140upd_run1/ant_ppo_results.json",
+        color: colors.violet
+      },
+      {
         id: "antPpoRslRepeatedAudit",
         label: "Ant PPO RSL repeated audit",
         path: "assets/ant_ppo_diffrl_rsl_exact_repeated_audit_run1/ant_ppo_results.json",
@@ -2065,6 +2076,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC corrected potential",
         path: "assets/ant_shac_dtfix_from_potential_ppo_anchor_h16_16env_12ep_run1/ant_results.json",
         color: colors.green
+      },
+      {
+        id: "antShacUprightCandidateAudit",
+        label: "Ant SHAC repeated-audited anchor",
+        path: "assets/ant_shac_upright_candidate_repeated_audit_run1/ant_results.json",
+        color: colors.teal
       },
       {
         id: "antShacDtfixPotentialStochStrict",
