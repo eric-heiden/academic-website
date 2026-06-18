@@ -1890,6 +1890,12 @@ def make_actor(
     return actor
 
 
+def freeze_actor_backbone(actor: torch.nn.Module) -> None:
+    head_names = ("mean.", "log_std", "logstd")
+    for name, param in actor.named_parameters():
+        param.requires_grad_(name.startswith(head_names))
+
+
 def load_actor_checkpoint(actor: torch.nn.Module, path: Path, device: torch.device) -> None:
     state = torch.load(path, map_location=device)
     try:
@@ -2692,6 +2698,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "actor_hidden_dims": args.actor_hidden_dims,
         "actor_logstd_init": args.actor_logstd_init,
         "actor_layer_norm": args.actor_layer_norm,
+        "train_final_layer_only": args.train_final_layer_only,
         "action_squash": args.action_squash,
         "acrobot_actuation": env.acrobot_actuation if args.env == "acrobot" else None,
         "ant_asset": env.ant_asset if args.env == "ant" else None,
@@ -2921,6 +2928,8 @@ def run_training(args: argparse.Namespace) -> dict:
     )
     if args.actor_path is not None:
         load_actor_checkpoint(actor, args.actor_path, env.torch_device)
+    if args.train_final_layer_only:
+        freeze_actor_backbone(actor)
     anchor_actor = None
     if args.anchor_action_penalty > 0.0:
         anchor_actor = make_actor(
@@ -4180,6 +4189,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--action-squash", choices=["tanh", "none"], default="tanh")
     parser.add_argument("--anchor-actor-path", type=Path, default=None)
     parser.add_argument("--anchor-action-penalty", type=float, default=0.0)
+    parser.add_argument("--train-final-layer-only", action="store_true")
     parser.add_argument("--actor-layer-norm", dest="actor_layer_norm", action="store_true", default=True)
     parser.add_argument("--no-actor-layer-norm", dest="actor_layer_norm", action="store_false")
     parser.add_argument("--use-critic", dest="use_critic", action="store_true", default=None)

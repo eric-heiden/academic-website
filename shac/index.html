@@ -426,8 +426,8 @@
           The latest scaled-actor finite-difference checks sharpen the SHAC diagnosis: one-step action error is 5.4e-3,
           one-step state/action error is 1.8e-2, and H=1/H=4 policy gradients stay at 3.9e-3/2.8e-2 mean relative error.
           H=8 policy directions remain sign-consistent but noisier at 1.36e-1 mean relative error. Guarded update probes
-          then rejected every Adam, SGD, H=8, and H=16 candidate from the 0.825 scaled actor because the 960-step selector
-          slowed down or found a terminal. The remaining failure is therefore not a single reset-state AD bug; it is the
+          then rejected every Adam, SGD, H=8, H=16, H=32, and final-layer-only candidate from the 0.825 scaled actor because
+          the 960-step selector slowed down or found a terminal. The remaining failure is therefore not a single reset-state AD bug; it is the
           mismatch between short differentiable Ant objectives and the long reliability selector.
         </p>
       </article>
@@ -490,9 +490,9 @@
             </tr>
             <tr>
               <td>Ant scaled actor, guarded SHAC updates</td>
-              <td>0 / 22 accepted</td>
+              <td>0 / 31 accepted</td>
               <td>n/a</td>
-              <td>Adam, SGD, H=8, and H=16 probes all reduced the 960-step selector or hit a terminal, then rolled back.</td>
+              <td>Adam, SGD, H=8/H=16/H=32, and final-layer-only probes all reduced the 960-step selector or hit a terminal, then rolled back.</td>
             </tr>
             <tr>
               <td>Ant policy H=5, margin 0.002</td>
@@ -838,10 +838,10 @@
           that last rare contact failure. The latest deterministic SHAC-wrapper check reproduces the strict scaled policy
           cleanly: 21.03 m mean displacement, 0 terminal worlds, and worst minimum-up 0.869 over three 1024-world no-reset
           repeats. The new selection guard then rolls back candidate updates that fail the long selector. This prevents
-          regression, but it also exposed the current blocker: 22 completed guarded candidates from the scaled actor were
-          all rejected, including Adam H=8, SGD H=16, and no-anchor/no-survival H=16 probes. The current headline therefore
-          stays cautious: Ant has a strict reliable scaled SHAC policy, but direct SHAC improvement from that policy still
-          needs a longer-horizon or better-aligned objective.
+          regression, but it also exposed the current blocker: 31 completed guarded candidates from the scaled actor were
+          all rejected, including Adam H=8, SGD H=16/H=32, no-anchor/no-survival H=16, and final-layer-only H=32 probes.
+          The current headline therefore stays cautious: Ant has a strict reliable scaled SHAC policy, but direct SHAC
+          improvement from that policy still needs a better-aligned objective or update rule.
         </p>
       </article>
       <article class="panel warn">
@@ -1808,8 +1808,8 @@
           bounded-action gait without exploiting a fragile contact branch. Contact finite differences still degrade once Ant
           feet sit on grazing active-set boundaries, but the strict scaled actor also shows that local derivatives can be
           sign-consistent while candidate updates remain bad for 960-step reliability. Adam was not the whole explanation:
-          guarded SGD probes also rolled back every H=16 candidate, and removing anchor/survival shaping made candidates
-          less reliable rather than faster. The missing piece is now a curriculum/objective that preserves more natural
+          guarded SGD probes also rolled back every H=16/H=32 candidate, and removing anchor/survival shaping or freezing
+          the actor backbone did not produce an accepted update. The missing piece is now a curriculum/objective that preserves more natural
           height and heading while increasing progress, plus a contact adjoint or smoothing strategy that remains useful
           across long horizons and active-set boundaries. The current no-reset matrix is Cheetah SHAC at 10.41 m, Hopper
           SHAC at 13.65 m, and strict scaled Ant SHAC at 21.02 m; the open target is recovering more of the 30 m Ant gait
@@ -2224,6 +2224,18 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC guarded SGD no anchor",
         path: "assets/ant_shac_guarded_sgd_det_from_scaled0825_h16_noanchor_8env_6ep_probe_run1/ant_results.json",
         color: colors.amber
+      },
+      {
+        id: "antShacGuardedSgdH32",
+        label: "Ant SHAC guarded SGD H=32",
+        path: "assets/ant_shac_guarded_sgd_det_from_scaled0825_h32_4env_3ep_probe_run1/ant_results.json",
+        color: colors.blue
+      },
+      {
+        id: "antShacHeadOnlySgdH32",
+        label: "Ant SHAC head-only SGD H=32",
+        path: "assets/ant_shac_headonly_sgd_det_from_scaled0825_h32_4env_6ep_probe_run1/ant_results.json",
+        color: colors.slate
       },
       {
         id: "antShacClippedH16Strict",
