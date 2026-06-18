@@ -291,7 +291,11 @@
           actors are no longer double-squashed during shared evaluation.
           The clean PPO baselines verify the Newton/MJWarp task setups: Hopper reaches 14.51 m with
           0 no-reset terminals, Cheetah reaches 12.66 m with 0 no-reset terminals, and the corrected IsaacLab-potential
-          Ant PPO control reaches about 31 m. A reward-bookkeeping bug in the Ant potential-progress path is fixed here:
+          Ant PPO control reaches about 31 m. Five-repeat PPO audits now make the Ant baseline clearer: the fast NV
+          IsaacLab-style PPO moves far but is unstable (955/2560 uninterrupted terminal worlds), while the corrected
+          potential-control PPO reaches about 31 m with 3/2560 uninterrupted terminal worlds. A stricter min-up PPO
+          continuation preserved the gait but also stayed at 3/2560, so PPO verifies the task is trainable while exposing
+          the same rare stochastic contact branches that SHAC must handle. A reward-bookkeeping bug in the Ant potential-progress path is fixed here:
           <code>q_next - q</code> is now divided by the full control timestep, not the physics substep.
           Cheetah is the clean SHAC stepping stone: MuJoCo contacts at substep 1 reach 10.41 m uninterrupted with 0 terminals.
           Hopper SHAC is now clean after moving the deterministic start pose off exact active joint limits and using a
@@ -765,9 +769,10 @@
           <figcaption>
             PPO continuation from the reliable tanh-wrapped actor using corrected IsaacLab-style potential progress,
             death cost 2, stochastic resets, and a repeated full-horizon selector. The corrected-reward eval reaches
-            30.97 m in the 512-world stochastic no-reset replay with 2 terminal worlds; deterministic repeated-world audits
-            still expose rare contact branches. This remains the PPO positive control proving the environment supports
-            fast Ant locomotion, not a SHAC result.
+            about 31 m in the 512-world stochastic no-reset replay. The newest five-repeat uninterrupted audit of this
+            checkpoint records 3 terminal worlds across 2560 worlds; a stricter min-up continuation keeps the same 31 m
+            speed class but does not reduce that total. This remains the PPO positive control proving the environment
+            supports fast Ant locomotion, not a SHAC result.
           </figcaption>
         </figure>
       </article>
@@ -1032,9 +1037,14 @@
         <p>
           PPO was rerun after fixing full-horizon selection, critic checkpoint restore, action-squash semantics, and the
           potential-progress timestep. The corrected potential-progress PPO actor reaches roughly 31 m but also shows rare
-          terminal worlds under replicated no-reset audits. This is still an important positive control: it proves Newton
-          plus MJWarp can produce fast Ant locomotion with the current assets and reward. The SHAC result now reaches the same
-          speed class on the nominal no-reset eval; the open issue is making both methods robust to stochastic reset samples.
+          terminal worlds under replicated no-reset audits. The new five-repeat audits quantify that split: the best fast
+          PPO potential-control actor records 3 terminal worlds across 2560 uninterrupted stochastic-reset worlds at
+          30.96 m mean displacement, while an 80-update stricter min-up continuation selects update 1 and remains at
+          3/2560 terminals with 31.20 m mean displacement. The much faster NV IsaacLab-style PPO is not a valid reliability
+          baseline under the same audit: it records 955/2560 uninterrupted terminal worlds despite 56.45 m mean displacement.
+          This is still an important positive control: it proves Newton plus MJWarp can produce fast Ant locomotion with the
+          current assets and reward. The SHAC result now reaches the same speed class on the nominal no-reset eval; the open
+          issue is making both methods robust to stochastic reset samples.
         </p>
       </article>
     </section>
@@ -2015,6 +2025,24 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.blue
       },
       {
+        id: "antPpoPotentialRepeatedAudit",
+        label: "Ant PPO potential repeated audit",
+        path: "assets/ant_ppo_potential_stoch_death2_fall50m_repeated_audit_run1/ant_ppo_results.json",
+        color: colors.green
+      },
+      {
+        id: "antPpoPotentialMinUp82Continue",
+        label: "Ant PPO min-up continuation",
+        path: "assets/ant_ppo_potential_minup82_continue_512env_80upd_run1/ant_ppo_results.json",
+        color: colors.amber
+      },
+      {
+        id: "antPpoRslRepeatedAudit",
+        label: "Ant PPO RSL repeated audit",
+        path: "assets/ant_ppo_diffrl_rsl_exact_repeated_audit_run1/ant_ppo_results.json",
+        color: colors.coral
+      },
+      {
         id: "antPpoIsaacPotentialDetEval",
         label: "Ant PPO potential det audit",
         path: "assets/ant_ppo_potential_dtfix_deteval_run1/ant_ppo_results.json",
@@ -2229,6 +2257,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO NV stable root",
         path: "assets/ant_ppo_nv_rootfix_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_results.json",
         color: colors.slate
+      },
+      {
+        id: "antPpoNvRootfixRepeatedAudit",
+        label: "Ant PPO NV repeated audit",
+        path: "assets/ant_ppo_nv_rootfix_isaaclab_force7p5_repeated_audit_run1/ant_ppo_results.json",
+        color: colors.coral
       },
       {
         id: "antPpoNvRootfixSingleFloor",

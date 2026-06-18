@@ -41,6 +41,7 @@ from run_newton_shac import (
     render_rollout,
     rollout_constraint_shortfalls,
     rollout_selection_score,
+    summarize_rollout_repeats,
     write_json,
 )
 from utils.running_mean_std import RunningMeanStd
@@ -641,20 +642,54 @@ def train_ppo(args: argparse.Namespace) -> dict:
         termination_penalty=args.termination_penalty,
         stochastic_init=args.eval_stochastic_init,
     )
-    eval_score = rollout_selection_score(
-        rollout,
-        num_envs=args.num_envs,
-        fall_penalty=args.selection_fall_penalty,
-        invalid_penalty=args.selection_invalid_penalty,
-        displacement_weight=args.selection_displacement_weight,
-        height_weight=args.selection_height_weight,
-        up_weight=args.selection_up_weight,
-        heading_weight=args.selection_heading_weight,
-        min_height=args.selection_min_height,
-        min_up=args.selection_min_up,
-        min_heading=args.selection_min_heading,
-        posture_penalty=args.selection_posture_penalty,
-    )
+    def score_rollout(candidate: dict) -> float:
+        return rollout_selection_score(
+            candidate,
+            num_envs=args.num_envs,
+            fall_penalty=args.selection_fall_penalty,
+            invalid_penalty=args.selection_invalid_penalty,
+            displacement_weight=args.selection_displacement_weight,
+            height_weight=args.selection_height_weight,
+            up_weight=args.selection_up_weight,
+            heading_weight=args.selection_heading_weight,
+            min_height=args.selection_min_height,
+            min_up=args.selection_min_up,
+            min_heading=args.selection_min_heading,
+            posture_penalty=args.selection_posture_penalty,
+        )
+
+    eval_score = score_rollout(rollout)
+    eval_repeats = None
+    eval_uninterrupted_repeats = None
+    if args.final_eval_repeats > 1:
+        repeated_rollouts = [rollout]
+        repeated_uninterrupted = [rollout_uninterrupted]
+        for _ in range(args.final_eval_repeats - 1):
+            repeated_rollouts.append(
+                evaluate_policy(
+                    env,
+                    actor,
+                    args.eval_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            )
+            repeated_uninterrupted.append(
+                evaluate_policy_uninterrupted(
+                    env,
+                    actor,
+                    args.eval_horizon,
+                    obs_rms=obs_rms,
+                    termination_penalty=args.termination_penalty,
+                    stochastic_init=args.eval_stochastic_init,
+                )
+            )
+        eval_repeats = summarize_rollout_repeats(repeated_rollouts, [score_rollout(item) for item in repeated_rollouts])
+        eval_uninterrupted_repeats = summarize_rollout_repeats(
+            repeated_uninterrupted,
+            [score_rollout(item) for item in repeated_uninterrupted],
+        )
     video_path = None
     poster_path = None
     if args.render_video:
@@ -731,6 +766,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "contact_backend": args.contact_backend,
         "rollout_steps": args.rollout_steps,
         "updates": args.updates,
+        "eval_horizon": args.eval_horizon,
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
@@ -758,6 +794,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "selection_posture_penalty": args.selection_posture_penalty,
         "selection_repeats": args.selection_repeats,
         "selection_uninterrupted": args.selection_uninterrupted,
+        "final_eval_repeats": args.final_eval_repeats,
         "lr": args.lr,
         "adaptive_kl": args.adaptive_kl,
         "desired_kl": args.desired_kl,
@@ -832,6 +869,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "history": history,
         "eval": rollout,
         "eval_uninterrupted": rollout_uninterrupted,
+        "eval_repeats": eval_repeats,
+        "eval_uninterrupted_repeats": eval_uninterrupted_repeats,
         "video": str(video_path) if video_path is not None else None,
         "poster": str(poster_path) if poster_path is not None else None,
         "gpu": torch.cuda.get_device_name(env.torch_device) if torch.cuda.is_available() else "cpu",
@@ -954,6 +993,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-posture-penalty", type=float, default=0.0)
     parser.add_argument("--selection-repeats", type=int, default=1)
     parser.add_argument("--selection-uninterrupted", action="store_true")
+    parser.add_argument("--final-eval-repeats", type=int, default=1)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--render-video", action="store_true")
