@@ -3105,10 +3105,24 @@ def run_training(args: argparse.Namespace) -> dict:
 
     env = make_env_from_args(args, args.num_envs)
     eval_env_args, has_eval_env_overrides = make_eval_args(args)
-    selection_env_count = args.selection_num_envs or args.num_envs
-    selection_env = env
-    if has_eval_env_overrides or selection_env_count != args.num_envs:
-        selection_env = make_env_from_args(eval_env_args, selection_env_count)
+    if args.selection_env_counts is not None:
+        selection_env_counts = list(dict.fromkeys(int(item) for item in args.selection_env_counts))
+    else:
+        selection_env_counts = [int(args.selection_num_envs or args.num_envs)]
+    if not selection_env_counts or any(item <= 0 for item in selection_env_counts):
+        raise ValueError("--selection-env-counts must contain positive integers")
+    selection_env_count = selection_env_counts[0]
+    selection_env_cache: dict[int, NewtonMuJoCoTorchEnv] = {}
+
+    def get_selection_env(num_envs: int) -> NewtonMuJoCoTorchEnv:
+        if num_envs not in selection_env_cache:
+            if has_eval_env_overrides or num_envs != args.num_envs:
+                selection_env_cache[num_envs] = make_env_from_args(eval_env_args, num_envs)
+            else:
+                selection_env_cache[num_envs] = env
+        return selection_env_cache[num_envs]
+
+    selection_env = get_selection_env(selection_env_count)
     actor = make_actor(
         env,
         stochastic=args.stochastic_actor,
@@ -3185,58 +3199,104 @@ def run_training(args: argparse.Namespace) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     live_history_path = out_dir / f"{args.env}_history_live.json"
 
+    def compact_selection_rollout(candidate: dict) -> dict:
+        return {
+            "num_envs": candidate.get("num_envs"),
+            "return": candidate.get("return"),
+            "mean_reward": candidate.get("mean_reward"),
+            "alive_fraction": candidate.get("alive_fraction"),
+            "mean_forward_displacement": candidate.get("mean_forward_displacement"),
+            "min_forward_displacement": candidate.get("min_forward_displacement"),
+            "max_forward_displacement": candidate.get("max_forward_displacement"),
+            "mean_height": candidate.get("mean_height"),
+            "min_height": candidate.get("min_height"),
+            "mean_up": candidate.get("mean_up"),
+            "min_up": candidate.get("min_up"),
+            "mean_heading": candidate.get("mean_heading"),
+            "min_heading": candidate.get("min_heading"),
+            "terminal_count": candidate.get("terminal_count"),
+            "fall_count": candidate.get("fall_count"),
+            "invalid_count": candidate.get("invalid_count"),
+        }
+
     def selection_evaluation() -> tuple[dict, float, dict]:
         worst_rollout = None
         worst_score = float("inf")
         worst_shortfalls = None
+        worst_env_count = None
+        robust_entries = []
         repeat_count = max(1, int(args.selection_repeats))
-        for _ in range(repeat_count):
-            selection_horizon = args.selection_horizon or args.eval_horizon
-            if args.selection_uninterrupted:
-                candidate_rollout = evaluate_policy_uninterrupted(
-                    selection_env,
-                    actor,
-                    selection_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
+        selection_horizon = args.selection_horizon or args.eval_horizon
+        for env_count in selection_env_counts:
+            current_selection_env = get_selection_env(env_count)
+            for repeat_idx in range(repeat_count):
+                if args.selection_uninterrupted:
+                    candidate_rollout = evaluate_policy_uninterrupted(
+                        current_selection_env,
+                        actor,
+                        selection_horizon,
+                        obs_rms=obs_rms,
+                        termination_penalty=args.termination_penalty,
+                        stochastic_init=args.eval_stochastic_init,
+                    )
+                else:
+                    candidate_rollout = evaluate_policy(
+                        current_selection_env,
+                        actor,
+                        selection_horizon,
+                        obs_rms=obs_rms,
+                        termination_penalty=args.termination_penalty,
+                        stochastic_init=args.eval_stochastic_init,
+                    )
+                candidate_score = rollout_selection_score(
+                    candidate_rollout,
+                    num_envs=current_selection_env.num_envs,
+                    fall_penalty=args.selection_fall_penalty,
+                    invalid_penalty=args.selection_invalid_penalty,
+                    displacement_weight=args.selection_displacement_weight,
+                    height_weight=args.selection_height_weight,
+                    up_weight=args.selection_up_weight,
+                    heading_weight=args.selection_heading_weight,
+                    min_height=args.selection_min_height,
+                    min_up=args.selection_min_up,
+                    min_heading=args.selection_min_heading,
+                    max_abs_joint=args.selection_max_abs_joint,
+                    posture_penalty=args.selection_posture_penalty,
                 )
-            else:
-                candidate_rollout = evaluate_policy(
-                    selection_env,
-                    actor,
-                    selection_horizon,
-                    obs_rms=obs_rms,
-                    termination_penalty=args.termination_penalty,
-                    stochastic_init=args.eval_stochastic_init,
-                )
-            candidate_score = rollout_selection_score(
-                candidate_rollout,
-                num_envs=selection_env.num_envs,
-                fall_penalty=args.selection_fall_penalty,
-                invalid_penalty=args.selection_invalid_penalty,
-                displacement_weight=args.selection_displacement_weight,
-                height_weight=args.selection_height_weight,
-                up_weight=args.selection_up_weight,
-                heading_weight=args.selection_heading_weight,
-                min_height=args.selection_min_height,
-                min_up=args.selection_min_up,
-                min_heading=args.selection_min_heading,
-                max_abs_joint=args.selection_max_abs_joint,
-                posture_penalty=args.selection_posture_penalty,
-            )
-            if candidate_score < worst_score or worst_rollout is None:
-                worst_rollout = candidate_rollout
-                worst_score = candidate_score
-                worst_shortfalls = rollout_constraint_shortfalls(
+                candidate_shortfalls = rollout_constraint_shortfalls(
                     candidate_rollout,
                     min_height=args.selection_min_height,
                     min_up=args.selection_min_up,
                     min_heading=args.selection_min_heading,
                     max_abs_joint=args.selection_max_abs_joint,
                 )
+                robust_entries.append(
+                    {
+                        "env_count": env_count,
+                        "repeat": repeat_idx + 1,
+                        "score": candidate_score,
+                        "shortfalls": candidate_shortfalls,
+                        "rollout": compact_selection_rollout(candidate_rollout),
+                    }
+                )
+                if candidate_score < worst_score or worst_rollout is None:
+                    worst_rollout = candidate_rollout
+                    worst_score = candidate_score
+                    worst_shortfalls = candidate_shortfalls
+                    worst_env_count = env_count
         assert worst_rollout is not None
         assert worst_shortfalls is not None
+        worst_rollout = copy.deepcopy(worst_rollout)
+        worst_rollout["selection_env_count"] = worst_env_count
+        if len(selection_env_counts) > 1 or repeat_count > 1:
+            worst_rollout["robust_selection"] = {
+                "mode": "worst_score",
+                "env_counts": selection_env_counts,
+                "repeats": repeat_count,
+                "worst_env_count": worst_env_count,
+                "worst_score": worst_score,
+                "entries": robust_entries,
+            }
         return worst_rollout, worst_score, worst_shortfalls
 
     run_t0 = time.perf_counter()
@@ -3760,6 +3820,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "num_envs": args.num_envs,
         "selection_num_envs": selection_env.num_envs,
+        "selection_env_counts": selection_env_counts,
         "seed": args.seed,
         "contact_backend": args.contact_backend,
         "eval_contact_backend": eval_env_args.contact_backend,
@@ -4431,6 +4492,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--num-envs", type=int, default=32)
     parser.add_argument("--selection-num-envs", type=int, default=None)
+    parser.add_argument("--selection-env-counts", type=parse_int_list, default=None)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--horizon", type=int, default=None)
     parser.add_argument("--eval-horizon", type=int, default=None)

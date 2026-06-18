@@ -37,6 +37,13 @@ def parse_float_list(value: str) -> list[float]:
     return [float(item) for item in items]
 
 
+def parse_int_list(value: str) -> list[int]:
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    if not items:
+        raise argparse.ArgumentTypeError("expected comma-separated integers")
+    return [int(item) for item in items]
+
+
 def load_result(path: Path) -> dict:
     with path.open() as f:
         return json.load(f)
@@ -56,7 +63,14 @@ def actor_from_result(result: dict, env, actor_path: Path):
     return actor
 
 
-def evaluate_candidate(result: dict, args: argparse.Namespace, actor, obs_rms) -> dict:
+def evaluate_candidate(
+    result: dict,
+    args: argparse.Namespace,
+    actor,
+    obs_rms,
+    *,
+    eval_num_envs: int | None = None,
+) -> dict:
     if args.eval_total_envs is not None and args.eval_chunk_size is not None:
         return evaluate_policy_chunked(
             lambda n: build_env(result, argparse.Namespace(video_num_envs=n, device=args.device)),
@@ -70,7 +84,10 @@ def evaluate_candidate(result: dict, args: argparse.Namespace, actor, obs_rms) -
             uninterrupted=True,
         )
 
-    eval_env = build_env(result, argparse.Namespace(video_num_envs=args.eval_num_envs, device=args.device))
+    eval_env = build_env(
+        result,
+        argparse.Namespace(video_num_envs=int(eval_num_envs or args.eval_num_envs), device=args.device),
+    )
     return evaluate_policy_uninterrupted(
         eval_env,
         actor,
@@ -95,6 +112,7 @@ def main() -> None:
     parser.add_argument("--steps", type=parse_float_list, default=[0.0, 1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3])
     parser.add_argument("--eval-horizon", type=int, default=None)
     parser.add_argument("--eval-num-envs", type=int, default=256)
+    parser.add_argument("--eval-env-counts", type=parse_int_list, default=None)
     parser.add_argument("--eval-total-envs", type=int, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=None)
     parser.add_argument("--eval-repeats", type=int, default=1)
@@ -202,15 +220,44 @@ def main() -> None:
     base_state = clone_module_state(actor)
     candidates = []
     t0 = time.perf_counter()
+    eval_env_counts = args.eval_env_counts or [args.eval_num_envs]
     for step in args.steps:
         actor.load_state_dict(base_state)
         assign_flat_parameters(params, base_params - float(step) * grad)
-        rollouts = [evaluate_candidate(eval_result, args, actor, obs_rms)]
-        scores = [score_rollout(rollouts[0])]
-        for _ in range(max(0, int(args.eval_repeats) - 1)):
-            rollouts.append(evaluate_candidate(eval_result, args, actor, obs_rms))
-            scores.append(score_rollout(rollouts[-1]))
-        rollout = rollouts[0]
+        rollouts = []
+        scores = []
+        eval_entries = []
+        for eval_count in eval_env_counts:
+            current_rollouts = [evaluate_candidate(eval_result, args, actor, obs_rms, eval_num_envs=eval_count)]
+            current_scores = [score_rollout(current_rollouts[0])]
+            for _ in range(max(0, int(args.eval_repeats) - 1)):
+                current_rollouts.append(
+                    evaluate_candidate(eval_result, args, actor, obs_rms, eval_num_envs=eval_count)
+                )
+                current_scores.append(score_rollout(current_rollouts[-1]))
+            rollouts.extend(current_rollouts)
+            scores.extend(current_scores)
+            representative = current_rollouts[0]
+            eval_entries.append(
+                {
+                    "num_envs": int(eval_count),
+                    "score": min(current_scores),
+                    "scores": current_scores,
+                    "dx": representative.get("mean_forward_displacement"),
+                    "ret": representative.get("return"),
+                    "falls": representative.get("fall_count"),
+                    "invalid": representative.get("invalid_count"),
+                    "terminal": representative.get("terminal_count"),
+                    "min_h": representative.get("min_height"),
+                    "min_up": representative.get("min_up"),
+                    "rollout": representative,
+                    "rollout_repeats": summarize_rollout_repeats(current_rollouts, current_scores)
+                    if len(current_rollouts) > 1
+                    else None,
+                }
+            )
+        worst_idx = int(np.argmin(scores))
+        rollout = rollouts[worst_idx]
         score = min(scores)
         repeat_summary = summarize_rollout_repeats(rollouts, scores) if len(rollouts) > 1 else None
         candidates.append(
@@ -218,6 +265,8 @@ def main() -> None:
                 "step": float(step),
                 "score": score,
                 "scores": scores,
+                "eval_env_counts": eval_env_counts,
+                "evals": eval_entries,
                 "shortfalls": rollout_constraint_shortfalls(
                     rollout,
                     min_height=min_height,
@@ -270,6 +319,7 @@ def main() -> None:
         "steps": [float(item) for item in args.steps],
         "eval_horizon": args.eval_horizon,
         "eval_num_envs": args.eval_num_envs,
+        "eval_env_counts": eval_env_counts,
         "eval_total_envs": args.eval_total_envs,
         "eval_chunk_size": args.eval_chunk_size,
         "eval_repeats": args.eval_repeats,
