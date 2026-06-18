@@ -63,6 +63,8 @@ class AntRewardWeights:
     energy_cost: float = 0.05
     dof_limit_cost: float = 1.0
     dof_vel_scale: float = 0.2
+    up_margin: float = 0.0
+    height_margin: float = 0.0
 
 
 @dataclass
@@ -148,6 +150,7 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
             "density_override": None,
             "contact_mu": 0.75,
             "joint_damping": 1.0,
+            "armature": 0.05,
             "start_height": ANT_DIFFRL_START_HEIGHT,
             "start_joint_q": list(ANT_START_JOINT_Q),
             "termination_height": ANT_TERMINATION_HEIGHT,
@@ -161,6 +164,7 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
         "density_override": None,
         "contact_mu": 1.0,
         "joint_damping": 0.1,
+        "armature": 0.05,
         "start_height": ANT_ISAACLAB_START_HEIGHT,
         "start_joint_q": list(ANT_ISAACLAB_START_JOINT_Q),
         "termination_height": ANT_ISAACLAB_TERMINATION_HEIGHT,
@@ -184,6 +188,8 @@ def resolve_ant_defaults(args: argparse.Namespace) -> None:
         args.ant_contact_mu = defaults["contact_mu"]
     if getattr(args, "ant_joint_damping", None) is None:
         args.ant_joint_damping = defaults["joint_damping"]
+    if getattr(args, "ant_armature", None) is None:
+        args.ant_armature = defaults["armature"]
     if getattr(args, "ant_start_height", None) is None:
         args.ant_start_height = defaults["start_height"]
     if getattr(args, "ant_start_joint_q", None) is None:
@@ -580,6 +586,7 @@ class NewtonMuJoCoTorchEnv:
         ant_contact_gap: float | None = None,
         ant_contact_mu: float | None = None,
         ant_joint_damping: float | None = None,
+        ant_armature: float | None = None,
         ant_min_up: float | None = None,
         ant_start_height: float | None = None,
         ant_start_joint_q: list[float] | None = None,
@@ -593,6 +600,8 @@ class NewtonMuJoCoTorchEnv:
         ant_reward_style: str | None = None,
         ant_action_order: str = "joint",
         ant_smooth_up_reward: bool = False,
+        ant_reward_min_up: float | None = None,
+        ant_reward_min_height: float | None = None,
         hopper_reward_style: str = "diffrl",
         hopper_start_joint_q: list[float] | None = None,
         hopper_contact_mu: float = 0.9,
@@ -640,6 +649,8 @@ class NewtonMuJoCoTorchEnv:
                 ant_contact_mu = ant_defaults["contact_mu"]
             if ant_joint_damping is None:
                 ant_joint_damping = ant_defaults["joint_damping"]
+            if ant_armature is None:
+                ant_armature = ant_defaults["armature"]
             if ant_start_height is None:
                 ant_start_height = ant_defaults["start_height"]
             if ant_start_joint_q is None:
@@ -658,6 +669,7 @@ class NewtonMuJoCoTorchEnv:
         self.ant_contact_gap = ant_contact_gap
         self.ant_contact_mu = ant_contact_mu
         self.ant_joint_damping = ant_joint_damping
+        self.ant_armature = ant_armature
         self.ant_min_up = ant_min_up
         self.ant_start_height = ant_start_height
         self.ant_start_joint_q = ant_start_joint_q
@@ -671,6 +683,8 @@ class NewtonMuJoCoTorchEnv:
         self.ant_reward_style = ant_reward_style
         self.ant_action_order = ant_action_order
         self.ant_smooth_up_reward = ant_smooth_up_reward
+        self.ant_reward_min_up = ant_reward_min_up
+        self.ant_reward_min_height = ant_reward_min_height
         self.hopper_reward_style = hopper_reward_style
         self.hopper_start_joint_q = hopper_start_joint_q
         self.hopper_contact_mu = hopper_contact_mu
@@ -926,6 +940,9 @@ class NewtonMuJoCoTorchEnv:
             ant_source = ET.tostring(root, encoding="unicode")
         ignore_names = ("^floor$",) if self.ant_asset == "nv" else ()
         source.add_mjcf(ant_source, up_axis=ant_up_axis, armature_scale=armature_scale, ignore_names=ignore_names)
+        if self.ant_armature is not None:
+            for dof_id in range(6, len(source.joint_armature)):
+                source.joint_armature[dof_id] = self.ant_armature
         if self.ant_joint_damping is not None:
             damping_alias = source.custom_attributes.get("mujoco:dof_passive_damping")
             for dof_id in range(6, len(source.joint_damping)):
@@ -1566,6 +1583,16 @@ class NewtonMuJoCoTorchEnv:
 
         if obs is None:
             obs = self.observe(q, qd, action)
+
+        def apply_ant_margin_penalties(reward: torch.Tensor, up_proj: torch.Tensor) -> torch.Tensor:
+            if self.ant_reward.up_margin > 0.0 and self.ant_reward_min_up is not None:
+                up_shortfall = torch.relu(float(self.ant_reward_min_up) - up_proj)
+                reward = reward - self.ant_reward.up_margin * up_shortfall.square()
+            if self.ant_reward.height_margin > 0.0 and self.ant_reward_min_height is not None:
+                height_shortfall = torch.relu(float(self.ant_reward_min_height) - q[:, 1])
+                reward = reward - self.ant_reward.height_margin * height_shortfall.square()
+            return reward
+
         if self.ant_reward_style in {
             "isaac",
             "isaaclab",
@@ -1593,9 +1620,12 @@ class NewtonMuJoCoTorchEnv:
                 up_reward = weights.up * torch.clamp(up_proj, min=0.0, max=1.0)
             else:
                 up_reward = torch.where(up_proj > 0.93, torch.full_like(up_proj, weights.up), torch.zeros_like(up_proj))
+            action_dof_vel = dof_vel
+            if self.ant_action_order == "actuator" and self.ant_actuator_dof_indices is not None:
+                action_dof_vel = qd[:, self.ant_actuator_dof_indices]
             actions_cost = action.square().sum(dim=-1)
-            energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
-            dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
+            energy_cost = torch.abs(action * action_dof_vel * weights.dof_vel_scale).sum(dim=-1)
+            dof_limit_cost = (dof_pos_scaled.abs() > 0.98).to(torch.float32).sum(dim=-1)
             height_term: torch.Tensor | float = 0.0
             if self.ant_reward_style in {"isaac", "isaaclab_potential_height", "isaac_heading_gated"}:
                 height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
@@ -1603,7 +1633,7 @@ class NewtonMuJoCoTorchEnv:
             progress = qd[:, 0]
             if self.ant_reward_style == "isaac_heading_gated":
                 progress = progress * torch.clamp(heading_proj, min=0.0)
-            return (
+            reward = (
                 weights.progress * progress
                 + weights.alive
                 + heading_reward
@@ -1613,17 +1643,20 @@ class NewtonMuJoCoTorchEnv:
                 - weights.energy_cost * energy_cost
                 - weights.dof_limit_cost * dof_limit_cost
             )
+            return apply_ant_margin_penalties(reward, up_proj)
         progress_reward = obs[:, 5]
-        up_reward = self.ant_reward.up * obs[:, 27]
+        up_proj = obs[:, 27]
+        up_reward = self.ant_reward.up * up_proj
         heading_reward = self.ant_reward.heading * obs[:, 28]
         height_reward = torch.clamp(obs[:, 0] - self.ant_termination_height, max=ANT_HEIGHT_REWARD_CAP)
-        return (
+        reward = (
             self.ant_reward.progress * progress_reward
             + up_reward
             + heading_reward
             + self.ant_reward.height * height_reward
             + self.ant_reward.action * action.square().sum(dim=-1)
         )
+        return apply_ant_margin_penalties(reward, up_proj)
 
     def transition_reward(
         self,
@@ -2229,6 +2262,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_contact_gap=args.ant_contact_gap,
         ant_contact_mu=args.ant_contact_mu,
         ant_joint_damping=args.ant_joint_damping,
+        ant_armature=args.ant_armature,
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
@@ -2242,6 +2276,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
         ant_smooth_up_reward=args.ant_smooth_up_reward,
+        ant_reward_min_up=args.ant_reward_min_up,
+        ant_reward_min_height=args.ant_reward_min_height,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
         hopper_contact_mu=args.hopper_contact_mu,
@@ -2269,6 +2305,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
             energy_cost=args.ant_energy_cost,
             dof_limit_cost=args.ant_dof_limit_cost,
             dof_vel_scale=args.ant_dof_vel_scale,
+            up_margin=args.ant_up_margin_penalty,
+            height_margin=args.ant_height_margin_penalty,
         ),
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
@@ -2584,6 +2622,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
         "ant_joint_damping": env.ant_joint_damping if args.env == "ant" else None,
+        "ant_armature": env.ant_armature if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
         "policy": {
@@ -2641,6 +2680,7 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         ant_contact_gap=args.ant_contact_gap,
         ant_contact_mu=args.ant_contact_mu,
         ant_joint_damping=args.ant_joint_damping,
+        ant_armature=args.ant_armature,
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
@@ -2654,6 +2694,8 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
         ant_smooth_up_reward=args.ant_smooth_up_reward,
+        ant_reward_min_up=args.ant_reward_min_up,
+        ant_reward_min_height=args.ant_reward_min_height,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
         hopper_contact_mu=args.hopper_contact_mu,
@@ -2681,6 +2723,8 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
             energy_cost=args.ant_energy_cost,
             dof_limit_cost=args.ant_dof_limit_cost,
             dof_vel_scale=args.ant_dof_vel_scale,
+            up_margin=args.ant_up_margin_penalty,
+            height_margin=args.ant_height_margin_penalty,
         ),
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
@@ -3351,6 +3395,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_contact_gap=args.ant_contact_gap,
                 ant_contact_mu=args.ant_contact_mu,
                 ant_joint_damping=args.ant_joint_damping,
+                ant_armature=args.ant_armature,
                 ant_min_up=args.ant_min_up,
                 ant_start_height=args.ant_start_height,
                 ant_start_joint_q=args.ant_start_joint_q,
@@ -3364,6 +3409,8 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_reward_style=args.ant_reward_style,
                 ant_action_order=args.ant_action_order,
                 ant_smooth_up_reward=args.ant_smooth_up_reward,
+                ant_reward_min_up=args.ant_reward_min_up,
+                ant_reward_min_height=args.ant_reward_min_height,
                 hopper_reward_style=args.hopper_reward_style,
                 hopper_start_joint_q=args.hopper_start_joint_q,
                 hopper_contact_mu=args.hopper_contact_mu,
@@ -3515,11 +3562,14 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
         "ant_joint_damping": env.ant_joint_damping if args.env == "ant" else None,
+        "ant_armature": env.ant_armature if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
         "ant_smooth_up_reward": env.ant_smooth_up_reward if args.env == "ant" else None,
+        "ant_reward_min_up": env.ant_reward_min_up if args.env == "ant" else None,
+        "ant_reward_min_height": env.ant_reward_min_height if args.env == "ant" else None,
         "phase_observation": env.phase_observation if args.env == "ant" else None,
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
@@ -3984,6 +4034,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-contact-mu", type=float, default=None)
     parser.add_argument("--ant-joint-damping", type=float, default=None)
+    parser.add_argument("--ant-armature", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=None)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
@@ -4001,6 +4052,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
     parser.add_argument("--ant-smooth-up-reward", action="store_true")
+    parser.add_argument("--ant-reward-min-up", type=float, default=None)
+    parser.add_argument("--ant-reward-min-height", type=float, default=None)
+    parser.add_argument("--ant-up-margin-penalty", type=float, default=0.0)
+    parser.add_argument("--ant-height-margin-penalty", type=float, default=0.0)
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)

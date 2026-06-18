@@ -290,7 +290,9 @@
           are not hidden by reset-spliced metrics. PPO now saves/loads critic checkpoints for valid continuation, and PPO
           actors are no longer double-squashed during shared evaluation. The latest Ant reruns also fix the native
           <code>action_squash=none</code> path: PPO and SHAC actions are now clamped to <code>[-1, 1]</code> before the
-          Newton force map, matching DiffRL and IsaacLab actuator semantics instead of allowing out-of-range torques.
+          Newton force map, matching DiffRL and IsaacLab actuator semantics instead of allowing out-of-range torques. The
+          latest Ant pass also resolves asset-specific defaults explicitly: both DiffRL and NV/IsaacLab Ant now use 0.05
+          actuated hinge armature, and the Isaac-style joint-limit cost penalizes lower and upper saturation symmetrically.
           The clean PPO baselines verify the Newton/MJWarp task setups: Hopper reaches 14.51 m with
           0 no-reset terminals, Cheetah reaches 12.66 m with 0 no-reset terminals, and the corrected clipped
           IsaacLab-potential Ant PPO replay reaches 15.18 m with 0 terminal worlds across five 1024-world no-reset repeats.
@@ -303,7 +305,8 @@
           the clipped PPO anchor, and a cautious H=8 update improves the deterministic no-reset replay to 15.39 m with
           0 terminals. Five repeated no-reset audits still expose the open reliability target: PPO has 0 terminals and
           minimum-up above 0.945, while the H=8 SHAC update has 0 terminals but one repeat dips to 0.485 minimum-up before
-          recovering. Longer H=16/H=32 Ant SHAC updates remain too slow or contact-sensitive to call reliable.
+          recovering. A late-state H=32 repair run now keeps a 30.04 m gait over 960 steps with only 1 terminal event across
+          5 x 1024 audited worlds, but that rare late failure is still enough to keep Ant marked unsolved.
           The MJWarp branch used here includes the fixes from this investigation: free-joint kinematics replay, dense
           constrained mass-solve VJPs, explicit RNE <code>qfrc_bias</code>/<code>cfrc_int</code> adjoints, branch-level
           kinematics replay, contact row <code>aref</code>/<code>D</code>/<code>J</code> adjoints, control buffer isolation,
@@ -328,7 +331,7 @@
       <div class="panel metric">
         <div class="label">Ant SHAC Distance</div>
         <div class="value" id="stable-return">...</div>
-        <p class="note">Current clipped H=8 SHAC probe; no-reset terminals shown next.</p>
+        <p class="note">Current 960-step SHAC near-miss; no-reset terminals shown next.</p>
       </div>
       <div class="panel metric">
         <div class="label">Ant Falls / No-Reset Terms</div>
@@ -380,11 +383,15 @@
           The newest Ant harness fix uses the stable -90 degree X free-root start quaternion for both DiffRL and NV Ant
           imports, because this is the pose that matches the configured start joints after Newton exports to the MuJoCo/MJWarp
           runtime. It also drops the embedded NV floor before adding Newton's ground plane; this removes the duplicate
-          coplanar floor contacts while preserving the native NV 0.01 hinge armature.
+          coplanar floor contacts, and <code>--ant-armature</code> now sets actuated hinge armature explicitly. The default
+          for both DiffRL and NV/IsaacLab Ant is 0.05, matching IsaacLab's actuator config instead of preserving the NV XML's
+          lower 0.01 value.
           The newest Ant runner fix clamps all policy actions before force assignment, so native no-squash PPO and SHAC
           now use the same bounded action contract as DiffRL and IsaacLab. A direct velocity probe also verified that the
           imported Ant root convention is linear velocity in <code>qd[0:3]</code> and angular velocity in <code>qd[3:6]</code>;
-          the remaining Ant issue is not a swapped velocity observation.
+          the remaining Ant issue is not a swapped velocity observation. The newest reward-bookkeeping fix also computes the
+          Isaac-style energy term in actuator order and changes the DOF-limit cost from an upper-limit-only check to
+          <code>abs(dof_pos_scaled) &gt; 0.98</code>, so crouched lower-limit gaits are penalized.
           The shared report renderer now follows a smoothed mass-weighted COM target and no longer resets videos on falls,
           so visible rollouts show the actual policy trajectory rather than a reset-spliced episode.
           Hopper stochastic resets are clamped inside finite joint limits. The newest Newton fix preserves MJCF joint anchor
@@ -404,8 +411,10 @@
           at 15.18 m with 0/5120 no-reset terminal worlds, 0 invalid worlds, and 0.945 minimum-up in the worst repeat.
           The current H=8 SHAC update can improve displacement to 15.39 m in the deterministic no-reset replay and stays
           terminal-free across five 1024-world repeats, but the repeated minimum-up dip shows it is not yet the best reliable
-          Ant gait. Longer SHAC horizons with contact-surrogate adjoints are currently CPU-bound, and later H=8 steps can
-          select a rare contact branch that falls despite better short-horizon reward. Hopper required two harness fixes:
+          Ant gait. The late-state H=32 repair from the clipped PPO anchor is the strongest speed result so far: it selected a
+          zero-fall 3 x 1024-world checkpoint and audited at 30.04 m over 960 steps, but still had 1 late terminal world in
+          5 x 1024 repeats. Longer SHAC horizons with contact-surrogate adjoints are currently CPU-bound, and later H=8/H=32
+          steps can still select a rare contact branch that falls despite better short-horizon reward. Hopper required two harness fixes:
           the default deterministic start is now 0.05 rad inside the two upper joint limits, and the selector uses a large
           fall gate so 0-fall checkpoints beat slightly faster late-fall checkpoints. Ant additionally needed the corrected
           potential-progress timestep, action clamping, IsaacLab-style bounded effort, and no-reset selection to avoid
@@ -797,8 +806,13 @@
           The latest debugging pass found two harness issues behind those false positives: the DiffRL Ant asset was being
           started with Isaac-style low joint defaults, and selector fall/invalid penalties were divided by world count. The
           runners now resolve Ant defaults by asset and score terminal counts as raw events, so one terminal world decisively
-          rejects a candidate.
-          The current headline therefore stays with the terminal-free clipped H=8 result despite its posture dip.
+          rejects a candidate. The newest pass also changes Ant lower-limit handling and actuator-order energy accounting,
+          then uses late-state SHAC warmups to train directly from 640-step PPO states. That selected a 30 m checkpoint with
+          0 terminals in a 3 x 1024-world selector, but the promoted 5 x 1024 audit still found 1 late failure. Stricter
+          five-repeat selection, explicit <code>min_up</code> termination, action scaling, and tanh evaluation did not remove
+          that last rare contact failure.
+          The current headline therefore stays cautious: Ant can now move fast under SHAC, but the best 960-step policy is
+          still a near miss rather than a reliable gait.
         </p>
       </article>
       <article class="panel warn">
@@ -810,6 +824,22 @@
           falls. These runs are useful for comparing contact-gradient behavior and selector design, but the current report
           headline uses the clipped 15 m PPO/SHAC runs above.
         </p>
+      </article>
+      <article class="panel warn">
+        <h2>Ant SHAC, Late-State Reliability Fine-Tune</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_shac_late_state_reliability_from_480ppo_32env_24ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_late_state_reliability_from_480ppo_32env_24ep_run1/ant_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            H=32 SHAC continuation from the clipped PPO actor with 640-step late-state warmups, a small action anchor,
+            corrected two-sided joint-limit costs, 0.05 Ant armature, and strong height/up margin rewards. The selected epoch
+            had 0 terminals in a 3 x 1024-world 960-step selector and moved about 30.08 m. The final 5 x 1024 promotion audit
+            averaged 30.04 m over 960 steps with 1 terminal world, 0 invalid worlds, 781.9 s runtime, and 36.7 MB peak
+            allocated CUDA memory. The clip is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow
+            camera, with no overlays.
+          </figcaption>
+        </figure>
       </article>
       <article class="panel ok">
         <h2>Ant PPO, Tanh-Wrapped RSL Continuation</h2>
@@ -1068,7 +1098,10 @@
           audit shows the same scale effect after the raw-count selector fix: a 512-world selector found a 31.23 m,
           zero-terminal checkpoint, but the 5 x 1024 promotion audit still recorded 2 terminal worlds because the torso up
           projection briefly dipped below 0.8. These negative probes confirm that selection scale and terminal-count scoring,
-          not just nominal rollout quality, are the remaining Ant blockers.
+          not just nominal rollout quality, are the remaining Ant blockers. The latest H=32 late-state SHAC repair is the best
+          current compromise: the selector found a zero-fall 30.08 m checkpoint over 3 x 1024 worlds, and the 5 x 1024
+          promotion audit moved 30.04 m over 960 steps with only 1 terminal world. That improves the speed target, but the
+          single terminal keeps the reliability target open.
         </p>
       </article>
       <article class="panel">
@@ -1079,9 +1112,10 @@
           splices or camera artifacts: failed worlds had torso heights below the termination threshold and flipped/upside-down
           up projections after long contact interaction. The current clipped H=8 SHAC run no longer terminates in the five
           repeated 1024-world audit, but its worst repeated minimum-up is 0.485, much lower than the PPO anchor's 0.945.
-          That posture dip is the remaining warning sign. Future work should improve Ant clearance and contact robustness
-          without reintroducing the old unbounded-torque behavior or collapsing into the standing policies found by earlier
-          soft-height PPO probes.
+          The late-state H=32 repair raises the speed target to 30.04 m over 960 steps, but the one failing world still flips
+          late after accumulated contact interaction. That posture/fall tail is the remaining warning sign. Future work should
+          improve Ant clearance and contact robustness without reintroducing the old unbounded-torque behavior or collapsing
+          into the standing policies found by earlier soft-height PPO probes.
         </p>
       </article>
       <article class="panel warn">
@@ -1091,9 +1125,11 @@
           potential-progress timestep. The decisive extra fix is action clamping. Under the valid bounded-action contract,
           the current PPO positive control is 15.18 m with 0/5120 no-reset terminal worlds and stable upright metrics. A
           continuation run initially preserved that result, then degraded when later updates optimized short-horizon PPO
-          reward while failing posture selection. This makes PPO a usable Ant environment sanity check, but also shows that
-          the reward/selector still needs to reject low-clearance local optima. Older 30 m-class PPO traces are now treated
-          as diagnostics because they predate the native no-squash clamp.
+          reward while failing posture selection. The older clipped 30 m PPO actor also fails a stricter 960-step audit with
+          2 terminal worlds in 5 x 1024 repeats, so the report no longer treats 480-step zero-fall PPO as sufficient evidence.
+          This makes PPO a usable Ant environment sanity check, but also shows that the reward/selector still needs to reject
+          low-clearance local optima. Older 30 m-class PPO traces are now treated as diagnostics unless they pass the current
+          no-reset promotion audit.
         </p>
       </article>
     </section>
@@ -1119,9 +1155,10 @@
           Raising the Ant termination floor to 0.55 m or forcing high-upright selection did not fix the visual gait. The
           identity-root NV diagnostic settled into a collapsed support pattern because the configured start joints no longer
           matched the stable diagonal stance. Restoring the -90 degree X start quaternion and dropping the duplicate floor
-          recovers moving NV PPO/SHAC policies, but they are still long-horizon fall-prone low crawls. Matching NV armature
-          to the DiffRL 0.05 value was also tested; it produced stable but mostly stationary policies, so the native NV
-          0.01 armature is retained for that asset.
+          recovers moving NV PPO/SHAC policies, but they are still long-horizon fall-prone low crawls. NV armature is now set
+          to 0.05 by default to match IsaacLab rather than the XML's 0.01 value. A fresh NV smoke run with 0.05 armature,
+          two-sided limit costs, and implicitfast integration was stable for 2 x 512 no-reset worlds, but only moved 3.51 m
+          over 480 steps, so it is a stable negative control rather than a competitive gait.
         </p>
       </article>
     </section>
@@ -2075,6 +2112,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.green
       },
       {
+        id: "antPpoClippedPotential960Audit",
+        label: "Ant PPO clipped 960 audit",
+        path: "assets/ant_ppo_reliable_clipped_potential_960audit_1024_run1/ant_ppo_results.json",
+        color: colors.coral
+      },
+      {
         id: "antPpoCorrectedPoseRawSelector",
         label: "Ant PPO corrected pose audit",
         path: "assets/ant_ppo_corrected_pose_minup_rawselect_best_audit_1024_run1/ant_ppo_results.json",
@@ -2091,6 +2134,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC clipped H=8",
         path: "assets/ant_shac_clipped_potential_anchor_h8_4env_4ep_run1/ant_results.json",
         color: colors.violet
+      },
+      {
+        id: "antShacLateStateReliability",
+        label: "Ant SHAC late-state repair",
+        path: "assets/ant_shac_late_state_reliability_from_480ppo_32env_24ep_run1/ant_results.json",
+        color: colors.blue
       },
       {
         id: "antShacClippedH16Strict",
@@ -2379,6 +2428,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO NV stable root",
         path: "assets/ant_ppo_nv_rootfix_isaaclab_force7p5_1024env_200upd_run1/ant_ppo_results.json",
         color: colors.slate
+      },
+      {
+        id: "antPpoNvArmature05Smoke",
+        label: "Ant PPO NV armature 0.05",
+        path: "assets/ant_ppo_nv_armature05_limitabs_implicitfast_smoke_256env_60upd_run1/ant_ppo_results.json",
+        color: colors.green
       },
       {
         id: "antPpoNvRootfixRepeatedAudit",
@@ -2963,7 +3018,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightProgress5")
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
-      const antLatest = presentRuns.find((run) => run.id === "antShacClippedH8")
+      const antLatest = presentRuns.find((run) => run.id === "antShacLateStateReliability")
+        || presentRuns.find((run) => run.id === "antShacClippedH8")
         || presentRuns.find((run) => run.id === "antShacClippedPpoAnchor")
         || presentRuns.find((run) => run.id === "antPpoClippedPotential")
         || presentRuns.find((run) => run.id === "antShacPromotedAnchor512Audit")

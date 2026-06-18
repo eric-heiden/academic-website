@@ -229,6 +229,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_contact_gap=args.ant_contact_gap,
         ant_contact_mu=args.ant_contact_mu,
         ant_joint_damping=args.ant_joint_damping,
+        ant_armature=args.ant_armature,
         ant_min_up=args.ant_min_up,
         ant_start_height=args.ant_start_height,
         ant_start_joint_q=args.ant_start_joint_q,
@@ -241,6 +242,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
+        ant_reward_min_up=args.ant_reward_min_up,
+        ant_reward_min_height=args.ant_reward_min_height,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
         hopper_contact_mu=args.hopper_contact_mu,
@@ -268,6 +271,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
             energy_cost=args.ant_energy_cost,
             dof_limit_cost=args.ant_dof_limit_cost,
             dof_vel_scale=args.ant_dof_vel_scale,
+            up_margin=args.ant_up_margin_penalty,
+            height_margin=args.ant_height_margin_penalty,
         ),
         hopper_reward=HopperRewardWeights(
             progress=args.hopper_progress_weight,
@@ -278,6 +283,59 @@ def train_ppo(args: argparse.Namespace) -> dict:
         ),
         cheetah_reward=CheetahRewardWeights(action=args.cheetah_action_penalty),
     )
+    selection_env = env
+    if args.selection_num_envs is not None and args.selection_num_envs != args.num_envs:
+        selection_env = NewtonMuJoCoTorchEnv(
+            env_name=args.env,
+            num_envs=args.selection_num_envs,
+            device=args.device,
+            dt=args.dt,
+            sim_substeps=args.sim_substeps,
+            mujoco_integrator=args.mujoco_integrator,
+            force_scale=args.force_scale,
+            contact_backend=args.contact_backend,
+            ant_asset=args.ant_asset,
+            ant_disable_joint_limits=args.ant_disable_joint_limits,
+            ant_density_override=args.ant_density_override,
+            ant_contact_margin=args.ant_contact_margin,
+            ant_contact_gap=args.ant_contact_gap,
+            ant_contact_mu=args.ant_contact_mu,
+            ant_joint_damping=args.ant_joint_damping,
+            ant_armature=args.ant_armature,
+            ant_min_up=args.ant_min_up,
+            ant_start_height=args.ant_start_height,
+            ant_start_joint_q=args.ant_start_joint_q,
+            ant_reset_position_scale=args.ant_reset_position_scale,
+            ant_reset_angle_scale=args.ant_reset_angle_scale,
+            ant_reset_joint_scale=args.ant_reset_joint_scale,
+            ant_reset_velocity_scale=args.ant_reset_velocity_scale,
+            ant_termination_height=args.ant_termination_height,
+            ant_max_healthy_height=args.ant_max_healthy_height,
+            ant_observation_style=args.ant_observation_style,
+            ant_reward_style=args.ant_reward_style,
+            ant_action_order=args.ant_action_order,
+            ant_reward_min_up=args.ant_reward_min_up,
+            ant_reward_min_height=args.ant_reward_min_height,
+            hopper_reward_style=args.hopper_reward_style,
+            hopper_start_joint_q=args.hopper_start_joint_q,
+            hopper_contact_mu=args.hopper_contact_mu,
+            hopper_joint_damping=args.hopper_joint_damping,
+            hopper_armature=args.hopper_armature,
+            hopper_termination_height=args.hopper_termination_height,
+            hopper_termination_angle=args.hopper_termination_angle,
+            hopper_termination_height_tolerance=args.hopper_termination_height_tolerance,
+            hopper_reset_position_scale=args.hopper_reset_position_scale,
+            hopper_reset_angle_scale=args.hopper_reset_angle_scale,
+            hopper_reset_joint_scale=args.hopper_reset_joint_scale,
+            hopper_reset_velocity_scale=args.hopper_reset_velocity_scale,
+            phase_observation=args.phase_observation,
+            phase_period=args.phase_period,
+            hopper_terminate_angle=args.hopper_terminate_angle,
+            locomotion_disable_joint_limits=args.locomotion_disable_joint_limits,
+            ant_reward=env.ant_reward,
+            hopper_reward=env.hopper_reward,
+            cheetah_reward=env.cheetah_reward,
+        )
 
     obs_dim = env.num_obs
     actor = PPOActor(
@@ -334,7 +392,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         for _ in range(max(1, int(args.selection_repeats))):
             if args.selection_uninterrupted:
                 candidate = evaluate_policy_uninterrupted(
-                    env,
+                    selection_env,
                     actor,
                     selection_horizon,
                     obs_rms=obs_rms,
@@ -343,7 +401,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 )
             else:
                 candidate = evaluate_policy(
-                    env,
+                    selection_env,
                     actor,
                     selection_horizon,
                     obs_rms=obs_rms,
@@ -352,7 +410,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 )
             candidate_score = rollout_selection_score(
                 candidate,
-                num_envs=args.num_envs,
+                num_envs=selection_env.num_envs,
                 fall_penalty=args.selection_fall_penalty,
                 invalid_penalty=args.selection_invalid_penalty,
                 displacement_weight=args.selection_displacement_weight,
@@ -629,7 +687,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         )
 
     rollout = evaluate_policy(
-        env,
+        selection_env,
         actor,
         args.eval_horizon,
         obs_rms=obs_rms,
@@ -637,7 +695,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         stochastic_init=args.eval_stochastic_init,
     )
     rollout_uninterrupted = evaluate_policy_uninterrupted(
-        env,
+        selection_env,
         actor,
         args.eval_horizon,
         obs_rms=obs_rms,
@@ -647,7 +705,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
     def score_rollout(candidate: dict) -> float:
         return rollout_selection_score(
             candidate,
-            num_envs=args.num_envs,
+            num_envs=selection_env.num_envs,
             fall_penalty=args.selection_fall_penalty,
             invalid_penalty=args.selection_invalid_penalty,
             displacement_weight=args.selection_displacement_weight,
@@ -669,7 +727,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         for _ in range(args.final_eval_repeats - 1):
             repeated_rollouts.append(
                 evaluate_policy(
-                    env,
+                    selection_env,
                     actor,
                     args.eval_horizon,
                     obs_rms=obs_rms,
@@ -679,7 +737,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             )
             repeated_uninterrupted.append(
                 evaluate_policy_uninterrupted(
-                    env,
+                    selection_env,
                     actor,
                     args.eval_horizon,
                     obs_rms=obs_rms,
@@ -713,6 +771,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_contact_gap=args.ant_contact_gap,
                 ant_contact_mu=args.ant_contact_mu,
                 ant_joint_damping=args.ant_joint_damping,
+                ant_armature=args.ant_armature,
                 ant_min_up=args.ant_min_up,
                 ant_start_height=args.ant_start_height,
                 ant_start_joint_q=args.ant_start_joint_q,
@@ -725,6 +784,8 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 ant_observation_style=args.ant_observation_style,
                 ant_reward_style=args.ant_reward_style,
                 ant_action_order=args.ant_action_order,
+                ant_reward_min_up=args.ant_reward_min_up,
+                ant_reward_min_height=args.ant_reward_min_height,
                 hopper_reward_style=args.hopper_reward_style,
                 hopper_start_joint_q=args.hopper_start_joint_q,
                 hopper_contact_mu=args.hopper_contact_mu,
@@ -839,6 +900,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_contact_gap": env.ant_contact_gap if args.env == "ant" else None,
         "ant_contact_mu": env.ant_contact_mu if args.env == "ant" else None,
         "ant_joint_damping": env.ant_joint_damping if args.env == "ant" else None,
+        "ant_armature": env.ant_armature if args.env == "ant" else None,
         "ant_min_up": env.ant_min_up if args.env == "ant" else None,
         "ant_start_height": env.ant_start_height if args.env == "ant" else None,
         "ant_start_joint_q": env.ant_start_joint_q if args.env == "ant" else None,
@@ -851,9 +913,12 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
+        "ant_reward_min_up": env.ant_reward_min_up if args.env == "ant" else None,
+        "ant_reward_min_height": env.ant_reward_min_height if args.env == "ant" else None,
         "phase_observation": env.phase_observation if args.env == "ant" else None,
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
+        "selection_num_envs": selection_env.num_envs,
         "total_seconds": total_s,
         "mean_update_seconds": float(np.mean([h["update_seconds"] for h in history])) if history else None,
         "mean_fps": float(np.mean([h["fps"] for h in history])) if history else None,
@@ -944,6 +1009,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-contact-gap", type=float, default=None)
     parser.add_argument("--ant-contact-mu", type=float, default=None)
     parser.add_argument("--ant-joint-damping", type=float, default=None)
+    parser.add_argument("--ant-armature", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
     parser.add_argument("--ant-start-height", type=float, default=None)
     parser.add_argument("--ant-start-joint-q", type=parse_float_list, default=None)
@@ -960,6 +1026,10 @@ def parse_args() -> argparse.Namespace:
         default=None,
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
+    parser.add_argument("--ant-reward-min-up", type=float, default=None)
+    parser.add_argument("--ant-reward-min-height", type=float, default=None)
+    parser.add_argument("--ant-up-margin-penalty", type=float, default=0.0)
+    parser.add_argument("--ant-height-margin-penalty", type=float, default=0.0)
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)
@@ -982,6 +1052,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hopper-terminate-angle", action="store_true")
     parser.add_argument("--cheetah-action-penalty", type=float, default=-0.1)
     parser.add_argument("--locomotion-disable-joint-limits", action="store_true")
+    parser.add_argument("--selection-num-envs", type=int, default=None)
     parser.add_argument("--selection-horizon", type=int, default=None)
     parser.add_argument("--selection-fall-penalty", type=float, default=ANT_DEFAULT_SELECTION_FALL_PENALTY)
     parser.add_argument("--selection-invalid-penalty", type=float, default=ANT_DEFAULT_SELECTION_INVALID_PENALTY)
