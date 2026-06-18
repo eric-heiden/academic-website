@@ -996,7 +996,9 @@
           The newest continuation sweeps add explicit selection-minimum logging, no-reset selection, and anchor action MSE.
           Pure progress updates rejected candidates with min-up 0.72-0.84. Adding an action-anchor plus upright reward creates
           zero-fall selection candidates near 31 m, but stochastic reset replays still need stronger robustness than the
-          current H=16 local SHAC objective provides.
+          current H=16 local SHAC objective provides. A smooth differentiable upright reward was also tested; it improved the
+          gradient signal in principle, but this run still failed the repeated stochastic no-reset selector and is kept as a
+          diagnostic rather than the promoted Ant result.
         </p>
       </article>
       <article class="panel">
@@ -2027,6 +2029,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC stochastic strict",
         path: "assets/ant_shac_dtfix_unintr_stoch_minup90_h16_16env_16ep_run1/ant_results.json",
         color: colors.violet
+      },
+      {
+        id: "antShacDtfixSmoothUpStoch",
+        label: "Ant SHAC smooth-up diagnostic",
+        path: "assets/ant_shac_dtfix_smoothup_unintr_stoch_h16_16env_16ep_run2/ant_results.json",
+        color: colors.coral
       },
       {
         id: "antShacAnchorProgress15",

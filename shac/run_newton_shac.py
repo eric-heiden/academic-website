@@ -486,6 +486,7 @@ class NewtonMuJoCoTorchEnv:
         ant_observation_style: str = "diffrl",
         ant_reward_style: str = "diffrl",
         ant_action_order: str = "joint",
+        ant_smooth_up_reward: bool = False,
         hopper_reward_style: str = "diffrl",
         hopper_start_joint_q: list[float] | None = None,
         hopper_contact_mu: float = 0.9,
@@ -544,6 +545,7 @@ class NewtonMuJoCoTorchEnv:
         self.ant_observation_style = ant_observation_style
         self.ant_reward_style = ant_reward_style
         self.ant_action_order = ant_action_order
+        self.ant_smooth_up_reward = ant_smooth_up_reward
         self.hopper_reward_style = hopper_reward_style
         self.hopper_start_joint_q = hopper_start_joint_q
         self.hopper_contact_mu = hopper_contact_mu
@@ -1455,7 +1457,10 @@ class NewtonMuJoCoTorchEnv:
                 torch.full_like(heading_proj, weights.heading),
                 weights.heading * heading_proj / 0.8,
             )
-            up_reward = torch.where(up_proj > 0.93, torch.full_like(up_proj, weights.up), torch.zeros_like(up_proj))
+            if self.ant_smooth_up_reward:
+                up_reward = weights.up * torch.clamp(up_proj, min=0.0, max=1.0)
+            else:
+                up_reward = torch.where(up_proj > 0.93, torch.full_like(up_proj, weights.up), torch.zeros_like(up_proj))
             actions_cost = action.square().sum(dim=-1)
             energy_cost = torch.abs(action * dof_vel * weights.dof_vel_scale).sum(dim=-1)
             dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
@@ -2003,6 +2008,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
+        ant_smooth_up_reward=args.ant_smooth_up_reward,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
         hopper_contact_mu=args.hopper_contact_mu,
@@ -2414,6 +2420,7 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         ant_observation_style=args.ant_observation_style,
         ant_reward_style=args.ant_reward_style,
         ant_action_order=args.ant_action_order,
+        ant_smooth_up_reward=args.ant_smooth_up_reward,
         hopper_reward_style=args.hopper_reward_style,
         hopper_start_joint_q=args.hopper_start_joint_q,
         hopper_contact_mu=args.hopper_contact_mu,
@@ -3016,6 +3023,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 ant_observation_style=args.ant_observation_style,
                 ant_reward_style=args.ant_reward_style,
                 ant_action_order=args.ant_action_order,
+                ant_smooth_up_reward=args.ant_smooth_up_reward,
                 hopper_reward_style=args.hopper_reward_style,
                 hopper_start_joint_q=args.hopper_start_joint_q,
                 hopper_contact_mu=args.hopper_contact_mu,
@@ -3157,6 +3165,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "ant_observation_style": env.ant_observation_style if args.env == "ant" else None,
         "ant_reward_style": env.ant_reward_style if args.env == "ant" else None,
         "ant_action_order": env.ant_action_order if args.env == "ant" else None,
+        "ant_smooth_up_reward": env.ant_smooth_up_reward if args.env == "ant" else None,
         "phase_observation": env.phase_observation if args.env == "ant" else None,
         "phase_period": env.phase_period if args.env == "ant" else None,
         "locomotion_disable_joint_limits": env.locomotion_disable_joint_limits if is_planar_locomotion_env(args.env) else None,
@@ -3631,6 +3640,7 @@ def parse_args() -> argparse.Namespace:
         default="isaaclab",
     )
     parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
+    parser.add_argument("--ant-smooth-up-reward", action="store_true")
     parser.add_argument("--phase-observation", action="store_true")
     parser.add_argument("--phase-period", type=int, default=60)
     parser.add_argument("--hopper-height-weight", type=float, default=1.0)
