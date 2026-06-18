@@ -157,6 +157,7 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
             "observation_style": "diffrl",
             "reward_style": "diffrl",
             "dof_limit_mode": "abs",
+            "dof_limit_cost": 1.0,
             "action_order": "actuator",
             "heading_weight": 1.0,
         }
@@ -172,7 +173,8 @@ def ant_defaults_for_asset(ant_asset: str) -> dict[str, Any]:
         "termination_height": ANT_ISAACLAB_TERMINATION_HEIGHT,
         "observation_style": "isaac",
         "reward_style": "isaaclab_potential",
-        "dof_limit_mode": "upper",
+        "dof_limit_mode": "abs",
+        "dof_limit_cost": 0.1,
         "action_order": "actuator",
         "heading_weight": 0.5,
     }
@@ -206,6 +208,8 @@ def resolve_ant_defaults(args: argparse.Namespace) -> None:
         args.ant_reward_style = defaults["reward_style"]
     if getattr(args, "ant_dof_limit_mode", None) is None:
         args.ant_dof_limit_mode = defaults["dof_limit_mode"]
+    if getattr(args, "ant_dof_limit_cost", None) is None:
+        args.ant_dof_limit_cost = defaults["dof_limit_cost"]
     if getattr(args, "ant_action_order", None) is None:
         args.ant_action_order = defaults["action_order"]
     if getattr(args, "ant_heading_weight", None) is None:
@@ -747,6 +751,8 @@ class NewtonMuJoCoTorchEnv:
         self.acrobot_actuation = acrobot_actuation
         if env_name == "ant":
             ant_defaults = ant_defaults_for_asset(ant_asset)
+            if ant_reward is None:
+                self.ant_reward.dof_limit_cost = ant_defaults["dof_limit_cost"]
             if ant_density_override is None:
                 ant_density_override = ant_defaults["density_override"]
             if ant_contact_mu is None:
@@ -1747,11 +1753,13 @@ class NewtonMuJoCoTorchEnv:
             if self.ant_action_order == "actuator" and self.ant_actuator_dof_indices is not None:
                 action_dof_vel = qd[:, self.ant_actuator_dof_indices]
             actions_cost = action.square().sum(dim=-1)
-            energy_cost = torch.abs(action * action_dof_vel * weights.dof_vel_scale).sum(dim=-1)
+            energy_cost = torch.abs(action * action_dof_vel).sum(dim=-1)
+            limit_threshold = 0.99
             if self.ant_dof_limit_mode == "upper":
-                dof_limit_cost = (dof_pos_scaled > 0.98).to(torch.float32).sum(dim=-1)
+                dof_limit_violation = torch.relu((dof_pos_scaled - limit_threshold) / (1.0 - limit_threshold))
             else:
-                dof_limit_cost = (dof_pos_scaled.abs() > 0.98).to(torch.float32).sum(dim=-1)
+                dof_limit_violation = torch.relu((dof_pos_scaled.abs() - limit_threshold) / (1.0 - limit_threshold))
+            dof_limit_cost = dof_limit_violation.sum(dim=-1)
             height_term: torch.Tensor | float = 0.0
             if self.ant_reward_style in {"isaac", "isaaclab_potential_height", "isaac_heading_gated"}:
                 height_reward = torch.clamp(q[:, 1] - self.ant_termination_height, min=0.0, max=ANT_HEIGHT_REWARD_CAP)
@@ -4412,7 +4420,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-alive-reward", type=float, default=0.5)
     parser.add_argument("--ant-actions-cost", type=float, default=0.005)
     parser.add_argument("--ant-energy-cost", type=float, default=0.05)
-    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=None)
     parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
     parser.add_argument("--ant-asset", choices=["diffrl", "nv"], default="diffrl")
     parser.add_argument("--ant-disable-joint-limits", action="store_true")

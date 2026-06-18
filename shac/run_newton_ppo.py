@@ -1071,7 +1071,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ant-alive-reward", type=float, default=0.5)
     parser.add_argument("--ant-actions-cost", type=float, default=0.005)
     parser.add_argument("--ant-energy-cost", type=float, default=0.05)
-    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=None)
     parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
     parser.add_argument("--ant-asset", choices=["diffrl", "nv"], default="diffrl")
     parser.add_argument("--ant-disable-joint-limits", action="store_true")

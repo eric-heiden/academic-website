@@ -720,6 +720,10 @@
         <h2>Contact Horizon Error</h2>
         <div id="contact-horizon-chart" class="chart"></div>
       </article>
+      <article class="panel">
+        <h2>Ant Contact Clone Drift</h2>
+        <div id="ant-clone-drift-chart" class="chart"></div>
+      </article>
     </section>
 
     <section class="grid two">
@@ -1118,6 +1122,24 @@
             reward but dropped full-horizon selection to lower 10-12 m gaits. Runtime was 148.1 s with 86.7 MB peak allocated
             CUDA memory. The video is the selected best actor, rendered from raw <code>ViewerGL.get_frame()</code> with the
             shared smoothed COM follow camera and no overlays.
+          </figcaption>
+        </figure>
+      </article>
+      <article class="panel ok">
+        <h2>Ant PPO, Corrected Reward Audit</h2>
+        <figure>
+          <video controls preload="none" poster="assets/ant_ppo_nv_abslimit_energyfix_audit_run1/ant_ppo_poster.png">
+            <source src="assets/ant_ppo_nv_abslimit_energyfix_audit_run1/ant_ppo_rollout.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            Re-audit of the reliable NV/IsaacLab PPO actor after switching the NV Ant defaults to absolute joint-limit
+            reward, IsaacLab's 0.1 limit weight, continuous differentiable limit violation, and unscaled physical energy
+            cost. The 3 x 1024 no-reset audit reports 7.19 m mean displacement, 0 terminal worlds, minimum-up 0.845 in the
+            worst repeat, maximum scaled joint position 1.16, 338.3 s audit/render time, and 39.8 MB peak allocated CUDA
+            memory. Attempts to fine-tune this checkpoint with PPO under the corrected reward were not promoted: even
+            conservative updates failed the repeated full-horizon selector, consistent with the contact clone-drift
+            diagnostics below. The clip is raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow
+            camera, with no overlays.
           </figcaption>
         </figure>
       </article>
@@ -2499,6 +2521,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         color: colors.blue
       },
       {
+        id: "antPpoNvAbsLimitAudit",
+        label: "Ant PPO abs-limit audit",
+        path: "assets/ant_ppo_nv_abslimit_energyfix_audit_run1/ant_ppo_results.json",
+        color: colors.green
+      },
+      {
         id: "antShacUprightCandidateAudit",
         label: "Ant SHAC repeated-audited anchor",
         path: "assets/ant_shac_upright_candidate_repeated_audit_run1/ant_results.json",
@@ -3036,6 +3064,34 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antNvRootfixH8Ppo: "assets/ant_multistep_grad_nv_rootfix_singlefloor_ppo_h8_run1.json"
     };
 
+    const clonePaths = [
+      {
+        label: "zero, no contact",
+        path: "assets/ant_clone_consistency_zero_none_nv_run1/clone_consistency.json",
+        color: colors.green
+      },
+      {
+        label: "zero, MuJoCo contact",
+        path: "assets/ant_clone_consistency_zero_mujoco_nv_run1/clone_consistency.json",
+        color: colors.blue
+      },
+      {
+        label: "zero, Newton contact",
+        path: "assets/ant_clone_consistency_zero_newton_nv_run1/clone_consistency.json",
+        color: colors.amber
+      },
+      {
+        label: "PPO, no contact",
+        path: "assets/ant_clone_consistency_ppo_none_nv_run1/clone_consistency.json",
+        color: colors.teal
+      },
+      {
+        label: "PPO, MuJoCo contact",
+        path: "assets/ant_clone_consistency_ppo_mujoco_nv_run1/clone_consistency.json",
+        color: colors.coral
+      }
+    ];
+
     function fmt(value, digits = 2) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) return "n/a";
       return Number(value).toLocaleString(undefined, {
@@ -3397,6 +3453,9 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antNvActuatorH4SurrogateEval),
         safeJson(diagPaths.antNvActuatorH16NoContactEval)
       ]);
+      const cloneRuns = await Promise.all(
+        clonePaths.map(async (run) => ({ ...run, data: await safeJson(run.path) }))
+      );
 
       const stable = presentRuns.find((run) => run.id === "cheetahShac1024NoReset")
         || presentRuns.find((run) => run.id === "cheetahShacSub1")
@@ -3429,6 +3488,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "antShacIsaacExactDefaultsDet")
         || presentRuns.find((run) => run.id === "antShacRslStochTerm20Head1")
         || presentRuns.find((run) => run.id === "antPpoRslStochTerm20Head1")
+        || presentRuns.find((run) => run.id === "antPpoNvAbsLimitAudit")
         || presentRuns.find((run) => run.id === "antPpoIsaacExactDefaults")
         || presentRuns.find((run) => run.id === "antShacIsaacPhysicalProgress2NoHeight")
         || presentRuns.find((run) => run.id === "antPpoIsaacPhysicalProgress2NoHeight")
@@ -3814,6 +3874,52 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         yaxis: { ...baseLayout.yaxis, title: "Best median relative error", type: "log" },
         margin: { t: 18, r: 18, b: 112, l: 68 }
       });
+
+      const clonePresent = cloneRuns.filter((run) => run.data);
+      if (clonePresent.length) {
+        const thresholdStep = (data, key) => {
+          const steps = data?.first_threshold_step || {};
+          return steps[key] ?? steps[String(Number(key))] ?? null;
+        };
+        plotOrMessage("ant-clone-drift-chart", [
+          {
+            type: "bar",
+            name: "final max q spread",
+            x: clonePresent.map((run) => run.label),
+            y: clonePresent.map((run) => Math.max(Number(run.data.final_max_q_delta_error) || 0, 1e-8)),
+            text: clonePresent.map((run) => `exact ${fmt(run.data.final_max_q_delta_error, 6)}`),
+            hovertemplate: "%{x}<br>%{text}<extra></extra>",
+            marker: { color: clonePresent.map((run) => run.color) }
+          },
+          {
+            type: "scatter",
+            mode: "lines+markers",
+            name: "first step > 1e-4",
+            x: clonePresent.map((run) => run.label),
+            y: clonePresent.map((run) => thresholdStep(run.data, "0.0001")),
+            yaxis: "y2",
+            marker: { color: colors.violet, size: 9, symbol: "diamond" },
+            line: { color: colors.violet, width: 2 }
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "final max qd spread",
+            x: clonePresent.map((run) => run.label),
+            y: clonePresent.map((run) => Math.max(Number(run.data.final_max_qd_error) || 0, 1e-8)),
+            marker: { color: colors.slate, size: 10, symbol: "circle-open" }
+          }
+        ], {
+          ...baseLayout,
+          xaxis: { ...baseLayout.xaxis, title: "", type: "category", tickangle: -18 },
+          yaxis: { ...baseLayout.yaxis, title: "Final max spread (log)", type: "log" },
+          yaxis2: { title: "First threshold step", overlaying: "y", side: "right", gridcolor: "rgba(0,0,0,0)", zeroline: false },
+          legend: { orientation: "h", y: -0.32 },
+          margin: { t: 18, r: 72, b: 92, l: 68 }
+        });
+      } else {
+        plotMessage("ant-clone-drift-chart", "No Ant clone-consistency JSON loaded for this report build.");
+      }
 
       function lineSearchSeries(data, label, color) {
         const rows = data?.candidates || [];

@@ -85,6 +85,8 @@ def load_obs_rms(path: Path | None, device: torch.device, obs_dim: int) -> Runni
 
 def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoTorchEnv:
     env_name = result["env"]
+    contact_backend = result.get("eval_contact_backend") or result.get("contact_backend")
+    ant_dof_limit_mode = result.get("eval_ant_dof_limit_mode") or result.get("ant_dof_limit_mode")
     return NewtonMuJoCoTorchEnv(
         env_name=env_name,
         num_envs=args.video_num_envs,
@@ -93,7 +95,7 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         sim_substeps=int(result.get("sim_substeps") or (16 if env_name in {"ant", "hopper", "cheetah"} else 1)),
         mujoco_integrator=result.get("mujoco_integrator") or "euler",
         force_scale=float(result.get("force_scale") or 200.0),
-        contact_backend=result.get("contact_backend") or ("mujoco" if env_name in {"ant", "hopper", "cheetah"} else "none"),
+        contact_backend=contact_backend or ("mujoco" if env_name in {"ant", "hopper", "cheetah"} else "none"),
         acrobot_actuation=result.get("acrobot_actuation") or "elbow",
         ant_asset=result.get("ant_asset") or "diffrl",
         ant_disable_joint_limits=bool(result.get("ant_disable_joint_limits") or False),
@@ -113,7 +115,7 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         ant_max_healthy_height=float(result.get("ant_max_healthy_height") or 1.5),
         ant_observation_style=result.get("ant_observation_style") or "diffrl",
         ant_reward_style=result.get("ant_reward_style") or "diffrl",
-        ant_dof_limit_mode=result.get("ant_dof_limit_mode") or "abs",
+        ant_dof_limit_mode=ant_dof_limit_mode or "abs",
         ant_action_order=result.get("ant_action_order") or "joint",
         hopper_reward_style=result.get("hopper_reward_style") or "diffrl",
         hopper_start_joint_q=result.get("hopper_start_joint_q"),
