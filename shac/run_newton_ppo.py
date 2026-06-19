@@ -225,6 +225,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         dt=args.dt,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_cone=args.mujoco_cone,
         mujoco_world_spacing_z=args.mujoco_world_spacing_z,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
@@ -308,6 +309,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
                 dt=args.dt,
                 sim_substeps=args.sim_substeps,
                 mujoco_integrator=args.mujoco_integrator,
+                mujoco_cone=args.mujoco_cone,
                 mujoco_world_spacing_z=args.mujoco_world_spacing_z,
                 force_scale=args.force_scale,
                 contact_backend=args.contact_backend,
@@ -386,6 +388,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
             dt=args.dt,
             sim_substeps=args.sim_substeps,
             mujoco_integrator=args.mujoco_integrator,
+            mujoco_cone=args.mujoco_cone,
             mujoco_world_spacing_z=args.mujoco_world_spacing_z,
             force_scale=args.force_scale,
             contact_backend=args.contact_backend,
@@ -956,6 +959,7 @@ def train_ppo(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "mujoco_cone": env.mujoco_cone,
         "mujoco_world_spacing_z": args.mujoco_world_spacing_z,
         "nconmax": env.nconmax,
         "njmax": env.njmax,
@@ -1104,6 +1108,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
+    parser.add_argument("--mujoco-cone", choices=["pyramidal", "elliptic"], default="pyramidal")
     parser.add_argument("--mujoco-world-spacing-z", type=float, default=None)
     parser.add_argument("--lr", type=float, default=3.0e-4)
     parser.add_argument("--adaptive-kl", action="store_true")

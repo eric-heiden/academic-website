@@ -497,6 +497,7 @@ def run(args: argparse.Namespace) -> dict:
         contact_backend=args.contact_backend,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_cone=args.mujoco_cone,
         ant_asset=args.ant_asset,
         ant_contact_mu=args.ant_contact_mu,
         ant_contact_margin=args.ant_contact_margin,
@@ -569,6 +570,7 @@ def run(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": args.sim_substeps,
         "mujoco_integrator": args.mujoco_integrator,
+        "mujoco_cone": args.mujoco_cone,
         "force_scale": args.force_scale,
         "ant_asset": args.ant_asset,
         "ant_contact_margin": args.ant_contact_margin,
@@ -647,6 +649,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--sim-substeps", type=int, default=2)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="implicitfast")
+    parser.add_argument("--mujoco-cone", choices=["pyramidal", "elliptic"], default="pyramidal")
     parser.add_argument("--force-scale", type=float, default=10.0)
     parser.add_argument("--contact-backend", choices=["mujoco", "newton", "none"], default="mujoco")
     parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default="off")

@@ -725,6 +725,7 @@ class NewtonMuJoCoTorchEnv:
         contact_backend: str,
         sim_substeps: int = 1,
         mujoco_integrator: str = "euler",
+        mujoco_cone: str = "pyramidal",
         cartpole_reward: CartpoleRewardWeights | None = None,
         ant_reward: AntRewardWeights | None = None,
         hopper_reward: HopperRewardWeights | None = None,
@@ -791,6 +792,7 @@ class NewtonMuJoCoTorchEnv:
         self.force_scale = force_scale
         self.contact_backend = contact_backend
         self.mujoco_integrator = mujoco_integrator
+        self.mujoco_cone = mujoco_cone
         self.mujoco_solver_iterations = int(mujoco_solver_iterations)
         self.mujoco_solver_ls_iterations = int(mujoco_solver_ls_iterations)
         self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
@@ -907,6 +909,7 @@ class NewtonMuJoCoTorchEnv:
             disable_contacts=not use_contacts,
             use_mujoco_contacts=contact_backend != "newton",
             integrator=mujoco_integrator,
+            cone=mujoco_cone,
             solver="newton",
             iterations=self.mujoco_solver_iterations,
             ls_iterations=self.mujoco_solver_ls_iterations,
@@ -2596,6 +2599,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         contact_backend=args.contact_backend,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_cone=args.mujoco_cone,
         mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
         mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
         mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
@@ -2928,6 +2932,7 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "mujoco_cone": env.mujoco_cone,
         "mujoco_smooth_adjoint": args.mujoco_smooth_adjoint,
         "mujoco_smooth_friction_viscosity": args.mujoco_smooth_friction_viscosity,
         "mujoco_smooth_friction_scale": args.mujoco_smooth_friction_scale,
@@ -3029,6 +3034,7 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         contact_backend=args.contact_backend,
         sim_substeps=args.sim_substeps,
         mujoco_integrator=args.mujoco_integrator,
+        mujoco_cone=args.mujoco_cone,
         mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
         mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
         mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
@@ -3994,6 +4000,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "dt": args.dt,
         "sim_substeps": env.sim_substeps,
         "mujoco_integrator": env.mujoco_integrator,
+        "mujoco_cone": env.mujoco_cone,
         "mujoco_smooth_adjoint": args.mujoco_smooth_adjoint,
         "eval_mujoco_smooth_adjoint": eval_env_args.mujoco_smooth_adjoint,
         "mujoco_smooth_friction_viscosity": args.mujoco_smooth_friction_viscosity,
@@ -4667,6 +4674,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--sim-substeps", type=int, default=None)
     parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
+    parser.add_argument("--mujoco-cone", choices=["pyramidal", "elliptic"], default="pyramidal")
     parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default="off")
     parser.add_argument("--mujoco-smooth-friction-viscosity", type=float, default=10.0)
     parser.add_argument("--mujoco-smooth-friction-scale", type=float, default=0.01)

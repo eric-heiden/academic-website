@@ -289,15 +289,18 @@
           <code>ViewerGL.get_frame()</code> frames. The Isaac-style DiffRL Ant policy must send torques in Newton
           joint-coordinate order; MJCF actuator order sends the learned torques to the wrong hips/ankles. The verified
           IsaacLab-matched preset is explicit: <code>ant_action_order=joint</code>, start height 0.5 m, pi/4 joint pose,
-          contact friction 1.0, joint damping 0.1, force scale 7.5, and progress/heading weights 2.0 / 0.5. With that
+          contact friction 1.0, joint damping 0.1, armature 0.05, force scale 7.5, and heading weight 0.5. With that
           preset, the current MJWarp branch's PPO positive control reaches 22.84 m over 480 MuJoCo-contact steps with
           0/1024 falls and 0 invalid worlds across three no-reset repeats.
-          The latest SHAC rerun uses Newton differentiable contacts for the gradient pass, MuJoCo contacts for candidate
-          validation, and a guarded line search that includes the zero step. One accepted line-search step from the stable
-          PPO actor reaches 24.06 m over 480 MuJoCo-contact steps with 0 falls/invalids in three 1024-world no-reset audits.
-          The remaining solver defect is narrower: native MuJoCo-contact adjoints still fail at the contacted Ant step-1
-          action/state split. No-contact and Newton-contact local checks are clean; increasing MuJoCo solver iterations
-          and capturing the substep mass factors did not move the H=2 MuJoCo-contact mismatch.
+          The best current SHAC Ant policy uses Newton-contact gradients for the accepted update and validates under
+          MuJoCo contacts. It reaches 24.06 m over the original 480-step audit and 35.02 m over a fresh 960-step
+          MuJoCo-contact trace, with 0 falls and 0 invalid worlds in both checks. A separate native MuJoCo-contact SHAC
+          continuation from the repeated-audited upright actor accepted a later low-LR gradient step and reached 33.64 m
+          over 960 steps with 0 falls/invalids; that result confirms the latest contact-distance fixes are useful, but the
+          faster Newton-gradient/MuJoCo-eval policy remains the promoted Ant clip.
+          The remaining solver defect is narrower: native MuJoCo-contact adjoints still show larger contact-boundary
+          finite-difference errors than no-contact and Newton-contact checks, so all Ant SHAC updates are still guarded by
+          MuJoCo-contact validation before a checkpoint is kept.
           All promoted clips below are raw
           <code>ViewerGL.get_frame()</code> frames rendered with one shared smoothed COM follow camera and no overlays.
           The MJWarp branch used here includes the differentiability fixes from this investigation: free-joint kinematics
@@ -345,11 +348,11 @@
     <section class="panel ok">
       <h2>Promoted Reliable Results</h2>
       <p>
-        The table below promotes reliable no-reset evaluations rather than the older diagnostic clips. Ant is shown from
-        the current MJWarp branch with Newton-contact gradients, MuJoCo-contact validation, and guarded line search. Hopper and
-        Cheetah use the strongest verified 480-step runs, all rendered with the same shared smoothed COM follow camera.
-        The shorter current-branch Hopper/Cheetah replays are still included in the plots as sanity checks, but the
-        promoted rows here report the best reliable policies found so far.
+        The table below promotes reliable no-reset evaluations rather than the older diagnostic clips. Ant includes the
+        original 480-step PPO sanity check and the best current SHAC policy re-rendered and re-traced for 960 MuJoCo-contact
+        steps. Hopper and Cheetah use the strongest verified 480-step runs, all rendered with the same shared smoothed COM
+        follow camera. The shorter current-branch Hopper/Cheetah replays are still included in the plots as sanity checks,
+        but the promoted rows here report the best reliable policies found so far.
       </p>
       <table>
         <thead>
@@ -376,11 +379,20 @@
           <tr>
             <td>Ant</td>
             <td>SHAC, Newton-contact grad + MuJoCo eval</td>
-            <td>480 steps, 1024 worlds</td>
-            <td>24.06 m, best epoch 1</td>
+            <td>960-step MuJoCo trace, 512 worlds</td>
+            <td>35.02 m; 24.06 m at the original 480-step audit</td>
             <td>0 / 0</td>
             <td>90.76 s</td>
             <td>33.52 MB</td>
+          </tr>
+          <tr>
+            <td>Ant</td>
+            <td>SHAC, native MuJoCo-contact continuation</td>
+            <td>960 steps, 512 worlds x 3 repeats</td>
+            <td>33.64 m, best epoch 6</td>
+            <td>0 / 0</td>
+            <td>2207.19 s</td>
+            <td>37.63 MB</td>
           </tr>
           <tr>
             <td>Hopper</td>
@@ -484,8 +496,9 @@
           <figcaption>
             Guarded SHAC update from the stable PPO actor: Newton differentiable contacts generate the gradient, MuJoCo
             contacts validate the candidate, and zero step is included in the line search. The selected epoch 1 reaches
-            24.06 m over 480 steps with 0 falls and 0 invalid worlds in three 1024-world no-reset audits. Frames are raw
-            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
+            24.06 m over the original 480-step audit and 35.02 m over the refreshed 960-step MuJoCo-contact trace, with
+            0 falls and 0 invalid worlds. Frames are raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM
+            follow camera.
           </figcaption>
         </figure>
       </article>
@@ -1573,14 +1586,16 @@
           joint-order actions, PPO reaches 22.84 m over 480 steps with 0 falls/invalids across three 1024-world repeats. With
           actuator-order actions, the same policy is the bad visual case: it barely moves and presses into joint limits.
           Loading the PPO actor through the SHAC path now preserves the same behavior, and the current guarded SHAC
-          continuation reaches 24.06 m with 0 falls/invalids, so the remaining Ant problem is not a checkpoint-loader, render-state, or
-          reset-splicing issue.
+          continuation reaches 24.06 m over the original 480-step audit and 35.02 m over a refreshed 960-step
+          MuJoCo-contact trace, with 0 falls/invalids. The remaining Ant problem is not a checkpoint-loader, render-state,
+          or reset-splicing issue.
         </p>
         <p>
           The current gradient audit shows why the policy update can now help while one diagnostic remains red. No-contact
-          and Newton-contact local Ant checks stay smooth at the contacted second step, but the native MuJoCo-contact adjoint
-          has a step-1 root-velocity/reward/state-position mismatch. The old single-count 8-11 m runs and line-search probes
-          remain plotted below as historical diagnostics, but they are no longer the promoted Ant numbers.
+          and Newton-contact local Ant checks stay smooth at the contacted second step, and the MuJoCo-contact fixes are now
+          good enough for a guarded native-contact continuation to improve a repeated-audited upright actor to 33.64 m over
+          960 steps. The native MuJoCo-contact finite-difference checks are still noisier around contact boundaries, so the
+          reliable Ant path remains guarded line search plus physical MuJoCo-contact validation.
         </p>
       </article>
       <article class="panel">
@@ -2341,6 +2356,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC Newton-contact guarded",
         path: "assets/ant_shac_newtoncontacts_guarded_linesearch_current_16env_1ep_run1/ant_results.json",
         color: colors.teal
+      },
+      {
+        id: "antShacMujocoReliableCurrent",
+        label: "Ant SHAC MuJoCo-contact reliable",
+        path: "assets/ant_shac_current_reliable_from_upright_anchor_h16_16env_12ep_run1/ant_results.json",
+        color: colors.blue
       },
       {
         id: "antPpoCorrectPresetContinue",

@@ -94,6 +94,7 @@ def build_env(result: dict[str, Any], args: argparse.Namespace) -> NewtonMuJoCoT
         dt=float(result.get("dt", 1.0 / 60.0)),
         sim_substeps=int(result.get("sim_substeps") or (16 if env_name in {"ant", "hopper", "cheetah"} else 1)),
         mujoco_integrator=result.get("mujoco_integrator") or "euler",
+        mujoco_cone=result.get("mujoco_cone") or "pyramidal",
         force_scale=float(result.get("force_scale") or 200.0),
         contact_backend=contact_backend or ("mujoco" if env_name in {"ant", "hopper", "cheetah"} else "none"),
         acrobot_actuation=result.get("acrobot_actuation") or "elbow",

@@ -117,6 +117,7 @@ class MinimalSolverEnv:
         self.torch_device = torch.device(device)
         self.wp_device = wp.device_from_torch(self.torch_device)
         self.dt = dt
+        contact_enabled = scene.startswith("ground_contact_")
 
         if scene == "single_hinge_zero_g":
             self.model = self._build_single_hinge()
@@ -138,18 +139,26 @@ class MinimalSolverEnv:
             self.model = self._build_planar_locomotion_branch(branches=2)
         elif scene == "free_body_zero_g":
             self.model = self._build_free_body()
+        elif scene == "ground_contact_sphere_slide":
+            self.model = self._build_ground_contact_body("sphere")
+        elif scene == "ground_contact_capsule_slide":
+            self.model = self._build_ground_contact_body("capsule")
+        elif scene == "ground_contact_box_slide":
+            self.model = self._build_ground_contact_body("box")
         else:
             raise ValueError(f"unknown scene: {scene}")
 
         self.solver = SolverMuJoCo(
             self.model,
-            disable_contacts=True,
+            disable_contacts=not contact_enabled,
             requires_grad=True,
             integrator="euler",
             solver="newton",
             jacobian=os.environ.get("NEWTON_SHAC_DIAG_JACOBIAN"),
             iterations=solver_iterations,
             ls_iterations=ls_iterations,
+            nconmax=32 if contact_enabled else None,
+            njmax=128 if contact_enabled else None,
             update_data_interval=1,
         )
         self.step_ctx = StepContext(self)
@@ -445,6 +454,44 @@ class MinimalSolverEnv:
         builder.add_articulation([joint])
         return builder.finalize(device=self.wp_device, requires_grad=True)
 
+    def _build_ground_contact_body(self, shape: str) -> newton.Model:
+        builder = newton.ModelBuilder(up_axis="Y", gravity=-9.81)
+        SolverMuJoCo.register_custom_attributes(builder)
+        body_cfg = newton.ModelBuilder.ShapeConfig(ke=4.0e4, kd=1.0e4, kf=3.0e3, mu=0.75)
+        ground_cfg = newton.ModelBuilder.ShapeConfig(ke=4.0e4, kd=1.0e4, kf=3.0e3, mu=0.75)
+
+        inertia = wp.mat33(np.diag([0.04, 0.05, 0.03]).astype(np.float32))
+        body = builder.add_link(mass=1.0, com=wp.vec3(0.0, 0.0, 0.0), inertia=inertia)
+        if shape == "sphere":
+            builder.add_shape_sphere(
+                body,
+                radius=0.12,
+                cfg=body_cfg,
+                color=wp.vec3(0.18, 0.62, 0.48),
+            )
+        elif shape == "capsule":
+            builder.add_shape_capsule(
+                body,
+                radius=0.08,
+                half_height=0.20,
+                cfg=body_cfg,
+                color=wp.vec3(0.21, 0.45, 0.86),
+            )
+        elif shape == "box":
+            builder.add_shape_box(
+                body,
+                hx=0.18,
+                hy=0.07,
+                hz=0.12,
+                cfg=body_cfg,
+                color=wp.vec3(0.88, 0.42, 0.22),
+            )
+        else:
+            raise ValueError(f"unknown ground contact shape: {shape}")
+        builder.add_articulation([builder.add_joint_free(body)])
+        builder.add_ground_plane(cfg=ground_cfg)
+        return builder.finalize(device=self.wp_device, requires_grad=True)
+
     @staticmethod
     def _visual_shape_cfg() -> newton.ModelBuilder.ShapeConfig:
         return newton.ModelBuilder.ShapeConfig(
@@ -519,6 +566,29 @@ class MinimalSolverEnv:
                 dtype=torch.float32,
                 device=self.torch_device,
             )
+            return q, qd, joint_f
+
+        if self.scene == "ground_contact_sphere_slide":
+            q = torch.tensor(
+                [[0.0, 0.118, 0.0, 0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device=self.torch_device
+            )
+            qd = torch.tensor([[0.55, -0.12, 0.08, 0.02, -0.04, 0.01]], dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor([[1.2, 0.0, 0.25, 0.0, 0.0, 0.0]], dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
+        if self.scene == "ground_contact_capsule_slide":
+            q = torch.tensor(
+                [[0.0, 0.079, 0.0, 0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device=self.torch_device
+            )
+            qd = torch.tensor([[0.48, -0.10, -0.06, 0.03, 0.02, -0.04]], dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor([[1.1, 0.0, -0.15, 0.0, 0.0, 0.0]], dtype=torch.float32, device=self.torch_device)
+            return q, qd, joint_f
+        if self.scene == "ground_contact_box_slide":
+            q = torch.tensor(
+                [[0.0, 0.068, 0.0, 0.03, -0.02, 0.04, 1.0]], dtype=torch.float32, device=self.torch_device
+            )
+            q[:, 3:7] = torch.nn.functional.normalize(q[:, 3:7], dim=-1)
+            qd = torch.tensor([[0.42, -0.09, 0.11, -0.03, 0.05, 0.02]], dtype=torch.float32, device=self.torch_device)
+            joint_f = torch.tensor([[1.0, 0.0, 0.20, 0.02, 0.0, -0.01]], dtype=torch.float32, device=self.torch_device)
             return q, qd, joint_f
 
         q = torch.tensor(
@@ -799,6 +869,45 @@ def make_cases(dt: float) -> list[DiagnosticCase]:
                 "root_angular_qd": ("qd", [3, 4, 5]),
                 "root_force": ("joint_f", [0, 1, 2, 3, 4, 5]),
             },
+        ),
+        DiagnosticCase(
+            name="contact_sphere_velocity_out",
+            scene="ground_contact_sphere_slide",
+            q_weight=[0.0] * 7,
+            qd_weight=[1.0, -0.2, 0.3, 0.05, -0.04, 0.02],
+            groups={
+                "root_pos_q": ("q", [0, 1, 2]),
+                "root_quat_q_normalized": ("q", [3, 4, 5, 6]),
+                "root_qd": ("qd", [0, 1, 2, 3, 4, 5]),
+                "root_force": ("joint_f", [0, 1, 2, 3, 4, 5]),
+            },
+            normalize_quat_for_fd=True,
+        ),
+        DiagnosticCase(
+            name="contact_capsule_velocity_out",
+            scene="ground_contact_capsule_slide",
+            q_weight=[0.0] * 7,
+            qd_weight=[1.0, -0.2, 0.3, 0.05, -0.04, 0.02],
+            groups={
+                "root_pos_q": ("q", [0, 1, 2]),
+                "root_quat_q_normalized": ("q", [3, 4, 5, 6]),
+                "root_qd": ("qd", [0, 1, 2, 3, 4, 5]),
+                "root_force": ("joint_f", [0, 1, 2, 3, 4, 5]),
+            },
+            normalize_quat_for_fd=True,
+        ),
+        DiagnosticCase(
+            name="contact_box_velocity_out",
+            scene="ground_contact_box_slide",
+            q_weight=[0.0] * 7,
+            qd_weight=[1.0, -0.2, 0.3, 0.05, -0.04, 0.02],
+            groups={
+                "root_pos_q": ("q", [0, 1, 2]),
+                "root_quat_q_normalized": ("q", [3, 4, 5, 6]),
+                "root_qd": ("qd", [0, 1, 2, 3, 4, 5]),
+                "root_force": ("joint_f", [0, 1, 2, 3, 4, 5]),
+            },
+            normalize_quat_for_fd=True,
         ),
     ]
 
@@ -1082,7 +1191,8 @@ def run(args: argparse.Namespace) -> dict:
         "epsilon_values": epsilons,
         "cases": results,
         "notes": [
-            "All scenes run with SolverMuJoCo, MJWarp backend, contacts disabled, and Euler integration.",
+            "All scenes run with SolverMuJoCo, MJWarp backend, and Euler integration.",
+            "Scenes with the ground_contact_ prefix enable native MuJoCo/MJWarp contact generation; the remaining scenes disable contacts.",
             "Finite differences perturb each input component independently; the normalized quaternion case re-normalizes q[3:7] before each evaluation.",
         ],
     }
