@@ -293,12 +293,14 @@
           With that preset, the current MJWarp branch's PPO positive control reaches 22.84 m over 480 MuJoCo-contact steps
           with 0/1024 falls and 0 invalid worlds across three no-reset repeats.
           The latest SHAC rerun uses the same physical preset, starts from the stable PPO actor, and incorporates the
-          corrected MJWarp contact-J sign plus an opt-in contact-position VJP. Its selected epoch 16 reaches 23.53 m over
-          480 MuJoCo-contact steps with 0 falls/invalids in three 1024-world no-reset audits. H=8 finite-difference checks
-          now show usable policy/action gradients under hard contact: 1.18e-2 policy error and 1.48e-2 fixed-action error
-          with full sign agreement. The remaining known defect is direct contacted state-position sensitivity at step 1,
-          where contact-position VJP still corrupts root/joint position gradients, so that path is disabled by default and
-          can be re-enabled only with <code>MJW_ENABLE_CONTACT_J_POS_VJP=1</code>.
+          corrected MJWarp contact-J sign plus generated contact-J geometry backward as the default path. Its selected
+          epoch 14 reaches 23.26 m over 480 MuJoCo-contact steps with 0 falls/invalids in three 1024-world no-reset audits.
+          H=8 finite-difference checks now show usable policy/action gradients under hard contact: 1.59e-2 policy error
+          and 2.00e-2 fixed-action error with full sign agreement; the H=2 direct initial-state check improves to 1.65e-1
+          when the duplicate manual contact-J geometry VJP is disabled. The remaining known defect is direct contacted
+          state-position sensitivity at step 1, especially joint position sensitivity. The manual contact-J geometry VJP is
+          now opt-in via <code>MJW_ENABLE_MANUAL_CONTACT_J_VJP=1</code>, and its contact-position term remains separately
+          guarded by <code>MJW_ENABLE_CONTACT_J_POS_VJP=1</code>.
           All promoted clips below are raw
           <code>ViewerGL.get_frame()</code> frames rendered with one shared smoothed COM follow camera and no overlays.
           The MJWarp branch used here includes the differentiability fixes from this investigation: free-joint kinematics
@@ -347,7 +349,7 @@
       <h2>Promoted Reliable Results</h2>
       <p>
         The table below promotes reliable no-reset evaluations rather than the older diagnostic clips. Ant is shown from
-        the current MJWarp branch after the contact-J sign fix and the contact-position VJP default change. Hopper and
+        the current MJWarp branch after the contact-J sign fix and the generated contact-J default change. Hopper and
         Cheetah use the strongest verified 480-step runs, all rendered with the same shared smoothed COM follow camera.
         The shorter current-branch Hopper/Cheetah replays are still included in the plots as sanity checks, but the
         promoted rows here report the best reliable policies found so far.
@@ -376,12 +378,12 @@
           </tr>
           <tr>
             <td>Ant</td>
-            <td>SHAC, current contact-J pass</td>
+            <td>SHAC, generated contact-J default</td>
             <td>480 steps, 1024 worlds</td>
-            <td>23.53 m, best epoch 16</td>
+            <td>23.26 m, best epoch 14</td>
             <td>0 / 0</td>
-            <td>182.66 s</td>
-            <td>33.64 MB</td>
+            <td>129.55 s epoch sum</td>
+            <td>33.59 MB</td>
           </tr>
           <tr>
             <td>Hopper</td>
@@ -479,13 +481,14 @@
       <article class="panel ok">
         <h2>Ant SHAC, Current MJWarp</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_current_posoff_stability_progress2_force75_warm_ppo_16env_24ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_current_posoff_stability_progress2_force75_warm_ppo_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_default_generated_contactJ_comparable_16env_24ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_default_generated_contactJ_comparable_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Current promoted Ant continuation after the contact-J sign fix and contact-position VJP default change. The
-            selected epoch 16 reaches 23.53 m over 480 steps with 0 falls and 0 invalid worlds in three 1024-world no-reset
-            audits. Frames are raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
+            Current pushed MJWarp default: the manual contact-J geometry VJP is opt-in, so contact-J geometry gradients flow
+            through generated backward from <code>smooth_contact_to_efc</code>. The selected epoch 14 reaches 23.26 m over
+            480 steps with 0 falls and 0 invalid worlds in three 1024-world no-reset audits. Frames are raw
+            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
@@ -733,22 +736,22 @@
               <td>Corrected joint-order PPO gradients are clean with the same physical knobs used by the report rollouts.</td>
             </tr>
             <tr>
-              <td>Ant current contact-J pass, H=2 / H=8 policy</td>
-              <td>5.23e-3 / 1.18e-2 mean rel.</td>
+              <td>Ant generated contact-J pass, H=2 / H=8 policy</td>
+              <td>6.36e-3 / 1.59e-2 mean rel.</td>
               <td>1.00 / 1.00</td>
-              <td>The contact-J sign fix restores useful policy gradients under MuJoCo hard contacts.</td>
+              <td>The contact-J sign fix plus generated geometry backward restores useful policy gradients under MuJoCo hard contacts.</td>
             </tr>
             <tr>
-              <td>Ant current contact-J pass, H=2 / H=8 fixed actions</td>
-              <td>2.06e-2 / 1.48e-2 mean rel.</td>
+              <td>Ant generated contact-J pass, H=2 / H=8 fixed actions</td>
+              <td>1.79e-2 / 2.00e-2 mean rel.</td>
               <td>1.00 / 1.00</td>
               <td>Open-loop action gradients now agree with finite differences over short hard-contact horizons.</td>
             </tr>
             <tr>
               <td>Ant current initial-state perturbation</td>
-              <td>6.72e-1 / 4.22e-1 mean rel.</td>
-              <td>0.75 / 1.00</td>
-              <td>Contacted position sensitivities are still poor; contact-position VJP is disabled by default until this path is fixed.</td>
+              <td>1.65e-1 / 4.32e-1 mean rel.</td>
+              <td>1.00 / 1.00</td>
+              <td>Disabling duplicate manual contact-J geometry improves H=2 state gradients; contacted position sensitivities still need work.</td>
             </tr>
             <tr>
               <td>Ant SHAC optimizer scaling</td>
@@ -2224,7 +2227,7 @@
           sign-consistent while candidate updates remain bad for 960-step reliability. Adam was not the whole explanation:
           guarded SGD probes also rolled back every H=16/H=32 candidate, and removing anchor/survival shaping or freezing
           the actor backbone did not produce an accepted hard-contact update. The current no-reset matrix is Cheetah SHAC at
-          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 23.53 m from the current contact-J pass. The
+          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 23.26 m from the generated contact-J default. The
           open Ant target is still a faster zero-terminal SHAC gait under the same joint-order, bounded-action contract. It
           no longer looks like a single RNE mass/bias cancellation bug.
         </p>
@@ -2373,6 +2376,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC Newton-grad current",
         path: "assets/ant_shac_newton_det_mujoco_select_from_ppo_h8_16env_32ep_run1/ant_results.json",
         color: colors.teal
+      },
+      {
+        id: "antShacGeneratedDefaultCurrent",
+        label: "Ant SHAC generated contact-J default",
+        path: "assets/ant_shac_default_generated_contactJ_comparable_16env_24ep_run1/ant_results.json",
+        color: colors.green
       },
       {
         id: "antShacMujocoSgdStrict",
@@ -3872,7 +3881,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
       const currentAntPpo = presentRuns.find((run) => run.id === "antPpoOffsetCurrent");
-      const currentAntShac = presentRuns.find((run) => run.id === "antShacLineSearchNewtonRobust")
+      const currentAntShac = presentRuns.find((run) => run.id === "antShacGeneratedDefaultCurrent")
+        || presentRuns.find((run) => run.id === "antShacLineSearchNewtonRobust")
         || presentRuns.find((run) => run.id === "antShacMujocoRobustSigned")
         || presentRuns.find((run) => run.id === "antShacMujocoSgdStrict")
         || presentRuns.find((run) => run.id === "antShacOffsetCurrent");
@@ -3922,8 +3932,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || currentCheetahShac
         || stable;
       const antDeterministicReplay = await safeJson("assets/ant_shac_isaaclab_phys_progress2_height1_eval1024_run1/ant_results.json");
-      const antH2DefaultPosOff = await safeJson("assets/ant_multistep_h2_default_posoff_probe_run1.json");
-      const antH8DefaultPosOff = await safeJson("assets/ant_multistep_h8_default_posoff_probe_run1.json");
+      const antH2DefaultGenerated = await safeJson("assets/ant_multistep_h2_default_generated_contactJ_probe_run1.json");
+      const antH8DefaultGenerated = await safeJson("assets/ant_multistep_h8_default_generated_contactJ_probe_run1.json");
       const antHeadline = antLatest?.data || antDeterministicReplay;
       const latestStamp = latestTimestamp([
         ...presentRuns.map((run) => run.data?.timestamp_pacific),
@@ -4015,8 +4025,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antHighspeedAfterStep1H32LineSearch?.timestamp_pacific,
         antHighspeedAfterStep1H32DisplacementLineSearch?.timestamp_pacific,
         antHighspeedAfterStep1H16NoContactLineSearch?.timestamp_pacific,
-        antH2DefaultPosOff?.timestamp_pacific,
-        antH8DefaultPosOff?.timestamp_pacific,
+        antH2DefaultGenerated?.timestamp_pacific,
+        antH8DefaultGenerated?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -4256,12 +4266,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["capsule contact policy", bestSweep(contactCapsule?.policy)]
       ].filter(([, row]) => positiveMetric(row) !== null);
       const antRows = [
-        ["Ant current H=2 policy", bestSweep(antH2DefaultPosOff?.policy, "mean_relative_error")],
-        ["Ant current H=2 fixed actions", bestSweep(antH2DefaultPosOff?.fixed_action_sequence, "mean_relative_error")],
-        ["Ant current H=2 init state", bestSweep(antH2DefaultPosOff?.initial_state_fixed_actions, "mean_relative_error")],
-        ["Ant current H=8 policy", bestSweep(antH8DefaultPosOff?.policy, "mean_relative_error")],
-        ["Ant current H=8 fixed actions", bestSweep(antH8DefaultPosOff?.fixed_action_sequence, "mean_relative_error")],
-        ["Ant current H=8 init state", bestSweep(antH8DefaultPosOff?.initial_state_fixed_actions, "mean_relative_error")],
+        ["Ant generated H=2 policy", bestSweep(antH2DefaultGenerated?.policy, "mean_relative_error")],
+        ["Ant generated H=2 fixed actions", bestSweep(antH2DefaultGenerated?.fixed_action_sequence, "mean_relative_error")],
+        ["Ant generated H=2 init state", bestSweep(antH2DefaultGenerated?.initial_state_fixed_actions, "mean_relative_error")],
+        ["Ant generated H=8 policy", bestSweep(antH8DefaultGenerated?.policy, "mean_relative_error")],
+        ["Ant generated H=8 fixed actions", bestSweep(antH8DefaultGenerated?.fixed_action_sequence, "mean_relative_error")],
+        ["Ant generated H=8 init state", bestSweep(antH8DefaultGenerated?.initial_state_fixed_actions, "mean_relative_error")],
         ["Ant d6 PPO H=8 MuJoCo policy", bestSweep(antD6PpoH8Mujoco?.policy, "mean_relative_error")],
         ["Ant d6 PPO H=8 Newton policy", bestSweep(antD6PpoH8Newton?.policy, "mean_relative_error")],
         ["Ant d6 PPO H=8 no-contact policy", bestSweep(antD6PpoH8NoContact?.policy, "mean_relative_error")],
