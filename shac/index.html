@@ -357,8 +357,11 @@
         negative diagnostic because it sends learned actions to the wrong joints; the high-damping DiffRL-pose replay is
         retained as a configuration-drift diagnostic because it is stable but slow. The latest promoted Ant SHAC line uses
         MuJoCo contacts for both the differentiable update and physical selector, and selects by the worst guarded score
-        across 1, 16, 256, 512, and 1024 cloned worlds. The older Newton-gradient/MuJoCo-eval line is retained because it
-        is faster, but it has less posture margin and did not use the robust clone-count selector.
+        across 1, 16, 256, 512, and 1024 cloned worlds. A corrected 60-update PPO continuation from the same high-speed
+        actor did not beat the anchor: every evaluated update was rolled back by the long-horizon guard, with candidates
+        ranging from 1,278.8 to 7,073.5 guarded score and two fall-heavy collapses. The older Newton-gradient/MuJoCo-eval
+        line is retained because it is faster, but it has less posture margin and did not use the robust clone-count
+        selector.
       </p>
       <table>
         <thead>
@@ -381,6 +384,15 @@
             <td>0 / 0</td>
             <td>57.35 s</td>
             <td>26.59 MB</td>
+          </tr>
+          <tr>
+            <td>Ant</td>
+            <td>PPO, 60-update guarded continuation</td>
+            <td>480 steps, 1024 worlds</td>
+            <td>22.84 m, best update 0</td>
+            <td>0 / 0</td>
+            <td>409.50 s</td>
+            <td>77.42 MB</td>
           </tr>
           <tr>
             <td>Ant</td>
@@ -2381,6 +2393,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO high-speed robust audit",
         path: "assets/ant_ppo_highspeed_reaudit_legacyphys_run1/ant_ppo_results.json",
         color: colors.green
+      },
+      {
+        id: "antPpoCorrectPresetContinue",
+        label: "Ant PPO corrected-preset continuation",
+        path: "assets/ant_ppo_correctpreset_continue_1024env_60upd_run1/ant_ppo_results.json",
+        color: colors.amber
       },
       {
         id: "antShacOffsetCurrent",
