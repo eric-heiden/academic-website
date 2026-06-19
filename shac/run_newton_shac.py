@@ -3612,7 +3612,73 @@ def run_training(args: argparse.Namespace) -> dict:
         max_survival_penalty = (
             float(torch.stack(survival_penalty_max).max().detach().cpu()) if survival_penalty_max else 0.0
         )
-        optimizer.step()
+        line_search_update = None
+        if args.selection_line_search_steps is not None:
+            line_search_steps = list(args.selection_line_search_steps)
+            if not any(abs(step) == 0.0 for step in line_search_steps):
+                line_search_steps.insert(0, 0.0)
+            base_params = flatten_parameters(actor_params)
+            grad = flatten_gradients(actor_params)
+            line_search_candidates = []
+            best_candidate_score = -float("inf")
+            best_candidate_rollout = None
+            best_candidate_shortfalls = None
+            best_candidate_step = 0.0
+            best_candidate_params = base_params.detach().clone()
+            for candidate_step in line_search_steps:
+                assign_flat_parameters(actor_params, base_params - float(candidate_step) * grad)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize(env.torch_device)
+                candidate_rollout, candidate_score, candidate_shortfalls = selection_evaluation()
+                line_search_candidates.append(
+                    {
+                        "step": float(candidate_step),
+                        "score": candidate_score,
+                        "shortfalls": candidate_shortfalls,
+                        "rollout": compact_selection_rollout(candidate_rollout),
+                    }
+                )
+                if candidate_score > best_candidate_score or best_candidate_rollout is None:
+                    best_candidate_score = candidate_score
+                    best_candidate_rollout = copy.deepcopy(candidate_rollout)
+                    best_candidate_shortfalls = candidate_shortfalls
+                    best_candidate_step = float(candidate_step)
+                    best_candidate_params = flatten_parameters(actor_params).detach().clone()
+            assert best_candidate_rollout is not None
+            assert best_candidate_shortfalls is not None
+            if args.selection_guard_updates:
+                assert guard_acceptance_threshold is not None
+                update_accepted = best_candidate_score >= guard_acceptance_threshold
+            else:
+                update_accepted = True
+            update_rolled_back = not update_accepted
+            if update_accepted:
+                assign_flat_parameters(actor_params, best_candidate_params)
+                if args.selection_guard_updates:
+                    accepted_selection_score = best_candidate_score
+            else:
+                assign_flat_parameters(actor_params, base_params)
+                if critic is not None and guard_critic_state is not None:
+                    critic.load_state_dict(guard_critic_state)
+                if critic_optimizer is not None and guard_critic_optimizer_state is not None:
+                    critic_optimizer.load_state_dict(guard_critic_optimizer_state)
+                restore_obs_rms_state(obs_rms, guard_obs_rms_state)
+                if guard_q is not None and guard_qd is not None and guard_prev_action is not None and guard_progress is not None:
+                    q = guard_q
+                    qd = guard_qd
+                    prev_action = guard_prev_action
+                    progress = guard_progress
+            optimizer.zero_grad(set_to_none=True)
+            line_search_update = {
+                "selected_step": best_candidate_step,
+                "best_score": best_candidate_score,
+                "candidates": line_search_candidates,
+                "selection_rollout": best_candidate_rollout,
+                "selection_score": best_candidate_score,
+                "selection_shortfalls": best_candidate_shortfalls,
+            }
+        else:
+            optimizer.step()
 
         value_loss = None
         if args.use_critic:
@@ -3658,10 +3724,16 @@ def run_training(args: argparse.Namespace) -> dict:
         if torch.cuda.is_available():
             torch.cuda.synchronize(env.torch_device)
 
-        selection_evaluated = (epoch + 1) % max(1, args.selection_interval) == 0 or epoch == args.epochs - 1
-        if selection_evaluated:
-            selection_rollout, selection_score, selection_shortfalls = selection_evaluation()
+        if line_search_update is not None:
+            selection_evaluated = True
+            selection_rollout = line_search_update["selection_rollout"]
+            selection_score = line_search_update["selection_score"]
+            selection_shortfalls = line_search_update["selection_shortfalls"]
         else:
+            selection_evaluated = (epoch + 1) % max(1, args.selection_interval) == 0 or epoch == args.epochs - 1
+        if line_search_update is None and selection_evaluated:
+            selection_rollout, selection_score, selection_shortfalls = selection_evaluation()
+        elif not selection_evaluated:
             selection_rollout = history[-1]["selection_rollout"] if history and "selection_rollout" in history[-1] else initial_selection_rollout
             selection_score = history[-1]["selection_score"] if history else initial_selection_score
             selection_shortfalls = rollout_constraint_shortfalls(
@@ -3671,7 +3743,7 @@ def run_training(args: argparse.Namespace) -> dict:
                 min_heading=args.selection_min_heading,
                 max_abs_joint=args.selection_max_abs_joint,
             )
-        if args.selection_guard_updates and selection_evaluated:
+        if line_search_update is None and args.selection_guard_updates and selection_evaluated:
             assert guard_acceptance_threshold is not None
             update_accepted = selection_score >= guard_acceptance_threshold
             if update_accepted:
@@ -3719,6 +3791,16 @@ def run_training(args: argparse.Namespace) -> dict:
                 "selection_guard_acceptance_threshold": guard_acceptance_threshold,
                 "selection_update_accepted": update_accepted,
                 "selection_update_rolled_back": update_rolled_back,
+                "selection_line_search_active": line_search_update is not None,
+                "selection_line_search_step": (
+                    line_search_update["selected_step"] if line_search_update is not None else None
+                ),
+                "selection_line_search_best_score": (
+                    line_search_update["best_score"] if line_search_update is not None else None
+                ),
+                "selection_line_search_candidates": (
+                    line_search_update["candidates"] if line_search_update is not None else None
+                ),
                 "training_warmup_steps": warmup_metrics["warmup_steps"],
                 "training_warmup_invalid_resets": warmup_metrics["warmup_invalid_resets"],
                 "training_warmup_fall_resets": warmup_metrics["warmup_fall_resets"],
@@ -3959,6 +4041,7 @@ def run_training(args: argparse.Namespace) -> dict:
         "selection_interval": args.selection_interval,
         "selection_guard_updates": args.selection_guard_updates,
         "selection_guard_max_score_drop": args.selection_guard_max_score_drop,
+        "selection_line_search_steps": args.selection_line_search_steps,
         "survival_height_min": args.survival_height_min,
         "survival_height_penalty": args.survival_height_penalty,
         "survival_up_min": args.survival_up_min,
@@ -4729,6 +4812,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selection-interval", type=int, default=1)
     parser.add_argument("--selection-guard-updates", action="store_true")
     parser.add_argument("--selection-guard-max-score-drop", type=float, default=0.0)
+    parser.add_argument("--selection-line-search-steps", type=parse_float_list, default=None)
     parser.add_argument("--survival-height-min", type=float, default=None)
     parser.add_argument("--survival-height-penalty", type=float, default=0.0)
     parser.add_argument("--survival-up-min", type=float, default=None)

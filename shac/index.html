@@ -294,13 +294,14 @@
           0.1, force scale 7.5, and progress/heading weights 2.0 / 0.5 unless overridden. With that corrected mapping and
           physics preset, the robust PPO positive control reaches 22.84 m over 480 MuJoCo-contact steps with 0/1024 falls
           and 0 invalid worlds across three no-reset repeats.
-          The current promoted SHAC step is selected by the worst guarded score across 1, 16, 256, 512, and 1024
-          MuJoCo-contact worlds. A signed H=16 MuJoCo-gradient line search accepts a single <code>1e-7</code> update from
-          the high-speed PPO actor, improving the guarded worst-count score from 7625.7 to 7778.7 and the 1024-world
-          replay displacement from 22.84 m to 23.45 m, with 0 falls/invalids and minimum height/up of
-          0.499 m / 0.957. Follow-up H=16 reward, H=32 reward, H=32 displacement-only, and H=16 no-contact-gradient /
-          MuJoCo-eval line searches from that updated actor all select step 0 under the strict long-horizon guard, so the
-          report promotes the one-step guarded update and keeps the rejected directions as diagnostics. The corrected H=8 finite-difference
+          The current promoted SHAC run uses Newton-contact gradients with MuJoCo-contact physical selection and an
+          explicit robust line search instead of a fixed optimizer step. Starting from the high-speed PPO actor, the H=8
+          line-search trainer evaluates candidate steps against the worst guarded score across 16, 256, and 1024
+          MuJoCo-contact worlds. It accepts two tiny updates, <code>3e-9</code> and <code>-1e-9</code>, then selects
+          step 0 for the remaining epochs. This improves the guarded score from 7625.7 to 8012.3 and the 1024-world
+          uninterrupted replay from 22.84 m to 23.58 m, with 0 falls/invalids and 1071.7 return. Fixed-step SHAC updates
+          at the old line-search scale still fail the 1024-world guard, so the report promotes the guarded line-search run
+          and keeps rejected directions as diagnostics. The corrected H=8 finite-difference
           check around the earlier d6 PPO actor still has about 4.1e-4 mean relative policy-gradient error with perfect
           sign agreement for MuJoCo, Newton, and no-contact stepping. The remaining Ant lesson is selector and objective
           robustness: older 30 m-class policies are retained as diagnostics only because strict posture/fall gates reject
@@ -356,12 +357,12 @@
         Isaac-style DiffRL actor, and explicit low-force Ant physics. The old actuator-order replay is retained only as a
         negative diagnostic because it sends learned actions to the wrong joints; the high-damping DiffRL-pose replay is
         retained as a configuration-drift diagnostic because it is stable but slow. The latest promoted Ant SHAC line uses
-        MuJoCo contacts for both the differentiable update and physical selector, and selects by the worst guarded score
-        across 1, 16, 256, 512, and 1024 cloned worlds. A corrected 60-update PPO continuation from the same high-speed
-        actor did not beat the anchor: every evaluated update was rolled back by the long-horizon guard, with candidates
-        ranging from 1,278.8 to 7,073.5 guarded score and two fall-heavy collapses. The older Newton-gradient/MuJoCo-eval
-        line is retained because it is faster, but it has less posture margin and did not use the robust clone-count
-        selector.
+        Newton contacts for the differentiable H=8 update, MuJoCo contacts for physical selection, and a line-search guard
+        across 16, 256, and 1024 cloned worlds. A fixed <code>3e-8</code> step looked plausible on smaller clone counts but
+        made all 1024 worlds terminate, which is why the trainer now selects candidate steps explicitly. The accepted
+        line-search run improves the robust score and 1024-world displacement without any falls. The older single-step
+        H=16 MuJoCo-gradient and 10.77 m Newton-gradient runs remain diagnostic, but they are no longer the promoted Ant
+        result.
       </p>
       <table>
         <thead>
@@ -396,12 +397,12 @@
           </tr>
           <tr>
             <td>Ant</td>
-            <td>SHAC, H=16 MuJoCo gradients / robust count guard</td>
+            <td>SHAC, H=8 Newton gradients / MuJoCo line-search guard</td>
             <td>480 steps, 1024 worlds</td>
-            <td>23.45 m</td>
+            <td>23.58 m</td>
             <td>0 / 0</td>
-            <td>71.80 s</td>
-            <td>26.48 MB</td>
+            <td>1140.34 s</td>
+            <td>33.98 MB</td>
           </tr>
           <tr>
             <td>Ant</td>
@@ -506,18 +507,17 @@
         </figure>
       </article>
       <article class="panel ok">
-        <h2>Ant SHAC, H=16 MuJoCo Guard</h2>
+        <h2>Ant SHAC, H=8 Line-Search Guard</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_highspeed_h16_step1e7_eval_run1/ant_poster.png">
-            <source src="assets/ant_shac_highspeed_h16_step1e7_eval_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_linesearch_newtoncontactgrad_mujocoeval_h8_fromppo_64env_10ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_linesearch_newtoncontactgrad_mujocoeval_h8_fromppo_64env_10ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Current promoted raw-contact Ant continuation: one signed H=16 MuJoCo-contact SHAC update from the high-speed
-            PPO actor, selected by the worst guarded score across 1, 16, 256, 512, and 1024 cloned MuJoCo-contact worlds.
-            The robust selector improves the PPO anchor's worst-count score from 7625.7 to 7778.7 and the 1024-world replay
-            from 22.84 m to 23.45 m over 480 steps, with 0 falls/invalids, minimum height 0.499 m, and minimum up 0.957.
-            Frames are raw
-            <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
+            Current promoted Ant continuation: Newton-contact H=8 SHAC gradients, MuJoCo-contact physical selection, and
+            an explicit candidate line search over the 16/256/1024-world guard. It accepts <code>3e-9</code>, then
+            <code>-1e-9</code>, and then selects step 0, improving the guard score from 7625.7 to 8012.3. The final
+            1024-world uninterrupted replay reaches 23.58 m and 1071.7 return over 480 steps with 0 falls and 0 invalid
+            worlds. Frames are raw <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
       </article>
@@ -585,10 +585,11 @@
       <p>
         The current d6 joint-order Ant PPO actor was rechecked with the exact physical knobs used by the promoted report
         runs: Isaac-style observations/reward, armature 0.05, absolute DOF-limit penalty, force scale 7.5, Euler with two
-        substeps, and the joint-order action mapping. At H=8 the policy-gradient finite differences are now clean for
-        MuJoCo, Newton, and no-contact stepping, all with perfect sign agreement. The remaining contact-rich Ant problem is
-        no longer a reset-state gradient bug in this baseline; it is optimizer and objective-horizon selection for policies
-        that are already walking near grazing foot contacts.
+        substeps, and the joint-order action mapping. The latest finite-difference split is sharper: without contacts the
+        multistep dynamics gradients stay accurate through H=8, while MuJoCo hard contacts break state/action sensitivities
+        as soon as the second physical step reaches active foot contacts. Newton differentiable contacts preserve the
+        fixed-action and initial-state gradients much better, which is why the promoted Ant SHAC update uses Newton-contact
+        gradients but still validates candidates with MuJoCo-contact rollouts.
       </p>
       <table>
         <thead>
@@ -597,30 +598,30 @@
             <th>Policy grad error</th>
             <th>Fixed-action grad error</th>
             <th>State grad error</th>
-            <th>Sign agreement</th>
+            <th>Interpretation</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>No contact</td>
-            <td>4.06e-4</td>
-            <td>5.95e-4</td>
-            <td>6.18e-5</td>
-            <td>1.00 / 1.00 / 1.00</td>
+            <td>4.17e-3</td>
+            <td>2.84e-3</td>
+            <td>1.91e-3</td>
+            <td>Clean through H=8; H=16 falls through the missing floor.</td>
           </tr>
           <tr>
             <td>Newton contacts</td>
-            <td>4.05e-4</td>
-            <td>6.74e-4</td>
-            <td>6.49e-5</td>
-            <td>1.00 / 1.00 / 1.00</td>
+            <td>6.22e-1</td>
+            <td>1.53e-3</td>
+            <td>3.07e-2</td>
+            <td>Usable as a gradient backend with guarded line search; policy FD remains noisy.</td>
           </tr>
           <tr>
             <td>MuJoCo contacts</td>
-            <td>4.06e-4</td>
-            <td>5.95e-4</td>
-            <td>6.18e-5</td>
-            <td>1.00 / 1.00 / 1.00</td>
+            <td>4.64e-1</td>
+            <td>3.60e-1</td>
+            <td>5.90e-1</td>
+            <td>Contact-state VJP mismatch appears by H=2 after active foot contact.</td>
           </tr>
         </tbody>
       </table>
@@ -1205,16 +1206,15 @@
         </p>
         <p>
           This separates the current issues. PPO is now a valid dynamics positive control for the Ant setup. Direct
-          MuJoCo-contact SHAC from that PPO actor improves when the optimizer uses a line-search-scale step instead of tiny
-          clipped Adam updates. The current selector audits each candidate at 1, 16, 256, 512, and 1024 worlds and keeps the
-          worst score. Under that stricter rule, the high-speed PPO anchor's worst guarded score is 7625.7; a signed H=16
-          step of <code>1e-7</code> improves it to 7778.7 and raises the 1024-world replay displacement to 23.45 m. Follow-up
-          probes from that updated actor are now broader: H=16 reward, H=32 reward, H=32 displacement-only, and H=16
-          no-contact-gradient / MuJoCo-eval line searches all select step 0. Several nonzero candidates still walk, but
-          none improve the guarded score and a few trigger clone-count-wide falls. That weakens the hypothesis of a remaining
-          simple MuJoCo hard-contact VJP sign bug at this policy; the current blocker is escaping this guarded local basin
-          with a differentiable objective and trust-region update that the 480-step physical selector accepts. The faster older Newton-gradient / MuJoCo-eval result reaches 10.77 m with
-          0 falls/invalids but lower height margin and without the robust count selector.
+          SHAC from that PPO actor improves only when the update is selected by an explicit line search rather than a fixed
+          optimizer step. The current selector audits each candidate at 16, 256, and 1024 worlds and keeps the worst score.
+          Under that rule, the high-speed PPO anchor's guarded score is 7625.7. The accepted H=8 Newton-gradient /
+          MuJoCo-eval run takes a <code>3e-9</code> step, then a <code>-1e-9</code> step, then selects zero, improving the
+          guarded score to 8012.3 and the final 1024-world replay to 23.58 m. A fixed <code>3e-8</code> update and several
+          neighboring line-search candidates still trigger clone-count-wide collapses, so the current blocker is not a
+          missing video overlay or a basic PPO/dynamics failure; it is making SHAC updates robust under hard-contact
+          nonsmoothness. The older H=16 MuJoCo-gradient and faster 10.77 m Newton-gradient / MuJoCo-eval results are retained
+          as diagnostics but are no longer the promoted Ant line.
           The older 30 m-class clips below remain useful debugging artifacts, but they are not promoted as reliable current
           Ant results.
         </p>
@@ -2237,11 +2237,12 @@
           environment. Ant needed environment fixes beyond the MJWarp adjoints: local Isaac-style observations/reward terms,
           asset-specific starts, bounded action handling, and an explicit action-order option. The newest audit found that
           the current Isaac-style DiffRL Ant actor is a joint-order policy; evaluating it as an actuator-order policy was the
-          source of the wrong pinned video. Under the current d6 branch, the PPO positive control reaches 8.65 m over
-          480 steps with 0 falls/invalids in three 1024-world no-reset repeats. Direct MuJoCo-contact SHAC now improves that
-          actor to 8.93 m when the update uses guarded SGD at the H=8 line-search scale, while the faster Newton-gradient
-          diagnostic reaches 10.77 m with lower height margin. The remaining blocker is posture/contact robustness under
-          longer differentiable horizons. The newest SHAC instrumentation records selection minima and posture
+          source of the wrong pinned video. Under the current d6 branch, the PPO positive control reaches 22.84 m over
+          480 steps with 0 falls/invalids in the 1024-world no-reset audit. The current promoted SHAC continuation uses
+          H=8 Newton-contact gradients, MuJoCo-contact evaluation, and a 16/256/1024-world line-search guard. It improves
+          the final 1024-world replay to 23.58 m with 0 falls/invalids, while fixed-step candidates at the old apparent
+          line-search scale can still collapse all 1024 worlds. The remaining blocker is robust contact-aware update
+          selection under longer differentiable horizons. The newest SHAC instrumentation records selection minima and posture
           shortfalls in every history row. Progress-2 SHAC continuation did not beat the selected actor: safe updates stayed
           below 14.79 m, while updates that chased more progress first lost uprightness, with min-up falling to roughly
           0.72-0.84; torso height was not the limiting constraint. For native NV Ant, the no-reset single deterministic
@@ -2256,7 +2257,7 @@
           sign-consistent while candidate updates remain bad for 960-step reliability. Adam was not the whole explanation:
           guarded SGD probes also rolled back every H=16/H=32 candidate, and removing anchor/survival shaping or freezing
           the actor backbone did not produce an accepted hard-contact update. The current no-reset matrix is Cheetah SHAC at
-          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 10.77 m from the Newton-gradient/MuJoCo-eval continuation. The
+          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 23.58 m from the Newton-gradient/MuJoCo-eval line-search continuation. The
           open Ant target is still a faster zero-terminal SHAC gait under the same joint-order, bounded-action contract. It
           no longer looks like a single RNE mass/bias cancellation bug.
         </p>
@@ -2417,6 +2418,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant SHAC high-speed H=16 guard",
         path: "assets/ant_shac_highspeed_h16_step1e7_eval_run1/ant_results.json",
         color: colors.violet
+      },
+      {
+        id: "antShacLineSearchNewtonRobust",
+        label: "Ant SHAC H=8 line-search guard",
+        path: "assets/ant_shac_linesearch_newtoncontactgrad_mujocoeval_h8_fromppo_64env_10ep_run1/ant_results.json",
+        color: colors.blue
       },
       {
         id: "antShacMujocoSgdStateRollback",
@@ -3426,7 +3433,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       antHighspeedAfterStep1H16LineSearch: "assets/ant_linesearch_highspeed_after_step1_h16_robust_signed_run1/ant_linesearch.json",
       antHighspeedAfterStep1H32LineSearch: "assets/ant_linesearch_highspeed_after_step1_h32_robust_signed_run1/ant_linesearch.json",
       antHighspeedAfterStep1H32DisplacementLineSearch: "assets/ant_linesearch_highspeed_after_step1_h32_displacement_run1/ant_linesearch.json",
-      antHighspeedAfterStep1H16NoContactLineSearch: "assets/ant_linesearch_highspeed_after_step1_h16_nocontactgrad_mujocoeval_run1/ant_linesearch.json"
+      antHighspeedAfterStep1H16NoContactLineSearch: "assets/ant_linesearch_highspeed_after_step1_h16_nocontactgrad_mujocoeval_run1/ant_linesearch.json",
+      antPpoH8NewtonRobust1024LineSearch: "assets/ant_linesearch_ppo_h8_newtoncontacts_grad64_mujocoeval_robust1024_run1/ant_linesearch.json"
     };
 
     const clonePaths = [
@@ -3837,7 +3845,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antHighspeedAfterStep1H16LineSearch,
         antHighspeedAfterStep1H32LineSearch,
         antHighspeedAfterStep1H32DisplacementLineSearch,
-        antHighspeedAfterStep1H16NoContactLineSearch
+        antHighspeedAfterStep1H16NoContactLineSearch,
+        antPpoH8NewtonRobust1024LineSearch
       ] = await Promise.all([
         safeJson(diagPaths.antScaledHeadH16),
         safeJson(diagPaths.antScaledHeadH32),
@@ -3877,7 +3886,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         safeJson(diagPaths.antHighspeedAfterStep1H16LineSearch),
         safeJson(diagPaths.antHighspeedAfterStep1H32LineSearch),
         safeJson(diagPaths.antHighspeedAfterStep1H32DisplacementLineSearch),
-        safeJson(diagPaths.antHighspeedAfterStep1H16NoContactLineSearch)
+        safeJson(diagPaths.antHighspeedAfterStep1H16NoContactLineSearch),
+        safeJson(diagPaths.antPpoH8NewtonRobust1024LineSearch)
       ]);
       const cloneRuns = await Promise.all(
         clonePaths.map(async (run) => ({ ...run, data: await safeJson(run.path) }))
@@ -3895,7 +3905,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
       const currentAntPpo = presentRuns.find((run) => run.id === "antPpoOffsetCurrent");
-      const currentAntShac = presentRuns.find((run) => run.id === "antShacMujocoRobustSigned")
+      const currentAntShac = presentRuns.find((run) => run.id === "antShacLineSearchNewtonRobust")
+        || presentRuns.find((run) => run.id === "antShacMujocoRobustSigned")
         || presentRuns.find((run) => run.id === "antShacMujocoSgdStrict")
         || presentRuns.find((run) => run.id === "antShacOffsetCurrent");
       const currentHopperShac = presentRuns.find((run) => run.id === "hopperShacOffsetCurrent");
@@ -4496,9 +4507,21 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
 
       function lineSearchSeries(data, label, color) {
         const rows = data?.candidates || [];
+        const representativeRollout = (row) => {
+          if (row.rollout || row.selection?.rollout) return row.rollout || row.selection.rollout;
+          const evals = row.evals || [];
+          if (!evals.length) return {};
+          const worst = evals.reduce((best, entry) => {
+            const score = Number(entry.score);
+            const bestScore = Number(best?.score);
+            if (!Number.isFinite(bestScore)) return entry;
+            return Number.isFinite(score) && score < bestScore ? entry : best;
+          }, evals[0]);
+          return worst.rollout || worst;
+        };
         const x = rows.map((row) => `${Number(row.step).toExponential(0)}`);
         const hover = rows.map((row) => {
-          const rollout = row.rollout || row.selection?.rollout || row.evals?.[0]?.rollout || {};
+          const rollout = representativeRollout(row);
           return [
             `${label}`,
             `step ${row.step}`,
@@ -4524,7 +4547,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
             type: "bar",
             name: `${label} terminals`,
             x,
-            y: rows.map((row) => (row.rollout || row.selection?.rollout || row.evals?.[0]?.rollout)?.terminal_count ?? null),
+            y: rows.map((row) => representativeRollout(row)?.terminal_count ?? representativeRollout(row)?.terminal ?? null),
             yaxis: "y2",
             marker: { color, opacity: 0.28 },
             hovertemplate: `${label}<br>step %{x}<br>terminals %{y}<extra></extra>`
@@ -4555,7 +4578,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ...lineSearchSeries(antHighspeedAfterStep1H16LineSearch, "after SHAC step H=16 reward", colors.amber),
         ...lineSearchSeries(antHighspeedAfterStep1H32LineSearch, "after SHAC step H=32 reward", colors.blue),
         ...lineSearchSeries(antHighspeedAfterStep1H32DisplacementLineSearch, "after SHAC step H=32 dx", colors.teal),
-        ...lineSearchSeries(antHighspeedAfterStep1H16NoContactLineSearch, "after SHAC step H=16 no-contact grad", colors.slate)
+        ...lineSearchSeries(antHighspeedAfterStep1H16NoContactLineSearch, "after SHAC step H=16 no-contact grad", colors.slate),
+        ...lineSearchSeries(antPpoH8NewtonRobust1024LineSearch, "current H=8 Newton 1024 guard", colors.coral)
       ], {
         ...baseLayout,
         barmode: "group",

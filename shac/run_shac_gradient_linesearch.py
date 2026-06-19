@@ -113,6 +113,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--steps", type=parse_float_list, default=[0.0, 1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3])
     parser.add_argument("--eval-horizon", type=int, default=None)
+    parser.add_argument("--grad-num-envs", type=int, default=1)
     parser.add_argument("--eval-num-envs", type=int, default=256)
     parser.add_argument("--eval-env-counts", type=parse_int_list, default=None)
     parser.add_argument("--eval-total-envs", type=int, default=None)
@@ -167,7 +168,7 @@ def main() -> None:
     if args.eval_horizon is None:
         args.eval_horizon = int(base_result.get("selection_horizon") or base_result.get("eval_horizon") or 480)
 
-    env = build_env(grad_result, argparse.Namespace(video_num_envs=1, device=args.device))
+    env = build_env(grad_result, argparse.Namespace(video_num_envs=args.grad_num_envs, device=args.device))
     actor = actor_from_result(grad_result, env, args.actor_path)
     obs_rms = load_obs_rms(args.obs_rms_path, env.torch_device, env.num_obs) if args.obs_rms_path else None
     obs_stats = None if obs_rms is None else (obs_rms.mean.detach().clone(), obs_rms.var.detach().clone())
