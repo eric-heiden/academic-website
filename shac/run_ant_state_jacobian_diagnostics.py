@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import warnings
 from pathlib import Path
 
@@ -11,13 +12,19 @@ import numpy as np
 import torch
 import warp as wp
 
+import mujoco_warp
+import newton
 from run_newton_shac import (
+    AntRewardWeights,
     DEFAULT_GRAD_CHECK_EPS,
     NewtonMuJoCoTorchEnv,
     central_difference_rows,
     finite_float,
+    git_commit_for_imported_module,
     normalize_vec,
     pacific_now_iso,
+    parse_float_list,
+    query_gpu,
     write_json,
 )
 
@@ -334,10 +341,42 @@ def run(args: argparse.Namespace) -> dict:
         dt=args.dt,
         force_scale=args.force_scale,
         contact_backend=args.contact_backend,
+        sim_substeps=args.sim_substeps,
+        mujoco_integrator=args.mujoco_integrator,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
         ant_contact_margin=args.ant_contact_margin,
         ant_contact_gap=args.ant_contact_gap,
+        ant_contact_mu=args.ant_contact_mu,
+        ant_density_override=args.ant_density_override,
+        ant_joint_damping=args.ant_joint_damping,
+        ant_armature=args.ant_armature,
         ant_min_up=args.ant_min_up,
+        ant_asset=args.ant_asset,
+        ant_start_height=args.ant_start_height,
+        ant_start_joint_q=args.ant_start_joint_q,
+        ant_termination_height=args.ant_termination_height,
+        ant_max_healthy_height=args.ant_max_healthy_height,
+        ant_observation_style=args.ant_observation_style,
+        ant_reward_style=args.ant_reward_style,
+        ant_dof_limit_mode=args.ant_dof_limit_mode,
+        ant_action_order=args.ant_action_order,
+        mujoco_smooth_adjoint=args.mujoco_smooth_adjoint,
+        mujoco_smooth_friction_viscosity=args.mujoco_smooth_friction_viscosity,
+        mujoco_smooth_friction_scale=args.mujoco_smooth_friction_scale,
+        mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
+        mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
+        mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
+        ant_reward=AntRewardWeights(
+            progress=args.ant_progress_weight,
+            heading=args.ant_heading_weight,
+            up=args.ant_up_weight,
+            height=args.ant_height_weight,
+            alive=args.ant_alive_reward,
+            actions_cost=args.ant_actions_cost,
+            energy_cost=args.ant_energy_cost,
+            dof_limit_cost=args.ant_dof_limit_cost,
+            dof_vel_scale=args.ant_dof_vel_scale,
+        ),
     )
     q0, qd0 = env.reset(noise=0.0, stochastic_init=False)
 
@@ -409,20 +448,44 @@ def run(args: argparse.Namespace) -> dict:
     result = {
         "mode": "ant_state_jacobian_diagnostics",
         "timestamp_pacific": pacific_now_iso(),
+        "newton_commit": git_commit_for_imported_module(newton),
+        "mujoco_warp_commit": git_commit_for_imported_module(mujoco_warp),
         "contact_backend": args.contact_backend,
         "num_envs": args.num_envs,
         "dt": args.dt,
+        "sim_substeps": args.sim_substeps,
+        "mujoco_integrator": args.mujoco_integrator,
         "force_scale": args.force_scale,
+        "ant_asset": args.ant_asset,
         "ant_disable_joint_limits": args.ant_disable_joint_limits,
         "ant_contact_margin": args.ant_contact_margin,
         "ant_contact_gap": args.ant_contact_gap,
+        "ant_contact_mu": args.ant_contact_mu,
+        "ant_density_override": args.ant_density_override,
+        "ant_joint_damping": args.ant_joint_damping,
+        "ant_armature": args.ant_armature,
         "ant_min_up": args.ant_min_up,
+        "ant_start_height": args.ant_start_height,
+        "ant_start_joint_q": args.ant_start_joint_q,
+        "ant_termination_height": args.ant_termination_height,
+        "ant_max_healthy_height": args.ant_max_healthy_height,
+        "ant_observation_style": args.ant_observation_style,
+        "ant_reward_style": args.ant_reward_style,
+        "ant_dof_limit_mode": args.ant_dof_limit_mode,
+        "ant_action_order": args.ant_action_order,
+        "mujoco_smooth_adjoint": args.mujoco_smooth_adjoint,
+        "mujoco_smooth_friction_viscosity": args.mujoco_smooth_friction_viscosity,
+        "mujoco_smooth_friction_scale": args.mujoco_smooth_friction_scale,
+        "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
+        "mujoco_smooth_penalty_damping_alpha": args.mujoco_smooth_penalty_damping_alpha,
+        "mujoco_smooth_friction_surrogate_alpha": args.mujoco_smooth_friction_surrogate_alpha,
         "epsilon_values": epsilons,
         "directions": args.directions,
         "action0_checks": action0_checks,
         "state0_reward1": state0_reward1,
         "state1_reward2_fixed_action": state1_reward2_fixed_action,
         "state0_reward2_simple_policy": state0_checks,
+        "gpu": query_gpu(),
     }
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -446,13 +509,51 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contact-backend", choices=["none", "newton", "mujoco"], default="none")
     parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
+    parser.add_argument("--sim-substeps", type=int, default=2)
+    parser.add_argument("--mujoco-integrator", choices=["euler", "rk4", "implicitfast", "implicit"], default="euler")
     parser.add_argument("--force-scale", type=float, default=100.0)
     parser.add_argument("--ant-disable-joint-limits", action="store_true")
+    parser.add_argument("--ant-asset", choices=["diffrl", "nv"], default="diffrl")
+    parser.add_argument("--ant-contact-mu", type=float, default=1.0)
     parser.add_argument("--ant-contact-margin", type=float, default=0.0)
     parser.add_argument("--ant-contact-gap", type=float, default=None)
+    parser.add_argument("--ant-density-override", type=float, default=None)
+    parser.add_argument("--ant-joint-damping", type=float, default=0.1)
+    parser.add_argument("--ant-armature", type=float, default=None)
     parser.add_argument("--ant-min-up", type=float, default=None)
+    parser.add_argument("--ant-start-height", type=float, default=0.5)
+    parser.add_argument(
+        "--ant-start-joint-q",
+        type=parse_float_list,
+        default=(0, 0.7853981633974483, 0, -0.7853981633974483, 0, -0.7853981633974483, 0, 0.7853981633974483),
+    )
+    parser.add_argument("--ant-termination-height", type=float, default=0.31)
+    parser.add_argument("--ant-max-healthy-height", type=float, default=1.5)
+    parser.add_argument("--ant-observation-style", choices=["isaac", "diffrl"], default="isaac")
+    parser.add_argument(
+        "--ant-reward-style",
+        choices=["isaac", "isaaclab", "isaaclab_potential", "isaaclab_potential_height", "isaac_heading_gated", "diffrl"],
+        default="isaac",
+    )
+    parser.add_argument("--ant-dof-limit-mode", choices=["abs", "upper"], default="abs")
+    parser.add_argument("--ant-action-order", choices=["joint", "actuator"], default="joint")
+    parser.add_argument("--ant-progress-weight", type=float, default=2.0)
+    parser.add_argument("--ant-heading-weight", type=float, default=0.5)
+    parser.add_argument("--ant-up-weight", type=float, default=0.1)
+    parser.add_argument("--ant-height-weight", type=float, default=1.0)
+    parser.add_argument("--ant-alive-reward", type=float, default=0.5)
+    parser.add_argument("--ant-actions-cost", type=float, default=0.005)
+    parser.add_argument("--ant-energy-cost", type=float, default=0.05)
+    parser.add_argument("--ant-dof-limit-cost", type=float, default=1.0)
+    parser.add_argument("--ant-dof-vel-scale", type=float, default=0.2)
+    parser.add_argument("--mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default="off")
+    parser.add_argument("--mujoco-smooth-friction-viscosity", type=float, default=10.0)
+    parser.add_argument("--mujoco-smooth-friction-scale", type=float, default=0.01)
+    parser.add_argument("--mujoco-smooth-friction-bypass-kf", type=float, default=0.0)
+    parser.add_argument("--mujoco-smooth-penalty-damping-alpha", type=float, default=0.0)
+    parser.add_argument("--mujoco-smooth-friction-surrogate-alpha", type=float, default=0.9)
     parser.add_argument("--directions", type=int, default=8)
-    parser.add_argument("--eps", type=float, nargs="*")
+    parser.add_argument("--eps", type=parse_float_list, default=None)
     parser.add_argument("--seed", type=int, default=23)
     return parser.parse_args()
 

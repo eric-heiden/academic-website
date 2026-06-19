@@ -284,23 +284,20 @@
       <div>
         <h1>SHAC with MuJoCo Warp</h1>
         <p class="lede">
-          Latest current-branch refresh, June 18 2026 Pacific time: the bad-looking Ant replay was traced to report
-          harness/configuration issues plus one remaining contact-gradient instability, not a renderer overlay. The
-          promoted Ant clips are raw <code>ViewerGL.get_frame()</code> frames. The Isaac-style DiffRL Ant policy must send
-          torques in Newton joint-coordinate order; MJCF actuator order sends the learned torques to the wrong hips/ankles.
-          The verified low-force preset is now explicit: <code>ant_action_order=joint</code>, start height 0.5 m, pi/4
-          joint pose, contact friction 1.0, joint damping 0.1, force scale 7.5, and progress/heading weights 2.0 / 0.5.
-          With that preset, the current MJWarp branch's PPO positive control reaches 22.84 m over 480 MuJoCo-contact steps
-          with 0/1024 falls and 0 invalid worlds across three no-reset repeats.
-          The latest SHAC rerun uses the same physical preset, starts from the stable PPO actor, and incorporates the
-          corrected MJWarp contact-J sign plus generated contact-J geometry backward as the default path. Its selected
-          epoch 14 reaches 23.26 m over 480 MuJoCo-contact steps with 0 falls/invalids in three 1024-world no-reset audits.
-          H=8 finite-difference checks now show usable policy/action gradients under hard contact: 1.59e-2 policy error
-          and 2.00e-2 fixed-action error with full sign agreement; the H=2 direct initial-state check improves to 1.65e-1
-          when the duplicate manual contact-J geometry VJP is disabled. The remaining known defect is direct contacted
-          state-position sensitivity at step 1, especially joint position sensitivity. The manual contact-J geometry VJP is
-          now opt-in via <code>MJW_ENABLE_MANUAL_CONTACT_J_VJP=1</code>, and its contact-position term remains separately
-          guarded by <code>MJW_ENABLE_CONTACT_J_POS_VJP=1</code>.
+          Latest current-branch refresh, June 19 2026 Pacific time: the bad-looking Ant replay was traced to
+          configuration and contact-gradient issues, not to a render overlay. The promoted Ant clips are raw
+          <code>ViewerGL.get_frame()</code> frames. The Isaac-style DiffRL Ant policy must send torques in Newton
+          joint-coordinate order; MJCF actuator order sends the learned torques to the wrong hips/ankles. The verified
+          IsaacLab-matched preset is explicit: <code>ant_action_order=joint</code>, start height 0.5 m, pi/4 joint pose,
+          contact friction 1.0, joint damping 0.1, force scale 7.5, and progress/heading weights 2.0 / 0.5. With that
+          preset, the current MJWarp branch's PPO positive control reaches 22.84 m over 480 MuJoCo-contact steps with
+          0/1024 falls and 0 invalid worlds across three no-reset repeats.
+          The latest SHAC rerun uses Newton differentiable contacts for the gradient pass, MuJoCo contacts for candidate
+          validation, and a guarded line search that includes the zero step. One accepted line-search step from the stable
+          PPO actor reaches 24.06 m over 480 MuJoCo-contact steps with 0 falls/invalids in three 1024-world no-reset audits.
+          The remaining solver defect is narrower: native MuJoCo-contact adjoints still fail at the contacted Ant step-1
+          action/state split. No-contact and Newton-contact local checks are clean; increasing MuJoCo solver iterations
+          and capturing the substep mass factors did not move the H=2 MuJoCo-contact mismatch.
           All promoted clips below are raw
           <code>ViewerGL.get_frame()</code> frames rendered with one shared smoothed COM follow camera and no overlays.
           The MJWarp branch used here includes the differentiability fixes from this investigation: free-joint kinematics
@@ -349,7 +346,7 @@
       <h2>Promoted Reliable Results</h2>
       <p>
         The table below promotes reliable no-reset evaluations rather than the older diagnostic clips. Ant is shown from
-        the current MJWarp branch after the contact-J sign fix and the generated contact-J default change. Hopper and
+        the current MJWarp branch with Newton-contact gradients, MuJoCo-contact validation, and guarded line search. Hopper and
         Cheetah use the strongest verified 480-step runs, all rendered with the same shared smoothed COM follow camera.
         The shorter current-branch Hopper/Cheetah replays are still included in the plots as sanity checks, but the
         promoted rows here report the best reliable policies found so far.
@@ -378,12 +375,12 @@
           </tr>
           <tr>
             <td>Ant</td>
-            <td>SHAC, generated contact-J default</td>
+            <td>SHAC, Newton-contact grad + MuJoCo eval</td>
             <td>480 steps, 1024 worlds</td>
-            <td>23.26 m, best epoch 14</td>
+            <td>24.06 m, best epoch 1</td>
             <td>0 / 0</td>
-            <td>129.55 s epoch sum</td>
-            <td>33.59 MB</td>
+            <td>90.76 s</td>
+            <td>33.52 MB</td>
           </tr>
           <tr>
             <td>Hopper</td>
@@ -481,13 +478,13 @@
       <article class="panel ok">
         <h2>Ant SHAC, Current MJWarp</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_shac_default_generated_contactJ_comparable_16env_24ep_run1/ant_poster.png">
-            <source src="assets/ant_shac_default_generated_contactJ_comparable_16env_24ep_run1/ant_rollout.mp4" type="video/mp4">
+          <video controls preload="none" poster="assets/ant_shac_newtoncontacts_guarded_linesearch_current_16env_1ep_run1/ant_poster.png">
+            <source src="assets/ant_shac_newtoncontacts_guarded_linesearch_current_16env_1ep_run1/ant_rollout.mp4" type="video/mp4">
           </video>
           <figcaption>
-            Current pushed MJWarp default: the manual contact-J geometry VJP is opt-in, so contact-J geometry gradients flow
-            through generated backward from <code>smooth_contact_to_efc</code>. The selected epoch 14 reaches 23.26 m over
-            480 steps with 0 falls and 0 invalid worlds in three 1024-world no-reset audits. Frames are raw
+            Guarded SHAC update from the stable PPO actor: Newton differentiable contacts generate the gradient, MuJoCo
+            contacts validate the candidate, and zero step is included in the line search. The selected epoch 1 reaches
+            24.06 m over 480 steps with 0 falls and 0 invalid worlds in three 1024-world no-reset audits. Frames are raw
             <code>ViewerGL.get_frame()</code> through the shared smoothed COM follow camera.
           </figcaption>
         </figure>
@@ -562,24 +559,24 @@
         <tbody>
           <tr>
             <td>No contact</td>
-            <td>4.17e-3</td>
-            <td>2.84e-3</td>
-            <td>1.91e-3</td>
-            <td>Clean through H=8; H=16 falls through the missing floor.</td>
+            <td>2.22e-3</td>
+            <td>7.79e-2</td>
+            <td>1.67e-4</td>
+            <td>Clean H=2 state path; step-1 local action/state errors stay near 2.1e-2 / 1.4e-3.</td>
           </tr>
           <tr>
             <td>Newton contacts</td>
-            <td>6.22e-1</td>
-            <td>1.53e-3</td>
-            <td>3.07e-2</td>
-            <td>Usable as a gradient backend with guarded line search; policy FD remains noisy.</td>
+            <td>1.37e-1</td>
+            <td>1.20e-1</td>
+            <td>2.90e-4</td>
+            <td>Local step-1 action/state errors are 2.1e-2 / 1.0e-3, so this is the usable SHAC gradient backend.</td>
           </tr>
           <tr>
             <td>MuJoCo contacts</td>
-            <td>4.64e-1</td>
-            <td>3.60e-1</td>
-            <td>5.90e-1</td>
-            <td>Contact-state VJP mismatch appears by H=2 after active foot contact.</td>
+            <td>1.26e-1</td>
+            <td>3.74e-1</td>
+            <td>9.96e-1</td>
+            <td>Contact-state VJP mismatch appears at step 1; root velocity/reward and contacted q sensitivities are wrong.</td>
           </tr>
         </tbody>
       </table>
@@ -647,11 +644,12 @@
         <p>
           PPO now works as an environment sanity check for all three locomotion tasks, and SHAC has reliable stepping-stone
           results for Cheetah, Hopper, and Ant. The Ant current-branch SHAC run improves the PPO baseline from 22.84 m to
-          23.53 m with 0 falls/invalids in repeated 1024-world audits, but it is still a low crouched gait and not a fully
+          24.06 m with 0 falls/invalids in repeated 1024-world audits, but it is still a low crouched gait and not a fully
           polished high-speed locomotion solution. The remaining solver issue is narrower: direct perturbations of contacted
-          Ant state position still expose a step-1 contact-J position VJP error, while policy/action gradients are now
-          sign-consistent and useful. Earlier 30 m-class Ant artifacts are retained as diagnostics because repeated no-reset
-          audits or action semantics later exposed rare failures or non-comparable torque contracts.
+          Ant state position still expose a native MuJoCo-contact step-1 VJP error, while Newton-contact gradients are useful
+          when every update is guarded by MuJoCo-contact evaluation. Earlier 30 m-class Ant artifacts are retained as
+          diagnostics because repeated no-reset audits or action semantics later exposed rare failures or non-comparable
+          torque contracts.
         </p>
       </article>
     </section>
@@ -736,22 +734,22 @@
               <td>Corrected joint-order PPO gradients are clean with the same physical knobs used by the report rollouts.</td>
             </tr>
             <tr>
-              <td>Ant generated contact-J pass, H=2 / H=8 policy</td>
-              <td>6.36e-3 / 1.59e-2 mean rel.</td>
-              <td>1.00 / 1.00</td>
-              <td>The contact-J sign fix plus generated geometry backward restores useful policy gradients under MuJoCo hard contacts.</td>
+              <td>Ant current H=2, no-contact / Newton / MuJoCo policy</td>
+              <td>2.22e-3 / 1.37e-1 / 1.26e-1 mean rel.</td>
+              <td>1.00 / 1.00 / 1.00</td>
+              <td>No-contact is clean; Newton contacts are usable for guarded SHAC; native MuJoCo contacts still have a contacted step-1 split error.</td>
             </tr>
             <tr>
-              <td>Ant generated contact-J pass, H=2 / H=8 fixed actions</td>
-              <td>1.79e-2 / 2.00e-2 mean rel.</td>
-              <td>1.00 / 1.00</td>
-              <td>Open-loop action gradients now agree with finite differences over short hard-contact horizons.</td>
+              <td>Ant current H=2, no-contact / Newton / MuJoCo fixed actions</td>
+              <td>7.79e-2 / 1.20e-1 / 3.74e-1 mean rel.</td>
+              <td>1.00 / 1.00 / 0.75</td>
+              <td>The bad native MuJoCo-contact fixed-action row is localized to step 1; Newton step-1 action error is 2.1e-2.</td>
             </tr>
             <tr>
-              <td>Ant current initial-state perturbation</td>
-              <td>1.65e-1 / 4.32e-1 mean rel.</td>
-              <td>1.00 / 1.00</td>
-              <td>Disabling duplicate manual contact-J geometry improves H=2 state gradients; contacted position sensitivities still need work.</td>
+              <td>Ant current H=2, no-contact / Newton / MuJoCo initial state</td>
+              <td>1.67e-4 / 2.90e-4 / 9.96e-1 mean rel.</td>
+              <td>1.00 / 1.00 / 0.50</td>
+              <td>Native MuJoCo-contact state-position sensitivities are the remaining red path; solver32 and captured-mass reruns do not improve it.</td>
             </tr>
             <tr>
               <td>Ant SHAC optimizer scaling</td>
@@ -1183,13 +1181,13 @@
         </p>
         <p>
           This separates the current issues. PPO is now a valid dynamics positive control for the Ant setup. The latest
-          SHAC run improves the no-reset 1024-world displacement to 23.53 m after the contact-J sign fix and with
-          contact-position VJP disabled by default. The H=8 finite-difference audit reports 1.18e-2 policy error and
-          1.48e-2 fixed-action error with full sign agreement, so the policy-gradient path is now usable. Direct
-          perturbations of contacted state position still expose a step-1 VJP error in root orientation and joint position,
-          which is why the contact-position VJP remains opt-in while frame/cdof contact-J adjoints stay enabled. Older
-          H=16 MuJoCo-gradient, line-search, and 10.77 m Newton-gradient / MuJoCo-eval results are retained as diagnostics
-          but are no longer the promoted Ant line.
+          SHAC run improves the no-reset 1024-world displacement to 24.06 m by using Newton differentiable contacts for the
+          gradient pass and MuJoCo contacts for guarded candidate validation. The current H=2 finite-difference audit reports
+          2.22e-3 policy error without contacts and clean Newton-contact local step-1 action/state errors of 2.1e-2 / 1.0e-3.
+          Native MuJoCo-contact adjoints still fail the contacted step-1 split, with 3.74e-1 fixed-action error and 9.96e-1
+          initial-state error; solver32 and captured-mass reruns do not improve that path. Older H=16 MuJoCo-gradient,
+          line-search, and 10.77 m Newton-gradient / MuJoCo-eval results are retained as diagnostics but are no longer the
+          promoted Ant line.
           The older 30 m-class clips below remain useful debugging artifacts, but they are not promoted as reliable current
           Ant results.
         </p>
@@ -1434,9 +1432,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Native NV Stable Root</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_nv_rootfix_singlefloor_eval_from_doublefloor_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             Native <code>nv_ant.xml</code> hinge armature, stable -90 degree X free-root start quaternion, and the embedded
             NV floor ignored before Newton adds its ground plane. Re-evaluating the selected PPO checkpoint in the corrected
@@ -1576,16 +1572,15 @@
           fresh check is action ordering: the Isaac-style DiffRL actor is a joint-order policy. With the d6 MJWarp branch and
           joint-order actions, PPO reaches 22.84 m over 480 steps with 0 falls/invalids across three 1024-world repeats. With
           actuator-order actions, the same policy is the bad visual case: it barely moves and presses into joint limits.
-          Loading the PPO actor through the SHAC path now preserves the same behavior, and the current SHAC continuation
-          reaches 23.53 m with 0 falls/invalids, so the remaining Ant problem is not a checkpoint-loader, render-state, or
+          Loading the PPO actor through the SHAC path now preserves the same behavior, and the current guarded SHAC
+          continuation reaches 24.06 m with 0 falls/invalids, so the remaining Ant problem is not a checkpoint-loader, render-state, or
           reset-splicing issue.
         </p>
         <p>
-          The current gradient audit shows why the policy update can now help while one diagnostic remains red. The H=8
-          policy-gradient relative error is 1.18e-2 and the fixed-action error is 1.48e-2 with full sign agreement. However,
-          direct initial-state perturbations under active contact still have 4.22e-1 relative error, and the local step-1
-          split points at contacted root/joint position sensitivities. The old single-count 8-11 m runs and line-search
-          probes remain plotted below as historical diagnostics, but they are no longer the promoted Ant numbers.
+          The current gradient audit shows why the policy update can now help while one diagnostic remains red. No-contact
+          and Newton-contact local Ant checks stay smooth at the contacted second step, but the native MuJoCo-contact adjoint
+          has a step-1 root-velocity/reward/state-position mismatch. The old single-count 8-11 m runs and line-search probes
+          remain plotted below as historical diagnostics, but they are no longer the promoted Ant numbers.
         </p>
       </article>
       <article class="panel">
@@ -1614,9 +1609,7 @@
       <article class="panel ok">
         <h2>Ant PPO, Mislabeled Defaults Smoke</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_defaults_smoke_512env_40upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             This 40-update smoke run is retained as a debugging negative control. It used the new reset pose and force scale,
             but the runner still inherited XML hinge damping 1.0, friction 0.75, 0.27 m termination height, and a 0.1
@@ -1679,9 +1672,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Height-Fixed Selector</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_heightfix_heading2_warm_move_128env_80upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_heightfix_heading2_warm_move_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             After fixing the ignored <code>ant_height_weight</code> term and selecting with displacement weight 500, PPO
             moves 3.99 m with mean height 0.64 and mean up 0.96. The policy is still not solved: it has 7 fall events in
@@ -1707,9 +1698,7 @@
       <article class="panel warn">
         <h2>Ant PPO, IsaacLab-Style MLP</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_mlp400_progress3_force80_minup07_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             Larger IsaacLab-style PPO networks, no observation RMS, and <code>up &gt; 0.7</code> selection keep the Ant upright:
             zero falls/invalids, mean up 0.93, but only 0.076 m displacement. This isolates optimizer capacity from locomotion.
@@ -1719,9 +1708,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Progress Warm-Start</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaaclab_mlp400_progress5_warm_minup07_128env_60upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             Continuing the larger PPO checkpoint with progress weight 5 improves score to 404.7 and displacement to 0.10 m,
             while later updates again trade short-horizon reward for worse full-horizon selection.
@@ -1734,9 +1721,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Strict Up Selector</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_diffrl_force200_actuator_minup085_128env_80upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_diffrl_force200_actuator_minup085_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             DiffRL-scale Ant PPO with actuator-order actions and <code>up &gt; 0.85</code> selection is stable but stationary:
             837.4 return, zero falls/invalids, mean up 0.97, and -0.06 m displacement.
@@ -1761,9 +1746,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Isaac Curriculum</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_isaac_curriculum_progress3_force80_128env_80upd_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             PPO with Isaac-style observations/reward terms, actuator-order torque mapping, and force scale 80 moves 5.88 m
             over 480 frames. It still has 8 fall events across the 128-env eval, so it is useful as a warm-start but not a
@@ -1791,9 +1774,7 @@
       <article class="panel warn">
         <h2>Hopper PPO, Angle Termination</h2>
         <figure>
-          <video controls preload="none" poster="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_poster.png">
-            <source src="assets/hopper_ppo_mujoco_angle_term200_64env_40upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             Angle termination fixes the height-only lying-down exploit and yields a stable upright policy, but displacement is
             only 0.44 m over 480 frames, so this is balance rather than locomotion.
@@ -1803,9 +1784,7 @@
       <article class="panel bad">
         <h2>Hopper PPO, Progress Weighted</h2>
         <figure>
-          <video controls preload="none" poster="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
-            <source src="assets/hopper_ppo_mujoco_angle_term200_progress5_64env_50upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             Progress weight 5 produces forward bursts, but the full eval has repeated falls: 3.13 m displacement with 256 fall
             events across the vectorized rollout. This is a failed locomotion policy despite high short-horizon reward.
@@ -1825,9 +1804,7 @@
       <article class="panel warn">
         <h2>Ant PPO, Default Reward</h2>
         <figure>
-          <video controls preload="none" poster="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_poster.png">
-            <source src="assets/ant_ppo_mujoco_margin002_term200_64env_40upd_after_rne_run1/ant_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             The default Ant reward trains a stable standing pose: 652 return, zero falls/invalids, and only 0.005 m forward
             displacement. This verifies stability but not locomotion.
@@ -1879,9 +1856,7 @@
       <article class="panel warn">
         <h2>Hopper PPO Curriculum</h2>
         <figure>
-          <video controls preload="none" poster="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_poster.png">
-            <source src="assets/hopper_ppo_curriculum_angle_to_progress3_64env_50upd_after_rne_run1/hopper_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             Warm-starting from the upright angle-termination policy and switching to progress weight 3 preserves reliability:
             573 return, 0.49 m displacement, zero falls/invalids. Later PPO updates increase short-horizon reward but destroy
@@ -2024,9 +1999,7 @@
       <article class="panel">
         <h2>Hopper PPO No-Limit</h2>
         <figure>
-          <video controls preload="none" poster="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_poster.png">
-            <source src="assets/hopper_ppo_mujoco_nolimits_sub16_implicitfast_128env_100upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             PPO/A2C-style control with MuJoCo contacts, joint limits disabled, 16 substeps, and implicitfast integration. Passive
             dynamics are more stable without limits, but the learned policy folds into a low posture: return -1456.3, displacement
@@ -2040,9 +2013,7 @@
       <article class="panel bad">
         <h2>Hopper PPO Faithful Reward</h2>
         <figure>
-          <video controls preload="none" poster="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_poster.png">
-            <source src="assets/hopper_ppo_mujoco_faithful_128env_120upd_run1/hopper_ppo_rollout.mp4" type="video/mp4">
-          </video>
+          <p class="note">Archive video not embedded because it predates the shared follow-camera metadata audit.</p>
           <figcaption>
             PPO with the DiffRL-style Hopper reward, MuJoCo contacts, and height-only termination. This negative control also
             collapses rather than hopping: return -226.3, displacement 0.007 m, and repeated short episodes.
@@ -2209,10 +2180,10 @@
           asset-specific starts, bounded action handling, and an explicit action-order option. The newest audit found that
           the current Isaac-style DiffRL Ant actor is a joint-order policy; evaluating it as an actuator-order policy was the
           source of the wrong pinned video. Under the current d6 branch, the PPO positive control reaches 22.84 m over
-          480 steps with 0 falls/invalids in the 1024-world no-reset audit. The current promoted SHAC continuation uses the
-          corrected contact-J sign with contact-position VJP disabled by default and improves the final 1024-world replay to
-          23.53 m with 0 falls/invalids. The remaining blocker is a narrower contacted state-position VJP bug under direct
-          state perturbations, not the policy/action gradient used by this SHAC update. The newest SHAC instrumentation records selection minima and posture
+          480 steps with 0 falls/invalids in the 1024-world no-reset audit. The current promoted SHAC continuation uses
+          Newton-contact gradients with MuJoCo-contact guarded validation and improves the final 1024-world replay to
+          24.06 m with 0 falls/invalids. The remaining blocker is the native MuJoCo-contact step-1 VJP bug under direct
+          state/action perturbations, not the Newton-contact gradient used by this guarded SHAC update. The newest SHAC instrumentation records selection minima and posture
           shortfalls in every history row. Progress-2 SHAC continuation did not beat the selected actor: safe updates stayed
           below 14.79 m, while updates that chased more progress first lost uprightness, with min-up falling to roughly
           0.72-0.84; torso height was not the limiting constraint. For native NV Ant, the no-reset single deterministic
@@ -2226,8 +2197,8 @@
           feet sit on grazing active-set boundaries, but the strict scaled actor also shows that local derivatives can be
           sign-consistent while candidate updates remain bad for 960-step reliability. Adam was not the whole explanation:
           guarded SGD probes also rolled back every H=16/H=32 candidate, and removing anchor/survival shaping or freezing
-          the actor backbone did not produce an accepted hard-contact update. The current no-reset matrix is Cheetah SHAC at
-          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 23.26 m from the generated contact-J default. The
+          the actor backbone did not produce an accepted native MuJoCo-contact update. The current no-reset matrix is Cheetah SHAC at
+          10.41 m, Hopper SHAC at 13.65 m, and Ant SHAC at 24.06 m from the Newton-contact guarded line search. The
           open Ant target is still a faster zero-terminal SHAC gait under the same joint-order, bounded-action contract. It
           no longer looks like a single RNE mass/bias cancellation bug.
         </p>
@@ -2364,6 +2335,12 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         label: "Ant PPO current MJWarp",
         path: "assets/ant_ppo_current_mjwarp_stable_height027_followcam_run1/ant_ppo_results.json",
         color: colors.green
+      },
+      {
+        id: "antShacNewtonGuardedCurrent",
+        label: "Ant SHAC Newton-contact guarded",
+        path: "assets/ant_shac_newtoncontacts_guarded_linesearch_current_16env_1ep_run1/ant_results.json",
+        color: colors.teal
       },
       {
         id: "antPpoCorrectPresetContinue",
@@ -3613,7 +3590,7 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         const bestValue = metricValue(best, preferred);
         if (value !== null && (bestValue === null || value < bestValue)) return row;
         return best;
-      }, null);
+      }, section?.best || null);
     }
 
     function bestComponentSweep(diag, component) {
@@ -3881,7 +3858,8 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         || presentRuns.find((run) => run.id === "uprightStable")
         || presentRuns.find((run) => run.id === "newtonStable");
       const currentAntPpo = presentRuns.find((run) => run.id === "antPpoOffsetCurrent");
-      const currentAntShac = presentRuns.find((run) => run.id === "antShacGeneratedDefaultCurrent")
+      const currentAntShac = presentRuns.find((run) => run.id === "antShacNewtonGuardedCurrent")
+        || presentRuns.find((run) => run.id === "antShacGeneratedDefaultCurrent")
         || presentRuns.find((run) => run.id === "antShacLineSearchNewtonRobust")
         || presentRuns.find((run) => run.id === "antShacMujocoRobustSigned")
         || presentRuns.find((run) => run.id === "antShacMujocoSgdStrict")
@@ -3934,6 +3912,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
       const antDeterministicReplay = await safeJson("assets/ant_shac_isaaclab_phys_progress2_height1_eval1024_run1/ant_results.json");
       const antH2DefaultGenerated = await safeJson("assets/ant_multistep_h2_default_generated_contactJ_probe_run1.json");
       const antH8DefaultGenerated = await safeJson("assets/ant_multistep_h8_default_generated_contactJ_probe_run1.json");
+      const antH2CurrentMujoco = await safeJson("assets/ant_multistep_h2_current_component_probe_run1.json");
+      const antH2CurrentNewton = await safeJson("assets/ant_multistep_h2_current_component_newtoncontacts_probe_run1.json");
+      const antH2CurrentNoContact = await safeJson("assets/ant_multistep_h2_current_component_nocontact_probe_run1.json");
+      const antH2CurrentSolver32 = await safeJson("assets/ant_multistep_h2_current_solver32_probe_run1.json");
+      const antH2CurrentCaptureMass = await safeJson("assets/ant_multistep_h2_current_capture_mass_probe_run1.json");
       const antHeadline = antLatest?.data || antDeterministicReplay;
       const latestStamp = latestTimestamp([
         ...presentRuns.map((run) => run.data?.timestamp_pacific),
@@ -4027,6 +4010,11 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         antHighspeedAfterStep1H16NoContactLineSearch?.timestamp_pacific,
         antH2DefaultGenerated?.timestamp_pacific,
         antH8DefaultGenerated?.timestamp_pacific,
+        antH2CurrentMujoco?.timestamp_pacific,
+        antH2CurrentNewton?.timestamp_pacific,
+        antH2CurrentNoContact?.timestamp_pacific,
+        antH2CurrentSolver32?.timestamp_pacific,
+        antH2CurrentCaptureMass?.timestamp_pacific,
         diagNewton?.timestamp_pacific,
         bug?.timestamp_pacific,
         cartpole?.timestamp_pacific
@@ -4266,6 +4254,21 @@ uv run --no-sync --project /home/horde/repos/newton-shac \
         ["capsule contact policy", bestSweep(contactCapsule?.policy)]
       ].filter(([, row]) => positiveMetric(row) !== null);
       const antRows = [
+        ["Ant current H=2 MuJoCo policy", antH2CurrentMujoco?.policy?.best],
+        ["Ant current H=2 MuJoCo fixed actions", antH2CurrentMujoco?.fixed_action_sequence?.best],
+        ["Ant current H=2 MuJoCo init state", antH2CurrentMujoco?.initial_state_fixed_actions?.best],
+        ["Ant current H=2 MuJoCo step-1 actions", antH2CurrentMujoco?.local_one_step_checks?.[1]?.action_best],
+        ["Ant current H=2 MuJoCo step-1 state", antH2CurrentMujoco?.local_one_step_checks?.[1]?.state_best],
+        ["Ant current H=2 Newton policy", antH2CurrentNewton?.policy?.best],
+        ["Ant current H=2 Newton fixed actions", antH2CurrentNewton?.fixed_action_sequence?.best],
+        ["Ant current H=2 Newton init state", antH2CurrentNewton?.initial_state_fixed_actions?.best],
+        ["Ant current H=2 Newton step-1 actions", antH2CurrentNewton?.local_one_step_checks?.[1]?.action_best],
+        ["Ant current H=2 Newton step-1 state", antH2CurrentNewton?.local_one_step_checks?.[1]?.state_best],
+        ["Ant current H=2 no-contact policy", antH2CurrentNoContact?.policy?.best],
+        ["Ant current H=2 no-contact fixed actions", antH2CurrentNoContact?.fixed_action_sequence?.best],
+        ["Ant current H=2 no-contact init state", antH2CurrentNoContact?.initial_state_fixed_actions?.best],
+        ["Ant MuJoCo H=2 solver32 fixed actions", antH2CurrentSolver32?.fixed_action_sequence?.best],
+        ["Ant MuJoCo H=2 captured-mass fixed actions", antH2CurrentCaptureMass?.fixed_action_sequence?.best],
         ["Ant generated H=2 policy", bestSweep(antH2DefaultGenerated?.policy, "mean_relative_error")],
         ["Ant generated H=2 fixed actions", bestSweep(antH2DefaultGenerated?.fixed_action_sequence, "mean_relative_error")],
         ["Ant generated H=2 init state", bestSweep(antH2DefaultGenerated?.initial_state_fixed_actions, "mean_relative_error")],

@@ -653,6 +653,7 @@ class NewtonMuJoCoStep(torch.autograd.Function):
         joint_f_in = joint_f.detach().contiguous()
         q_out = torch.empty_like(q_in)
         qd_out = torch.empty_like(qd_in)
+        env.zero_solver_buffers()
         env.step_warp(q_in, qd_in, joint_f_in, q_out, qd_out, requires_grad=False)
         ctx.step_ctx = step_ctx
         ctx.save_for_backward(q_in, qd_in, joint_f_in)
@@ -778,6 +779,8 @@ class NewtonMuJoCoTorchEnv:
         mujoco_smooth_penalty_damping_alpha: float = 0.0,
         mujoco_smooth_friction_surrogate_alpha: float = 0.9,
         mujoco_world_spacing_z: float | None = None,
+        mujoco_solver_iterations: int = 8,
+        mujoco_solver_ls_iterations: int = 8,
     ):
         self.env_name = env_name
         self.num_envs = num_envs
@@ -788,6 +791,8 @@ class NewtonMuJoCoTorchEnv:
         self.force_scale = force_scale
         self.contact_backend = contact_backend
         self.mujoco_integrator = mujoco_integrator
+        self.mujoco_solver_iterations = int(mujoco_solver_iterations)
+        self.mujoco_solver_ls_iterations = int(mujoco_solver_ls_iterations)
         self.cartpole_reward = cartpole_reward or CartpoleRewardWeights()
         self.ant_reward = ant_reward or AntRewardWeights()
         self.hopper_reward = hopper_reward or HopperRewardWeights()
@@ -903,8 +908,8 @@ class NewtonMuJoCoTorchEnv:
             use_mujoco_contacts=contact_backend != "newton",
             integrator=mujoco_integrator,
             solver="newton",
-            iterations=8,
-            ls_iterations=8,
+            iterations=self.mujoco_solver_iterations,
+            ls_iterations=self.mujoco_solver_ls_iterations,
             update_data_interval=1,
             nconmax=self.nconmax,
             njmax=self.njmax,
@@ -1344,6 +1349,9 @@ class NewtonMuJoCoTorchEnv:
                 newton.eval_fk(self.model, state_in.joint_q, state_in.joint_qd, state_in)
                 contacts = self.model.collide(state_in, self.contacts)
             self.solver.step(state_in, state_out, control, contacts, sub_dt)
+            if requires_grad and self.contact_backend == "mujoco":
+                data = self.solver.mjw_data
+                intermediates.extend([data.qfrc_applied, data.xfrc_applied, data.ctrl])
             current_q_wp = next_q_wp
             current_qd_wp = next_qd_wp
         wp.synchronize()
@@ -2595,6 +2603,8 @@ def run_gradient_check(args: argparse.Namespace) -> dict:
         mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
         mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
         mujoco_world_spacing_z=args.mujoco_world_spacing_z,
+        mujoco_solver_iterations=args.mujoco_solver_iterations,
+        mujoco_solver_ls_iterations=args.mujoco_solver_ls_iterations,
         acrobot_actuation=args.acrobot_actuation,
         ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
@@ -3026,6 +3036,8 @@ def make_env_from_args(args: argparse.Namespace, num_envs: int) -> NewtonMuJoCoT
         mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
         mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
         mujoco_world_spacing_z=args.mujoco_world_spacing_z,
+        mujoco_solver_iterations=args.mujoco_solver_iterations,
+        mujoco_solver_ls_iterations=args.mujoco_solver_ls_iterations,
         acrobot_actuation=args.acrobot_actuation,
         ant_asset=args.ant_asset,
         ant_disable_joint_limits=args.ant_disable_joint_limits,
@@ -4661,6 +4673,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mujoco-smooth-friction-bypass-kf", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-penalty-damping-alpha", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-friction-surrogate-alpha", type=float, default=0.9)
+    parser.add_argument("--mujoco-solver-iterations", type=int, default=8)
+    parser.add_argument("--mujoco-solver-ls-iterations", type=int, default=8)
     parser.add_argument("--mujoco-world-spacing-z", type=float, default=None)
     parser.add_argument("--eval-contact-backend", choices=["mujoco", "newton", "none"], default=None)
     parser.add_argument("--eval-mujoco-smooth-adjoint", choices=["off", "smooth", "free_body", "surrogate"], default=None)

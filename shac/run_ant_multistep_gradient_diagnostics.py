@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import warp as wp
 
+import mujoco
 from run_newton_shac import (
     ANT_DEFAULT_TERMINATION_PENALTY,
     DEFAULT_GRAD_CHECK_EPS,
@@ -39,6 +40,7 @@ from run_newton_shac import (
     write_json,
     finalize_terminal_reward,
     git_commit_for_imported_module,
+    normalize_vec,
 )
 
 import mujoco_warp
@@ -54,6 +56,23 @@ def _directions(count: int, width: int, seed: int, device: torch.device, dtype: 
     generator.manual_seed(seed)
     dirs = torch.randn((count, width), generator=generator, dtype=dtype, device=device)
     return dirs / dirs.norm(dim=1, keepdim=True).clamp(min=1.0e-12)
+
+
+def _normalize_state_q(q: torch.Tensor) -> torch.Tensor:
+    if q.shape[-1] < 7:
+        return q
+    return torch.cat([q[:, :3], normalize_vec(q[:, 3:7]), q[:, 7:]], dim=-1)
+
+
+def _apply_state_values(values: torch.Tensor, q_count: int, q_shape, qd_shape) -> tuple[torch.Tensor, torch.Tensor]:
+    q = values[:q_count].view(q_shape).clone()
+    qd = values[q_count:].view(qd_shape).clone()
+    return _normalize_state_q(q), qd
+
+
+def _disable_mujoco_warmstart(env: NewtonMuJoCoTorchEnv) -> None:
+    env.solver.mj_model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_WARMSTART)
+    env.solver.mjw_model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_WARMSTART)
 
 
 def _step_reward(env: NewtonMuJoCoTorchEnv, q: torch.Tensor, qd: torch.Tensor, action: torch.Tensor, args):
@@ -164,7 +183,7 @@ def _check_initial_state(env, q0, qd0, actions_base, args, epsilons):
     q_req = q0.detach().clone().requires_grad_(True)
     qd_req = qd0.detach().clone().requires_grad_(True)
     actions = [action.detach() for action in actions_base]
-    loss, metrics = _rollout_fixed_actions(env, q_req, qd_req, actions, args)
+    loss, metrics = _rollout_fixed_actions(env, _normalize_state_q(q_req), qd_req, actions, args)
     loss.backward()
     analytic = torch.cat(
         [
@@ -181,8 +200,7 @@ def _check_initial_state(env, q0, qd0, actions_base, args, epsilons):
 
     def evaluate() -> float:
         with torch.no_grad():
-            q_eval = mutable[:q_count].view_as(q0)
-            qd_eval = mutable[q_count:].view_as(qd0)
+            q_eval, qd_eval = _apply_state_values(mutable, q_count, q0.shape, qd0.shape)
             value, _ = _rollout_fixed_actions(env, q_eval, qd_eval, actions, args)
         return float(value.detach().cpu())
 
@@ -245,7 +263,7 @@ def _check_one_step_at_state(env, q_base, qd_base, action_base, args, epsilons, 
     action_detached = action_base.detach()
     state_loss, state_metrics = one_step_action_loss(
         env,
-        q0=q_req,
+        q0=_normalize_state_q(q_req),
         qd0=qd_req,
         action=action_detached,
         termination_penalty=args.termination_penalty,
@@ -266,10 +284,11 @@ def _check_one_step_at_state(env, q_base, qd_base, action_base, args, epsilons, 
 
     def evaluate_state() -> float:
         with torch.no_grad():
+            q_eval, qd_eval = _apply_state_values(state_mutable, q_count, q_base.shape, qd_base.shape)
             value, _ = one_step_action_loss(
                 env,
-                q0=state_mutable[:q_count].view_as(q_base),
-                qd0=state_mutable[q_count:].view_as(qd_base),
+                q0=q_eval,
+                qd0=qd_eval,
                 action=action_detached,
                 termination_penalty=args.termination_penalty,
             )
@@ -316,6 +335,16 @@ def _check_one_step_at_state(env, q_base, qd_base, action_base, args, epsilons, 
             assign=assign_state,
         )
 
+    action_component_rows = _check_one_step_action_components(
+        env,
+        q_base=q_base,
+        qd_base=qd_base,
+        action_base=action_base,
+        args=args,
+        epsilons=epsilons,
+        seed_offset=seed_offset + 30000,
+    )
+
     return {
         "action": {
             "loss": float(loss.detach().cpu()),
@@ -323,6 +352,7 @@ def _check_one_step_at_state(env, q_base, qd_base, action_base, args, epsilons, 
             "analytic_grad_norm": finite_float(float(action_grad.to(torch.float64).norm().detach().cpu())),
             "best": _best(action_rows),
             "epsilon_sweep": action_rows,
+            "components": action_component_rows,
         },
         "state": {
             "loss": float(state_loss.detach().cpu()),
@@ -333,6 +363,62 @@ def _check_one_step_at_state(env, q_base, qd_base, action_base, args, epsilons, 
             "components": component_rows,
         },
     }
+
+
+def _check_one_step_action_components(env, q_base, qd_base, action_base, args, epsilons, seed_offset: int) -> dict:
+    generator = torch.Generator(device=env.torch_device)
+    generator.manual_seed(args.seed + seed_offset)
+    q_weight = torch.randn_like(q_base, generator=generator)
+    qd_weight = torch.randn_like(qd_base, generator=generator)
+    obs_weight = torch.randn((env.num_envs, env.num_obs), generator=generator, device=env.torch_device)
+
+    def losses_for(action: torch.Tensor) -> dict[str, torch.Tensor]:
+        q_next, qd_next, reward, _, _ = _step_reward(env, q_base.detach(), qd_base.detach(), action, args)
+        obs_next = env.observe(q_next, qd_next, action)
+        return {
+            "q_next_weighted": (q_next * q_weight).mean(),
+            "qd_next_weighted": (qd_next * qd_weight).mean(),
+            "obs_next_weighted": (obs_next * obs_weight).mean(),
+            "root_x_velocity": qd_next[:, 0].mean(),
+            "reward": reward.mean(),
+        }
+
+    base = action_base.detach().reshape(-1)
+    directions = _directions(args.directions, base.numel(), args.seed + seed_offset + 1000, env.torch_device, base.dtype)
+    component_results = {}
+    for loss_index, loss_name in enumerate(
+        ["q_next_weighted", "qd_next_weighted", "obs_next_weighted", "root_x_velocity", "reward"]
+    ):
+        action_req = action_base.detach().clone().requires_grad_(True)
+        losses = losses_for(action_req)
+        loss = losses[loss_name]
+        loss.backward()
+        analytic = torch.nan_to_num(action_req.grad.detach().reshape(-1), nan=0.0, posinf=0.0, neginf=0.0)
+        mutable = base.clone()
+
+        def assign(values: torch.Tensor) -> None:
+            mutable.copy_(values)
+
+        def evaluate() -> float:
+            with torch.no_grad():
+                value = losses_for(mutable.view_as(action_base))[loss_name]
+            return float(value.detach().cpu())
+
+        rows = central_difference_rows(
+            base_values=base,
+            analytic_grad=analytic,
+            directions=directions,
+            epsilons=epsilons,
+            evaluate=evaluate,
+            assign=assign,
+        )
+        component_results[loss_name] = {
+            "loss": finite_float(float(loss.detach().cpu())),
+            "analytic_grad_norm": finite_float(float(analytic.to(torch.float64).norm().detach().cpu())),
+            "best": _best(rows),
+            "epsilon_sweep": rows,
+        }
+    return component_results
 
 
 def _local_step_checks(env, q0, qd0, actions_base, args, epsilons) -> list[dict]:
@@ -348,6 +434,9 @@ def _local_step_checks(env, q0, qd0, actions_base, args, epsilons) -> list[dict]
                 "state_best": checks["state"]["best"],
                 "state_component_best": {
                     name: _best(rows) for name, rows in checks["state"]["components"].items()
+                },
+                "action_component_best": {
+                    name: data["best"] for name, data in checks["action"]["components"].items()
                 },
                 "action_metrics": checks["action"]["metrics"],
                 "state_metrics": checks["state"]["metrics"],
@@ -434,6 +523,8 @@ def run(args: argparse.Namespace) -> dict:
         mujoco_smooth_friction_bypass_kf=args.mujoco_smooth_friction_bypass_kf,
         mujoco_smooth_penalty_damping_alpha=args.mujoco_smooth_penalty_damping_alpha,
         mujoco_smooth_friction_surrogate_alpha=args.mujoco_smooth_friction_surrogate_alpha,
+        mujoco_solver_iterations=args.mujoco_solver_iterations,
+        mujoco_solver_ls_iterations=args.mujoco_solver_ls_iterations,
         ant_reward=AntRewardWeights(
             progress=args.ant_progress_weight,
             heading=args.ant_heading_weight,
@@ -449,6 +540,8 @@ def run(args: argparse.Namespace) -> dict:
         cheetah_reward=CheetahRewardWeights(),
         contact_reward=ContactTargetRewardWeights(),
     )
+    if args.mujoco_disable_warmstart:
+        _disable_mujoco_warmstart(env)
     actor = make_actor(
         env,
         stochastic=False,
@@ -480,10 +573,13 @@ def run(args: argparse.Namespace) -> dict:
         "ant_asset": args.ant_asset,
         "ant_contact_margin": args.ant_contact_margin,
         "ant_contact_gap": args.ant_contact_gap,
+        "ant_contact_mu": args.ant_contact_mu,
         "ant_disable_joint_limits": args.ant_disable_joint_limits,
         "ant_density_override": args.ant_density_override,
         "ant_joint_damping": args.ant_joint_damping,
         "ant_armature": args.ant_armature,
+        "ant_start_height": args.ant_start_height,
+        "ant_start_joint_q": args.ant_start_joint_q,
         "ant_max_healthy_height": args.ant_max_healthy_height,
         "ant_dof_limit_mode": args.ant_dof_limit_mode,
         "ant_observation_style": args.ant_observation_style,
@@ -499,8 +595,24 @@ def run(args: argparse.Namespace) -> dict:
         "mujoco_smooth_friction_bypass_kf": args.mujoco_smooth_friction_bypass_kf,
         "mujoco_smooth_penalty_damping_alpha": args.mujoco_smooth_penalty_damping_alpha,
         "mujoco_smooth_friction_surrogate_alpha": args.mujoco_smooth_friction_surrogate_alpha,
+        "mujoco_solver_iterations": args.mujoco_solver_iterations,
+        "mujoco_solver_ls_iterations": args.mujoco_solver_ls_iterations,
+        "mujoco_disable_warmstart": args.mujoco_disable_warmstart,
         "termination_penalty": args.termination_penalty,
         "ant_termination_height": args.ant_termination_height,
+        "ant_reward": {
+            "progress": args.ant_progress_weight,
+            "heading": args.ant_heading_weight,
+            "up": args.ant_up_weight,
+            "height": args.ant_height_weight,
+            "alive": args.ant_alive_reward,
+            "actions_cost": args.ant_actions_cost,
+            "energy_cost": args.ant_energy_cost,
+            "dof_limit_cost": args.ant_dof_limit_cost,
+            "dof_vel_scale": args.ant_dof_vel_scale,
+        },
+        "actor_path": str(args.actor_path),
+        "obs_rms_path": str(args.obs_rms_path) if args.obs_rms_path is not None else None,
         "epsilon_values": epsilons,
         "directions": args.directions,
         "policy": _check_policy(env, actor, q0, qd0, prev0, obs_stats, args, epsilons),
@@ -543,6 +655,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mujoco-smooth-friction-bypass-kf", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-penalty-damping-alpha", type=float, default=0.0)
     parser.add_argument("--mujoco-smooth-friction-surrogate-alpha", type=float, default=0.9)
+    parser.add_argument("--mujoco-solver-iterations", type=int, default=8)
+    parser.add_argument("--mujoco-solver-ls-iterations", type=int, default=8)
+    parser.add_argument("--mujoco-disable-warmstart", action="store_true")
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--rew-scale", type=float, default=1.0)
     parser.add_argument("--termination-penalty", type=float, default=ANT_DEFAULT_TERMINATION_PENALTY)
