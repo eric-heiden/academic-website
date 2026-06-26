@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DiscoGrad-style program smoothing in Warp · Reports · Eric Heiden</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2430;
+      --muted: #687283;
+      --line: #d9dee7;
+      --paper: #f7f5f0;
+      --panel: #fffdf8;
+      --accent: #0f766e;
+      --accent-2: #2563eb;
+      --warn: #92400e;
+      --bad: #991b1b;
+      --good-bg: #d1fae5;
+      --warn-bg: #fef3c7;
+      --bad-bg: #fee2e2;
+      --blue-bg: #dbeafe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    main {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 56px 0;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: baseline;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+      margin-bottom: 30px;
+    }
+    header a, a { color: var(--accent); text-decoration: none; }
+    h1 { margin: 0; font-size: clamp(1.9rem, 4vw, 2.8rem); line-height: 1.1; letter-spacing: 0; }
+    h2 { margin: 42px 0 14px; font-size: 1.35rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    h3 { margin: 24px 0 8px; font-size: 1.05rem; color: var(--muted); }
+    p, li { line-height: 1.62; font-size: 1rem; }
+    .meta, small { color: var(--muted); }
+    code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+    pre { background: #f0eee7; border-left: 3px solid var(--accent); padding: 12px 14px; overflow-x: auto; border-radius: 6px; }
+    .tldr {
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+      padding: 15px 18px;
+      border-radius: 4px;
+      margin-bottom: 22px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin: 16px 0 20px;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .metric strong { display: block; font-size: 1.35rem; margin-top: 4px; }
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      margin: 12px 0 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 0.93rem;
+    }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #efece4; color: #4b5563; font-weight: 650; font-size: 0.86rem; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .good { background: var(--good-bg); color: #065f46; font-weight: 650; }
+    .warn { background: var(--warn-bg); color: var(--warn); font-weight: 650; }
+    .bad { background: var(--bad-bg); color: var(--bad); font-weight: 650; }
+    .blue { background: var(--blue-bg); color: #1e40af; font-weight: 650; }
+    .caption { color: var(--muted); margin-top: -12px; font-size: 0.92rem; }
+    .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid var(--line); margin-top: 38px; padding-top: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>DiscoGrad-style program smoothing in Warp</h1>
+    <a href="../">All reports</a>
+  </header>
+
+  <div class="meta" id="meta">Loading results...</div>
+
+  <div class="tldr">
+    <p>
+      I implemented a small Warp helper module for Gaussian program smoothing and evaluated it on branch-heavy
+      objectives. On the hard triangle intersection problem, ordinary AD and crisp finite differences report zero
+      gradient at branch-boundary probes, while the score-function smoother and smoothed finite differences recover
+      clear boundary-normal signal. On the 2D collision tasks, crisp AD is fast but often unstable because it follows
+      one collision path; smoothed estimators are slower but provide gradients with bounded, branch-aware behavior.
+    </p>
+  </div>
+
+  <div class="grid" id="headline"></div>
+
+  <h2>1. Method</h2>
+  <p>
+    DiscoGrad smooths branchy programs by differentiating a Gaussian-smoothed objective rather than a single crisp
+    execution path. The Warp prototype follows that idea without source-to-source transformation: users provide a
+    scalar Warp loss function and parameter arrays, and <code>warp.optim.smoothing</code> estimates gradients using
+    pathwise AD over perturbed executions, score-function Gaussian smoothing, or common-random-number finite
+    differences. The score-function estimator is slower than a single Tape pass but it can see discontinuities that
+    pathwise AD ignores.
+  </p>
+  <pre><code>import warp.optim
+
+result = warp.optim.smoothing.estimate_score_function(
+    loss_fn, [params], sigma=0.07, samples=128, seed=17
+)
+optimizer.step(result.gradients)</code></pre>
+
+  <h2>2. Triangle Distance and Intersection</h2>
+  <p>
+    The triangle objective uses Warp kernels for a hard inside/outside intersection indicator and a squared outside
+    distance. For the intersection indicator, the crisp program is piecewise constant: both AD and ordinary finite
+    differences are zero unless the finite-difference step happens to cross an edge. Smoothing turns the edge into a
+    finite-width probability transition and recovers useful gradients near the boundary.
+  </p>
+  <img src="triangle_gradients.png" alt="Triangle gradient fields comparing crisp AD, score smoothing, and smoothed finite differences">
+  <p class="caption">Green indicates the triangle interior. Arrows are gradients with respect to the queried point.</p>
+  <div id="triangle-tables"></div>
+
+  <h2>3. Billiards-Style Collision Optimization</h2>
+  <p>
+    The collision examples optimize the initial velocity of a point ball inside a rectangular table with circular
+    bumpers. The simulated loss is final squared distance to a target plus a small speed penalty. Collisions are
+    branchy: small velocity changes can alter which obstacle is hit and when.
+  </p>
+  <img src="collision_trajectories.png" alt="Optimized billiards trajectories for each gradient estimator">
+  <img src="collision_convergence.png" alt="Collision optimization convergence curves">
+  <div id="collision-table"></div>
+
+  <h2>4. Variance and Benchmarks</h2>
+  <p>
+    The score estimator's sample variance falls as the sample count increases, but its per-estimate cost scales with
+    the number of perturbed program executions. Smoothed finite differences are the most expensive here because each
+    parameter component needs positive and negative smoothed objective evaluations.
+  </p>
+  <img src="gradient_variance.png" alt="Gradient variance versus sample count">
+  <img src="benchmark_speed.png" alt="Benchmark speed comparison">
+  <div id="benchmark-table"></div>
+
+  <h2>5. Limitations</h2>
+  <ul>
+    <li>The local Warp build is CPU-only because the machine has CUDA Toolkit 11.5 while current Warp main requires CUDA Toolkit 12 or newer to build CUDA support.</li>
+    <li>The helper is intentionally generic and minimally invasive, so it loops over perturbed executions in Python. A future batched estimator could reduce launch overhead substantially.</li>
+    <li>This is a DiscoGrad-style smoothing utility, not a full DiscoGrad source transformer. It does not automatically instrument branch conditions inside arbitrary kernels.</li>
+  </ul>
+
+  <div class="footnote">
+    Sources: Kreikemeyer and Andelfinger, <a href="https://arxiv.org/abs/2310.03585">Smoothing Methods for Automatic
+    Differentiation Across Conditional Branches</a>; <a href="https://github.com/DiscoGrad/DiscoGrad">DiscoGrad</a>.
+    Results generated from <code>warp/examples/optim/example_program_smoothing.py</code>.
+  </div>
+</main>
+
+<script>
+function fmt(x, digits = 3) {
+  if (typeof x !== "number" || !isFinite(x)) return String(x);
+  if (Math.abs(x) >= 100) return x.toFixed(1);
+  if (Math.abs(x) >= 1) return x.toFixed(digits);
+  if (Math.abs(x) >= 0.001) return x.toFixed(4);
+  return x.toExponential(2);
+}
+
+function methodLabel(method) {
+  return {
+    autodiff: "AD",
+    finite_difference: "Finite diff",
+    smooth_score: "Smooth score",
+    smooth_fd: "Smoothed FD"
+  }[method] || method;
+}
+
+function methodClass(method, value, best) {
+  if (method === "autodiff" && value === 0) return "bad";
+  if (Math.abs(value - best) < 1e-12) return "good";
+  if (method.startsWith("smooth")) return "blue";
+  return "";
+}
+
+function table(headers, rows) {
+  return `<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+
+fetch("results.json")
+  .then(r => r.json())
+  .then(data => {
+    const m = data.metadata;
+    document.getElementById("meta").innerHTML =
+      `Generated on ${m.platform} · Warp ${m.warp_version} · device: <code>${m.device}</code> · ` +
+      `${m.samples} smoothing samples · ${m.train_iters} optimization iterations · CUDA enabled: ${m.cuda_enabled}`;
+
+    const pinball = data.collision_optimization.pinball_bank.final_losses;
+    const crowded = data.collision_optimization.crowded_table.final_losses;
+    document.getElementById("headline").innerHTML = [
+      ["Triangle branch gradient", "AD = 0, smoother nonzero"],
+      ["Pinball final loss", `score ${fmt(pinball.smooth_score)} · smoothed FD ${fmt(pinball.smooth_fd)}`],
+      ["Crowded-table final loss", `score ${fmt(crowded.smooth_score)} · smoothed FD ${fmt(crowded.smooth_fd)}`],
+      ["Benchmark mode", m.cuda_enabled ? "CUDA" : "CPU-only"]
+    ].map(([k, v]) => `<div class="metric"><span>${k}</span><strong>${v}</strong></div>`).join("");
+
+    const triSections = [];
+    for (const [objective, points] of Object.entries(data.triangle_probe)) {
+      const rows = [];
+      for (const [point, methods] of Object.entries(points)) {
+        for (const [method, r] of Object.entries(methods)) {
+          rows.push(`<tr>
+            <td>${objective}</td>
+            <td>${point}</td>
+            <td>${methodLabel(method)}</td>
+            <td class="num">${fmt(r.value, 5)}</td>
+            <td class="num">${fmt(r.gradient[0])}</td>
+            <td class="num">${fmt(r.gradient[1])}</td>
+            <td class="num ${r.grad_norm === 0 ? "bad" : method.startsWith("smooth") ? "blue" : ""}">${fmt(r.grad_norm)}</td>
+            <td class="num">${fmt(r.elapsed_ms, 2)}</td>
+          </tr>`);
+        }
+      }
+      triSections.push(table(["Objective", "Probe", "Method", "Value", "grad x", "grad y", "|grad|", "ms"], rows));
+    }
+    document.getElementById("triangle-tables").innerHTML = triSections.join("");
+
+    const collisionRows = [];
+    for (const [scenario, result] of Object.entries(data.collision_optimization)) {
+      const best = Math.min(...Object.values(result.final_losses));
+      for (const [method, loss] of Object.entries(result.final_losses)) {
+        const velocity = result.final_velocities[method];
+        collisionRows.push(`<tr>
+          <td>${scenario}</td>
+          <td>${methodLabel(method)}</td>
+          <td class="num ${methodClass(method, loss, best)}">${fmt(loss, 5)}</td>
+          <td class="num">[${fmt(velocity[0])}, ${fmt(velocity[1])}]</td>
+        </tr>`);
+      }
+    }
+    document.getElementById("collision-table").innerHTML =
+      table(["Scenario", "Method", "Final crisp loss", "Final velocity"], collisionRows);
+
+    const benchRows = data.benchmarks.map(r => `<tr>
+      <td>${r.problem}</td>
+      <td>${methodLabel(r.method)}</td>
+      <td class="num">${r.samples}</td>
+      <td class="num">${fmt(r.mean_ms, 2)}</td>
+      <td class="num">${fmt(r.std_ms, 2)}</td>
+      <td class="num">${fmt(r.python_peak_kib, 2)}</td>
+      <td class="num">${fmt(r.rss_delta_kib, 2)}</td>
+      <td class="num">${fmt(r.grad_norm, 3)}</td>
+    </tr>`);
+    document.getElementById("benchmark-table").innerHTML =
+      table(["Problem", "Method", "Samples", "Mean ms", "Std ms", "Python peak KiB", "RSS delta KiB", "|grad|"], benchRows);
+  });
+</script>
+</body>
+</html>
