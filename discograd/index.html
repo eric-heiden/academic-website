@@ -114,8 +114,9 @@
       I implemented a small Warp helper module for Gaussian program smoothing and evaluated it on branch-heavy
       objectives. On the hard triangle intersection problem, ordinary AD and crisp finite differences report zero
       gradient at branch-boundary probes, while the score-function smoother and smoothed finite differences recover
-      clear boundary-normal signal. On the 2D collision tasks, crisp AD is fast but often unstable because it follows
-      one collision path; smoothed estimators are slower but provide gradients with bounded, branch-aware behavior.
+      clear boundary-normal signal. The follow-up run uses CUDA and a batched score estimator, launching one Warp
+      kernel over all perturbation samples. On the 2D collision tasks, crisp AD is fast but unstable because it follows
+      one collision path; smoothed estimators are slower but provide gradients with branch-aware behavior.
     </p>
   </div>
 
@@ -127,15 +128,24 @@
     execution path. The Warp prototype follows that idea without source-to-source transformation: users provide a
     scalar Warp loss function and parameter arrays, and <code>warp.optim.smoothing</code> estimates gradients using
     pathwise AD over perturbed executions, score-function Gaussian smoothing, or common-random-number finite
-    differences. The score-function estimator is slower than a single Tape pass but it can see discontinuities that
-    pathwise AD ignores.
+    differences. The new batched score path accepts a loss function over a leading sample dimension, so score samples
+    run in parallel on CUDA instead of as a Python loop. The score-function estimator is still slower than a single
+    Tape pass but it can see discontinuities that pathwise AD ignores.
   </p>
   <pre><code>import warp.optim
 
-result = warp.optim.smoothing.estimate_score_function(
-    loss_fn, [params], sigma=0.07, samples=128, seed=17
+result = warp.optim.smoothing.estimate_score_function_batched(
+    batched_loss_fn, [params], sigma=0.07, samples=128, seed=17
 )
 optimizer.step(result.gradients)</code></pre>
+  <p>
+    This is close in spirit to Suh, Pang, and Tedrake's bundled gradients: both optimize a randomized-smoothed
+    objective by averaging information in a neighborhood of the current state. The first-order bundled-gradient
+    variant averages local derivatives, which is most useful when each sampled branch has meaningful derivatives.
+    The zero-order bundled-gradient variant uses sampled values; this report's score estimator is the same practical
+    choice for hard branch indicators and discontinuous collision events where pathwise derivatives can be zero or
+    misleading.
+  </p>
 
   <h2>2. Triangle Distance and Intersection</h2>
   <p>
@@ -156,28 +166,38 @@ optimizer.step(result.gradients)</code></pre>
   </p>
   <img src="collision_trajectories.png" alt="Optimized billiards trajectories for each gradient estimator">
   <img src="collision_convergence.png" alt="Collision optimization convergence curves">
+  <img src="collision_landscape.png" alt="Collision loss landscapes over initial velocity with optimizer paths">
+  <p class="caption">Velocity-space landscapes show narrow low-loss bands and branch-induced discontinuities. Lines are optimizer paths.</p>
   <div id="collision-table"></div>
 
-  <h2>4. Variance and Benchmarks</h2>
+  <h2>4. Sample Count and Benchmarks</h2>
   <p>
-    The score estimator's sample variance falls as the sample count increases, but its per-estimate cost scales with
-    the number of perturbed program executions. Smoothed finite differences are the most expensive here because each
-    parameter component needs positive and negative smoothed objective evaluations.
+    The score estimator's standard error falls as the sample count increases. With batched CUDA sampling, the wall
+    time grows slowly across the tested range, so the main tradeoff is estimator quality rather than launch overhead.
+    In these probes, 64-128 samples are enough for the triangle and pinball gradient direction to become stable, while
+    the crowded collision case benefits from 512-1024+ samples.
   </p>
   <img src="gradient_variance.png" alt="Gradient variance versus sample count">
+  <img src="score_sample_gradient_sweep.png" alt="Score sample count versus gradient error and cosine similarity">
+  <img src="score_sample_optimization.png" alt="Score sample count versus collision optimization quality">
   <img src="benchmark_speed.png" alt="Benchmark speed comparison">
+  <div id="sample-table"></div>
+  <div id="sample-optimization-table"></div>
+  <div id="speedup-table"></div>
   <div id="benchmark-table"></div>
 
   <h2>5. Limitations</h2>
   <ul>
-    <li>The local Warp build is CPU-only because the machine has CUDA Toolkit 11.5 while current Warp main requires CUDA Toolkit 12 or newer to build CUDA support.</li>
-    <li>The helper is intentionally generic and minimally invasive, so it loops over perturbed executions in Python. A future batched estimator could reduce launch overhead substantially.</li>
+    <li>The CUDA build used Toolkit 12.6 with MathDx disabled. These examples do not use Warp tile MathDx operations.</li>
+    <li>The batched score estimator parallelizes perturbed loss evaluation, but gradient reduction is still performed on the host after copying per-sample losses.</li>
     <li>This is a DiscoGrad-style smoothing utility, not a full DiscoGrad source transformer. It does not automatically instrument branch conditions inside arbitrary kernels.</li>
   </ul>
 
   <div class="footnote">
     Sources: Kreikemeyer and Andelfinger, <a href="https://arxiv.org/abs/2310.03585">Smoothing Methods for Automatic
-    Differentiation Across Conditional Branches</a>; <a href="https://github.com/DiscoGrad/DiscoGrad">DiscoGrad</a>.
+    Differentiation Across Conditional Branches</a>; <a href="https://github.com/DiscoGrad/DiscoGrad">DiscoGrad</a>;
+    Suh, Pang, and Tedrake, <a href="https://arxiv.org/abs/2109.05143">Bundled Gradients through Contact via
+    Randomized Smoothing</a>.
     Results generated from <code>warp/examples/optim/example_program_smoothing.py</code>.
   </div>
 </main>
@@ -196,6 +216,8 @@ function methodLabel(method) {
     autodiff: "AD",
     finite_difference: "Finite diff",
     smooth_score: "Smooth score",
+    smooth_score_batched: "Smooth score batched",
+    smooth_score_scalar: "Smooth score scalar",
     smooth_fd: "Smoothed FD"
   }[method] || method;
 }
@@ -217,7 +239,9 @@ fetch("results.json")
     const m = data.metadata;
     document.getElementById("meta").innerHTML =
       `Generated on ${m.platform} · Warp ${m.warp_version} · device: <code>${m.device}</code> · ` +
-      `${m.samples} smoothing samples · ${m.train_iters} optimization iterations · CUDA enabled: ${m.cuda_enabled}`;
+      `${m.samples} smoothing samples · ${m.train_iters} optimization iterations · ` +
+      `score backend: <code>${m.score_backend}</code> · CUDA toolkit: ${m.cuda_toolkit?.join(".") || "n/a"} · ` +
+      `driver: ${m.cuda_driver?.join(".") || "n/a"}`;
 
     const pinball = data.collision_optimization.pinball_bank.final_losses;
     const crowded = data.collision_optimization.crowded_table.final_losses;
@@ -225,7 +249,7 @@ fetch("results.json")
       ["Triangle branch gradient", "AD = 0, smoother nonzero"],
       ["Pinball final loss", `score ${fmt(pinball.smooth_score)} · smoothed FD ${fmt(pinball.smooth_fd)}`],
       ["Crowded-table final loss", `score ${fmt(crowded.smooth_score)} · smoothed FD ${fmt(crowded.smooth_fd)}`],
-      ["Benchmark mode", m.cuda_enabled ? "CUDA" : "CPU-only"]
+      ["Benchmark mode", m.cuda_available ? "CUDA" : "CPU-only"]
     ].map(([k, v]) => `<div class="metric"><span>${k}</span><strong>${v}</strong></div>`).join("");
 
     const triSections = [];
@@ -264,6 +288,60 @@ fetch("results.json")
     }
     document.getElementById("collision-table").innerHTML =
       table(["Scenario", "Method", "Final crisp loss", "Final velocity"], collisionRows);
+
+    const sampleRows = data.score_sample_gradient_sweep.rows;
+    const sampleSummaryRows = [];
+    for (const problem of [...new Set(sampleRows.map(r => r.problem))].sort()) {
+      const rows = sampleRows.filter(r => r.problem === problem).sort((a, b) => a.samples - b.samples);
+      const stable = rows.find(r => r.mean_cosine_to_reference >= 0.98) || rows[rows.length - 1];
+      const final = rows[rows.length - 1];
+      sampleSummaryRows.push(`<tr>
+        <td>${problem}</td>
+        <td class="num">${stable.samples}</td>
+        <td class="num">${fmt(stable.mean_cosine_to_reference, 4)}</td>
+        <td class="num">${fmt(stable.mean_error_norm, 4)}</td>
+        <td class="num">${fmt(final.mean_cosine_to_reference, 4)}</td>
+        <td class="num">${fmt(final.mean_elapsed_ms, 3)}</td>
+      </tr>`);
+    }
+    document.getElementById("sample-table").innerHTML =
+      `<h3>Gradient sample-count summary</h3>` +
+      table(["Problem", "First mean cosine >= 0.98", "Cosine there", "Error there", "Max-sample cosine", "Max-sample ms"], sampleSummaryRows);
+
+    const optRows = data.score_sample_optimization_sweep.rows;
+    const optSummaryRows = [];
+    for (const scenario of [...new Set(optRows.map(r => r.scenario))].sort()) {
+      const rows = optRows.filter(r => r.scenario === scenario);
+      const bestFinal = rows.reduce((a, b) => a.mean_final_loss < b.mean_final_loss ? a : b);
+      const bestSeen = rows.reduce((a, b) => a.mean_best_loss < b.mean_best_loss ? a : b);
+      optSummaryRows.push(`<tr>
+        <td>${scenario}</td>
+        <td class="num">${bestFinal.samples}</td>
+        <td class="num">${fmt(bestFinal.mean_final_loss, 5)}</td>
+        <td class="num">${bestSeen.samples}</td>
+        <td class="num">${fmt(bestSeen.mean_best_loss, 5)}</td>
+      </tr>`);
+    }
+    document.getElementById("sample-optimization-table").innerHTML =
+      `<h3>Score-only optimization sweep</h3>` +
+      table(["Scenario", "Best final-loss samples", "Mean final loss", "Best-seen samples", "Mean best loss"], optSummaryRows);
+
+    const speedupRows = [];
+    for (const problem of [...new Set(data.benchmarks.map(r => r.problem))].sort()) {
+      const batched = data.benchmarks.find(r => r.problem === problem && r.method === "smooth_score_batched");
+      const scalar = data.benchmarks.find(r => r.problem === problem && r.method === "smooth_score_scalar");
+      if (batched && scalar) {
+        speedupRows.push(`<tr>
+          <td>${problem}</td>
+          <td class="num">${fmt(batched.mean_ms, 3)}</td>
+          <td class="num">${fmt(scalar.mean_ms, 3)}</td>
+          <td class="num good">${fmt(scalar.mean_ms / batched.mean_ms, 2)}x</td>
+        </tr>`);
+      }
+    }
+    document.getElementById("speedup-table").innerHTML =
+      `<h3>Batched score sampling speedup</h3>` +
+      table(["Problem", "Batched ms", "Scalar ms", "Speedup"], speedupRows);
 
     const benchRows = data.benchmarks.map(r => `<tr>
       <td>${r.problem}</td>
