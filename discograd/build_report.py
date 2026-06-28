@@ -32,7 +32,7 @@ from discograd.validate_report import (
     ValidationError,
     _assert_no_local_path,
     _ReportHTMLParser,
-    validate_manifest,
+    validate_bundle,
 )
 
 
@@ -268,12 +268,28 @@ def _validate_png_assets(root: Path, files: Mapping[str, Any]) -> None:
 
 
 @dataclass(frozen=True, slots=True)
+class ReportReferenceDecision:
+    status: str
+    pilot_tier: str
+    pilot_manifest_sha256: str
+    pilot_source_commit: str
+    pilot_projected_report_seconds: float
+    decided_at_utc: str
+    protocol_fingerprint: str
+    path_reference_samples: int
+    contact_reference_samples: int
+    reference_seed_sets: int
+    rationale: str
+
+
+@dataclass(frozen=True, slots=True)
 class ManifestRecord:
     schema_version: int
     tier: str
     source: Mapping[str, Any]
     config: Mapping[str, Any]
     accepted: Mapping[str, Any]
+    report_reference_count_decision: ReportReferenceDecision
     files: Mapping[str, Any]
 
 
@@ -343,6 +359,20 @@ class ScenarioValidity:
 
 
 @dataclass(frozen=True, slots=True)
+class ReportRuntime:
+    tier: str
+    elapsed_seconds: float
+    elapsed_measurement: str
+    measurement_excludes: tuple[str, ...]
+    measured_finalization_pass_seconds: float
+    measured_installation_pass_seconds: float
+    phase_seconds: Mapping[str, float]
+    projection_factors: Mapping[str, float]
+    projection_model: str
+    projected_report_seconds: float
+
+
+@dataclass(frozen=True, slots=True)
 class SummaryTables:
     schema_version: int
     method_labels: Mapping[str, str]
@@ -353,6 +383,7 @@ class SummaryTables:
     optimization_summaries: tuple[OptimizationSummary, ...]
     performance_summaries: tuple[PerformanceSummary, ...]
     scenario_validity: tuple[ScenarioValidity, ...]
+    runtime: ReportRuntime
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,10 +421,56 @@ class OptimizationRow:
     scenario_family: str
     scenario: str
     method: str
+    schedule_id: int | None
+    initial_hard_loss: float | None
     final_hard_loss: float
     held_out_loss: float
+    accepted: bool | None
     success: bool
+    physical_valid: bool | None
+    minimum_positive_normal_impulse: float | None
+    positive_impulse_threshold: float | None
+    max_penetration: float | None
+    max_contact_energy_gain: float | None
+    max_pair_momentum_error: float | None
+    max_pair_angular_momentum_error: float | None
+    stick_contacts: int | None
+    slide_contacts: int | None
+    zero_limit_slide_contacts: int | None
+    hard_evaluation_forward_executions: int | None
+    realized_outer_seeds: tuple[int, ...]
+    gradient_work: tuple[Mapping[str, Any], ...]
     raw: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class PathSmoothingContract:
+    source_file: str
+    source_index: int
+    row_id: str
+    residual_source_file: str
+    residual_source_index: int
+    complete: bool
+    transformed_sites: int
+    smoothed_sites: int
+    numerical_gauge_sites: int
+    fully_smoothed: bool
+    fingerprint: str
+    root_callable_keys: tuple[str, ...]
+    callable_keys: tuple[str, ...]
+    target: str
+    target_label: str
+    unbiased_target: bool
+    control_certificate_fingerprint: str
+    hard_forward_executions: int
+    soft_forward_executions: int
+    numerical_gauge_assumption: bool
+    control_numerical_gauge_sites: int
+    numerical_gauge_policy: str
+    onb_seam_semantics: str
+    parameter_extension: str
+    parameter_lower: tuple[float, ...]
+    parameter_upper: tuple[float, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -486,6 +563,7 @@ class ReportModel:
     optimization_rows: tuple[OptimizationRow, ...]
     performance_rows: tuple[PerformanceRow, ...]
     reference_rows: tuple[ReferenceRow, ...]
+    path_smoothing_contract: PathSmoothingContract
     plots: Mapping[str, PlotDataset]
     raw_row_ids: frozenset[str]
     raw_records: Mapping[str, RawRecord]
@@ -505,6 +583,46 @@ def _dataset_rows(payload: Any, *, source_file: str) -> tuple[Mapping[str, Any],
     )
 
 
+def _load_reference_decision(value: Any) -> ReportReferenceDecision:
+    decision = _mapping(value, name="manifest.report_reference_count_decision")
+    prefix = "manifest.report_reference_count_decision"
+    return ReportReferenceDecision(
+        status=_string(decision.get("status"), name=f"{prefix}.status"),
+        pilot_tier=_string(decision.get("pilot_tier"), name=f"{prefix}.pilot_tier"),
+        pilot_manifest_sha256=_string(
+            decision.get("pilot_manifest_sha256"),
+            name=f"{prefix}.pilot_manifest_sha256",
+        ),
+        pilot_source_commit=_string(
+            decision.get("pilot_source_commit"), name=f"{prefix}.pilot_source_commit"
+        ),
+        pilot_projected_report_seconds=_number(
+            decision.get("pilot_projected_report_seconds"),
+            name=f"{prefix}.pilot_projected_report_seconds",
+        ),
+        decided_at_utc=_string(
+            decision.get("decided_at_utc"), name=f"{prefix}.decided_at_utc"
+        ),
+        protocol_fingerprint=_string(
+            decision.get("protocol_fingerprint"),
+            name=f"{prefix}.protocol_fingerprint",
+        ),
+        path_reference_samples=_integer(
+            decision.get("path_reference_samples"),
+            name=f"{prefix}.path_reference_samples",
+        ),
+        contact_reference_samples=_integer(
+            decision.get("contact_reference_samples"),
+            name=f"{prefix}.contact_reference_samples",
+        ),
+        reference_seed_sets=_integer(
+            decision.get("reference_seed_sets"),
+            name=f"{prefix}.reference_seed_sets",
+        ),
+        rationale=_string(decision.get("rationale"), name=f"{prefix}.rationale"),
+    )
+
+
 def _load_manifest(value: Any) -> ManifestRecord:
     mapping = _mapping(value, name="data/manifest.json")
     return ManifestRecord(
@@ -515,7 +633,61 @@ def _load_manifest(value: Any) -> ManifestRecord:
         source=_freeze(_mapping(mapping.get("source"), name="manifest.source")),
         config=_freeze(_mapping(mapping.get("config"), name="manifest.config")),
         accepted=_freeze(_mapping(mapping.get("accepted"), name="manifest.accepted")),
+        report_reference_count_decision=_load_reference_decision(
+            mapping.get("report_reference_count_decision")
+        ),
         files=_freeze(_mapping(mapping.get("files"), name="manifest.files")),
+    )
+
+
+def _numeric_mapping(value: Any, *, name: str) -> Mapping[str, float]:
+    mapping = _mapping(value, name=name)
+    return MappingProxyType(
+        {
+            _string(key, name=f"{name} key"): _number(child, name=f"{name}.{key}")
+            for key, child in mapping.items()
+        }
+    )
+
+
+def _load_runtime(value: Any) -> ReportRuntime:
+    runtime = _mapping(value, name="summary.runtime")
+    return ReportRuntime(
+        tier=_string(runtime.get("tier"), name="summary.runtime.tier"),
+        elapsed_seconds=_number(
+            runtime.get("elapsed_seconds"), name="summary.runtime.elapsed_seconds"
+        ),
+        elapsed_measurement=_string(
+            runtime.get("elapsed_measurement"),
+            name="summary.runtime.elapsed_measurement",
+        ),
+        measurement_excludes=_strings(
+            runtime.get("measurement_excludes"),
+            name="summary.runtime.measurement_excludes",
+            nonempty=True,
+        ),
+        measured_finalization_pass_seconds=_number(
+            runtime.get("measured_finalization_pass_seconds"),
+            name="summary.runtime.measured_finalization_pass_seconds",
+        ),
+        measured_installation_pass_seconds=_number(
+            runtime.get("measured_installation_pass_seconds"),
+            name="summary.runtime.measured_installation_pass_seconds",
+        ),
+        phase_seconds=_numeric_mapping(
+            runtime.get("phase_seconds"), name="summary.runtime.phase_seconds"
+        ),
+        projection_factors=_numeric_mapping(
+            runtime.get("projection_factors"),
+            name="summary.runtime.projection_factors",
+        ),
+        projection_model=_string(
+            runtime.get("projection_model"), name="summary.runtime.projection_model"
+        ),
+        projected_report_seconds=_number(
+            runtime.get("projected_report_seconds"),
+            name="summary.runtime.projected_report_seconds",
+        ),
     )
 
 
@@ -776,6 +948,7 @@ def _load_summary(value: Any) -> SummaryTables:
         optimization_summaries=tuple(optimization_summaries),
         performance_summaries=tuple(performance_summaries),
         scenario_validity=tuple(validity_rows),
+        runtime=_load_runtime(mapping.get("runtime")),
     )
 
 
@@ -833,6 +1006,40 @@ def _optimization_row(
     source_file: str, index: int, row: Mapping[str, Any]
 ) -> OptimizationRow:
     prefix = f"{source_file}.rows[{index}]"
+    physical_value = row.get("final_physical_validity")
+    physical = (
+        None
+        if physical_value is None
+        else _mapping(physical_value, name=f"{prefix}.final_physical_validity")
+    )
+    hard_work_value = row.get("hard_evaluation_work")
+    hard_work = (
+        None
+        if hard_work_value is None
+        else _mapping(hard_work_value, name=f"{prefix}.hard_evaluation_work")
+    )
+    realized_seed_value = row.get("realized_outer_seeds")
+    realized_outer_seeds = (
+        ()
+        if realized_seed_value is None
+        else tuple(
+            _integer(seed, name=f"{prefix}.realized_outer_seeds[{seed_index}]")
+            for seed_index, seed in enumerate(
+                _sequence(realized_seed_value, name=f"{prefix}.realized_outer_seeds")
+            )
+        )
+    )
+    gradient_work_value = row.get("gradient_work")
+    gradient_work = (
+        ()
+        if gradient_work_value is None
+        else tuple(
+            _freeze(_mapping(record, name=f"{prefix}.gradient_work[{work_index}]"))
+            for work_index, record in enumerate(
+                _sequence(gradient_work_value, name=f"{prefix}.gradient_work")
+            )
+        )
+    )
     return OptimizationRow(
         source_file=source_file,
         source_index=index,
@@ -842,11 +1049,106 @@ def _optimization_row(
         ),
         scenario=_string(row.get("scenario"), name=f"{prefix}.scenario"),
         method=_method(row.get("method"), name=f"{prefix}.method"),
+        schedule_id=_optional_integer(
+            row.get("schedule_id"), name=f"{prefix}.schedule_id"
+        ),
+        initial_hard_loss=_optional_number(
+            row.get("initial_hard_loss"), name=f"{prefix}.initial_hard_loss"
+        ),
         final_hard_loss=_number(
             row.get("final_hard_loss"), name=f"{prefix}.final_hard_loss"
         ),
         held_out_loss=_number(row.get("held_out_loss"), name=f"{prefix}.held_out_loss"),
+        accepted=(
+            None
+            if row.get("accepted") is None
+            else _boolean(row.get("accepted"), name=f"{prefix}.accepted")
+        ),
         success=_boolean(row.get("success"), name=f"{prefix}.success"),
+        physical_valid=(
+            None
+            if physical is None
+            else _boolean(physical.get("valid"), name=f"{prefix}.physical_valid")
+        ),
+        minimum_positive_normal_impulse=(
+            None
+            if physical is None
+            else _number(
+                physical.get("minimum_positive_normal_impulse"),
+                name=f"{prefix}.minimum_positive_normal_impulse",
+            )
+        ),
+        positive_impulse_threshold=(
+            None
+            if physical is None
+            else _number(
+                physical.get("positive_impulse_threshold"),
+                name=f"{prefix}.positive_impulse_threshold",
+            )
+        ),
+        max_penetration=(
+            None
+            if physical is None
+            else _number(
+                physical.get("max_penetration"), name=f"{prefix}.max_penetration"
+            )
+        ),
+        max_contact_energy_gain=(
+            None
+            if physical is None
+            else _number(
+                physical.get("max_contact_energy_gain"),
+                name=f"{prefix}.max_contact_energy_gain",
+            )
+        ),
+        max_pair_momentum_error=(
+            None
+            if physical is None
+            else _number(
+                physical.get("max_pair_momentum_error"),
+                name=f"{prefix}.max_pair_momentum_error",
+            )
+        ),
+        max_pair_angular_momentum_error=(
+            None
+            if physical is None
+            else _number(
+                physical.get("max_pair_angular_momentum_error"),
+                name=f"{prefix}.max_pair_angular_momentum_error",
+            )
+        ),
+        stick_contacts=(
+            None
+            if physical is None
+            else _integer(
+                physical.get("stick_contacts"), name=f"{prefix}.stick_contacts"
+            )
+        ),
+        slide_contacts=(
+            None
+            if physical is None
+            else _integer(
+                physical.get("slide_contacts"), name=f"{prefix}.slide_contacts"
+            )
+        ),
+        zero_limit_slide_contacts=(
+            None
+            if physical is None
+            else _integer(
+                physical.get("zero_limit_slide_contacts"),
+                name=f"{prefix}.zero_limit_slide_contacts",
+            )
+        ),
+        hard_evaluation_forward_executions=(
+            None
+            if hard_work is None
+            else _integer(
+                hard_work.get("total_forward_executions"),
+                name=f"{prefix}.hard_evaluation_work.total_forward_executions",
+            )
+        ),
+        realized_outer_seeds=realized_outer_seeds,
+        gradient_work=gradient_work,
         raw=_freeze(row),
     )
 
@@ -928,6 +1230,119 @@ def _reference_row(
         counts=_freeze(_mapping(row.get("counts"), name=f"{prefix}.counts")),
         reference_gradient=gradient,
         raw=_freeze(row),
+    )
+
+
+def _path_smoothing_contract(
+    raw_records: Mapping[str, RawRecord], gradient_rows: Sequence[GradientRow]
+) -> PathSmoothingContract:
+    protocol_records = [
+        record
+        for record in raw_records.values()
+        if record.source_file == "data/raw/path_tracer_gradients.json"
+        and record.raw.get("scenario") == "path_randomness_protocol"
+    ]
+    if len(protocol_records) != 1:
+        raise BuildError("path smoothing contract requires one protocol record")
+    residual_rows = [
+        row
+        for row in gradient_rows
+        if row.source_file == "data/raw/path_tracer_gradients.json"
+        and row.method == "residual_control_variate"
+    ]
+    if not residual_rows:
+        raise BuildError("path smoothing contract requires residual estimator rows")
+    protocol = protocol_records[0]
+    residual = min(residual_rows, key=lambda row: row.source_index)
+    certificate = _mapping(
+        protocol.raw.get("certificate"), name="path protocol certificate"
+    )
+    control = _mapping(
+        protocol.raw.get("control_variate"), name="path protocol control_variate"
+    )
+    config = _mapping(residual.raw.get("config"), name="path residual config")
+    return PathSmoothingContract(
+        source_file=protocol.source_file,
+        source_index=protocol.source_index,
+        row_id=protocol.row_id,
+        residual_source_file=residual.source_file,
+        residual_source_index=residual.source_index,
+        complete=_boolean(
+            certificate.get("complete"), name="path certificate.complete"
+        ),
+        transformed_sites=_integer(
+            certificate.get("transformed_sites"),
+            name="path certificate.transformed_sites",
+        ),
+        smoothed_sites=_integer(
+            certificate.get("smoothed_sites"), name="path certificate.smoothed_sites"
+        ),
+        numerical_gauge_sites=_integer(
+            certificate.get("numerical_gauge_sites"),
+            name="path certificate.numerical_gauge_sites",
+        ),
+        fully_smoothed=_boolean(
+            certificate.get("fully_smoothed"),
+            name="path certificate.fully_smoothed",
+        ),
+        fingerprint=_string(
+            certificate.get("fingerprint"), name="path certificate.fingerprint"
+        ),
+        root_callable_keys=_strings(
+            certificate.get("root_callable_keys"),
+            name="path certificate.root_callable_keys",
+            nonempty=True,
+        ),
+        callable_keys=_strings(
+            certificate.get("callable_keys"),
+            name="path certificate.callable_keys",
+            nonempty=True,
+        ),
+        target=_string(control.get("target"), name="path control target"),
+        target_label=_string(
+            residual.raw.get("target_label"), name="path residual target_label"
+        ),
+        unbiased_target=_boolean(
+            control.get("unbiased_target"), name="path control unbiased_target"
+        ),
+        control_certificate_fingerprint=_string(
+            control.get("certificate_fingerprint"),
+            name="path control certificate_fingerprint",
+        ),
+        hard_forward_executions=_integer(
+            control.get("hard_forward_executions"),
+            name="path control hard_forward_executions",
+        ),
+        soft_forward_executions=_integer(
+            control.get("soft_forward_executions"),
+            name="path control soft_forward_executions",
+        ),
+        numerical_gauge_assumption=_boolean(
+            control.get("numerical_gauge_assumption"),
+            name="path control numerical_gauge_assumption",
+        ),
+        control_numerical_gauge_sites=_integer(
+            control.get("numerical_gauge_sites"),
+            name="path control numerical_gauge_sites",
+        ),
+        numerical_gauge_policy=_string(
+            config.get("numerical_gauge_policy"),
+            name="path residual numerical_gauge_policy",
+        ),
+        onb_seam_semantics=_string(
+            config.get("onb_seam_semantics"),
+            name="path residual onb_seam_semantics",
+        ),
+        parameter_extension=_string(
+            config.get("parameter_extension"),
+            name="path residual parameter_extension",
+        ),
+        parameter_lower=_vector(
+            config.get("parameter_lower"), name="path residual parameter_lower"
+        ),
+        parameter_upper=_vector(
+            config.get("parameter_upper"), name="path residual parameter_upper"
+        ),
     )
 
 
@@ -1289,6 +1704,9 @@ def _validate_validity_summaries(
     groups: dict[str, list[RawRecord]] = defaultdict(list)
     for record in raw_records.values():
         row = record.raw
+        if record.source_file == "data/raw/contact_3d_optimization.json":
+            groups["contact_3d_optimization"].append(record)
+            continue
         if (
             row.get("method") in REQUIRED_METHOD_IDS
             or "final_hard_loss" in row
@@ -1312,12 +1730,29 @@ def _validate_validity_summaries(
             aggregate.source_row_ids,
             tuple(record.row_id for record in selected),
         )
-        if aggregate.accepted is not all(flags):
+        if scenario == "contact_3d_optimization":
+            successful_methods = tuple(
+                record.raw["method"]
+                for record in selected
+                if record.raw.get("success") is True
+            )
+            expected_accepted = (
+                bool(selected) and all(flags) and bool(successful_methods)
+            )
+            expected_metrics = {
+                "row_count": len(selected),
+                "accepted_count": sum(flags),
+                "success_count": len(successful_methods),
+                "successful_methods": successful_methods,
+            }
+        else:
+            expected_accepted = all(flags)
+            expected_metrics = {
+                "row_count": len(selected),
+                "accepted_count": sum(flags),
+            }
+        if aggregate.accepted is not expected_accepted:
             raise BuildError("summary validity accepted aggregate mismatch")
-        expected_metrics = {
-            "row_count": len(selected),
-            "accepted_count": sum(flags),
-        }
         if dict(aggregate.metrics) != expected_metrics:
             raise BuildError("summary validity metrics aggregate mismatch")
 
@@ -1397,7 +1832,7 @@ def _validate_summary_aggregates(
 def _load_report(root: Path) -> ReportModel:
     root = Path(root)
     try:
-        manifest_payload, loaded = validate_manifest(root)
+        manifest_payload, loaded, _rows, _commit = validate_bundle(root)
     except ValidationError as error:
         raise BuildError(str(error)) from error
 
@@ -1509,6 +1944,7 @@ def _load_report(root: Path) -> ReportModel:
         sorted(performance_rows, key=lambda row: (row.scenario, row.method, row.row_id))
     )
     ordered_references = tuple(sorted(reference_rows, key=lambda row: row.cell_id))
+    path_smoothing_contract = _path_smoothing_contract(raw_records, ordered_gradients)
     _validate_summary_aggregates(
         summary,
         gradient_rows=ordered_gradients,
@@ -1524,6 +1960,7 @@ def _load_report(root: Path) -> ReportModel:
         optimization_rows=ordered_optimizations,
         performance_rows=ordered_performance,
         reference_rows=ordered_references,
+        path_smoothing_contract=path_smoothing_contract,
         plots=MappingProxyType(plots),
         raw_row_ids=frozenset(raw_row_ids),
         raw_records=MappingProxyType(raw_records),
@@ -2707,6 +3144,296 @@ def _protocol_tables(model: ReportModel) -> str:
     )
 
 
+def _reference_decision_table(model: ReportModel) -> str:
+    decision = model.manifest.report_reference_count_decision
+    fields = (
+        ("Status", "status", decision.status),
+        ("Pilot tier", "pilot_tier", decision.pilot_tier),
+        (
+            "Pilot manifest SHA-256",
+            "pilot_manifest_sha256",
+            decision.pilot_manifest_sha256,
+        ),
+        ("Pilot source commit", "pilot_source_commit", decision.pilot_source_commit),
+        (
+            "Pilot projected report seconds",
+            "pilot_projected_report_seconds",
+            decision.pilot_projected_report_seconds,
+        ),
+        ("Decision time (UTC)", "decided_at_utc", decision.decided_at_utc),
+        (
+            "Protocol fingerprint",
+            "protocol_fingerprint",
+            decision.protocol_fingerprint,
+        ),
+        (
+            "Path reference samples",
+            "path_reference_samples",
+            decision.path_reference_samples,
+        ),
+        (
+            "Contact reference samples",
+            "contact_reference_samples",
+            decision.contact_reference_samples,
+        ),
+        ("Reference seed sets", "reference_seed_sets", decision.reference_seed_sets),
+        ("Rationale", "rationale", decision.rationale),
+    )
+    rows = [
+        "<tr>"
+        f"{_text_cell(label)}"
+        f"{_value_cell(value, 'data/manifest.json', '/report_reference_count_decision/' + field)}"
+        "</tr>"
+        for label, field, value in fields
+    ]
+    return _table(
+        "Accepted report reference-count decision", ("Decision field", "Value"), rows
+    )
+
+
+def _path_contract_table(model: ReportModel) -> str:
+    contract = model.path_smoothing_contract
+    protocol_prefix = f"/rows/{contract.source_index}"
+    residual_prefix = f"/rows/{contract.residual_source_index}"
+    fields = (
+        (
+            "Complete callable projection",
+            contract.complete,
+            contract.source_file,
+            protocol_prefix + "/certificate/complete",
+        ),
+        (
+            "Fully smoothed",
+            contract.fully_smoothed,
+            contract.source_file,
+            protocol_prefix + "/certificate/fully_smoothed",
+        ),
+        (
+            "Transformed sites",
+            contract.transformed_sites,
+            contract.source_file,
+            protocol_prefix + "/certificate/transformed_sites",
+        ),
+        (
+            "Smoothed sites",
+            contract.smoothed_sites,
+            contract.source_file,
+            protocol_prefix + "/certificate/smoothed_sites",
+        ),
+        (
+            "Numerical-gauge sites",
+            contract.numerical_gauge_sites,
+            contract.source_file,
+            protocol_prefix + "/certificate/numerical_gauge_sites",
+        ),
+        (
+            "Certificate fingerprint",
+            contract.fingerprint,
+            contract.source_file,
+            protocol_prefix + "/certificate/fingerprint",
+        ),
+        (
+            "Gauge-qualified target",
+            contract.target,
+            contract.source_file,
+            protocol_prefix + "/control_variate/target",
+        ),
+        (
+            "Target label",
+            contract.target_label,
+            contract.residual_source_file,
+            residual_prefix + "/target_label",
+        ),
+        (
+            "Unbiased target under recorded assumption",
+            contract.unbiased_target,
+            contract.source_file,
+            protocol_prefix + "/control_variate/unbiased_target",
+        ),
+        (
+            "Numerical-gauge assumption",
+            contract.numerical_gauge_assumption,
+            contract.source_file,
+            protocol_prefix + "/control_variate/numerical_gauge_assumption",
+        ),
+        (
+            "Control certificate fingerprint",
+            contract.control_certificate_fingerprint,
+            contract.source_file,
+            protocol_prefix + "/control_variate/certificate_fingerprint",
+        ),
+        (
+            "Control hard forwards",
+            contract.hard_forward_executions,
+            contract.source_file,
+            protocol_prefix + "/control_variate/hard_forward_executions",
+        ),
+        (
+            "Control soft forwards",
+            contract.soft_forward_executions,
+            contract.source_file,
+            protocol_prefix + "/control_variate/soft_forward_executions",
+        ),
+        (
+            "Numerical-gauge policy",
+            contract.numerical_gauge_policy,
+            contract.residual_source_file,
+            residual_prefix + "/config/numerical_gauge_policy",
+        ),
+        (
+            "ONB seam semantics",
+            contract.onb_seam_semantics,
+            contract.residual_source_file,
+            residual_prefix + "/config/onb_seam_semantics",
+        ),
+        (
+            "Parameter extension",
+            contract.parameter_extension,
+            contract.residual_source_file,
+            residual_prefix + "/config/parameter_extension",
+        ),
+        (
+            "Parameter lower bounds",
+            contract.parameter_lower,
+            contract.residual_source_file,
+            residual_prefix + "/config/parameter_lower",
+        ),
+        (
+            "Parameter upper bounds",
+            contract.parameter_upper,
+            contract.residual_source_file,
+            residual_prefix + "/config/parameter_upper",
+        ),
+    )
+    rows = [
+        f"<tr>{_text_cell(label)}{_value_cell(value, source_file, pointer)}</tr>"
+        for label, value, source_file, pointer in fields
+    ]
+    return _table(
+        "Path smoothing certificate and numerical gauge",
+        ("Contract field", "Value"),
+        rows,
+    )
+
+
+def _contact_optimization_evidence_table(model: ReportModel) -> str:
+    selected = sorted(
+        (
+            row
+            for row in model.optimization_rows
+            if row.source_file == "data/raw/contact_3d_optimization.json"
+        ),
+        key=lambda row: (
+            row.method,
+            row.schedule_id if row.schedule_id is not None else -1,
+        ),
+    )
+    if len(selected) != 48:
+        raise BuildError("contact optimization evidence must contain 48 schedule rows")
+    rows = []
+    for row in selected:
+        prefix = f"/rows/{row.source_index}"
+        physical = prefix + "/final_physical_validity"
+        rows.append(
+            "<tr>"
+            f"{_value_cell(row.method, row.source_file, prefix + '/method')}"
+            f"{_value_cell(row.schedule_id, row.source_file, prefix + '/schedule_id')}"
+            f"{_value_cell(row.accepted, row.source_file, prefix + '/accepted')}"
+            f"{_value_cell(row.success, row.source_file, prefix + '/success')}"
+            f"{_value_cell(row.initial_hard_loss, row.source_file, prefix + '/initial_hard_loss')}"
+            f"{_value_cell(row.final_hard_loss, row.source_file, prefix + '/final_hard_loss')}"
+            f"{_value_cell(row.held_out_loss, row.source_file, prefix + '/held_out_loss')}"
+            f"{_value_cell(row.physical_valid, row.source_file, physical + '/valid')}"
+            f"{_value_cell(row.minimum_positive_normal_impulse, row.source_file, physical + '/minimum_positive_normal_impulse')}"
+            f"{_value_cell(row.positive_impulse_threshold, row.source_file, physical + '/positive_impulse_threshold')}"
+            f"{_value_cell(row.max_penetration, row.source_file, physical + '/max_penetration')}"
+            f"{_value_cell(row.max_contact_energy_gain, row.source_file, physical + '/max_contact_energy_gain')}"
+            f"{_value_cell(row.max_pair_momentum_error, row.source_file, physical + '/max_pair_momentum_error')}"
+            f"{_value_cell(row.max_pair_angular_momentum_error, row.source_file, physical + '/max_pair_angular_momentum_error')}"
+            f"{_value_cell(row.stick_contacts, row.source_file, physical + '/stick_contacts')}"
+            f"{_value_cell(row.slide_contacts, row.source_file, physical + '/slide_contacts')}"
+            f"{_value_cell(row.zero_limit_slide_contacts, row.source_file, physical + '/zero_limit_slide_contacts')}"
+            f"{_value_cell(row.hard_evaluation_forward_executions, row.source_file, prefix + '/hard_evaluation_work/total_forward_executions')}"
+            "</tr>"
+        )
+    return _table(
+        "Contact optimization physical rechecks",
+        (
+            "Method",
+            "Schedule",
+            "Accepted",
+            "Success",
+            "Initial hard loss",
+            "Final hard loss",
+            "Held-out loss",
+            "Physical validity",
+            "Minimum positive impulse",
+            "Positive-impulse threshold",
+            "Max penetration",
+            "Max contact-energy gain",
+            "Pair momentum error",
+            "Pair angular-momentum error",
+            "Stick contacts",
+            "Slide contacts",
+            "Zero-limit slides",
+            "Hard evaluation forwards",
+        ),
+        rows,
+    )
+
+
+def _runtime_tables(model: ReportModel) -> str:
+    runtime = model.summary.runtime
+    fields = (
+        ("Tier", "tier", runtime.tier),
+        ("Elapsed seconds", "elapsed_seconds", runtime.elapsed_seconds),
+        ("Elapsed measurement", "elapsed_measurement", runtime.elapsed_measurement),
+        (
+            "Measurement exclusions",
+            "measurement_excludes",
+            runtime.measurement_excludes,
+        ),
+        (
+            "Measured finalization pass seconds",
+            "measured_finalization_pass_seconds",
+            runtime.measured_finalization_pass_seconds,
+        ),
+        (
+            "Measured installation pass seconds",
+            "measured_installation_pass_seconds",
+            runtime.measured_installation_pass_seconds,
+        ),
+        ("Projection model", "projection_model", runtime.projection_model),
+        (
+            "Projected report seconds",
+            "projected_report_seconds",
+            runtime.projected_report_seconds,
+        ),
+    )
+    metadata_rows = [
+        "<tr>"
+        f"{_text_cell(label)}"
+        f"{_value_cell(value, SUMMARY_FILE, '/runtime/' + field)}"
+        "</tr>"
+        for label, field, value in fields
+    ]
+    phase_rows = [
+        "<tr>"
+        f"{_text_cell(phase.replace('_', ' '))}"
+        f"{_value_cell(seconds, SUMMARY_FILE, '/runtime/phase_seconds/' + _json_pointer_part(phase))}"
+        f"{_value_cell(runtime.projection_factors[phase], SUMMARY_FILE, '/runtime/projection_factors/' + _json_pointer_part(phase))}"
+        "</tr>"
+        for phase, seconds in runtime.phase_seconds.items()
+    ]
+    return _table(
+        "Installed report runtime", ("Runtime field", "Value"), metadata_rows
+    ) + _table(
+        "Installed phase timings and projection factors",
+        ("Phase", "Measured seconds", "Projection factor"),
+        phase_rows,
+    )
+
+
 def _reproducibility(model: ReportModel) -> str:
     source = model.manifest.source
     commit = _string(source.get("commit"), name="manifest.source.commit")
@@ -2799,6 +3526,12 @@ def _token_values(model: ReportModel) -> dict[str, str]:
         "PERFORMANCE_TABLE": _performance_table(model),
         "VALIDITY_TABLE": _validity_table(model),
         "PROTOCOL_TABLES": _protocol_tables(model),
+        "REFERENCE_DECISION_TABLE": _reference_decision_table(model),
+        "PATH_CONTRACT_TABLE": _path_contract_table(model),
+        "CONTACT_OPTIMIZATION_EVIDENCE_TABLE": _contact_optimization_evidence_table(
+            model
+        ),
+        "RUNTIME_TABLES": _runtime_tables(model),
         "REPRODUCIBILITY": _reproducibility(model),
     }
     for token in FIGURE_SPECS:

@@ -100,7 +100,7 @@
     <section id="scope">
       <h2>Scope and claims</h2>
       <p>This report evaluates an opt-in Warp source transform for eligible value branches together with whole-program smoothing estimators. It separates compiler behavior, estimator targets, numerical evidence, scenario validity, recovery, and cost. The implementation remains experimental: a finite gradient is not treated as evidence of correctness, and native operations outside the analyzed source graph remain outside the transform.</p>
-      <p>The contributions are a crisp-forward or soft-forward local merge, conservative closed-graph certification, explicit partial-surrogate labeling, corrected antithetic accounting, and a multi-scenario evidence bundle with accepted references and traceable plots.</p>
+      <p>The contributions are a crisp-forward or soft-forward local merge, conservative closed-graph certification, explicit numerical-gauge and partial-surrogate labels, corrected antithetic accounting, and a multi-scenario evidence bundle with accepted references and traceable plots. A complete callable projection is reported separately from the stronger claim that every transformed site is smoothed.</p>
       {{HEADLINE_TABLE}}
       {{VALIDITY_TABLE}}
     </section>
@@ -115,10 +115,10 @@
       <div class="equation" role="math" aria-label="Soft surrogate">S<sub>τ</sub> = w<sub>τ</sub>(m)a + (1 − w<sub>τ</sub>(m))b</div>
       <div class="equation" role="math" aria-label="Straight-through construction">H<sub>ST</sub> = stopgrad(H − S) + S</div>
       <div class="equation" role="math" aria-label="Residual control-variate identity">∇E[H] = E[∇S] + E[(H−S)u / σ]</div>
-      <p>The score estimator targets the Gaussian-smoothed hard objective without differentiating the hard program. Pathwise smoothing differentiates realized paths and therefore omits true jump terms. Common-random-number finite differences approximate a finite-step target. Soft AD differentiates <var>S</var>, while the residual identity is exact only under the stated smoothing and regularity assumptions.</p>
-      <p><strong>Exactness.</strong> Score smoothing and a fully certified residual identity target ∇J<sub>H</sub>; finite differences retain step error. <strong>Bias.</strong> Pathwise AD misses jump terms, soft AD targets a different surrogate, and straight-through AD is a pseudo-gradient. <strong>Variance.</strong> Score terms can be noisy; antithetic pairs, common random numbers, and the soft control variate reduce variance without changing those target labels.</p>
+      <p>The score estimator targets the Gaussian-smoothed hard objective without differentiating the hard program. Pathwise smoothing differentiates realized paths and therefore omits true jump terms. Common-random-number finite differences approximate a finite-step target. Soft AD differentiates <var>S</var>. For the path renderer, the residual identity targets the Gaussian-smoothed, box-clipped hard render under the recorded almost-everywhere numerical-gauge assumption; that qualification is part of the target, not an implementation footnote.</p>
+      <p><strong>Exactness.</strong> Score smoothing targets ∇J<sub>H</sub>. The gauge-qualified path residual target additionally assumes that exact selected-arm Duff-chart and safety-gauge derivatives are valid almost everywhere; finite differences retain step error. <strong>Bias.</strong> Pathwise AD misses jump terms, soft AD targets a different surrogate, and straight-through AD is a pseudo-gradient. <strong>Variance.</strong> Score terms can be noisy; antithetic pairs, common random numbers, and the soft control variate reduce variance without changing those target labels.</p>
       <div class="callout"><strong>Straight-through rule.</strong> Crisp forward mode is a surrogate/pseudo-gradient, not the derivative of the hard execution. Its primal follows the exact selected arm while its adjoint follows the configured local merge.</div>
-      <p>The residual control variate combines a hard residual-score term with a soft pathwise term. Its accounting distinguishes hard forward executions from soft forward executions and records backward passes separately. A globally unbiased-target label requires a complete certificate; preserved or opaque sites force an explicit partial-surrogate label.</p>
+      <p>The residual control variate combines a hard residual-score term with a soft pathwise term. Its accounting distinguishes hard forward executions from soft forward executions and records backward passes separately. A gauge-qualified unbiased-target label requires both a complete current callable projection and its explicit regularity assumptions. Preserved or opaque physical-event sites force an explicit partial-surrogate label.</p>
       {{METHOD_TABLE}}
       {{RESIDUAL_COUNTS_TABLE}}
     </section>
@@ -145,8 +145,9 @@ def choose(x: float, width: float):
     <section id="protocol">
       <h2>Experimental protocol</h2>
       <p>All compared methods use manifest-declared devices, budgets, starts, and seed domains. Antithetic samples are adjacent positive/negative pairs, so uncertainty is computed over independent pair contributions. Common random numbers hold inner renderer or simulator randomness fixed across finite-difference sides and residual hard/soft evaluations.</p>
-      <p>Reference cells use batched five-point stencils at <var>h</var> and at a half-sized step, independent score replicates, Student-t intervals, and explicit acceptance checks. Optimization records retain held-out evaluations and parameter or physical-validity diagnostics. Performance records separate compilation from synchronized warmed execution and count conceptual forwards and backwards.</p>
+      <p>Reference cells use batched five-point stencils at <var>h</var> and at a half-sized step, independent score replicates, Student-t intervals, and explicit acceptance checks. The exact report counts were retained only after the recorded clean pilot projected the accepted workload; the decision, protocol fingerprint, counts, and rationale are immutable evidence below. Optimization records retain held-out evaluations and parameter or physical-validity diagnostics. Performance records separate compilation from synchronized warmed execution and count conceptual forwards and backwards.</p>
       {{PROTOCOL_TABLES}}
+      {{REFERENCE_DECISION_TABLE}}
       {{REFERENCE_TABLE}}
     </section>
 
@@ -159,14 +160,16 @@ def choose(x: float, width: float):
     <section id="path-tracing">
       <h2>Fixed-depth analytic-sphere path tracing</h2>
       <p>The renderer traces a fixed number of ray slots through five analytic spheres: ground, diffuse objects, a mirror, and an emitter. Static sphere and bounce loops retain unconditional work while local alive, material, throughput, direction, and radiance state carry the path. Independent target and held-out seeds separate fitting from evaluation.</p>
-      <p>Evidence includes secondary material hits, depth histograms, direct and indirect contributions, material-sequence entropy, sphere-test counts, parameter response, reference-relative gradients, and held-out recovery. Visibility remains discontinuous even though eligible local hit-selection branches have surrogate derivatives.</p>
+      <p>Evidence includes secondary material hits, depth histograms, direct and indirect contributions, material-sequence entropy, sphere-test counts, parameter response, reference-relative gradients, and held-out recovery. The certificate is complete for the recorded callable projection but the renderer is <strong>not fully smoothed</strong>: two sites use smooth merges while five Duff-chart and safety-gauge sites keep exact selected-arm derivatives. Visibility remains discontinuous, and the residual target is globally unbiased only under the explicit almost-everywhere numerical-gauge assumption shown below.</p>
+      {{PATH_CONTRACT_TABLE}}
       {{PATH_FIGURES}}
     </section>
 
     <section id="contact-3d">
       <h2>Three-dimensional impulse and friction contact</h2>
       <p>The contact scene tracks translation and angular state for several rigid spheres under gravity, static boundaries, and fixed-order sequential-impulse sweeps. Diagnostics distinguish penetration corrections from positive normal impulses, record floor and pair-contact ordering, and separate sticking from sliding under a Coulomb bound.</p>
-      <p>Validity gates cover penetration, contact-induced energy gain, pair momentum, angular momentum, mode activation, hard/diagnostic parity, and timestep refinement. Recovery accepts a candidate only when the hard objective improves and the physical checks remain satisfied.</p>
+      <p>Validity gates cover penetration, contact-induced energy gain, pair momentum, angular momentum, mode activation, hard/diagnostic parity, and timestep refinement. Final optimization acceptance is recomputed from hard held-out equality and the physical recheck. All 48 method-by-schedule records validate ordered positive-impulse and correction streams, event multiplicity, mode activation, disjoint seed domains, and exact execution work before rendering.</p>
+      {{CONTACT_OPTIMIZATION_EVIDENCE_TABLE}}
       {{CONTACT_FIGURES}}
     </section>
 
@@ -194,7 +197,7 @@ def choose(x: float, width: float):
 
     <section id="performance">
       <h2>Measured cost</h2>
-      <p>Cold compilation is isolated from warmed execution. Timed regions synchronize the selected device, and tables retain forward/backward counts beside median and interquartile wall time. Python allocation peaks, process RSS, Warp allocation availability, and device-memory availability remain distinct measurements rather than being collapsed into one memory claim.</p>
+      <p>Cold compilation is isolated from warmed execution. Timed regions synchronize the selected device, and tables retain forward/backward counts beside median and interquartile wall time. Python allocation peaks, process RSS, Warp allocation availability, and device-memory availability remain distinct measurements rather than being collapsed into one memory claim. Published end-to-end elapsed time runs through one complete descriptor-relative installation pass. The final timing-metadata rewrite and metadata-bearing reinstall with binding verification are excluded from that elapsed number and recorded explicitly below.</p>
       {{PERFORMANCE_TABLE}}
       {{PERFORMANCE_FIGURES}}
     </section>
@@ -208,12 +211,14 @@ def choose(x: float, width: float):
         <li>Straight-through gradients are pseudo-gradients and may not integrate to the crisp-forward objective.</li>
         <li>Score estimators remain noisy, while finite differences retain finite-step bias and extra executions.</li>
         <li>Fixed-loop rendering and contact cases provide controlled evidence rather than production-scale coverage.</li>
+        <li>The path certificate is complete for its current callable projection but <code>fully_smoothed=false</code>; five numerical-gauge branches rely on exact selected-arm derivatives almost everywhere.</li>
         <li>Hardware claims are restricted to devices present in the manifest and measured performance rows.</li>
       </ul>
     </section>
 
     <section id="reproducibility">
       <h2>Reproducibility and provenance</h2>
+      {{RUNTIME_TABLES}}
       {{REPRODUCIBILITY}}
     </section>
   </main>

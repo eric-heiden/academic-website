@@ -130,6 +130,128 @@ _COMMAND_PREFIXES = (
     ("uv", "run", "-m", _PROGRAM_MODULE),
     ("python", "-m", _PROGRAM_MODULE),
 )
+_REPORT_CONFIG = {
+    "width": 24,
+    "height": 16,
+    "spp": 2,
+    "bounces": 3,
+    "smoothing_samples": [8, 16, 32, 64, 128],
+    "estimator_seeds": 32,
+    "optimization_steps": 64,
+    "optimization_schedules": 16,
+    "path_reference_samples": 32768,
+    "contact_reference_samples": 65536,
+    "reference_seed_sets": 4,
+}
+_REPORT_REFERENCE_COUNT_RATIONALE = (
+    "Accepted after a clean CPU pilot projected 30,807.341991021996 seconds for the report workload; "
+    "the nominal reference counts are retained without reduction."
+)
+_REPORT_REFERENCE_COUNT_DECISION = {
+    "status": "accepted",
+    "pilot_tier": "pilot",
+    "pilot_manifest_sha256": "d6ab265c77e3f08fe759fde02bf4d07e43b8c358a4bb46024da1422ba73dd6cb",
+    "pilot_source_commit": "e25b05937fa149a341177559f2fa7f7e2ff3f651",
+    "pilot_projected_report_seconds": 30807.341991021996,
+    "decided_at_utc": "2026-06-28T14:43:54Z",
+    "protocol_fingerprint": "f44b07543db9c793cc0fd16a2fde768cc7c7589b60f9489e9f600c31d729e0e9",
+    "path_reference_samples": 32768,
+    "contact_reference_samples": 65536,
+    "reference_seed_sets": 4,
+    "rationale": _REPORT_REFERENCE_COUNT_RATIONALE,
+}
+_REPORT_RUNTIME_PHASES = (
+    "gradients_analytic",
+    "gradients_triangle_2d",
+    "gradients_collision_2d",
+    "gradients_path_tracer",
+    "gradients_contact_3d",
+    "gradients_opaque_mesh",
+    "references_triangle_2d",
+    "references_collision_2d",
+    "references_path_tracer",
+    "references_contact_3d",
+    "references_opaque_mesh",
+    "optimization_path_tracer",
+    "optimization_contact_3d",
+    "performance",
+    "serialization",
+    "assets",
+    "validation",
+    "finalization",
+    "installation",
+    "orchestration",
+)
+_PATH_CERTIFICATE_FINGERPRINT = (
+    "8f4814d92d301575e1d79caa80ddb6dcdf3a89cce666950000b5d24aa3129676"
+)
+_PATH_GAUGE_TARGET = "gaussian_smoothed_hard_with_numerical_gauge_assumption"
+_PATH_GAUGE_TARGET_LABEL = (
+    "certified residual control variate for the Gaussian-smoothed box-clipped hard render; "
+    "exact Duff and safety-gauge selected-arm derivatives hold almost everywhere"
+)
+_PATH_ONB_SEAM_SEMANTICS = (
+    "z >= 0 uses the positive Duff chart; z < 0 uses the negative Duff chart; "
+    "this numerical gauge branch is not smoothed"
+)
+_PATH_ROOT_CALLABLE_KEYS = (
+    "kernel:image_loss_384_kernel(image:array(ndim=1, dtype=vec3d),"
+    "target:array(ndim=1, dtype=vec3d),loss:array(ndim=1, dtype=float64))",
+    "kernel:path_trace_soft_3_kernel(params:array(ndim=1, dtype=float64),"
+    "random_values:array(ndim=1, dtype=float64),base_directions:array(ndim=1, dtype=vec3d),"
+    "centers:array(ndim=1, dtype=vec3d),radii:array(ndim=1, dtype=float64),"
+    "movable:array(ndim=1, dtype=float64),albedos:array(ndim=1, dtype=vec3d),"
+    "emissions:array(ndim=1, dtype=vec3d),mirrors:array(ndim=1, dtype=float64),"
+    "terminals:array(ndim=1, dtype=float64),material_ids:array(ndim=1, dtype=float64),"
+    "width:int32,height:int32,samples_per_pixel:int32,random_stride:int32,gate_width:float64,"
+    "radiance:array(ndim=1, dtype=vec3d),direct:array(ndim=1, dtype=vec3d),"
+    "indirect:array(ndim=1, dtype=vec3d),depths:array(ndim=1, dtype=float64),"
+    "sequences:array(ndim=1, dtype=float64))",
+    "kernel:reduce_paths_2_kernel(path_radiance:array(ndim=1, dtype=vec3d),"
+    "path_direct:array(ndim=1, dtype=vec3d),path_indirect:array(ndim=1, dtype=vec3d),"
+    "image:array(ndim=1, dtype=vec3d),direct_image:array(ndim=1, dtype=vec3d),"
+    "indirect_image:array(ndim=1, dtype=vec3d))",
+)
+_PATH_CALLABLE_KEYS = (
+    "function:_clip_path_parameters(params:vec3d,return:vec3d)",
+    "function:_clip_scalar_exact(value:float64,lower:float64,upper:float64,return:float64)",
+    "function:_cosine_hemisphere_from_basis(normal:vec3d,tangent:vec3d,bitangent:vec3d,"
+    "random_u1:float64,random_u2:float64,return:vec3d)",
+    "function:_duff_chart_sign(normal_z:float64,return:float64)",
+    "function:_duff_frisvad_basis(normal:vec3d)",
+    "function:_event_scalar_soft(exact_measure:float64,smooth_margin:float64,current:float64,"
+    "candidate:float64,gate_width:float64,return:float64)",
+    "function:_event_vector_soft(exact_measure:float64,smooth_margin:float64,current:vec3d,"
+    "candidate:vec3d,gate_width:float64,return:vec3d)",
+    "function:_finish_bounce(origin_alive:vec4d,direction_depth:vec4d,throughput_first:vec4d,"
+    "radiance:vec3d,direct_radiance:vec3d,indirect_radiance:vec3d,sequence:float64,"
+    "best_distance:float64,hit:float64,hit_normal:vec3d,albedo:vec3d,emission:vec3d,"
+    "mirror:float64,terminal:float64,material_id:float64,diffuse_direction:vec3d)",
+    "function:_initial_path_state(params:vec3d,base_direction:vec3d)",
+    "function:_least_aligned_basis_soft(normal:vec3d,gate_width:float64)",
+    "function:_minimum_soft(first:float64,second:float64,gate_width:float64,return:float64)",
+    "function:_multiply_vector(first:vec3d,second:vec3d,return:vec3d)",
+    "function:_numeric_abs(value:float64,return:float64)",
+    "function:_numeric_max(first:float64,second:float64,return:float64)",
+    "function:_safe_normalize(value:vec3d,return:vec3d)",
+    "function:_sphere_candidate_distance_soft(half_b:float64,square_root:float64,"
+    "gate_width:float64,return:float64)",
+    "function:_store_path(path_index:int32,radiance_value:vec3d,direct_value:vec3d,"
+    "indirect_value:vec3d,depth_value:float64,sequence_value:float64,"
+    "radiance:array(ndim=1, dtype=vec3d),direct:array(ndim=1, dtype=vec3d),"
+    "indirect:array(ndim=1, dtype=vec3d),depths:array(ndim=1, dtype=float64),"
+    "sequences:array(ndim=1, dtype=float64))",
+    "function:_total_nonnegative(value:float64,return:float64)",
+    "function:_trace_bounce_soft(origin_alive:vec4d,direction_depth:vec4d,"
+    "throughput_first:vec4d,radiance:vec3d,direct_radiance:vec3d,indirect_radiance:vec3d,"
+    "sequence:float64,params:vec3d,random_u1:float64,random_u2:float64,"
+    "centers:array(ndim=1, dtype=vec3d),radii:array(ndim=1, dtype=float64),"
+    "movable:array(ndim=1, dtype=float64),albedos:array(ndim=1, dtype=vec3d),"
+    "emissions:array(ndim=1, dtype=vec3d),mirrors:array(ndim=1, dtype=float64),"
+    "terminals:array(ndim=1, dtype=float64),material_ids:array(ndim=1, dtype=float64),"
+    "gate_width:float64)",
+    *_PATH_ROOT_CALLABLE_KEYS,
+)
 
 
 def _css_has_external_or_active_content(value: str) -> bool:
@@ -327,6 +449,1113 @@ def _finite_vector(value: Any, *, name: str, nonnegative: bool = False) -> list[
         _finite_number(item, name=f"{name}[{index}]", nonnegative=nonnegative)
         for index, item in enumerate(value)
     ]
+
+
+def _json_type_strict_equal(actual: Any, expected: Any) -> bool:
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return set(actual) == set(expected) and all(
+            _json_type_strict_equal(actual[key], expected[key]) for key in expected
+        )
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _json_type_strict_equal(actual_item, expected_item)
+            for actual_item, expected_item in zip(actual, expected, strict=True)
+        )
+    return bool(actual == expected)
+
+
+def _validate_report_config_and_decision(manifest: dict[str, Any]) -> dict[str, Any]:
+    config = manifest.get("config")
+    if not _json_type_strict_equal(config, _REPORT_CONFIG):
+        raise ValidationError(
+            "report config and sample counts must exactly match the pilot-approved "
+            "protocol fingerprint"
+        )
+    decision = manifest.get("report_reference_count_decision")
+    if not _json_type_strict_equal(decision, _REPORT_REFERENCE_COUNT_DECISION):
+        raise ValidationError(
+            "report reference-count decision must exactly match the accepted pilot evidence and protocol fingerprint"
+        )
+    return config
+
+
+def _validate_installed_runtime(runtime: Any) -> None:
+    required_keys = {
+        "tier",
+        "elapsed_seconds",
+        "elapsed_measurement",
+        "measurement_excludes",
+        "measured_finalization_pass_seconds",
+        "measured_installation_pass_seconds",
+        "phase_seconds",
+        "projection_factors",
+        "projection_model",
+        "projected_report_seconds",
+    }
+    if not isinstance(runtime, dict) or set(runtime) != required_keys:
+        raise ValidationError(
+            "summary runtime must publish the exact installed-measurement schema"
+        )
+    expected_exclusions = [
+        "final_install_timing_metadata_rewrite",
+        "final_metadata_bearing_reinstall_and_binding_verification",
+    ]
+    if (
+        runtime.get("tier") != "report"
+        or runtime.get("elapsed_measurement")
+        != "through_one_complete_descriptor_relative_install_pass"
+        or runtime.get("measurement_excludes") != expected_exclusions
+        or runtime.get("projection_model")
+        != "measured_phase_times_scaled_by_exact_report_workload_ratios"
+    ):
+        raise ValidationError(
+            "summary runtime does not describe the canonical installed measurement"
+        )
+    phases = runtime.get("phase_seconds")
+    factors = runtime.get("projection_factors")
+    if (
+        not isinstance(phases, dict)
+        or set(phases) != set(_REPORT_RUNTIME_PHASES)
+        or not isinstance(factors, dict)
+        or set(factors) != set(_REPORT_RUNTIME_PHASES)
+    ):
+        raise ValidationError(
+            "summary runtime phase or projection coverage is incomplete"
+        )
+    for name in _REPORT_RUNTIME_PHASES:
+        if (
+            type(phases[name]) is not float
+            or not math.isfinite(phases[name])
+            or phases[name] < 0.0
+        ):
+            raise ValidationError(
+                f"summary runtime phase {name!r} must be a finite nonnegative float"
+            )
+        if type(factors[name]) is not float or factors[name] != 1.0:
+            raise ValidationError(
+                f"summary runtime report projection factor {name!r} must be 1.0"
+            )
+    numeric_fields = (
+        "elapsed_seconds",
+        "measured_finalization_pass_seconds",
+        "measured_installation_pass_seconds",
+        "projected_report_seconds",
+    )
+    if any(
+        type(runtime.get(name)) is not float or not math.isfinite(runtime[name])
+        for name in numeric_fields
+    ):
+        raise ValidationError("summary runtime durations must be finite floats")
+    finalization = runtime["measured_finalization_pass_seconds"]
+    installation = runtime["measured_installation_pass_seconds"]
+    if (
+        runtime["elapsed_seconds"] <= 0.0
+        or finalization <= 0.0
+        or installation <= 0.0
+        or finalization != phases["finalization"]
+        or installation != phases["installation"]
+    ):
+        raise ValidationError(
+            "summary runtime finalization or installation measurement is inconsistent"
+        )
+    projected = sum(phases[name] * factors[name] for name in _REPORT_RUNTIME_PHASES)
+    tolerance = 1.0e-12 * max(1.0, abs(projected), abs(runtime["elapsed_seconds"]))
+    if (
+        abs(runtime["projected_report_seconds"] - projected) > tolerance
+        or abs(runtime["elapsed_seconds"] - projected) > tolerance
+    ):
+        raise ValidationError(
+            "summary runtime projected and elapsed durations do not recompute from phases"
+        )
+
+
+def _expected_path_certificate() -> dict[str, Any]:
+    return {
+        "complete": True,
+        "transformed_sites": 7,
+        "smoothed_sites": 2,
+        "numerical_gauge_sites": 5,
+        "fully_smoothed": False,
+        "fingerprint": _PATH_CERTIFICATE_FINGERPRINT,
+        "root_callable_keys": list(_PATH_ROOT_CALLABLE_KEYS),
+        "callable_keys": list(_PATH_CALLABLE_KEYS),
+    }
+
+
+def _validate_path_numerical_gauge_contract(
+    method_rows: list[dict[str, Any]],
+    path_rows: list[dict[str, Any]],
+    *,
+    source_commit: str,
+    device: str,
+) -> None:
+    protocols = [
+        row for row in path_rows if row.get("scenario") == "path_randomness_protocol"
+    ]
+    if len(protocols) != 1:
+        raise ValidationError(
+            "path numerical-gauge protocol row is missing or duplicated"
+        )
+    protocol = protocols[0]
+    expected_seed_tables = {
+        "training": list(range(1000, 1032)),
+        "target": list(range(2000, 2016)),
+        "held_out": list(range(3000, 3016)),
+        "reference_base": 4000,
+        "reference_inner_base": 4001,
+    }
+    if (
+        protocol.get("accepted") is not True
+        or protocol.get("source_commit") != source_commit
+        or protocol.get("device") != device
+        or not _json_type_strict_equal(
+            protocol.get("seed_tables"), expected_seed_tables
+        )
+        or protocol.get("estimator_outer_seeds") != list(range(10000, 10032))
+        or protocol.get("reference_protocol")
+        != {
+            "inputs": {"reference_base": 4000, "reference_inner_base": 4001},
+            "realized_streams_location": "data/raw/references.json:seeds",
+        }
+        or protocol.get("render_work")
+        != {"paths_per_forward": 768, "sphere_tests_per_forward": 11520}
+    ):
+        raise ValidationError(
+            "path randomness protocol is not canonical or source-bound"
+        )
+    if not _json_type_strict_equal(
+        protocol.get("certificate"), _expected_path_certificate()
+    ):
+        raise ValidationError(
+            "path numerical-gauge certificate projection or fingerprint is not exact"
+        )
+    control = protocol.get("control_variate")
+    expected_control = {
+        "unbiased_target": True,
+        "target": _PATH_GAUGE_TARGET,
+        "certificate_fingerprint": _PATH_CERTIFICATE_FINGERPRINT,
+        "hard_forward_executions": 8,
+        "soft_forward_executions": 8,
+        "numerical_gauge_assumption": True,
+        "numerical_gauge_sites": 5,
+    }
+    if not _json_type_strict_equal(control, expected_control):
+        raise ValidationError(
+            "path numerical-gauge control protocol is not exact or certificate-bound"
+        )
+
+    residual_count = 0
+    expected_lower = [-0.8, -0.5, -0.9]
+    expected_upper = [0.8, 0.5, 0.3]
+    for row in method_rows:
+        if row.get("scenario_family") != "path_tracer":
+            if row.get("target") == _PATH_GAUGE_TARGET:
+                raise ValidationError(
+                    "only path residual rows may claim the numerical-gauge target"
+                )
+            if (
+                row.get("numerical_gauge_assumption", False) is not False
+                or row.get("numerical_gauge_sites", 0) != 0
+            ):
+                raise ValidationError(
+                    "nonpath rows must not claim a numerical-gauge assumption"
+                )
+            continue
+        config = row.get("config")
+        if (
+            not isinstance(config, dict)
+            or config.get("numerical_gauge_policy")
+            != "exact_selected_arm_derivative_almost_everywhere"
+            or config.get("numerical_gauge_sites") != 5
+            or config.get("parameter_extension")
+            != "componentwise_box_clip_before_geometry"
+            or not _json_type_strict_equal(
+                config.get("parameter_lower"), expected_lower
+            )
+            or not _json_type_strict_equal(
+                config.get("parameter_upper"), expected_upper
+            )
+            or config.get("onb_seam_semantics") != _PATH_ONB_SEAM_SEMANTICS
+        ):
+            raise ValidationError(
+                "path method row has an incomplete numerical-gauge configuration"
+            )
+        if row.get("method") == "residual_control_variate":
+            residual_count += 1
+            if (
+                row.get("target") != _PATH_GAUGE_TARGET
+                or row.get("target_label") != _PATH_GAUGE_TARGET_LABEL
+                or row.get("unbiased_target") is not True
+                or row.get("certificate_fingerprint") != _PATH_CERTIFICATE_FINGERPRINT
+                or row.get("numerical_gauge_assumption") is not True
+                or row.get("numerical_gauge_sites") != 5
+            ):
+                raise ValidationError(
+                    "path residual target is not gauge-qualified and certificate-bound"
+                )
+        elif (
+            row.get("numerical_gauge_assumption") is not False
+            or row.get("numerical_gauge_sites") != 0
+        ):
+            raise ValidationError(
+                "nonresidual path rows must not claim a numerical-gauge estimator assumption"
+            )
+    if residual_count == 0:
+        raise ValidationError(
+            "path numerical-gauge protocol requires residual-control-variate rows"
+        )
+
+
+def _validate_path_gradient_contract(path_rows: list[dict[str, Any]]) -> None:
+    method_specs = {
+        "crisp_ad": (
+            (1,),
+            False,
+            None,
+            "hard_program",
+            "local derivative of the box-clipped hard-render execution path",
+            True,
+        ),
+        "crisp_fd": (
+            (1,),
+            False,
+            0.01,
+            "hard_program_central_difference",
+            "central finite difference of the box-clipped hard render",
+            True,
+        ),
+        "smoothed_pathwise": (
+            (8, 16, 32, 64, 128),
+            True,
+            None,
+            "gaussian_smoothed_hard",
+            "pathwise samples of the box-clipped hard render; visibility-boundary terms are omitted",
+            False,
+        ),
+        "score": (
+            (8, 16, 32, 64, 128),
+            True,
+            None,
+            "gaussian_smoothed_hard",
+            "unbiased Gaussian score estimator of the box-clipped hard render",
+            True,
+        ),
+        "smoothed_crn_fd": (
+            (8, 16, 32, 64, 128),
+            True,
+            0.01,
+            "gaussian_smoothed_hard_finite_epsilon",
+            "CRN central difference of the Gaussian-smoothed box-clipped hard render",
+            True,
+        ),
+        "soft_ad": (
+            (1,),
+            False,
+            None,
+            "local_soft_surrogate",
+            "AD of the source-smoothed box-clipped path-tracing surrogate",
+            True,
+        ),
+        "straight_through_ad": (
+            (1,),
+            False,
+            None,
+            "hard_primal_local_soft_pseudogradient",
+            "box-clipped hard rendered primal with a source-smoothed pseudo-gradient",
+            None,
+        ),
+        "residual_control_variate": (
+            (8, 16, 32, 64, 128),
+            True,
+            None,
+            _PATH_GAUGE_TARGET,
+            _PATH_GAUGE_TARGET_LABEL,
+            True,
+        ),
+    }
+    method_rows = [
+        row
+        for row in path_rows
+        if row.get("scenario_family") == "path_tracer" and "gradient" in row
+    ]
+    expected_identities = {
+        (method, samples, 10000 + seed, 1000 + seed)
+        for method, (sample_counts, *_rest) in method_specs.items()
+        for samples in sample_counts
+        for seed in range(32)
+    }
+    identities = [
+        (
+            row.get("method"),
+            row.get("samples"),
+            row.get("outer_seed"),
+            row.get("inner_seed"),
+        )
+        for row in method_rows
+    ]
+    if (
+        len(method_rows) != 768
+        or len(set(identities)) != 768
+        or set(identities) != expected_identities
+    ):
+        raise ValidationError(
+            "path gradient rows do not provide exact deterministic and stochastic "
+            "coverage; each stratum requires exactly 32 rows with distinct outer "
+            "seeds and canonical outer_seed values"
+        )
+
+    digest_by_inner_seed: dict[int, str] = {}
+    for row in method_rows:
+        row_id = row.get("row_id", "path gradient row")
+        method = row.get("method")
+        sample_counts, antithetic, epsilon, target, target_label, unbiased = (
+            method_specs[method]
+        )
+        inner_seed = row.get("inner_seed")
+        config = row.get("config")
+        if (
+            isinstance(inner_seed, bool)
+            or not isinstance(inner_seed, int)
+            or inner_seed < 0
+            or not isinstance(config, dict)
+        ):
+            raise ValidationError(
+                f"{row_id} cannot establish the path inner_seed digest mapping"
+            )
+        digest = config.get("inner_random_digest")
+        if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+            raise ValidationError(f"{row_id} has an invalid inner-random digest")
+        expected_config = {
+            "bounces": 3,
+            "epsilon": epsilon,
+            "gate_family": "gaussian",
+            "gate_width": 0.05,
+            "height": 16,
+            "inner_random_digest": digest,
+            "outer_parameter_sigma": 0.03,
+            "numerical_gauge_policy": (
+                "exact_selected_arm_derivative_almost_everywhere"
+            ),
+            "numerical_gauge_sites": 5,
+            "onb_seam_semantics": _PATH_ONB_SEAM_SEMANTICS,
+            "parameter_extension": "componentwise_box_clip_before_geometry",
+            "parameter_lower": [-0.8, -0.5, -0.9],
+            "parameter_upper": [0.8, 0.5, 0.3],
+            "paths_per_forward": 768,
+            "pixels": 384,
+            "samples_per_pixel": 2,
+            "sphere_tests_per_forward": 11520,
+            "target_seed": 2000,
+            "width": 24,
+            "workload_policy": "fixed_stochastic_sample_count_not_equal_execution",
+        }
+        if (
+            row.get("samples") not in sample_counts
+            or row.get("antithetic") is not antithetic
+            or row.get("target") != target
+            or row.get("target_label") != target_label
+            or row.get("unbiased_target") is not unbiased
+            or not _json_type_strict_equal(config, expected_config)
+        ):
+            raise ValidationError(
+                f"path gradient method/config contract is not exact for {row_id}"
+            )
+        previous = digest_by_inner_seed.setdefault(inner_seed, digest)
+        if digest != previous:
+            raise ValidationError(
+                "path inner_seed maps to inconsistent inner-random digests across "
+                "methods or sample counts"
+            )
+    if set(digest_by_inner_seed) != set(range(1000, 1032)):
+        raise ValidationError(
+            "path inner_seed digest mapping does not cover the canonical 32 seeds"
+        )
+
+
+def _path_optimization_float(value: Any, *, name: str) -> float:
+    if type(value) is not float or not math.isfinite(value):
+        raise ValidationError(f"path optimization {name} must be a finite float")
+    return value
+
+
+def _path_optimization_history(
+    value: Any,
+    *,
+    name: str,
+    length: int,
+    dimension: int | None = None,
+) -> list[Any]:
+    if not isinstance(value, list) or len(value) != length:
+        raise ValidationError(
+            f"path optimization {name} must contain exactly {length} records"
+        )
+    if dimension is None:
+        for index, item in enumerate(value):
+            _path_optimization_float(item, name=f"{name}[{index}]")
+        return value
+    for index, item in enumerate(value):
+        if not isinstance(item, list) or len(item) != dimension:
+            raise ValidationError(
+                f"path optimization {name}[{index}] must be a {dimension}-vector"
+            )
+        for component, scalar in enumerate(item):
+            _path_optimization_float(scalar, name=f"{name}[{index}][{component}]")
+    return value
+
+
+def _validate_path_optimization_contract(
+    rows: list[dict[str, Any]],
+    summary: dict[str, Any],
+    *,
+    source_commit: str,
+    device: str,
+) -> None:
+    methods = (
+        "crisp_ad",
+        "soft_ad",
+        "straight_through_ad",
+        "residual_control_variate",
+    )
+    expected_identities = {
+        (method, schedule) for schedule in range(16) for method in methods
+    }
+    identities = [(row.get("method"), row.get("schedule_id")) for row in rows]
+    if (
+        len(rows) != 64
+        or len(set(identities)) != 64
+        or set(identities) != expected_identities
+    ):
+        raise ValidationError(
+            "path optimization requires exactly 64 unique method/schedule identities"
+        )
+
+    required_keys = {
+        "row_id",
+        "scenario_family",
+        "scenario",
+        "method",
+        "schedule_id",
+        "initial_hard_loss",
+        "final_hard_loss",
+        "held_out_loss",
+        "success",
+        "accepted",
+        "source_commit",
+        "device",
+        "losses",
+        "parameters",
+        "gradients",
+        "final_parameter_error",
+        "estimator_seeds",
+        "target_seed",
+        "held_out_seed",
+        "deterministic_final_recheck",
+        "final_recheck_seed",
+        "final_recheck_protocol",
+        "held_out_render_evaluations",
+        "held_out_render_work",
+        "objective_extension",
+        "numerical_gauge_policy",
+        "box_constraints",
+    }
+    expected_render_work = {
+        "cached_target_renders": 1,
+        "shared_initial_candidate_renders": 1,
+        "optimization_candidate_renders": 256,
+        "deterministic_final_recheck_renders": 4,
+        "total_candidate_renders": 261,
+        "total_renders": 262,
+    }
+    expected_box = {"lower": [-0.8, -0.5, -0.9], "upper": [0.8, 0.5, 0.3]}
+    for row in rows:
+        row_id = row.get("row_id")
+        schedule = row.get("schedule_id")
+        if set(row) != required_keys:
+            raise ValidationError(
+                f"path optimization row {row_id!r} does not have the exact producer schema"
+            )
+        if (
+            not isinstance(row_id, str)
+            or not row_id
+            or type(schedule) is not int
+            or row.get("scenario_family") != "path_tracer"
+            or row.get("scenario") != "analytic_five_sphere"
+            or row.get("source_commit") != source_commit
+            or row.get("device") != device
+        ):
+            raise ValidationError(
+                f"path optimization row {row_id!r} is not scenario/source/device bound"
+            )
+        initial = _path_optimization_float(
+            row.get("initial_hard_loss"), name=f"{row_id}.initial_hard_loss"
+        )
+        final = _path_optimization_float(
+            row.get("final_hard_loss"), name=f"{row_id}.final_hard_loss"
+        )
+        held_out = _path_optimization_float(
+            row.get("held_out_loss"), name=f"{row_id}.held_out_loss"
+        )
+        recheck = _path_optimization_float(
+            row.get("deterministic_final_recheck"),
+            name=f"{row_id}.deterministic_final_recheck",
+        )
+        losses = _path_optimization_history(
+            row.get("losses"), name=f"{row_id}.losses", length=65
+        )
+        parameters = _path_optimization_history(
+            row.get("parameters"),
+            name=f"{row_id}.parameters",
+            length=65,
+            dimension=3,
+        )
+        _path_optimization_history(
+            row.get("gradients"),
+            name=f"{row_id}.gradients",
+            length=64,
+            dimension=3,
+        )
+        parameter_error = _path_optimization_float(
+            row.get("final_parameter_error"),
+            name=f"{row_id}.final_parameter_error",
+        )
+        if parameter_error < 0.0:
+            raise ValidationError(
+                f"path optimization {row_id}.final_parameter_error must be nonnegative"
+            )
+        expected_seeds = list(range(12000 + 100 * schedule, 12064 + 100 * schedule))
+        if row.get("estimator_seeds") != expected_seeds:
+            raise ValidationError(
+                f"path optimization {row_id} estimator seed schedule is not canonical"
+            )
+        if any(
+            parameter[component] < expected_box["lower"][component]
+            or parameter[component] > expected_box["upper"][component]
+            for parameter in parameters
+            for component in range(3)
+        ):
+            raise ValidationError(
+                f"path optimization {row_id} parameter history leaves the box"
+            )
+        accepted = (
+            final == held_out == recheck
+            and row.get("target_seed") == 2000 + schedule
+            and row.get("held_out_seed") == 3000 + schedule
+            and row.get("final_recheck_seed") == 3000 + schedule
+            and row.get("final_recheck_protocol")
+            == "same_seed_integrity_check_against_cached_immutable_target"
+        )
+        success = accepted and final < initial
+        if (
+            row.get("accepted") is not accepted
+            or accepted is not True
+            or row.get("success") is not success
+            or losses[0] != initial
+            or losses[-1] != final
+        ):
+            raise ValidationError(
+                f"path optimization {row_id} acceptance, success, or loss history does not recompute"
+            )
+        if (
+            row.get("held_out_render_evaluations") != 66
+            or not _json_type_strict_equal(
+                row.get("held_out_render_work"), expected_render_work
+            )
+            or row.get("objective_extension")
+            != "componentwise_box_clip_before_geometry"
+            or row.get("numerical_gauge_policy")
+            != "exact_selected_arm_derivative_almost_everywhere"
+            or not _json_type_strict_equal(row.get("box_constraints"), expected_box)
+        ):
+            raise ValidationError(
+                f"path optimization {row_id} render work, box, or gauge protocol is not exact"
+            )
+
+    declared = [
+        record
+        for record in summary.get("optimization_summaries", [])
+        if isinstance(record, dict) and record.get("scenario") == "path_tracer"
+    ]
+    if len(declared) != len(methods):
+        raise ValidationError(
+            "path optimization_summaries must cover exactly four recovery methods"
+        )
+    for method in methods:
+        selected = [row for row in rows if row["method"] == method]
+        actual = [record for record in declared if record.get("method") == method]
+        if len(actual) != 1:
+            raise ValidationError(
+                "path optimization_summaries method identity is missing or duplicated"
+            )
+        final_values = [row["final_hard_loss"] for row in selected]
+        held_values = [row["held_out_loss"] for row in selected]
+        expected = {
+            "scenario": "path_tracer",
+            "method": method,
+            "final_hard_loss_mean": sum(final_values) / len(final_values),
+            "final_hard_loss_ci_low": _linear_quantile(final_values, 0.025),
+            "final_hard_loss_ci_high": _linear_quantile(final_values, 0.975),
+            "success_rate": sum(row["success"] for row in selected) / len(selected),
+            "held_out_loss_mean": sum(held_values) / len(held_values),
+            "source_row_ids": [row["row_id"] for row in selected],
+        }
+        if not _json_type_strict_equal(actual[0], expected):
+            raise ValidationError(
+                f"path optimization_summaries aggregate for {method} is not exact"
+            )
+
+
+_CONTACT_METHODS = ("soft_ad", "straight_through_ad", "residual_control_variate")
+_CONTACT_EVENT_LABELS = (
+    "pair_01",
+    "pair_02",
+    "pair_12",
+    "floor_0",
+    "floor_1",
+    "floor_2",
+    "ramp_0",
+    "ramp_1",
+    "ramp_2",
+)
+
+
+def _contact_event_sequences(value: Any, *, name: str) -> list[list[list[str]]]:
+    if not isinstance(value, list) or len(value) != 180:
+        raise ValidationError(f"contact {name} event evidence must contain 180 steps")
+    normalized = []
+    for step in value:
+        if not isinstance(step, list) or len(step) != 4:
+            raise ValidationError(
+                f"contact {name} event evidence must contain four sweeps per step"
+            )
+        normalized_step = []
+        for sweep in step:
+            if (
+                not isinstance(sweep, list)
+                or any(
+                    not isinstance(event, str) or event not in _CONTACT_EVENT_LABELS
+                    for event in sweep
+                )
+                or len(sweep) != len(set(sweep))
+            ):
+                raise ValidationError(f"contact {name} event multiplicity is invalid")
+            positions = [_CONTACT_EVENT_LABELS.index(event) for event in sweep]
+            if positions != sorted(positions):
+                raise ValidationError(
+                    f"contact {name} events violate canonical solver order"
+                )
+            normalized_step.append(list(sweep))
+        normalized.append(normalized_step)
+    return normalized
+
+
+def _contact_event_counts(sequences: list[list[list[str]]]) -> dict[str, int]:
+    return {
+        label: sum(
+            event == label for step in sequences for sweep in step for event in sweep
+        )
+        for label in _CONTACT_EVENT_LABELS
+    }
+
+
+def _validate_contact_physical_validity(value: Any) -> bool:
+    expected_keys = {
+        "valid",
+        "checks",
+        "pair_contact_counts",
+        "static_contact_counts",
+        "pair_correction_counts",
+        "static_correction_counts",
+        "positive_impulse_event_types_by_step_and_sweep",
+        "correction_event_types_by_step_and_sweep",
+        "canonical_solver_event_order",
+        "event_sequence_semantics",
+        "stick_contacts",
+        "slide_contacts",
+        "zero_limit_slide_contacts",
+        "body_steps",
+        "contact_sweeps",
+        "pair_solver_calls",
+        "static_solver_calls",
+        "minimum_positive_normal_impulse",
+        "positive_impulse_threshold",
+        "max_penetration",
+        "max_contact_energy_gain",
+        "max_pair_momentum_error",
+        "max_pair_angular_momentum_error",
+        "thresholds",
+    }
+    check_keys = {
+        "pair_01_contact",
+        "pair_12_contact",
+        "ordered_pair_01_then_pair_12",
+        "floor_contact",
+        "ramp_contact",
+        "stick_mode",
+        "slide_mode",
+        "no_zero_limit_slide",
+        "penetration_bounded",
+        "contact_energy_bounded",
+        "pair_momentum_conserved",
+        "pair_angular_momentum_conserved",
+        "meaningful_positive_impulse",
+    }
+    thresholds = {
+        "max_penetration": 0.03,
+        "max_contact_energy_gain": 0.02,
+        "max_pair_momentum_error": 1.0e-5,
+        "max_pair_angular_momentum_error": 1.0e-5,
+    }
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        raise ValidationError(
+            "contact optimization physical-validity schema is not canonical"
+        )
+    checks = value.get("checks")
+    if (
+        not isinstance(checks, dict)
+        or set(checks) != check_keys
+        or any(type(flag) is not bool for flag in checks.values())
+        or not _json_type_strict_equal(value.get("thresholds"), thresholds)
+    ):
+        raise ValidationError(
+            "contact optimization physical thresholds or checks are invalid"
+        )
+    count_schemas = {
+        "pair_contact_counts": {"0-1", "0-2", "1-2"},
+        "pair_correction_counts": {"0-1", "0-2", "1-2"},
+        "static_contact_counts": {"floor", "ramp"},
+        "static_correction_counts": {"floor", "ramp"},
+    }
+    for field, keys in count_schemas.items():
+        counts = value.get(field)
+        if (
+            not isinstance(counts, dict)
+            or set(counts) != keys
+            or any(type(count) is not int or count < 0 for count in counts.values())
+        ):
+            raise ValidationError(f"contact optimization {field} is invalid")
+    for field in ("stick_contacts", "slide_contacts", "zero_limit_slide_contacts"):
+        if type(value.get(field)) is not int or value[field] < 0:
+            raise ValidationError(
+                f"contact optimization {field} must be a nonnegative integer"
+            )
+    for field in (
+        "minimum_positive_normal_impulse",
+        "positive_impulse_threshold",
+        "max_penetration",
+        "max_contact_energy_gain",
+        "max_pair_momentum_error",
+        "max_pair_angular_momentum_error",
+    ):
+        if (
+            type(value.get(field)) is not float
+            or not math.isfinite(value[field])
+            or value[field] < 0.0
+        ):
+            raise ValidationError(
+                f"contact optimization {field} must be a finite nonnegative float"
+            )
+
+    positive = _contact_event_sequences(
+        value.get("positive_impulse_event_types_by_step_and_sweep"),
+        name="positive-impulse",
+    )
+    corrections = _contact_event_sequences(
+        value.get("correction_event_types_by_step_and_sweep"),
+        name="correction",
+    )
+    if any(
+        not set(positive_sweep) <= set(correction_sweep)
+        for positive_step, correction_step in zip(positive, corrections, strict=True)
+        for positive_sweep, correction_sweep in zip(
+            positive_step, correction_step, strict=True
+        )
+    ):
+        raise ValidationError(
+            "contact positive events must be a per-sweep subset of correction events"
+        )
+    positive_counts = _contact_event_counts(positive)
+    correction_counts = _contact_event_counts(corrections)
+    expected_counts = {
+        "pair_contact_counts": {
+            "0-1": positive_counts["pair_01"],
+            "0-2": positive_counts["pair_02"],
+            "1-2": positive_counts["pair_12"],
+        },
+        "static_contact_counts": {
+            "floor": sum(positive_counts[f"floor_{body}"] for body in range(3)),
+            "ramp": sum(positive_counts[f"ramp_{body}"] for body in range(3)),
+        },
+        "pair_correction_counts": {
+            "0-1": correction_counts["pair_01"],
+            "0-2": correction_counts["pair_02"],
+            "1-2": correction_counts["pair_12"],
+        },
+        "static_correction_counts": {
+            "floor": sum(correction_counts[f"floor_{body}"] for body in range(3)),
+            "ramp": sum(correction_counts[f"ramp_{body}"] for body in range(3)),
+        },
+    }
+    if any(
+        not _json_type_strict_equal(value.get(field), counts)
+        for field, counts in expected_counts.items()
+    ):
+        raise ValidationError(
+            "contact event multiplicity disagrees with aggregate counts"
+        )
+    ordered = [event for step in positive for sweep in step for event in sweep]
+    first = [index for index, event in enumerate(ordered) if event == "pair_01"]
+    second = [index for index, event in enumerate(ordered) if event == "pair_12"]
+    ordered_transfer = bool(first and second and first[-1] < second[0])
+    total_positive = sum(positive_counts.values())
+    if (
+        value.get("canonical_solver_event_order") != list(_CONTACT_EVENT_LABELS)
+        or value.get("event_sequence_semantics")
+        != "ordered_per_step_per_sweep_solver_call_events_with_multiplicity"
+        or value.get("body_steps") != 540
+        or value.get("contact_sweeps") != 720
+        or value.get("pair_solver_calls") != 2160
+        or value.get("static_solver_calls") != 4320
+        or value.get("positive_impulse_threshold") != 1.0e-8
+        or value["stick_contacts"] + value["slide_contacts"] != total_positive
+    ):
+        raise ValidationError(
+            "contact optimization event work or semantics are inconsistent"
+        )
+    expected_checks = {
+        "pair_01_contact": value["pair_contact_counts"]["0-1"] > 0,
+        "pair_12_contact": value["pair_contact_counts"]["1-2"] > 0,
+        "ordered_pair_01_then_pair_12": ordered_transfer,
+        "floor_contact": value["static_contact_counts"]["floor"] > 0,
+        "ramp_contact": value["static_contact_counts"]["ramp"] > 0,
+        "stick_mode": value["stick_contacts"] > 0,
+        "slide_mode": value["slide_contacts"] > 0,
+        "no_zero_limit_slide": value["zero_limit_slide_contacts"] == 0,
+        "penetration_bounded": value["max_penetration"] < thresholds["max_penetration"],
+        "contact_energy_bounded": value["max_contact_energy_gain"]
+        < thresholds["max_contact_energy_gain"],
+        "pair_momentum_conserved": value["max_pair_momentum_error"]
+        < thresholds["max_pair_momentum_error"],
+        "pair_angular_momentum_conserved": (
+            value["max_pair_angular_momentum_error"]
+            < thresholds["max_pair_angular_momentum_error"]
+        ),
+        "meaningful_positive_impulse": (
+            total_positive > 0
+            and value["minimum_positive_normal_impulse"]
+            >= value["positive_impulse_threshold"]
+        ),
+    }
+    valid = all(expected_checks.values())
+    if (
+        not _json_type_strict_equal(checks, expected_checks)
+        or value.get("valid") is not valid
+    ):
+        raise ValidationError(
+            "contact optimization event order or physical checks do not recompute"
+        )
+    return valid
+
+
+def _linear_quantile(values: list[float], quantile: float) -> float:
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * quantile
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    weight = position - lower
+    return (1.0 - weight) * ordered[lower] + weight * ordered[upper]
+
+
+def _validate_contact_optimization_contract(
+    rows: list[dict[str, Any]],
+    summary: dict[str, Any],
+    *,
+    source_commit: str,
+    device: str,
+) -> None:
+    expected_identities = {
+        (method, schedule) for schedule in range(16) for method in _CONTACT_METHODS
+    }
+    identities = [(row.get("method"), row.get("schedule_id")) for row in rows]
+    if (
+        len(rows) != 48
+        or len(set(identities)) != 48
+        or set(identities) != expected_identities
+    ):
+        raise ValidationError(
+            "contact optimization method/schedule identities are incomplete or duplicated"
+        )
+    expected_hard_work = {
+        "initial_forward_executions": 1,
+        "line_search_batches": 64,
+        "line_search_candidates_per_batch": 6,
+        "line_search_forward_executions": 384,
+        "final_forward_executions": 1,
+        "recheck_forward_executions": 1,
+        "total_forward_executions": 387,
+    }
+    schedule_domains: dict[int, tuple[int, ...]] = {}
+    successful_methods = []
+    accepted_count = 0
+    for row in rows:
+        method = row["method"]
+        schedule = row["schedule_id"]
+        if row.get("source_commit") != source_commit or row.get("device") != device:
+            raise ValidationError("contact optimization row is not source/device bound")
+        domain = tuple(range(6000 + 64 * schedule, 6000 + 64 * schedule + 64))
+        if row.get("realized_outer_seeds") != list(domain):
+            raise ValidationError("contact optimization seed domain is not canonical")
+        previous = schedule_domains.setdefault(schedule, domain)
+        if previous != domain:
+            raise ValidationError(
+                "contact optimization methods disagree on schedule seed domains"
+            )
+        method_work = (
+            {
+                "samples": 8,
+                "forward_executions": 16,
+                "backward_executions": 8,
+                "independent_contributions": 4,
+                "parameter_perturbations": 8,
+                "hard_forward_executions": 8,
+                "soft_forward_executions": 8,
+            }
+            if method == "residual_control_variate"
+            else {
+                "samples": 1,
+                "forward_executions": 1,
+                "backward_executions": 1,
+                "independent_contributions": 1,
+                "parameter_perturbations": 1,
+                "hard_forward_executions": None,
+                "soft_forward_executions": None,
+            }
+        )
+        work = row.get("gradient_work")
+        if not isinstance(work, list) or len(work) != 64:
+            raise ValidationError(
+                "contact optimization gradient work must cover 64 sequential steps"
+            )
+        for step, record in enumerate(work):
+            expected = {
+                "step": step,
+                "outer_seed": domain[step],
+                "inner_seed": None,
+                **method_work,
+            }
+            if not _json_type_strict_equal(record, expected):
+                raise ValidationError("contact optimization gradient work is not exact")
+        if not _json_type_strict_equal(
+            row.get("hard_evaluation_work"), expected_hard_work
+        ):
+            raise ValidationError(
+                "contact optimization hard evaluation work is not exact"
+            )
+        physical_valid = _validate_contact_physical_validity(
+            row.get("final_physical_validity")
+        )
+        initial = row.get("initial_hard_loss")
+        final = row.get("final_hard_loss")
+        held_out = row.get("held_out_loss")
+        finite_losses = all(
+            type(value) is float and math.isfinite(value)
+            for value in (initial, final, held_out)
+        )
+        accepted = finite_losses and final == held_out and physical_valid
+        success = accepted and final < initial
+        if row.get("accepted") is not accepted or row.get("success") is not success:
+            raise ValidationError(
+                "contact optimization accepted/success booleans disagree with recomputed losses"
+            )
+        accepted_count += int(accepted)
+        if success:
+            successful_methods.append(method)
+    flattened_domains = [
+        seed for schedule in range(16) for seed in schedule_domains[schedule]
+    ]
+    if len(flattened_domains) != len(set(flattened_domains)):
+        raise ValidationError("contact optimization schedule seed domains overlap")
+    if accepted_count != len(rows) or not successful_methods:
+        raise ValidationError(
+            "contact optimization requires all rows accepted and at least one successful method"
+        )
+
+    expected_validity = {
+        "scenario": "contact_3d_optimization",
+        "accepted": True,
+        "metrics": {
+            "row_count": len(rows),
+            "accepted_count": accepted_count,
+            "success_count": len(successful_methods),
+            "successful_methods": successful_methods,
+        },
+        "source_row_ids": [row["row_id"] for row in rows],
+    }
+    validity_rows = [
+        record
+        for record in summary.get("scenario_validity", [])
+        if isinstance(record, dict)
+        and record.get("scenario") == "contact_3d_optimization"
+    ]
+    if len(validity_rows) != 1 or not _json_type_strict_equal(
+        validity_rows[0], expected_validity
+    ):
+        raise ValidationError(
+            "scenario_validity contact optimization summary is not exact"
+        )
+
+    summary_rows = [
+        record
+        for record in summary.get("optimization_summaries", [])
+        if isinstance(record, dict) and record.get("scenario") == "contact_3d"
+    ]
+    if len(summary_rows) != len(_CONTACT_METHODS):
+        raise ValidationError(
+            "optimization_summaries contact optimization coverage is incomplete"
+        )
+    for method in _CONTACT_METHODS:
+        selected = [row for row in rows if row["method"] == method]
+        declared = [record for record in summary_rows if record.get("method") == method]
+        if len(declared) != 1:
+            raise ValidationError(
+                "contact optimization summary method identity is duplicated"
+            )
+        final_values = [row["final_hard_loss"] for row in selected]
+        held_values = [row["held_out_loss"] for row in selected]
+        expected = {
+            "scenario": "contact_3d",
+            "method": method,
+            "final_hard_loss_mean": sum(final_values) / len(final_values),
+            "final_hard_loss_ci_low": _linear_quantile(final_values, 0.025),
+            "final_hard_loss_ci_high": _linear_quantile(final_values, 0.975),
+            "success_rate": sum(row["success"] for row in selected) / len(selected),
+            "held_out_loss_mean": sum(held_values) / len(held_values),
+            "source_row_ids": [row["row_id"] for row in selected],
+        }
+        actual = declared[0]
+        if set(actual) != set(expected):
+            raise ValidationError("contact optimization summary schema is not exact")
+        for field in expected:
+            if field in {
+                "final_hard_loss_mean",
+                "final_hard_loss_ci_low",
+                "final_hard_loss_ci_high",
+                "success_rate",
+                "held_out_loss_mean",
+            }:
+                if type(actual[field]) is not float or not math.isclose(
+                    actual[field], expected[field], rel_tol=1.0e-12, abs_tol=1.0e-15
+                ):
+                    raise ValidationError(
+                        "contact optimization summary numeric aggregate is inconsistent"
+                    )
+            elif not _json_type_strict_equal(actual[field], expected[field]):
+                raise ValidationError(
+                    "contact optimization summary lineage or labels are inconsistent"
+                )
 
 
 def _assert_no_local_path(value: Any, *, location: str) -> None:
@@ -1000,6 +2229,34 @@ def _validate_source(
     if not isinstance(source.get("seeds"), dict) or not source["seeds"]:
         raise ValidationError("source.seeds must be a nonempty object")
     _validate_seed_tree(source["seeds"], name="source.seeds")
+    expected_seeds = {
+        "analytic_estimator_outer": list(range(100, 132)),
+        "collision_estimator_outer": list(range(300, 332)),
+        "contact_3d": {
+            "estimator_outer": list(range(5000, 5032)),
+            "optimization_outer": [6000 + 64 * schedule for schedule in range(16)],
+            "reference_base": 302,
+            "reference_inner_base": 402,
+        },
+        "opaque_mesh": {
+            "estimator_outer": list(range(9000, 9032)),
+            "reference_base": 10000,
+            "reference_inner_base": 11000,
+        },
+        "path_tracer": {
+            "training": list(range(1000, 1032)),
+            "target": list(range(2000, 2016)),
+            "held_out": list(range(3000, 3016)),
+            "reference_base": 4000,
+            "reference_inner_base": 4001,
+            "estimator_outer": list(range(10000, 10032)),
+        },
+        "triangle_estimator_outer": list(range(200, 232)),
+    }
+    if not _json_type_strict_equal(source["seeds"], expected_seeds):
+        raise ValidationError(
+            "source seed protocol must exactly match the canonical report schedule"
+        )
     for row in method_rows:
         row_commit = row.get("source_commit")
         if row_commit != commit:
@@ -1071,6 +2328,8 @@ def _validate_protocol(
     summary = loaded["data/summary.json"]
     if not isinstance(summary, dict) or summary.get("schema_version") != SCHEMA_VERSION:
         raise ValidationError("data/summary.json must use schema_version 1")
+    config = _validate_report_config_and_decision(manifest)
+    _validate_installed_runtime(summary.get("runtime"))
 
     all_raw_rows = [row for rows in raw_rows.values() for row in rows]
     row_ids: dict[str, dict[str, Any]] = {}
@@ -1109,6 +2368,25 @@ def _validate_protocol(
     for row in method_rows:
         _validate_method_row(row)
     commit, source_device = _validate_source(manifest, method_rows)
+    _validate_path_numerical_gauge_contract(
+        method_rows,
+        raw_rows["path_tracer_gradients.json"],
+        source_commit=commit,
+        device=source_device,
+    )
+    _validate_path_gradient_contract(raw_rows["path_tracer_gradients.json"])
+    _validate_path_optimization_contract(
+        raw_rows["path_tracer_optimization.json"],
+        summary,
+        source_commit=commit,
+        device=source_device,
+    )
+    _validate_contact_optimization_contract(
+        raw_rows["contact_3d_optimization.json"],
+        summary,
+        source_commit=commit,
+        device=source_device,
+    )
     for row in raw_rows["performance.json"]:
         if row.get("source_commit") != commit:
             raise ValidationError(
@@ -1134,9 +2412,6 @@ def _validate_protocol(
         "reference_required",
         "reason",
     }
-    config = manifest.get("config")
-    if not isinstance(config, dict):
-        raise ValidationError("manifest config must be an object")
     estimator_seeds = _nonnegative_int(
         config.get("estimator_seeds"), name="config.estimator_seeds"
     )
@@ -1226,10 +2501,61 @@ def _validate_protocol(
                     f"{cell['scenario']}/{method}/N={samples} outer_seed values must be nonnegative integers"
                 )
             seeds = set(raw_seeds)
-            if len(seeds) != estimator_seeds:
+            if len(matching) != estimator_seeds or len(seeds) != estimator_seeds:
                 raise ValidationError(
-                    f"{cell['scenario']}/{method}/N={samples} requires 32 distinct outer seeds; found {len(seeds)}"
+                    f"{cell['scenario']}/{method}/N={samples} requires exactly 32 rows with distinct outer seeds; "
+                    f"found rows={len(matching)}, seeds={len(seeds)}"
                 )
+            if cell["scenario"] == "path_tracer":
+                expected_pairs = {
+                    (10_000 + index, 1_000 + index) for index in range(estimator_seeds)
+                }
+                observed_pairs = {
+                    (row.get("outer_seed"), row.get("inner_seed")) for row in matching
+                }
+                if observed_pairs != expected_pairs:
+                    raise ValidationError(
+                        f"path_tracer/{method}/N={samples} does not use the canonical outer/inner seed pairs"
+                    )
+                starts = {row.get("start_id") for row in matching}
+                targets = {row.get("target") for row in matching}
+                normalized_configs = []
+                inner_digests = set()
+                for row in matching:
+                    config_row = row.get("config")
+                    if not isinstance(config_row, dict):
+                        raise ValidationError(
+                            f"path_tracer/{method}/N={samples} requires configuration metadata"
+                        )
+                    digest = config_row.get("inner_random_digest")
+                    if (
+                        not isinstance(digest, str)
+                        or _SHA256_RE.fullmatch(digest) is None
+                    ):
+                        raise ValidationError(
+                            f"path_tracer/{method}/N={samples} has an invalid inner-random digest"
+                        )
+                    inner_digests.add(digest)
+                    normalized_configs.append(
+                        {
+                            key: value
+                            for key, value in config_row.items()
+                            if key != "inner_random_digest"
+                        }
+                    )
+                if (
+                    len(starts) != 1
+                    or len(targets) != 1
+                    or len(inner_digests) != estimator_seeds
+                    or any(
+                        config_row != normalized_configs[0]
+                        for config_row in normalized_configs[1:]
+                    )
+                ):
+                    raise ValidationError(
+                        f"path_tracer/{method}/N={samples} has inconsistent strata or per-seed randomness"
+                    )
+                continue
             strata: dict[tuple[Any, ...], list[int]] = {}
             for row, seed in zip(matching, raw_seeds):
                 key = (
@@ -1553,14 +2879,21 @@ def _validate_protocol(
     opaque_rows = raw_rows["opaque_mesh.json"]
     if not opaque_rows:
         raise ValidationError("opaque mesh diagnostics are missing")
-    for row in opaque_rows:
-        if (
-            row.get("transform_status") != "estimator_only"
-            or row.get("transformable") is not False
-        ):
-            raise ValidationError(
-                "opaque native/BVH branches must be labeled estimator-only"
-            )
+    opaque_protocol_rows = [
+        row
+        for row in opaque_rows
+        if row.get("method") not in REQUIRED_METHOD_IDS
+        and ("transform_status" in row or "transformable" in row)
+    ]
+    if (
+        len(opaque_protocol_rows) != 1
+        or opaque_protocol_rows[0].get("transform_status") != "estimator_only"
+        or opaque_protocol_rows[0].get("transformable") is not False
+    ):
+        raise ValidationError(
+            "opaque native/BVH branches require a one-to-one estimator-only "
+            "protocol diagnostic"
+        )
     for cell in applicability:
         if cell["scenario"] == "opaque_mesh" and cell["transformable"] is not False:
             raise ValidationError(
@@ -1840,12 +3173,22 @@ def _validate_html(root: Path, commit: str) -> None:
             )
 
 
-def validate_publication(root: Path) -> dict[str, int]:
+def validate_bundle(
+    root: Path,
+) -> tuple[dict[str, Any], dict[str, Any], int, str]:
+    """Validate and return one descriptor-relative evidence-bundle snapshot."""
+
     root = Path(root)
     if not root.is_dir():
         raise ValidationError(f"report root does not exist: {root}")
     manifest, loaded = validate_manifest(root)
     rows, commit = _validate_protocol(manifest, loaded)
+    return manifest, loaded, rows, commit
+
+
+def validate_publication(root: Path) -> dict[str, int]:
+    root = Path(root)
+    _manifest, _loaded, rows, commit = validate_bundle(root)
     _validate_html(root.resolve(), commit)
     return {
         "files": len(EXPECTED_FILES),

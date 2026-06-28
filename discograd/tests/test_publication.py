@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import contextlib
 import dataclasses
 import hashlib
@@ -70,6 +71,135 @@ REPORT_TEMPLATE = Path(__file__).resolve().parents[1] / "report_template.html"
 BUILD_SCRIPT = REPORT_TEMPLATE.with_name("build_report.py")
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+
+REPORT_CONFIG = {
+    "width": 24,
+    "height": 16,
+    "spp": 2,
+    "bounces": 3,
+    "smoothing_samples": [8, 16, 32, 64, 128],
+    "estimator_seeds": 32,
+    "optimization_steps": 64,
+    "optimization_schedules": 16,
+    "path_reference_samples": 32768,
+    "contact_reference_samples": 65536,
+    "reference_seed_sets": 4,
+}
+REPORT_REFERENCE_COUNT_RATIONALE = (
+    "Accepted after a clean CPU pilot projected 30,807.341991021996 seconds for the report workload; "
+    "the nominal reference counts are retained without reduction."
+)
+REPORT_REFERENCE_COUNT_DECISION = {
+    "status": "accepted",
+    "pilot_tier": "pilot",
+    "pilot_manifest_sha256": "d6ab265c77e3f08fe759fde02bf4d07e43b8c358a4bb46024da1422ba73dd6cb",
+    "pilot_source_commit": "e25b05937fa149a341177559f2fa7f7e2ff3f651",
+    "pilot_projected_report_seconds": 30807.341991021996,
+    "decided_at_utc": "2026-06-28T14:43:54Z",
+    "protocol_fingerprint": "f44b07543db9c793cc0fd16a2fde768cc7c7589b60f9489e9f600c31d729e0e9",
+    "path_reference_samples": 32768,
+    "contact_reference_samples": 65536,
+    "reference_seed_sets": 4,
+    "rationale": REPORT_REFERENCE_COUNT_RATIONALE,
+}
+PATH_CERTIFICATE_FINGERPRINT = (
+    "8f4814d92d301575e1d79caa80ddb6dcdf3a89cce666950000b5d24aa3129676"
+)
+PATH_GAUGE_TARGET = "gaussian_smoothed_hard_with_numerical_gauge_assumption"
+PATH_GAUGE_TARGET_LABEL = (
+    "certified residual control variate for the Gaussian-smoothed box-clipped hard render; "
+    "exact Duff and safety-gauge selected-arm derivatives hold almost everywhere"
+)
+PATH_ONB_SEAM_SEMANTICS = (
+    "z >= 0 uses the positive Duff chart; z < 0 uses the negative Duff chart; "
+    "this numerical gauge branch is not smoothed"
+)
+PATH_OPTIMIZATION_METHODS = (
+    "crisp_ad",
+    "soft_ad",
+    "straight_through_ad",
+    "residual_control_variate",
+)
+PATH_ROOT_CALLABLE_KEYS = (
+    "kernel:image_loss_384_kernel(image:array(ndim=1, dtype=vec3d),"
+    "target:array(ndim=1, dtype=vec3d),loss:array(ndim=1, dtype=float64))",
+    "kernel:path_trace_soft_3_kernel(params:array(ndim=1, dtype=float64),"
+    "random_values:array(ndim=1, dtype=float64),base_directions:array(ndim=1, dtype=vec3d),"
+    "centers:array(ndim=1, dtype=vec3d),radii:array(ndim=1, dtype=float64),"
+    "movable:array(ndim=1, dtype=float64),albedos:array(ndim=1, dtype=vec3d),"
+    "emissions:array(ndim=1, dtype=vec3d),mirrors:array(ndim=1, dtype=float64),"
+    "terminals:array(ndim=1, dtype=float64),material_ids:array(ndim=1, dtype=float64),"
+    "width:int32,height:int32,samples_per_pixel:int32,random_stride:int32,gate_width:float64,"
+    "radiance:array(ndim=1, dtype=vec3d),direct:array(ndim=1, dtype=vec3d),"
+    "indirect:array(ndim=1, dtype=vec3d),depths:array(ndim=1, dtype=float64),"
+    "sequences:array(ndim=1, dtype=float64))",
+    "kernel:reduce_paths_2_kernel(path_radiance:array(ndim=1, dtype=vec3d),"
+    "path_direct:array(ndim=1, dtype=vec3d),path_indirect:array(ndim=1, dtype=vec3d),"
+    "image:array(ndim=1, dtype=vec3d),direct_image:array(ndim=1, dtype=vec3d),"
+    "indirect_image:array(ndim=1, dtype=vec3d))",
+)
+PATH_CALLABLE_KEYS = (
+    "function:_clip_path_parameters(params:vec3d,return:vec3d)",
+    "function:_clip_scalar_exact(value:float64,lower:float64,upper:float64,return:float64)",
+    "function:_cosine_hemisphere_from_basis(normal:vec3d,tangent:vec3d,bitangent:vec3d,"
+    "random_u1:float64,random_u2:float64,return:vec3d)",
+    "function:_duff_chart_sign(normal_z:float64,return:float64)",
+    "function:_duff_frisvad_basis(normal:vec3d)",
+    "function:_event_scalar_soft(exact_measure:float64,smooth_margin:float64,current:float64,"
+    "candidate:float64,gate_width:float64,return:float64)",
+    "function:_event_vector_soft(exact_measure:float64,smooth_margin:float64,current:vec3d,"
+    "candidate:vec3d,gate_width:float64,return:vec3d)",
+    "function:_finish_bounce(origin_alive:vec4d,direction_depth:vec4d,throughput_first:vec4d,"
+    "radiance:vec3d,direct_radiance:vec3d,indirect_radiance:vec3d,sequence:float64,"
+    "best_distance:float64,hit:float64,hit_normal:vec3d,albedo:vec3d,emission:vec3d,"
+    "mirror:float64,terminal:float64,material_id:float64,diffuse_direction:vec3d)",
+    "function:_initial_path_state(params:vec3d,base_direction:vec3d)",
+    "function:_least_aligned_basis_soft(normal:vec3d,gate_width:float64)",
+    "function:_minimum_soft(first:float64,second:float64,gate_width:float64,return:float64)",
+    "function:_multiply_vector(first:vec3d,second:vec3d,return:vec3d)",
+    "function:_numeric_abs(value:float64,return:float64)",
+    "function:_numeric_max(first:float64,second:float64,return:float64)",
+    "function:_safe_normalize(value:vec3d,return:vec3d)",
+    "function:_sphere_candidate_distance_soft(half_b:float64,square_root:float64,"
+    "gate_width:float64,return:float64)",
+    "function:_store_path(path_index:int32,radiance_value:vec3d,direct_value:vec3d,"
+    "indirect_value:vec3d,depth_value:float64,sequence_value:float64,"
+    "radiance:array(ndim=1, dtype=vec3d),direct:array(ndim=1, dtype=vec3d),"
+    "indirect:array(ndim=1, dtype=vec3d),depths:array(ndim=1, dtype=float64),"
+    "sequences:array(ndim=1, dtype=float64))",
+    "function:_total_nonnegative(value:float64,return:float64)",
+    "function:_trace_bounce_soft(origin_alive:vec4d,direction_depth:vec4d,"
+    "throughput_first:vec4d,radiance:vec3d,direct_radiance:vec3d,indirect_radiance:vec3d,"
+    "sequence:float64,params:vec3d,random_u1:float64,random_u2:float64,"
+    "centers:array(ndim=1, dtype=vec3d),radii:array(ndim=1, dtype=float64),"
+    "movable:array(ndim=1, dtype=float64),albedos:array(ndim=1, dtype=vec3d),"
+    "emissions:array(ndim=1, dtype=vec3d),mirrors:array(ndim=1, dtype=float64),"
+    "terminals:array(ndim=1, dtype=float64),material_ids:array(ndim=1, dtype=float64),"
+    "gate_width:float64)",
+    *PATH_ROOT_CALLABLE_KEYS,
+)
+REPORT_RUNTIME_PHASES = (
+    "gradients_analytic",
+    "gradients_triangle_2d",
+    "gradients_collision_2d",
+    "gradients_path_tracer",
+    "gradients_contact_3d",
+    "gradients_opaque_mesh",
+    "references_triangle_2d",
+    "references_collision_2d",
+    "references_path_tracer",
+    "references_contact_3d",
+    "references_opaque_mesh",
+    "optimization_path_tracer",
+    "optimization_contact_3d",
+    "performance",
+    "serialization",
+    "assets",
+    "validation",
+    "finalization",
+    "installation",
+    "orchestration",
 )
 
 
@@ -173,6 +303,353 @@ def _refresh_manifest(root: Path) -> None:
     write_fixture_json(manifest_path, manifest)
 
 
+def _report_runtime_record() -> dict[str, object]:
+    phase_seconds = {
+        name: 0.1 + 0.01 * index for index, name in enumerate(REPORT_RUNTIME_PHASES)
+    }
+    elapsed_seconds = sum(phase_seconds.values())
+    return {
+        "tier": "report",
+        "elapsed_seconds": elapsed_seconds,
+        "elapsed_measurement": "through_one_complete_descriptor_relative_install_pass",
+        "measurement_excludes": [
+            "final_install_timing_metadata_rewrite",
+            "final_metadata_bearing_reinstall_and_binding_verification",
+        ],
+        "measured_finalization_pass_seconds": phase_seconds["finalization"],
+        "measured_installation_pass_seconds": phase_seconds["installation"],
+        "phase_seconds": phase_seconds,
+        "projection_factors": dict.fromkeys(REPORT_RUNTIME_PHASES, 1.0),
+        "projection_model": "measured_phase_times_scaled_by_exact_report_workload_ratios",
+        "projected_report_seconds": elapsed_seconds,
+    }
+
+
+def _path_method_config(inner_seed: int, method: str) -> dict[str, object]:
+    return {
+        "bounces": 3,
+        "epsilon": 0.01 if method in {"crisp_fd", "smoothed_crn_fd"} else None,
+        "gate_family": "gaussian",
+        "gate_width": 0.05,
+        "height": 16,
+        "inner_random_digest": hashlib.sha256(
+            f"path-inner-seed:{inner_seed}".encode()
+        ).hexdigest(),
+        "numerical_gauge_policy": "exact_selected_arm_derivative_almost_everywhere",
+        "numerical_gauge_sites": 5,
+        "onb_seam_semantics": PATH_ONB_SEAM_SEMANTICS,
+        "outer_parameter_sigma": 0.03,
+        "parameter_extension": "componentwise_box_clip_before_geometry",
+        "parameter_lower": [-0.8, -0.5, -0.9],
+        "parameter_upper": [0.8, 0.5, 0.3],
+        "paths_per_forward": 768,
+        "pixels": 384,
+        "samples_per_pixel": 2,
+        "sphere_tests_per_forward": 11520,
+        "target_seed": 2000,
+        "width": 24,
+        "workload_policy": "fixed_stochastic_sample_count_not_equal_execution",
+    }
+
+
+def _path_protocol_row() -> dict[str, object]:
+    return {
+        "row_id": "path:randomness-protocol",
+        "scenario_family": "path_tracer",
+        "scenario": "path_randomness_protocol",
+        "accepted": True,
+        "source_commit": "1" * 40,
+        "device": "cpu",
+        "seed_domains": {
+            "inner": "camera_and_bsdf_samples",
+            "outer": "gaussian_parameter_perturbations",
+            "target": "independent_target_render",
+        },
+        "seed_tables": {
+            "training": list(range(1000, 1032)),
+            "target": list(range(2000, 2016)),
+            "held_out": list(range(3000, 3016)),
+            "reference_base": 4000,
+            "reference_inner_base": 4001,
+        },
+        "estimator_outer_seeds": list(range(10000, 10032)),
+        "reference_protocol": {
+            "inputs": {"reference_base": 4000, "reference_inner_base": 4001},
+            "realized_streams_location": "data/raw/references.json:seeds",
+        },
+        "render_work": {"paths_per_forward": 768, "sphere_tests_per_forward": 11520},
+        "certificate": {
+            "complete": True,
+            "transformed_sites": 7,
+            "smoothed_sites": 2,
+            "numerical_gauge_sites": 5,
+            "fully_smoothed": False,
+            "fingerprint": PATH_CERTIFICATE_FINGERPRINT,
+            "root_callable_keys": list(PATH_ROOT_CALLABLE_KEYS),
+            "callable_keys": list(PATH_CALLABLE_KEYS),
+        },
+        "control_variate": {
+            "unbiased_target": True,
+            "target": PATH_GAUGE_TARGET,
+            "certificate_fingerprint": PATH_CERTIFICATE_FINGERPRINT,
+            "hard_forward_executions": 8,
+            "soft_forward_executions": 8,
+            "numerical_gauge_assumption": True,
+            "numerical_gauge_sites": 5,
+        },
+    }
+
+
+def _path_optimization_rows() -> list[dict[str, object]]:
+    render_work = {
+        "cached_target_renders": 1,
+        "shared_initial_candidate_renders": 1,
+        "optimization_candidate_renders": 256,
+        "deterministic_final_recheck_renders": 4,
+        "total_candidate_renders": 261,
+        "total_renders": 262,
+    }
+    rows = []
+    for schedule in range(16):
+        estimator_seeds = list(range(12000 + 100 * schedule, 12064 + 100 * schedule))
+        losses = [1.0 - 0.5 * step / 64 for step in range(65)]
+        parameters = [[0.0, 0.0, 0.0] for _ in range(65)]
+        gradients = [[0.0, 0.0, 0.0] for _ in range(64)]
+        for method in PATH_OPTIMIZATION_METHODS:
+            rows.append(
+                {
+                    "row_id": f"path:optimization:{method}:{schedule}",
+                    "scenario_family": "path_tracer",
+                    "scenario": "analytic_five_sphere",
+                    "method": method,
+                    "schedule_id": schedule,
+                    "initial_hard_loss": 1.0,
+                    "final_hard_loss": 0.5,
+                    "held_out_loss": 0.5,
+                    "success": True,
+                    "accepted": True,
+                    "source_commit": "1" * 40,
+                    "device": "cpu",
+                    "losses": list(losses),
+                    "parameters": copy.deepcopy(parameters),
+                    "gradients": copy.deepcopy(gradients),
+                    "final_parameter_error": 0.5,
+                    "estimator_seeds": list(estimator_seeds),
+                    "target_seed": 2000 + schedule,
+                    "held_out_seed": 3000 + schedule,
+                    "deterministic_final_recheck": 0.5,
+                    "final_recheck_seed": 3000 + schedule,
+                    "final_recheck_protocol": (
+                        "same_seed_integrity_check_against_cached_immutable_target"
+                    ),
+                    "held_out_render_evaluations": 66,
+                    "held_out_render_work": dict(render_work),
+                    "objective_extension": "componentwise_box_clip_before_geometry",
+                    "numerical_gauge_policy": (
+                        "exact_selected_arm_derivative_almost_everywhere"
+                    ),
+                    "box_constraints": {
+                        "lower": [-0.8, -0.5, -0.9],
+                        "upper": [0.8, 0.5, 0.3],
+                    },
+                }
+            )
+    return rows
+
+
+def _path_optimization_summaries(
+    rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "scenario": "path_tracer",
+            "method": method,
+            "final_hard_loss_mean": 0.5,
+            "final_hard_loss_ci_low": 0.5,
+            "final_hard_loss_ci_high": 0.5,
+            "success_rate": 1.0,
+            "held_out_loss_mean": 0.5,
+            "source_row_ids": [
+                row["row_id"] for row in rows if row["method"] == method
+            ],
+        }
+        for method in sorted(PATH_OPTIMIZATION_METHODS)
+    ]
+
+
+def _contact_physical_validity() -> dict[str, object]:
+    positive = [[[] for _ in range(4)] for _ in range(180)]
+    positive[0][0] = ["pair_01", "floor_0"]
+    positive[1][0] = ["pair_12", "ramp_0"]
+    return {
+        "valid": True,
+        "checks": {
+            "pair_01_contact": True,
+            "pair_12_contact": True,
+            "ordered_pair_01_then_pair_12": True,
+            "floor_contact": True,
+            "ramp_contact": True,
+            "stick_mode": True,
+            "slide_mode": True,
+            "no_zero_limit_slide": True,
+            "penetration_bounded": True,
+            "contact_energy_bounded": True,
+            "pair_momentum_conserved": True,
+            "pair_angular_momentum_conserved": True,
+            "meaningful_positive_impulse": True,
+        },
+        "pair_contact_counts": {"0-1": 1, "0-2": 0, "1-2": 1},
+        "static_contact_counts": {"floor": 1, "ramp": 1},
+        "pair_correction_counts": {"0-1": 1, "0-2": 0, "1-2": 1},
+        "static_correction_counts": {"floor": 1, "ramp": 1},
+        "positive_impulse_event_types_by_step_and_sweep": positive,
+        "correction_event_types_by_step_and_sweep": copy.deepcopy(positive),
+        "canonical_solver_event_order": [
+            "pair_01",
+            "pair_02",
+            "pair_12",
+            "floor_0",
+            "floor_1",
+            "floor_2",
+            "ramp_0",
+            "ramp_1",
+            "ramp_2",
+        ],
+        "event_sequence_semantics": "ordered_per_step_per_sweep_solver_call_events_with_multiplicity",
+        "stick_contacts": 1,
+        "slide_contacts": 3,
+        "zero_limit_slide_contacts": 0,
+        "body_steps": 540,
+        "contact_sweeps": 720,
+        "pair_solver_calls": 2160,
+        "static_solver_calls": 4320,
+        "minimum_positive_normal_impulse": 1.0e-6,
+        "positive_impulse_threshold": 1.0e-8,
+        "max_penetration": 0.02,
+        "max_contact_energy_gain": 0.01,
+        "max_pair_momentum_error": 5.0e-6,
+        "max_pair_angular_momentum_error": 5.0e-6,
+        "thresholds": {
+            "max_penetration": 0.03,
+            "max_contact_energy_gain": 0.02,
+            "max_pair_momentum_error": 1.0e-5,
+            "max_pair_angular_momentum_error": 1.0e-5,
+        },
+    }
+
+
+def _contact_gradient_work(method: str, schedule: int) -> list[dict[str, object]]:
+    method_work = (
+        {
+            "samples": 8,
+            "forward_executions": 16,
+            "backward_executions": 8,
+            "independent_contributions": 4,
+            "parameter_perturbations": 8,
+            "hard_forward_executions": 8,
+            "soft_forward_executions": 8,
+        }
+        if method == "residual_control_variate"
+        else {
+            "samples": 1,
+            "forward_executions": 1,
+            "backward_executions": 1,
+            "independent_contributions": 1,
+            "parameter_perturbations": 1,
+            "hard_forward_executions": None,
+            "soft_forward_executions": None,
+        }
+    )
+    return [
+        {
+            "step": step,
+            "outer_seed": 6000 + 64 * schedule + step,
+            "inner_seed": None,
+            **method_work,
+        }
+        for step in range(64)
+    ]
+
+
+def _contact_optimization_rows() -> list[dict[str, object]]:
+    rows = []
+    losses = [1.0 - 0.5 * step / 64 for step in range(65)]
+    parameters = [[0.0, 0.0, 0.0] for _ in range(65)]
+    hard_work = {
+        "initial_forward_executions": 1,
+        "line_search_batches": 64,
+        "line_search_candidates_per_batch": 6,
+        "line_search_forward_executions": 384,
+        "final_forward_executions": 1,
+        "recheck_forward_executions": 1,
+        "total_forward_executions": 387,
+    }
+    for schedule in range(16):
+        seeds = list(range(6000 + 64 * schedule, 6000 + 64 * schedule + 64))
+        for method in ("soft_ad", "straight_through_ad", "residual_control_variate"):
+            rows.append(
+                {
+                    "row_id": f"contact:optimization:{method}:{schedule}",
+                    "scenario_family": "contact_3d",
+                    "scenario": "three_sphere_floor_ramp",
+                    "method": method,
+                    "schedule_id": schedule,
+                    "initial_hard_loss": 1.0,
+                    "final_hard_loss": 0.5,
+                    "held_out_loss": 0.5,
+                    "success": True,
+                    "accepted": True,
+                    "source_commit": "1" * 40,
+                    "device": "cpu",
+                    "losses": list(losses),
+                    "parameters": copy.deepcopy(parameters),
+                    "final_target_position_error": 0.5,
+                    "final_physical_validity": _contact_physical_validity(),
+                    "gradient_work": _contact_gradient_work(method, schedule),
+                    "hard_evaluation_work": dict(hard_work),
+                    "realized_outer_seeds": seeds,
+                }
+            )
+    return rows
+
+
+def _contact_optimization_summaries(
+    rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "scenario": "contact_3d",
+            "method": method,
+            "final_hard_loss_mean": 0.5,
+            "final_hard_loss_ci_low": 0.5,
+            "final_hard_loss_ci_high": 0.5,
+            "success_rate": 1.0,
+            "held_out_loss_mean": 0.5,
+            "source_row_ids": [
+                row["row_id"] for row in rows if row["method"] == method
+            ],
+        }
+        for method in sorted(
+            ("soft_ad", "straight_through_ad", "residual_control_variate")
+        )
+    ]
+
+
+def _contact_optimization_validity(rows: list[dict[str, object]]) -> dict[str, object]:
+    successful_methods = [row["method"] for row in rows if row["success"]]
+    return {
+        "scenario": "contact_3d_optimization",
+        "accepted": True,
+        "metrics": {
+            "row_count": len(rows),
+            "accepted_count": len(rows),
+            "success_count": len(successful_methods),
+            "successful_methods": successful_methods,
+        },
+        "source_row_ids": [row["row_id"] for row in rows],
+    }
+
+
 def make_valid_fixture(test: unittest.TestCase) -> Path:
     temporary = tempfile.TemporaryDirectory()
     test.addCleanup(temporary.cleanup)
@@ -247,47 +724,212 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 parameter_perturbations=2,
                 independent_contributions=1,
             )
-    score_rows = [
-        {
-            **method_rows[3],
-            "row_id": f"path:score:8:{seed}",
-            "scenario_family": "path_tracer",
-            "samples": 8,
-            "outer_seed": seed,
-            "scenario": "five_spheres",
-            "start_id": "initial",
-            "target": "initial_parameters",
-            "antithetic": True,
-            "forward_executions": 8,
+    path_method_rows = []
+    for samples in REPORT_CONFIG["smoothing_samples"]:
+        for seed_index in range(REPORT_CONFIG["estimator_seeds"]):
+            outer_seed = 10000 + seed_index
+            inner_seed = 1000 + seed_index
+            common = {
+                "scenario_family": "path_tracer",
+                "samples": samples,
+                "outer_seed": outer_seed,
+                "inner_seed": inner_seed,
+                "scenario": "analytic_five_sphere",
+                "start_id": "initial_parameters",
+                "antithetic": True,
+                "gradient": [0.0, 0.0, 0.0],
+                "reference_gradient": [0.0, 0.0, 0.0],
+                "contribution_variance_available": True,
+                "gradient_variance_available": True,
+                "contribution_variance": [0.0, 0.0, 0.0],
+                "gradient_variance": [0.0, 0.0, 0.0],
+                "ci_low": [0.0, 0.0, 0.0],
+                "ci_high": [0.0, 0.0, 0.0],
+            }
+            path_method_rows.append(
+                {
+                    **method_rows[2],
+                    **common,
+                    "row_id": f"path:smoothed_pathwise:{samples}:{outer_seed}",
+                    "method": "smoothed_pathwise",
+                    "target": "gaussian_smoothed_hard",
+                    "target_label": (
+                        "pathwise samples of the box-clipped hard render; "
+                        "visibility-boundary terms are omitted"
+                    ),
+                    "unbiased_target": False,
+                    "certificate_fingerprint": None,
+                    "numerical_gauge_assumption": False,
+                    "numerical_gauge_sites": 0,
+                    "config": _path_method_config(inner_seed, "smoothed_pathwise"),
+                    "forward_executions": samples,
+                    "backward_executions": samples,
+                    "independent_contributions": samples // 2,
+                    "parameter_perturbations": samples,
+                    "hard_forward_executions": None,
+                    "soft_forward_executions": None,
+                }
+            )
+            path_method_rows.append(
+                {
+                    **method_rows[3],
+                    **common,
+                    "row_id": f"path:score:{samples}:{outer_seed}",
+                    "method": "score",
+                    "target": "gaussian_smoothed_hard",
+                    "target_label": "unbiased Gaussian score estimator of the box-clipped hard render",
+                    "unbiased_target": True,
+                    "certificate_fingerprint": None,
+                    "numerical_gauge_assumption": False,
+                    "numerical_gauge_sites": 0,
+                    "config": _path_method_config(inner_seed, "score"),
+                    "forward_executions": samples,
+                    "backward_executions": 0,
+                    "independent_contributions": samples // 2,
+                    "parameter_perturbations": samples,
+                    "hard_forward_executions": None,
+                    "soft_forward_executions": None,
+                }
+            )
+            path_method_rows.append(
+                {
+                    **method_rows[4],
+                    **common,
+                    "row_id": f"path:smoothed_crn_fd:{samples}:{outer_seed}",
+                    "method": "smoothed_crn_fd",
+                    "target": "gaussian_smoothed_hard_finite_epsilon",
+                    "target_label": (
+                        "CRN central difference of the Gaussian-smoothed box-clipped hard render"
+                    ),
+                    "unbiased_target": True,
+                    "certificate_fingerprint": None,
+                    "numerical_gauge_assumption": False,
+                    "numerical_gauge_sites": 0,
+                    "config": _path_method_config(inner_seed, "smoothed_crn_fd"),
+                    "forward_executions": 7 * samples,
+                    "backward_executions": 0,
+                    "independent_contributions": 1,
+                    "parameter_perturbations": 6,
+                    "hard_forward_executions": None,
+                    "soft_forward_executions": None,
+                    "contribution_variance_available": False,
+                    "gradient_variance_available": False,
+                    "contribution_variance": None,
+                    "gradient_variance": None,
+                    "ci_low": None,
+                    "ci_high": None,
+                }
+            )
+            path_method_rows.append(
+                {
+                    **residual_row,
+                    **common,
+                    "row_id": f"path:residual_control_variate:{samples}:{outer_seed}",
+                    "method": "residual_control_variate",
+                    "target": PATH_GAUGE_TARGET,
+                    "target_label": PATH_GAUGE_TARGET_LABEL,
+                    "unbiased_target": True,
+                    "certificate_fingerprint": PATH_CERTIFICATE_FINGERPRINT,
+                    "numerical_gauge_assumption": True,
+                    "numerical_gauge_sites": 5,
+                    "config": _path_method_config(
+                        inner_seed, "residual_control_variate"
+                    ),
+                    "forward_executions": 2 * samples,
+                    "backward_executions": samples,
+                    "independent_contributions": samples // 2,
+                    "parameter_perturbations": samples,
+                    "hard_forward_executions": samples,
+                    "soft_forward_executions": samples,
+                }
+            )
+    deterministic_specs = {
+        "crisp_ad": {
+            "target": "hard_program",
+            "target_label": (
+                "local derivative of the box-clipped hard-render execution path"
+            ),
+            "unbiased_target": True,
+            "forward_executions": 1,
+            "backward_executions": 1,
+            "parameter_perturbations": 1,
+        },
+        "crisp_fd": {
+            "target": "hard_program_central_difference",
+            "target_label": "central finite difference of the box-clipped hard render",
+            "unbiased_target": True,
+            "forward_executions": 7,
             "backward_executions": 0,
-            "independent_contributions": 4,
-            "parameter_perturbations": 8,
-            "contribution_variance_available": True,
-            "gradient_variance_available": True,
-            "contribution_variance": [0.0],
-            "gradient_variance": [0.0],
-            "ci_low": [0.0],
-            "ci_high": [0.0],
-        }
-        for seed in range(32)
-    ]
+            "parameter_perturbations": 6,
+        },
+        "soft_ad": {
+            "target": "local_soft_surrogate",
+            "target_label": (
+                "AD of the source-smoothed box-clipped path-tracing surrogate"
+            ),
+            "unbiased_target": True,
+            "forward_executions": 1,
+            "backward_executions": 1,
+            "parameter_perturbations": 1,
+        },
+        "straight_through_ad": {
+            "target": "hard_primal_local_soft_pseudogradient",
+            "target_label": (
+                "box-clipped hard rendered primal with a source-smoothed pseudo-gradient"
+            ),
+            "unbiased_target": None,
+            "forward_executions": 1,
+            "backward_executions": 1,
+            "parameter_perturbations": 1,
+        },
+    }
+    templates = {row["method"]: row for row in method_rows}
+    for seed_index in range(REPORT_CONFIG["estimator_seeds"]):
+        outer_seed = 10000 + seed_index
+        inner_seed = 1000 + seed_index
+        for method, spec in deterministic_specs.items():
+            path_method_rows.append(
+                {
+                    **templates[method],
+                    "row_id": f"path:{method}:1:{outer_seed}",
+                    "scenario_family": "path_tracer",
+                    "scenario": "analytic_five_sphere",
+                    "start_id": "initial_parameters",
+                    "method": method,
+                    "target": spec["target"],
+                    "target_label": spec["target_label"],
+                    "samples": 1,
+                    "outer_seed": outer_seed,
+                    "inner_seed": inner_seed,
+                    "antithetic": False,
+                    "gradient": [0.0, 0.0, 0.0],
+                    "reference_gradient": [0.0, 0.0, 0.0],
+                    "unbiased_target": spec["unbiased_target"],
+                    "certificate_fingerprint": None,
+                    "numerical_gauge_assumption": False,
+                    "numerical_gauge_sites": 0,
+                    "config": _path_method_config(inner_seed, method),
+                    "forward_executions": spec["forward_executions"],
+                    "backward_executions": spec["backward_executions"],
+                    "independent_contributions": 1,
+                    "parameter_perturbations": spec["parameter_perturbations"],
+                    "hard_forward_executions": None,
+                    "soft_forward_executions": None,
+                    "contribution_variance_available": False,
+                    "gradient_variance_available": False,
+                    "contribution_variance": None,
+                    "gradient_variance": None,
+                    "ci_low": None,
+                    "ci_high": None,
+                }
+            )
+    path_protocol = _path_protocol_row()
     analytic_anchor = {
         "row_id": "analytic:anchor",
         "scenario_family": "analytic",
         "accepted": True,
     }
-    optimization_rows = [
-        {
-            "row_id": f"path:optimization:score:{seed}",
-            "scenario_family": "path_tracer",
-            "scenario": "five_spheres",
-            "method": "score",
-            "final_hard_loss": 0.0,
-            "held_out_loss": 0.0,
-            "success": True,
-        }
-        for seed in range(2)
-    ]
+    optimization_rows = _path_optimization_rows()
     comparison_images = {
         "comparison_initial": [[[0.2, 0.2, 0.2]]],
         "comparison_target": [[[0.0, 0.0, 0.0]]],
@@ -347,6 +989,11 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "max_penetration": 0.01,
         "max_contact_energy_gain": 0.02,
     }
+    contact_optimization_rows = _contact_optimization_rows()
+    optimization_summaries = [
+        *_contact_optimization_summaries(contact_optimization_rows),
+        *_path_optimization_summaries(optimization_rows),
+    ]
     opaque_diagnostic = {
         "row_id": "mesh:0",
         "scenario_family": "opaque_mesh",
@@ -355,14 +1002,57 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "transformable": False,
         "boundary": {"transformed_sites": 0, "preserved_sites": 1},
     }
+    opaque_estimator = {
+        **method_rows[3],
+        "row_id": "mesh:score:8:9000",
+        "scenario_family": "opaque_mesh",
+        "scenario": "procedural_cube_silhouette",
+        "start_id": "camera_parameters",
+        "target": "gaussian_smoothed_hard",
+        "target_label": "unbiased Gaussian score estimator of the hard native mesh query",
+        "samples": 8,
+        "outer_seed": 9000,
+        "inner_seed": 11000,
+        "antithetic": True,
+        "gradient": [0.0, 0.0, 0.0],
+        "reference_gradient": [0.0, 0.0, 0.0],
+        "forward_executions": 8,
+        "backward_executions": 0,
+        "independent_contributions": 4,
+        "parameter_perturbations": 8,
+        "contribution_variance_available": True,
+        "gradient_variance_available": True,
+        "contribution_variance": [0.0, 0.0, 0.0],
+        "gradient_variance": [0.0, 0.0, 0.0],
+        "ci_low": [0.0, 0.0, 0.0],
+        "ci_high": [0.0, 0.0, 0.0],
+        "unbiased_target": True,
+        "certificate_fingerprint": None,
+        "numerical_gauge_assumption": False,
+        "numerical_gauge_sites": 0,
+        "config": {
+            "epsilon": None,
+            "forward_budget": 8,
+            "mesh_rebuilt_per_sample": False,
+            "native_operation": "mesh_query_ray",
+            "sigma": [0.03, 0.03, 0.03],
+            "transform_status": "estimator_only",
+            "unused_forward_budget": 0,
+        },
+    }
     raw: dict[str, list[dict[str, object]]] = {name: [] for name in RAW_NAMES}
     raw["analytic.json"] = [*method_rows, analytic_anchor]
-    raw["path_tracer_gradients.json"] = [*score_rows, *comparison_rows]
+    raw["path_tracer_gradients.json"] = [
+        *path_method_rows,
+        path_protocol,
+        *comparison_rows,
+    ]
     raw["path_tracer_optimization.json"] = optimization_rows
     raw["triangle_2d.json"] = [triangle_diagnostic]
     raw["collision_2d.json"] = [collision_diagnostic]
     raw["contact_3d_gradients.json"] = [contact_gradient, contact_diagnostic]
-    raw["opaque_mesh.json"] = [opaque_diagnostic]
+    raw["contact_3d_optimization.json"] = contact_optimization_rows
+    raw["opaque_mesh.json"] = [opaque_diagnostic, opaque_estimator]
     raw["performance.json"] = [
         {
             "row_id": f"perf:{method}",
@@ -480,22 +1170,54 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         }
         for row in method_rows
     ]
-    method_summaries.extend(
-        (
+    for method, spec in deterministic_specs.items():
+        selected = [row for row in path_method_rows if row["method"] == method]
+        method_summaries.append(
             {
-                "scenario": "path_tracer:five_spheres:initial",
-                "target": "initial_parameters",
-                "method": "score",
-                "samples": 8,
-                "mean_gradient": [0.0],
+                "scenario": "path_tracer:analytic_five_sphere:initial_parameters",
+                "target": spec["target"],
+                "method": method,
+                "samples": 1,
+                "mean_gradient": [0.0, 0.0, 0.0],
                 "relative_error": 0.0,
                 "cosine_similarity": 0.0,
                 "sign_agreement": 0.0,
-                "empirical_bias": [0.0],
-                "empirical_variance": [0.0],
-                "mean_squared_error": [0.0],
-                "source_row_ids": [row["row_id"] for row in score_rows],
-            },
+                "empirical_bias": [0.0, 0.0, 0.0],
+                "empirical_variance": [0.0, 0.0, 0.0],
+                "mean_squared_error": [0.0, 0.0, 0.0],
+                "source_row_ids": [row["row_id"] for row in selected],
+            }
+        )
+    for method, target in (
+        ("smoothed_pathwise", "gaussian_smoothed_hard"),
+        ("score", "gaussian_smoothed_hard"),
+        ("smoothed_crn_fd", "gaussian_smoothed_hard_finite_epsilon"),
+        ("residual_control_variate", PATH_GAUGE_TARGET),
+    ):
+        for samples in REPORT_CONFIG["smoothing_samples"]:
+            selected = [
+                row
+                for row in path_method_rows
+                if row["method"] == method and row["samples"] == samples
+            ]
+            method_summaries.append(
+                {
+                    "scenario": "path_tracer:analytic_five_sphere:initial_parameters",
+                    "target": target,
+                    "method": method,
+                    "samples": samples,
+                    "mean_gradient": [0.0, 0.0, 0.0],
+                    "relative_error": 0.0,
+                    "cosine_similarity": 0.0,
+                    "sign_agreement": 0.0,
+                    "empirical_bias": [0.0, 0.0, 0.0],
+                    "empirical_variance": [0.0, 0.0, 0.0],
+                    "mean_squared_error": [0.0, 0.0, 0.0],
+                    "source_row_ids": [row["row_id"] for row in selected],
+                }
+            )
+    method_summaries.extend(
+        (
             {
                 "scenario": "contact_3d:three_sphere_floor_ramp:initial_launch_velocity",
                 "target": "launch_velocity",
@@ -510,6 +1232,20 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "mean_squared_error": [0.0],
                 "source_row_ids": [contact_gradient["row_id"]],
             },
+            {
+                "scenario": "opaque_mesh:procedural_cube_silhouette:camera_parameters",
+                "target": "gaussian_smoothed_hard",
+                "method": "score",
+                "samples": 8,
+                "mean_gradient": [0.0, 0.0, 0.0],
+                "relative_error": 0.0,
+                "cosine_similarity": 0.0,
+                "sign_agreement": 0.0,
+                "empirical_bias": [0.0, 0.0, 0.0],
+                "empirical_variance": [0.0, 0.0, 0.0],
+                "mean_squared_error": [0.0, 0.0, 0.0],
+                "source_row_ids": [opaque_estimator["row_id"]],
+            },
         )
     )
     method_summaries.sort(
@@ -520,17 +1256,6 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
             int(row["samples"]),
         )
     )
-    path_summary_index = next(
-        index
-        for index, row in enumerate(method_summaries)
-        if str(row["scenario"]).startswith("path_tracer:")
-    )
-    contact_summary_index = next(
-        index
-        for index, row in enumerate(method_summaries)
-        if str(row["scenario"]).startswith("contact_3d:")
-    )
-
     plot_rows = {
         "analytic_gates.json": [
             {
@@ -550,22 +1275,30 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "hard_values": [0.0, 1.0],
                 "source_row_ids": [triangle_diagnostic["row_id"]],
             },
-            {
-                "plot_id": f"path-tracer-gradient-quality-{path_summary_index}",
-                "kind": "path_tracer_gradient_quality",
-                "scenario": "path_tracer:five_spheres:initial",
-                "method": "score",
-                "values": [0.0],
-                "source_row_ids": [row["row_id"] for row in score_rows],
-            },
-            {
-                "plot_id": f"contact-3d-gradient-quality-{contact_summary_index}",
-                "kind": "contact_3d_gradient_quality",
-                "scenario": "contact_3d:three_sphere_floor_ramp:initial_launch_velocity",
-                "method": "soft_ad",
-                "values": [0.0],
-                "source_row_ids": [contact_gradient["row_id"]],
-            },
+            *[
+                {
+                    "plot_id": f"path-tracer-gradient-quality-{index}",
+                    "kind": "path_tracer_gradient_quality",
+                    "scenario": row["scenario"],
+                    "method": row["method"],
+                    "values": [row["relative_error"]],
+                    "source_row_ids": row["source_row_ids"],
+                }
+                for index, row in enumerate(method_summaries)
+                if str(row["scenario"]).startswith("path_tracer:")
+            ],
+            *[
+                {
+                    "plot_id": f"contact-3d-gradient-quality-{index}",
+                    "kind": "contact_3d_gradient_quality",
+                    "scenario": row["scenario"],
+                    "method": row["method"],
+                    "values": [row["relative_error"]],
+                    "source_row_ids": row["source_row_ids"],
+                }
+                for index, row in enumerate(method_summaries)
+                if str(row["scenario"]).startswith("contact_3d:")
+            ],
         ],
         "bias_variance.json": [
             {
@@ -578,13 +1311,19 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
             for index, row in enumerate(method_summaries)
         ],
         "optimization.json": [
-            {
-                "plot_id": "optimization-0",
-                "scenario": "path_tracer",
-                "method": "score",
-                "values": [0.0, 0.0],
-                "source_row_ids": [row["row_id"] for row in optimization_rows],
-            },
+            *[
+                {
+                    "plot_id": f"optimization-{index}",
+                    "scenario": row["scenario"],
+                    "method": row["method"],
+                    "values": [
+                        row["final_hard_loss_mean"],
+                        row["held_out_loss_mean"],
+                    ],
+                    "source_row_ids": row["source_row_ids"],
+                }
+                for index, row in enumerate(optimization_summaries)
+            ],
             {
                 "plot_id": "path-render-comparison",
                 "kind": "path_render_comparison",
@@ -672,9 +1411,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "analytic": [analytic_anchor],
         "triangle_2d": raw["triangle_2d.json"],
         "collision_2d": raw["collision_2d.json"],
-        "path_tracer": comparison_rows,
+        "path_tracer": [path_protocol, *comparison_rows],
         "contact_3d": [contact_diagnostic],
-        "opaque_mesh": raw["opaque_mesh.json"],
+        "opaque_mesh": [opaque_diagnostic],
         "references": reference_rows,
     }
     summary = {
@@ -696,25 +1435,15 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "source_row_ids": [analytic_anchor["row_id"]],
             },
             "path_best_held_out_loss": {
-                "value": 0.0,
+                "value": 0.5,
                 "unit": "mean_squared_error",
                 "source_row_ids": [optimization_rows[0]["row_id"]],
             },
         },
         "method_summaries": method_summaries,
-        "optimization_summaries": [
-            {
-                "scenario": "path_tracer",
-                "method": "score",
-                "final_hard_loss_mean": 0.0,
-                "final_hard_loss_ci_low": 0.0,
-                "final_hard_loss_ci_high": 0.0,
-                "success_rate": 1.0,
-                "held_out_loss_mean": 0.0,
-                "source_row_ids": [row["row_id"] for row in optimization_rows],
-            }
-        ],
+        "optimization_summaries": optimization_summaries,
         "performance_summaries": performance_summaries,
+        "runtime": _report_runtime_record(),
         "scenario_validity": [
             {
                 "scenario": scenario,
@@ -726,7 +1455,8 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "source_row_ids": [row["row_id"] for row in rows],
             }
             for scenario, rows in validity_groups.items()
-        ],
+        ]
+        + [_contact_optimization_validity(contact_optimization_rows)],
     }
     write_fixture_json(root / "data/summary.json", summary)
     for name in FIGURE_NAMES:
@@ -751,22 +1481,35 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         }
         for method in REQUIRED_METHOD_IDS
     ]
-    applicability.append(
-        {
-            "scenario": "path_tracer",
-            "method": "score",
-            "samples": 8,
-            "stochastic": True,
-            "antithetic": True,
-            "report_required": True,
-            "estimator_only": False,
-            "applicable": True,
-            "transformable": True,
-            "optimization_enabled": True,
-            "reference_required": True,
-            "reason": None,
-        }
-    )
+    path_stochastic_methods = {
+        "smoothed_pathwise",
+        "score",
+        "smoothed_crn_fd",
+        "residual_control_variate",
+    }
+    for method in (
+        "smoothed_pathwise",
+        "score",
+        "smoothed_crn_fd",
+        "residual_control_variate",
+    ):
+        for samples in REPORT_CONFIG["smoothing_samples"]:
+            applicability.append(
+                {
+                    "scenario": "path_tracer",
+                    "method": method,
+                    "samples": samples,
+                    "stochastic": True,
+                    "antithetic": True,
+                    "report_required": True,
+                    "estimator_only": False,
+                    "applicable": True,
+                    "transformable": True,
+                    "optimization_enabled": True,
+                    "reference_required": True,
+                    "reason": None,
+                }
+            )
     for scenario in (
         "triangle_2d",
         "collision_2d",
@@ -775,8 +1518,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "opaque_mesh",
     ):
         for method in REQUIRED_METHOD_IDS:
-            if (scenario, method) == ("path_tracer", "score"):
+            if scenario == "path_tracer" and method in path_stochastic_methods:
                 continue
+            path_deterministic = scenario == "path_tracer"
             applicability.append(
                 {
                     "scenario": scenario,
@@ -784,13 +1528,18 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                     "samples": 1,
                     "stochastic": False,
                     "antithetic": False,
-                    "report_required": False,
+                    "report_required": path_deterministic,
                     "estimator_only": scenario == "opaque_mesh",
-                    "applicable": False,
-                    "transformable": False,
-                    "optimization_enabled": False,
+                    "applicable": path_deterministic,
+                    "transformable": path_deterministic,
+                    "optimization_enabled": path_deterministic
+                    and method in {"crisp_ad", "soft_ad", "straight_through_ad"},
                     "reference_required": False,
-                    "reason": "fixture cell is intentionally unsupported",
+                    "reason": (
+                        None
+                        if path_deterministic
+                        else "fixture cell is intentionally unsupported"
+                    ),
                 }
             )
     manifest = {
@@ -821,18 +1570,36 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
             "device": "cpu",
             "cpu_model": "test",
             "cpu_threads": 1,
-            "seeds": {"estimator": [0]},
+            "seeds": {
+                "analytic_estimator_outer": list(range(100, 132)),
+                "collision_estimator_outer": list(range(300, 332)),
+                "contact_3d": {
+                    "estimator_outer": list(range(5000, 5032)),
+                    "optimization_outer": [
+                        6000 + 64 * schedule for schedule in range(16)
+                    ],
+                    "reference_base": 302,
+                    "reference_inner_base": 402,
+                },
+                "opaque_mesh": {
+                    "estimator_outer": list(range(9000, 9032)),
+                    "reference_base": 10000,
+                    "reference_inner_base": 11000,
+                },
+                "path_tracer": {
+                    "training": list(range(1000, 1032)),
+                    "target": list(range(2000, 2016)),
+                    "held_out": list(range(3000, 3016)),
+                    "reference_base": 4000,
+                    "reference_inner_base": 4001,
+                    "estimator_outer": list(range(10000, 10032)),
+                },
+                "triangle_estimator_outer": list(range(200, 232)),
+            },
         },
-        "config": {
-            "smoothing_samples": [8],
-            "estimator_seeds": 32,
-            "path_reference_samples": 32768,
-            "contact_reference_samples": 65536,
-            "reference_seed_sets": 4,
-            "optimization_steps": 10,
-            "optimization_schedules": 2,
-        },
+        "config": dict(REPORT_CONFIG),
         "accepted": {"analytic": True, "references": True, "scenario_validity": True},
+        "report_reference_count_decision": dict(REPORT_REFERENCE_COUNT_DECISION),
         "reference_required_cells": list(EXPECTED_REFERENCE_CELLS),
         "applicability": applicability,
         "files": {},
@@ -856,9 +1623,511 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
 
 class PublicationValidationTests(unittest.TestCase):
     def test_valid_fixture_is_accepted(self):
-        result = validate_publication(make_valid_fixture(self))
+        root = make_valid_fixture(self)
+        manifest = json.loads((root / "data/manifest.json").read_text(encoding="utf-8"))
+        summary = json.loads((root / "data/summary.json").read_text(encoding="utf-8"))
+        path_rows = json.loads(
+            (root / "data/raw/path_tracer_gradients.json").read_text(encoding="utf-8")
+        )["rows"]
+        path_optimization_rows = json.loads(
+            (root / "data/raw/path_tracer_optimization.json").read_text(
+                encoding="utf-8"
+            )
+        )["rows"]
+        protocol = next(
+            row
+            for row in path_rows
+            if row.get("scenario") == "path_randomness_protocol"
+        )
+        self.assertEqual(manifest["config"], REPORT_CONFIG)
+        self.assertEqual(
+            manifest["report_reference_count_decision"],
+            REPORT_REFERENCE_COUNT_DECISION,
+        )
+        self.assertEqual(
+            summary["runtime"]["elapsed_measurement"],
+            "through_one_complete_descriptor_relative_install_pass",
+        )
+        self.assertEqual(
+            set(summary["runtime"]["phase_seconds"]), set(REPORT_RUNTIME_PHASES)
+        )
+        self.assertEqual(
+            protocol["certificate"]["fingerprint"], PATH_CERTIFICATE_FINGERPRINT
+        )
+        self.assertEqual(
+            protocol["certificate"]["root_callable_keys"], list(PATH_ROOT_CALLABLE_KEYS)
+        )
+        self.assertEqual(
+            protocol["certificate"]["callable_keys"], list(PATH_CALLABLE_KEYS)
+        )
+        self.assertEqual(len(path_optimization_rows), 64)
+        self.assertEqual(
+            {(row["method"], row["schedule_id"]) for row in path_optimization_rows},
+            {
+                (method, schedule)
+                for method in PATH_OPTIMIZATION_METHODS
+                for schedule in range(16)
+            },
+        )
+
+        result = validate_publication(root)
         self.assertEqual(result["files"], 31)
         self.assertGreater(result["rows"], 32)
+
+    def test_canonical_path_seed_pairs_do_not_split_stochastic_strata(self):
+        root = make_valid_fixture(self)
+        path = json.loads(
+            (root / "data/raw/path_tracer_gradients.json").read_text(encoding="utf-8")
+        )
+        rows = [
+            row
+            for row in path["rows"]
+            if row.get("method")
+            in {
+                "smoothed_pathwise",
+                "score",
+                "smoothed_crn_fd",
+                "residual_control_variate",
+            }
+        ]
+        for method in (
+            "smoothed_pathwise",
+            "score",
+            "smoothed_crn_fd",
+            "residual_control_variate",
+        ):
+            for samples in REPORT_CONFIG["smoothing_samples"]:
+                selected = [
+                    row
+                    for row in rows
+                    if row["method"] == method and row["samples"] == samples
+                ]
+                self.assertEqual(len(selected), 32)
+                self.assertEqual(
+                    [(row["outer_seed"], row["inner_seed"]) for row in selected],
+                    [(10000 + index, 1000 + index) for index in range(32)],
+                )
+                self.assertEqual(
+                    len({row["config"]["inner_random_digest"] for row in selected}),
+                    32,
+                )
+
+        validate_publication(root)
+
+    def test_opaque_estimator_rows_do_not_repeat_diagnostic_scope_fields(self):
+        root = make_valid_fixture(self)
+        opaque = json.loads(
+            (root / "data/raw/opaque_mesh.json").read_text(encoding="utf-8")
+        )["rows"]
+        diagnostics = [row for row in opaque if row.get("method") is None]
+        estimators = [row for row in opaque if row.get("method") is not None]
+        self.assertEqual(len(diagnostics), 1)
+        self.assertTrue(estimators)
+        self.assertEqual(diagnostics[0]["transform_status"], "estimator_only")
+        self.assertIs(diagnostics[0]["transformable"], False)
+        self.assertTrue(
+            all(
+                "transform_status" not in row and "transformable" not in row
+                for row in estimators
+            )
+        )
+
+        validate_publication(root)
+
+    def test_report_reference_count_decision_is_exact_and_immutable(self):
+        cases = (
+            ("missing", None),
+            ("status", "pending_pilot"),
+            ("protocol_fingerprint", "0" * 64),
+            ("pilot_manifest_sha256", "0" * 64),
+            ("pilot_source_commit", "0" * 40),
+            ("pilot_projected_report_seconds", 1.0),
+            ("decided_at_utc", "2026-06-28T14:43:55Z"),
+            ("path_reference_samples", 32768.0),
+            ("contact_reference_samples", 65535),
+            ("reference_seed_sets", 3),
+            ("rationale", ""),
+        )
+        for field, value in cases:
+            with self.subTest(field=field):
+                root = make_valid_fixture(self)
+                manifest_path = root / "data/manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if field == "missing":
+                    del manifest["report_reference_count_decision"]
+                else:
+                    manifest["report_reference_count_decision"][field] = value
+                write_fixture_json(manifest_path, manifest)
+
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "decision|pilot|protocol fingerprint|reference count",
+                ):
+                    validate_publication(root)
+
+    def test_report_config_is_bound_to_the_accepted_protocol_fingerprint(self):
+        cases = (
+            ("width", 23),
+            ("height", 15),
+            ("spp", 1),
+            ("bounces", 2),
+            ("smoothing_samples", [8, 16, 32, 128, 64]),
+            ("optimization_steps", 63),
+            ("optimization_schedules", 15),
+        )
+        for field, value in cases:
+            with self.subTest(field=field):
+                root = make_valid_fixture(self)
+                manifest_path = root / "data/manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["config"][field] = value
+                write_fixture_json(manifest_path, manifest)
+
+                with self.assertRaisesRegex(
+                    ValidationError, "config|protocol|decision|fingerprint"
+                ):
+                    validate_publication(root)
+
+    def test_published_runtime_requires_the_complete_installed_measurement(self):
+        cases = (
+            "missing",
+            "staging_measurement",
+            "exclusions",
+            "zero_finalization",
+            "finalization_mismatch",
+            "zero_installation",
+            "installation_mismatch",
+            "missing_phase",
+            "projection_factor",
+            "projection_model",
+            "projected_seconds",
+            "boolean_duration",
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                root = make_valid_fixture(self)
+                summary_path = root / "data/summary.json"
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                runtime = summary["runtime"]
+                if case == "missing":
+                    del summary["runtime"]
+                elif case == "staging_measurement":
+                    runtime["elapsed_measurement"] = (
+                        "through_one_complete_final_write_hash_validation_pass"
+                    )
+                elif case == "exclusions":
+                    runtime["measurement_excludes"] = ["metadata_rewrite"]
+                elif case == "zero_finalization":
+                    runtime["measured_finalization_pass_seconds"] = 0.0
+                    runtime["phase_seconds"]["finalization"] = 0.0
+                elif case == "finalization_mismatch":
+                    runtime["measured_finalization_pass_seconds"] += 1.0
+                elif case == "zero_installation":
+                    runtime["measured_installation_pass_seconds"] = 0.0
+                    runtime["phase_seconds"]["installation"] = 0.0
+                elif case == "installation_mismatch":
+                    runtime["measured_installation_pass_seconds"] += 1.0
+                elif case == "missing_phase":
+                    del runtime["phase_seconds"]["installation"]
+                elif case == "projection_factor":
+                    runtime["projection_factors"]["installation"] = 2.0
+                elif case == "projection_model":
+                    runtime["projection_model"] = "unrecorded_projection"
+                elif case == "projected_seconds":
+                    runtime["projected_report_seconds"] += 1.0
+                else:
+                    runtime["elapsed_seconds"] = True
+                write_fixture_json(summary_path, summary)
+                _refresh_manifest(root)
+
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "runtime|installation|elapsed|phase|projection|measurement",
+                ):
+                    validate_publication(root)
+
+    def test_path_numerical_gauge_contract_is_exact_and_certificate_bound(self):
+        cases = (
+            "missing_protocol",
+            "target",
+            "target_label",
+            "unbiased_target",
+            "row_gauge_sites",
+            "config_policy",
+            "config_bounds",
+            "control_fingerprint",
+            "control_forward_mismatch",
+            "certificate_site_count",
+            "coherent_forged_fingerprint",
+            "callable_projection",
+            "nonresidual_gauge_claim",
+            "nonpath_claim",
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                root = make_valid_fixture(self)
+                path_file = root / "data/raw/path_tracer_gradients.json"
+                payload = json.loads(path_file.read_text(encoding="utf-8"))
+                protocol = next(
+                    row
+                    for row in payload["rows"]
+                    if row.get("scenario") == "path_randomness_protocol"
+                )
+                residuals = [
+                    row
+                    for row in payload["rows"]
+                    if row.get("method") == "residual_control_variate"
+                ]
+                residual = residuals[0]
+                if case == "missing_protocol":
+                    payload["rows"].remove(protocol)
+                    summary_path = root / "data/summary.json"
+                    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                    validity = next(
+                        row
+                        for row in summary["scenario_validity"]
+                        if row["scenario"] == "path_tracer"
+                    )
+                    validity["source_row_ids"].remove(protocol["row_id"])
+                    validity["metrics"]["row_count"] -= 1
+                    validity["metrics"]["accepted_count"] -= 1
+                    write_fixture_json(summary_path, summary)
+                elif case == "target":
+                    for row in residuals:
+                        row["target"] = "gaussian_smoothed_hard"
+                elif case == "target_label":
+                    residual["target_label"] = "unqualified residual target"
+                elif case == "unbiased_target":
+                    residual["unbiased_target"] = False
+                elif case == "row_gauge_sites":
+                    residual["numerical_gauge_sites"] = 4
+                elif case == "config_policy":
+                    for row in residuals:
+                        row["config"]["numerical_gauge_policy"] = "smoothed"
+                elif case == "config_bounds":
+                    for row in residuals:
+                        row["config"]["parameter_upper"] = [0.8, 0.5, 0.4]
+                elif case == "control_fingerprint":
+                    protocol["control_variate"]["certificate_fingerprint"] = "0" * 64
+                elif case == "control_forward_mismatch":
+                    protocol["control_variate"]["soft_forward_executions"] = 16
+                elif case == "certificate_site_count":
+                    protocol["certificate"]["numerical_gauge_sites"] = 4
+                elif case == "coherent_forged_fingerprint":
+                    forged = "0" * 64
+                    protocol["certificate"]["fingerprint"] = forged
+                    protocol["control_variate"]["certificate_fingerprint"] = forged
+                    for row in residuals:
+                        row["certificate_fingerprint"] = forged
+                elif case == "callable_projection":
+                    protocol["certificate"]["callable_keys"] = protocol["certificate"][
+                        "callable_keys"
+                    ][:-1]
+                elif case == "nonresidual_gauge_claim":
+                    score = next(
+                        row for row in payload["rows"] if row.get("method") == "score"
+                    )
+                    score["numerical_gauge_assumption"] = True
+                    score["numerical_gauge_sites"] = 5
+                else:
+                    analytic_path = root / "data/raw/analytic.json"
+                    analytic = json.loads(analytic_path.read_text(encoding="utf-8"))
+                    analytic["rows"][0]["target"] = PATH_GAUGE_TARGET
+                    analytic["rows"][0]["numerical_gauge_assumption"] = True
+                    analytic["rows"][0]["numerical_gauge_sites"] = 5
+                    write_fixture_json(analytic_path, analytic)
+                write_fixture_json(path_file, payload)
+                _refresh_manifest(root)
+
+                with self.assertRaisesRegex(
+                    ValidationError, "path|gauge|certificate|target|protocol"
+                ):
+                    validate_publication(root)
+
+    def test_path_optimization_protocol_is_exact_and_complete(self):
+        cases = (
+            "missing_identity",
+            "duplicate_identity",
+            "unknown_method",
+            "schedule",
+            "estimator_seeds",
+            "target_seed",
+            "held_out_seed",
+            "source_commit",
+            "device",
+            "accepted",
+            "success",
+            "final_recheck",
+            "recheck_seed",
+            "recheck_protocol",
+            "held_out_evaluations",
+            "render_work",
+            "objective_extension",
+            "gauge_policy",
+            "box_constraints",
+            "loss_work",
+            "parameter_work",
+            "gradient_work",
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                root = make_valid_fixture(self)
+                path = root / "data/raw/path_tracer_optimization.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                row = payload["rows"][0]
+                if case == "missing_identity":
+                    payload["rows"].pop()
+                elif case == "duplicate_identity":
+                    payload["rows"][-1]["method"] = row["method"]
+                    payload["rows"][-1]["schedule_id"] = row["schedule_id"]
+                elif case == "unknown_method":
+                    row["method"] = "unknown"
+                elif case == "schedule":
+                    row["schedule_id"] = 16
+                elif case == "estimator_seeds":
+                    row["estimator_seeds"][0] += 1
+                elif case == "target_seed":
+                    row["target_seed"] += 1
+                elif case == "held_out_seed":
+                    row["held_out_seed"] += 1
+                elif case == "source_commit":
+                    row["source_commit"] = "2" * 40
+                elif case == "device":
+                    row["device"] = "cuda:0"
+                elif case == "accepted":
+                    row["accepted"] = False
+                elif case == "success":
+                    row["success"] = False
+                elif case == "final_recheck":
+                    row["deterministic_final_recheck"] += 0.25
+                elif case == "recheck_seed":
+                    row["final_recheck_seed"] += 1
+                elif case == "recheck_protocol":
+                    row["final_recheck_protocol"] = "fresh_target"
+                elif case == "held_out_evaluations":
+                    row["held_out_render_evaluations"] -= 1
+                elif case == "render_work":
+                    row["held_out_render_work"]["total_renders"] -= 1
+                elif case == "objective_extension":
+                    row["objective_extension"] = "unbounded"
+                elif case == "gauge_policy":
+                    row["numerical_gauge_policy"] = "smoothed"
+                elif case == "box_constraints":
+                    row["box_constraints"]["upper"][0] = 0.7
+                elif case == "loss_work":
+                    row["losses"].pop()
+                elif case == "parameter_work":
+                    row["parameters"].pop()
+                else:
+                    row["gradients"].pop()
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "path optimization|path-tracer optimization",
+                ):
+                    validate_publication(root)
+
+    def test_path_inner_random_digest_is_global_by_inner_seed(self):
+        cases = (
+            ("cross_method", "score", 8, "f" * 64),
+            ("cross_sample_count", "score", 16, "e" * 64),
+        )
+        for case, method, samples, forged_digest in cases:
+            with self.subTest(case=case):
+                root = make_valid_fixture(self)
+                path = root / "data/raw/path_tracer_gradients.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                row = next(
+                    record
+                    for record in payload["rows"]
+                    if record.get("method") == method
+                    and record.get("samples") == samples
+                    and record.get("inner_seed") == 1000
+                )
+                row["config"]["inner_random_digest"] = forged_digest
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "inner_seed|inner-random digest|inner random digest",
+                ):
+                    validate_publication(root)
+
+    def test_manifest_source_seed_tree_is_exact(self):
+        cases = ("missing_domain", "path_training", "contact_optimization")
+        for case in cases:
+            with self.subTest(case=case):
+                root = make_valid_fixture(self)
+                path = root / "data/manifest.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                seeds = payload["source"]["seeds"]
+                if case == "missing_domain":
+                    del seeds["triangle_estimator_outer"]
+                elif case == "path_training":
+                    seeds["path_tracer"]["training"][0] = 999
+                else:
+                    seeds["contact_3d"]["optimization_outer"][0] += 1
+                write_fixture_json(path, payload)
+
+                with self.assertRaisesRegex(
+                    ValidationError, "source.*seed|seed.*protocol|canonical.*seed"
+                ):
+                    validate_publication(root)
+
+    def test_path_gradient_rows_require_deterministic_coverage_and_exact_configs(self):
+        cases = (
+            "missing_deterministic",
+            "crisp_fd_epsilon",
+            "smoothed_crn_fd_epsilon",
+            "non_fd_epsilon",
+            "common_config",
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                root = make_valid_fixture(self)
+                path = root / "data/raw/path_tracer_gradients.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if case == "missing_deterministic":
+                    index = next(
+                        index
+                        for index, row in enumerate(payload["rows"])
+                        if row.get("method") == "crisp_ad"
+                        and row.get("scenario_family") == "path_tracer"
+                    )
+                    payload["rows"].pop(index)
+                else:
+                    method, samples = {
+                        "crisp_fd_epsilon": ("crisp_fd", 1),
+                        "smoothed_crn_fd_epsilon": ("smoothed_crn_fd", 8),
+                        "non_fd_epsilon": ("score", 8),
+                        "common_config": ("score", 8),
+                    }[case]
+                    selected = [
+                        record
+                        for record in payload["rows"]
+                        if record.get("method") == method
+                        and record.get("samples") == samples
+                    ]
+                    if case in {"crisp_fd_epsilon", "smoothed_crn_fd_epsilon"}:
+                        for row in selected:
+                            row["config"]["epsilon"] = None
+                    elif case == "non_fd_epsilon":
+                        for row in selected:
+                            row["config"]["epsilon"] = 0.01
+                    else:
+                        for row in selected:
+                            row["config"]["paths_per_forward"] -= 1
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "path.*gradient|path.*config|path.*method|deterministic|epsilon",
+                ):
+                    validate_publication(root)
 
     def test_missing_manifest_is_rejected(self):
         root = make_valid_fixture(self)
@@ -1072,12 +2341,16 @@ class PublicationValidationTests(unittest.TestCase):
         removed = next(
             index
             for index, row in enumerate(payload["rows"])
-            if row.get("method") == "score" and row.get("outer_seed") == 31
+            if row.get("method") == "score"
+            and row.get("samples") == 8
+            and row.get("outer_seed") == 10031
         )
         payload["rows"].pop(removed)
         write_fixture_json(path, payload)
         _refresh_manifest(root)
-        with self.assertRaisesRegex(ValidationError, "32 distinct outer seeds"):
+        with self.assertRaisesRegex(
+            ValidationError, "32.*distinct outer seeds|exactly 32 rows"
+        ):
             validate_publication(root)
 
         root = make_valid_fixture(self)
@@ -1384,10 +2657,9 @@ class PublicationValidationTests(unittest.TestCase):
     def test_nonfinite_json_and_missing_literature_are_rejected(self):
         root = make_valid_fixture(self)
         path = root / "data/summary.json"
-        path.write_text(
-            path.read_text(encoding="utf-8").replace('"value": 0.0', '"value": NaN', 1),
-            encoding="utf-8",
-        )
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["headline_metrics"]["path_best_held_out_loss"]["value"] = math.nan
+        path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
         _refresh_manifest(root)
         with self.assertRaisesRegex(ValidationError, "non-finite"):
             validate_publication(root)
@@ -1468,6 +2740,63 @@ class ReportBuilderTests(unittest.TestCase):
         from discograd import build_report
 
         return build_report
+
+    def test_builder_rejects_invalid_full_bundle_protocol(self):
+        builder = self._builder()
+
+        def mutate_decision(root: Path) -> None:
+            path = root / "data/manifest.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["report_reference_count_decision"]["status"] = "rejected"
+            write_fixture_json(path, payload)
+
+        def mutate_runtime(root: Path) -> None:
+            path = root / "data/summary.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["runtime"]["elapsed_measurement"] = "partial_run"
+            write_fixture_json(path, payload)
+            _refresh_manifest(root)
+
+        def mutate_path_certificate(root: Path) -> None:
+            path = root / "data/raw/path_tracer_gradients.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            protocol = next(
+                row
+                for row in payload["rows"]
+                if row.get("scenario") == "path_randomness_protocol"
+            )
+            protocol["certificate"]["fully_smoothed"] = True
+            write_fixture_json(path, payload)
+            _refresh_manifest(root)
+
+        def mutate_contact_validity(root: Path) -> None:
+            path = root / "data/raw/contact_3d_optimization.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            validity = payload["rows"][0]["final_physical_validity"]
+            validity["minimum_positive_normal_impulse"] = 0.0
+            write_fixture_json(path, payload)
+            _refresh_manifest(root)
+
+        cases = (
+            ("decision", mutate_decision, "decision|pilot|reference"),
+            ("runtime", mutate_runtime, "runtime|elapsed|measurement"),
+            (
+                "path certificate",
+                mutate_path_certificate,
+                "path|certificate|fully_smoothed|gauge",
+            ),
+            (
+                "contact validity",
+                mutate_contact_validity,
+                "contact|impulse|physical|validity",
+            ),
+        )
+        for name, mutate, message in cases:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                mutate(root)
+                with self.assertRaisesRegex(builder.BuildError, message):
+                    builder.render_report(root=root, template_path=REPORT_TEMPLATE)
 
     def test_current_producer_gradient_plot_kind_and_ids_are_supported(self):
         builder = self._builder()
@@ -1691,40 +3020,24 @@ class ReportBuilderTests(unittest.TestCase):
         path = root / "data/raw/path_tracer_optimization.json"
         path_rows = json.loads(path.read_text(encoding="utf-8"))
         for row in path_rows["rows"]:
+            row["initial_hard_loss"] = 3.0
+            row["final_hard_loss"] = 2.0
             row["held_out_loss"] = 2.0
+            row["deterministic_final_recheck"] = 2.0
+            row["losses"][0] = 3.0
+            row["losses"][-1] = 2.0
         write_fixture_json(path, path_rows)
-        contact_row = {
-            "row_id": "contact:optimization:soft_ad:0",
-            "scenario_family": "contact_3d",
-            "scenario": "three_sphere_floor_ramp",
-            "method": "soft_ad",
-            "final_hard_loss": 0.0,
-            "held_out_loss": 1.0,
-            "success": True,
-        }
-        write_fixture_json(
-            root / "data/raw/contact_3d_optimization.json",
-            {
-                "schema_version": 1,
-                "dataset": "contact_3d_optimization",
-                "rows": [contact_row],
-            },
-        )
         summary_path = root / "data/summary.json"
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
-        path_summary = summary["optimization_summaries"][0]
-        path_summary["held_out_loss_mean"] = 2.0
-        contact_summary = {
-            "scenario": "contact_3d",
-            "method": "soft_ad",
-            "final_hard_loss_mean": 0.0,
-            "final_hard_loss_ci_low": 0.0,
-            "final_hard_loss_ci_high": 0.0,
-            "success_rate": 1.0,
-            "held_out_loss_mean": 1.0,
-            "source_row_ids": [contact_row["row_id"]],
-        }
-        summary["optimization_summaries"] = [contact_summary, path_summary]
+        for path_summary in summary["optimization_summaries"]:
+            if path_summary["scenario"] != "path_tracer":
+                continue
+            path_summary.update(
+                final_hard_loss_mean=2.0,
+                final_hard_loss_ci_low=2.0,
+                final_hard_loss_ci_high=2.0,
+                held_out_loss_mean=2.0,
+            )
         summary["headline_metrics"]["path_best_held_out_loss"].update(
             value=2.0,
             source_row_ids=[path_rows["rows"][0]["row_id"]],
@@ -1732,20 +3045,9 @@ class ReportBuilderTests(unittest.TestCase):
         write_fixture_json(summary_path, summary)
         optimization_plot = root / "data/plot_data/optimization.json"
         plot_payload = json.loads(optimization_plot.read_text(encoding="utf-8"))
-        plot_payload["rows"][0].update(
-            plot_id="optimization-1",
-            values=[0.0, 2.0],
-        )
-        plot_payload["rows"].insert(
-            0,
-            {
-                "plot_id": "optimization-0",
-                "scenario": "contact_3d",
-                "method": "soft_ad",
-                "values": [0.0, 1.0],
-                "source_row_ids": [contact_row["row_id"]],
-            },
-        )
+        for row in plot_payload["rows"]:
+            if row.get("scenario") == "path_tracer" and row.get("kind") is None:
+                row["values"] = [2.0, 2.0]
         write_fixture_json(optimization_plot, plot_payload)
         _refresh_manifest(root)
         builder.render_report(root=root, template_path=REPORT_TEMPLATE)
@@ -1766,6 +3068,24 @@ class ReportBuilderTests(unittest.TestCase):
         write_fixture_json(path, path_payload)
         summary_path = root / "data/summary.json"
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        for index, path_summary in enumerate(summary["optimization_summaries"]):
+            if path_summary["scenario"] != "path_tracer":
+                continue
+            source_ids = [
+                row["row_id"]
+                for row in path_payload["rows"]
+                if row["method"] == path_summary["method"]
+            ]
+            path_summary["source_row_ids"] = source_ids
+            optimization_plot = root / "data/plot_data/optimization.json"
+            plot_payload = json.loads(optimization_plot.read_text(encoding="utf-8"))
+            plot_row = next(
+                row
+                for row in plot_payload["rows"]
+                if row.get("plot_id") == f"optimization-{index}"
+            )
+            plot_row["source_row_ids"] = source_ids
+            write_fixture_json(optimization_plot, plot_payload)
         summary["headline_metrics"]["path_best_held_out_loss"]["source_row_ids"] = [
             path_payload["rows"][0]["row_id"]
         ]
@@ -2428,6 +3748,140 @@ class ReportBuilderTests(unittest.TestCase):
             with self.subTest(label=label):
                 self.assertIn(label, page)
 
+    def test_typed_model_exposes_immutable_publication_contract(self):
+        builder = self._builder()
+        model = builder.load_report(make_valid_fixture(self))
+
+        decision = model.manifest.report_reference_count_decision
+        self.assertEqual(decision.status, "accepted")
+        self.assertEqual(
+            decision.protocol_fingerprint,
+            REPORT_REFERENCE_COUNT_DECISION["protocol_fingerprint"],
+        )
+        self.assertEqual(decision.path_reference_samples, 32768)
+        self.assertEqual(decision.contact_reference_samples, 65536)
+
+        runtime = model.summary.runtime
+        self.assertEqual(
+            runtime.elapsed_measurement,
+            "through_one_complete_descriptor_relative_install_pass",
+        )
+        self.assertIn("installation", runtime.phase_seconds)
+        self.assertEqual(len(runtime.measurement_excludes), 2)
+
+        contract = model.path_smoothing_contract
+        self.assertTrue(contract.complete)
+        self.assertFalse(contract.fully_smoothed)
+        self.assertEqual(
+            (
+                contract.transformed_sites,
+                contract.smoothed_sites,
+                contract.numerical_gauge_sites,
+            ),
+            (7, 2, 5),
+        )
+        self.assertEqual(contract.fingerprint, PATH_CERTIFICATE_FINGERPRINT)
+        self.assertEqual(contract.target, PATH_GAUGE_TARGET)
+        self.assertTrue(contract.numerical_gauge_assumption)
+
+        contact_rows = [
+            row
+            for row in model.optimization_rows
+            if row.source_file == "data/raw/contact_3d_optimization.json"
+        ]
+        self.assertEqual(len(contact_rows), 48)
+        self.assertEqual(
+            {
+                row.method: sum(item.method == row.method for item in contact_rows)
+                for row in contact_rows
+            },
+            {
+                "residual_control_variate": 16,
+                "soft_ad": 16,
+                "straight_through_ad": 16,
+            },
+        )
+        self.assertTrue(all(row.physical_valid for row in contact_rows))
+        self.assertTrue(
+            all(row.hard_evaluation_forward_executions == 387 for row in contact_rows)
+        )
+
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            decision.status = "changed"
+        with self.assertRaises(TypeError):
+            runtime.phase_seconds["installation"] = 0.0
+
+    def test_report_renders_decision_gauge_contact_and_installed_runtime(self):
+        builder = self._builder()
+        root = make_valid_fixture(self)
+        page = builder.render_report(root=root, template_path=REPORT_TEMPLATE).decode(
+            "utf-8"
+        )
+        parser = _RenderedPageParser()
+        parser.feed(page)
+
+        self.assertIn("Accepted report reference-count decision", page)
+        self.assertIn("Path smoothing certificate and numerical gauge", page)
+        self.assertIn("Contact optimization physical rechecks", page)
+        self.assertIn("Installed report runtime", page)
+        self.assertIn("fully smoothed", page.casefold())
+        self.assertIn("almost everywhere", page.casefold())
+        self.assertIn("not fully smoothed", page.casefold())
+        self.assertIn(REPORT_REFERENCE_COUNT_RATIONALE, page)
+        self.assertIn(PATH_CERTIFICATE_FINGERPRINT, page)
+        self.assertIn(PATH_GAUGE_TARGET, page)
+        self.assertIn(PATH_GAUGE_TARGET_LABEL, page)
+        self.assertIn("through_one_complete_descriptor_relative_install_pass", page)
+        self.assertIn("final_metadata_bearing_reinstall_and_binding_verification", page)
+
+        sourced_cells = [
+            (
+                attributes.get("data-source-file"),
+                unquote(attributes.get("data-source-key", "")),
+                text,
+            )
+            for attributes, text in parser.cells
+            if attributes.get("data-source-file") is not None
+        ]
+        self.assertTrue(
+            any(cell[2] == PATH_ONB_SEAM_SEMANTICS for cell in sourced_cells)
+        )
+        self.assertIn(
+            (
+                "data/manifest.json",
+                "#/report_reference_count_decision/status",
+                "accepted",
+            ),
+            sourced_cells,
+        )
+        self.assertIn(
+            (
+                "data/summary.json",
+                "#/runtime/elapsed_measurement",
+                "through_one_complete_descriptor_relative_install_pass",
+            ),
+            sourced_cells,
+        )
+        contact_schedule_cells = [
+            cell
+            for cell in sourced_cells
+            if cell[0] == "data/raw/contact_3d_optimization.json"
+            and cell[1].endswith("/schedule_id")
+        ]
+        physical_valid_cells = [
+            cell
+            for cell in sourced_cells
+            if cell[0] == "data/raw/contact_3d_optimization.json"
+            and cell[1].endswith("/final_physical_validity/valid")
+        ]
+        self.assertEqual(len(contact_schedule_cells), 48)
+        self.assertEqual(len(physical_valid_cells), 48)
+        self.assertEqual(
+            sorted(int(cell[2]) for cell in contact_schedule_cells),
+            sorted(list(range(16)) * 3),
+        )
+        self.assertTrue(all(cell[2] == "true" for cell in physical_valid_cells))
+
     def test_residual_execution_table_does_not_truncate_rows(self):
         builder = self._builder()
         root = make_valid_fixture(self)
@@ -2483,7 +3937,16 @@ class ReportBuilderTests(unittest.TestCase):
         page = builder.render_report(root=root, template_path=REPORT_TEMPLATE).decode(
             "utf-8"
         )
-        self.assertEqual(page.count("hard_forward_executions"), 10)
+        path_rows = json.loads(
+            (root / "data/raw/path_tracer_gradients.json").read_text(encoding="utf-8")
+        )["rows"]
+        path_residual_count = sum(
+            row.get("method") == "residual_control_variate" for row in path_rows
+        )
+        self.assertEqual(
+            page.count("hard_forward_executions"),
+            len(residual_rows) + path_residual_count + 1,
+        )
 
     def test_corrupt_png_is_rejected_even_when_manifest_digest_matches(self):
         builder = self._builder()
