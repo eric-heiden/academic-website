@@ -1584,6 +1584,20 @@ def _validate_protocol(
     return total_rows, commit
 
 
+def _validated_html_attributes(
+    tag: str, attrs: list[tuple[str, str | None]]
+) -> dict[str, str | None]:
+    validated: list[tuple[str, str | None]] = []
+    seen: set[str] = set()
+    for name, value in attrs:
+        normalized = name.casefold()
+        if normalized in seen:
+            raise ValidationError(f"duplicate HTML attribute {name!r} on <{tag}>")
+        seen.add(normalized)
+        validated.append((normalized, value))
+    return dict(validated)
+
+
 class _ReportHTMLParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -1600,7 +1614,7 @@ class _ReportHTMLParser(HTMLParser):
         self._element_stack: list[tuple[str, str | None, bool, bool, str | None]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        attributes = dict(attrs)
+        attributes = _validated_html_attributes(tag, attrs)
         element_id = attributes.get("id")
         style = (attributes.get("style") or "").replace(" ", "").casefold()
         hidden = (

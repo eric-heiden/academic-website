@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Warp Branch Smoothing: Evidence, Semantics, and Measured Trade-offs</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #526078;
+      --paper: #f8fafc;
+      --surface: #ffffff;
+      --line: #d7deea;
+      --accent: #0f766e;
+      --accent-dark: #115e59;
+      --code: #eef2f7;
+      --max: 76rem;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font: 1rem/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--accent-dark); text-underline-offset: 0.16em; }
+    a:focus-visible { outline: 0.2rem solid var(--accent); outline-offset: 0.2rem; }
+    header, main, footer { width: min(calc(100% - 2rem), var(--max)); margin-inline: auto; }
+    header { padding: 4.5rem 0 2rem; }
+    .eyebrow { color: var(--accent-dark); font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { max-width: 18ch; margin: 0.25rem 0 1rem; font-size: clamp(2.35rem, 7vw, 5rem); line-height: 0.98; letter-spacing: -0.045em; }
+    h2 { margin-top: 0; font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.15; }
+    h3 { margin-bottom: 0.35rem; line-height: 1.25; }
+    .lede { max-width: 70ch; color: var(--muted); font-size: 1.16rem; }
+    nav { margin: 2rem 0 0; padding: 1rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--surface); }
+    nav ul { display: flex; flex-wrap: wrap; gap: 0.45rem 1rem; margin: 0; padding: 0; list-style: none; }
+    section { margin: 1.25rem 0; padding: clamp(1.25rem, 4vw, 2.5rem); border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
+    section p, section li { max-width: 78ch; }
+    .callout { margin: 1.25rem 0; padding: 1rem 1.2rem; border-left: 0.3rem solid var(--accent); background: #ecfdf5; }
+    .equation { overflow-x: auto; padding: 0.8rem 1rem; border-radius: 0.55rem; background: var(--code); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    pre { overflow-x: auto; padding: 1rem; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--code); }
+    .table-scroll { overflow-x: auto; margin: 1.25rem 0; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    caption { padding: 0 0 0.65rem; font-weight: 750; text-align: left; }
+    th, td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #334155; background: #f1f5f9; }
+    .method { white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.9em; }
+    .figure-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1rem; margin: 1.25rem 0; }
+    figure { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 0.75rem; background: #fff; }
+    figure img { display: block; width: 100%; height: auto; background: #e2e8f0; }
+    figcaption { padding: 0.8rem 0.9rem; color: var(--muted); font-size: 0.92rem; }
+    .metadata { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 0.8rem; }
+    .metadata div { min-width: 0; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.55rem; }
+    .metadata dt { color: var(--muted); font-weight: 700; }
+    .metadata dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; }
+    footer { padding: 2rem 0 4rem; color: var(--muted); }
+    @media (max-width: 42rem) {
+      header { padding-top: 2.5rem; }
+      section { border-radius: 0.7rem; }
+      th, td { padding: 0.55rem; }
+    }
+    @media print {
+      body { background: #fff; font-size: 10pt; }
+      header, main, footer { width: 100%; }
+      nav { display: none; }
+      section { break-inside: avoid; border-color: #aaa; box-shadow: none; }
+      a { color: inherit; text-decoration: none; }
+      figure { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body data-source-commit="{{SOURCE_COMMIT_ATTR}}">
+  <header>
+    <div class="eyebrow">Experimental compiler and estimator evaluation</div>
+    <h1>Warp branch smoothing</h1>
+    {{HERO_SUMMARY}}
+    <nav aria-label="Report sections">
+      <ul>
+        <li><a href="#scope">Scope</a></li>
+        <li><a href="#semantics">Semantics</a></li>
+        <li><a href="#literature">Literature</a></li>
+        <li><a href="#grammar">Grammar</a></li>
+        <li><a href="#protocol">Protocol</a></li>
+        <li><a href="#analytic">Analytic checks</a></li>
+        <li><a href="#path-tracing">Path tracing</a></li>
+        <li><a href="#contact-3d">Contact</a></li>
+        <li><a href="#opaque-mesh">Opaque mesh</a></li>
+        <li><a href="#gradient-quality">Gradient quality</a></li>
+        <li><a href="#optimization">Optimization</a></li>
+        <li><a href="#performance">Performance</a></li>
+        <li><a href="#limitations">Limitations</a></li>
+        <li><a href="#reproducibility">Reproducibility</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="scope">
+      <h2>Scope and claims</h2>
+      <p>This report evaluates an opt-in Warp source transform for eligible value branches together with whole-program smoothing estimators. It separates compiler behavior, estimator targets, numerical evidence, scenario validity, recovery, and cost. The implementation remains experimental: a finite gradient is not treated as evidence of correctness, and native operations outside the analyzed source graph remain outside the transform.</p>
+      <p>The contributions are a crisp-forward or soft-forward local merge, conservative closed-graph certification, explicit partial-surrogate labeling, corrected antithetic accounting, and a multi-scenario evidence bundle with accepted references and traceable plots.</p>
+      {{HEADLINE_TABLE}}
+      {{VALIDITY_TABLE}}
+    </section>
+
+    <section id="semantics">
+      <h2>Objectives and estimator semantics</h2>
+      <p>The hard objective <var>H</var> is the original execution. Gaussian smoothing defines <var>J</var>(θ) = E[<var>H</var>(θ + σu)]. A local soft program <var>S</var> replaces only certified branch merges; it is a surrogate, not a declaration that the hard program became continuous.</p>
+      <div class="equation" role="math" aria-label="Gaussian-smoothed hard objective">J<sub>H</sub>(θ) = E<sub>u</sub>[H(θ + σu)]</div>
+      <div class="equation" role="math" aria-label="Score estimator identity">∇J<sub>H</sub>(θ) = E[H(θ + σu)u / σ]</div>
+      <div class="equation" role="math" aria-label="Pathwise estimator target">g<sub>path</sub> = E[∇<sub>θ</sub>H(θ + σu; ξ)]</div>
+      <div class="equation" role="math" aria-label="Finite-difference target">g<sub>FD</sub>(h) = E[(H(θ + h + σu; ξ) − H(θ − h + σu; ξ)) / (2h)]</div>
+      <div class="equation" role="math" aria-label="Soft surrogate">S<sub>τ</sub> = w<sub>τ</sub>(m)a + (1 − w<sub>τ</sub>(m))b</div>
+      <div class="equation" role="math" aria-label="Straight-through construction">H<sub>ST</sub> = stopgrad(H − S) + S</div>
+      <div class="equation" role="math" aria-label="Residual control-variate identity">∇E[H] = E[∇S] + E[(H−S)u / σ]</div>
+      <p>The score estimator targets the Gaussian-smoothed hard objective without differentiating the hard program. Pathwise smoothing differentiates realized paths and therefore omits true jump terms. Common-random-number finite differences approximate a finite-step target. Soft AD differentiates <var>S</var>, while the residual identity is exact only under the stated smoothing and regularity assumptions.</p>
+      <p><strong>Exactness.</strong> Score smoothing and a fully certified residual identity target ∇J<sub>H</sub>; finite differences retain step error. <strong>Bias.</strong> Pathwise AD misses jump terms, soft AD targets a different surrogate, and straight-through AD is a pseudo-gradient. <strong>Variance.</strong> Score terms can be noisy; antithetic pairs, common random numbers, and the soft control variate reduce variance without changing those target labels.</p>
+      <div class="callout"><strong>Straight-through rule.</strong> Crisp forward mode is a surrogate/pseudo-gradient, not the derivative of the hard execution. Its primal follows the exact selected arm while its adjoint follows the configured local merge.</div>
+      <p>The residual control variate combines a hard residual-score term with a soft pathwise term. Its accounting distinguishes hard forward executions from soft forward executions and records backward passes separately. A globally unbiased-target label requires a complete certificate; preserved or opaque sites force an explicit partial-surrogate label.</p>
+      {{METHOD_TABLE}}
+      {{RESIDUAL_COUNTS_TABLE}}
+    </section>
+
+    <section id="literature">
+      <h2>Relationship to prior work</h2>
+      <p><a href="https://arxiv.org/abs/2109.05143">Bundled Gradients through Contact</a> motivates optimizing discontinuous simulators by sampling a neighborhood rather than trusting one realized active set. In <a href="https://arxiv.org/abs/2310.03585">DiscoGrad</a> and its <a href="https://github.com/DiscoGrad/DiscoGrad">reference implementation</a>, the DGO backend estimates jump contributions explicitly, while DGSI is a distinct smoothing approach. Warp instead keeps its ordinary reverse-AD lowering and adds conservative source-local merge rules plus whole-program estimators; DGO is not silently substituted as the default adjoint.</p>
+      <p><a href="https://github.com/a-paulus/softtorch">SoftTorch</a> and the accompanying <a href="https://arxiv.org/abs/2603.08824">SoftJAX/SoftTorch work</a> inform the gate families and crisp-forward surrogate interpretation. The implementation here is narrower: only effects proven safe for eager arm evaluation enter a certified soft graph.</p>
+    </section>
+
+    <section id="grammar">
+      <h2>Supported transformation grammar</h2>
+      <p>The supported core consists of two-arm local assignments and symmetric same-index stores. Predicates carry an exact Boolean and an explicit signed margin. Both arm expressions must be pure, total under eager evaluation, and closed over known callees. Nested conditions are transformed only when every nested site satisfies the same contract.</p>
+      <pre><code>@wp.func(branch_smoothing=config)
+def choose(x: float, width: float):
+    if wp.smooth_condition(x &gt; 0.0, x):
+        value = x * x
+    else:
+        value = -x
+    return value</code></pre>
+      <p>Unsafe inactive reads, atomics, early exits, unknown effects, differing store indices, and opaque native queries are rejected or preserved according to the requested diagnostic mode. Specializations retain the smoothing specification, and module hashes include the ordered transform configuration and transformed syntax.</p>
+    </section>
+
+    <section id="protocol">
+      <h2>Experimental protocol</h2>
+      <p>All compared methods use manifest-declared devices, budgets, starts, and seed domains. Antithetic samples are adjacent positive/negative pairs, so uncertainty is computed over independent pair contributions. Common random numbers hold inner renderer or simulator randomness fixed across finite-difference sides and residual hard/soft evaluations.</p>
+      <p>Reference cells use batched five-point stencils at <var>h</var> and at a half-sized step, independent score replicates, Student-t intervals, and explicit acceptance checks. Optimization records retain held-out evaluations and parameter or physical-validity diagnostics. Performance records separate compilation from synchronized warmed execution and count conceptual forwards and backwards.</p>
+      {{PROTOCOL_TABLES}}
+      {{REFERENCE_TABLE}}
+    </section>
+
+    <section id="analytic">
+      <h2>Analytic and low-dimensional checks</h2>
+      <p>Closed-form Gaussian step and kink probes anchor value, gradient sign, gate-width scaling, support behavior, and off-boundary decay. Triangle slices compare hard intersections, soft values, straight-through primal bits, and analytic edge-normal gradients. The collision regressions add several starts and measured active-set coverage without treating them as headline physical evidence.</p>
+      {{ANALYTIC_FIGURES}}
+    </section>
+
+    <section id="path-tracing">
+      <h2>Fixed-depth analytic-sphere path tracing</h2>
+      <p>The renderer traces a fixed number of ray slots through five analytic spheres: ground, diffuse objects, a mirror, and an emitter. Static sphere and bounce loops retain unconditional work while local alive, material, throughput, direction, and radiance state carry the path. Independent target and held-out seeds separate fitting from evaluation.</p>
+      <p>Evidence includes secondary material hits, depth histograms, direct and indirect contributions, material-sequence entropy, sphere-test counts, parameter response, reference-relative gradients, and held-out recovery. Visibility remains discontinuous even though eligible local hit-selection branches have surrogate derivatives.</p>
+      {{PATH_FIGURES}}
+    </section>
+
+    <section id="contact-3d">
+      <h2>Three-dimensional impulse and friction contact</h2>
+      <p>The contact scene tracks translation and angular state for several rigid spheres under gravity, static boundaries, and fixed-order sequential-impulse sweeps. Diagnostics distinguish penetration corrections from positive normal impulses, record floor and pair-contact ordering, and separate sticking from sliding under a Coulomb bound.</p>
+      <p>Validity gates cover penetration, contact-induced energy gain, pair momentum, angular momentum, mode activation, hard/diagnostic parity, and timestep refinement. Recovery accepts a candidate only when the hard objective improves and the physical checks remain satisfied.</p>
+      {{CONTACT_FIGURES}}
+    </section>
+
+    <section id="opaque-mesh">
+      <h2>Opaque native mesh-query boundary</h2>
+      <p>A procedural cube is built once and queried through Warp's native BVH. Camera parameters alter rays, not topology. Because native traversal and hit state are not a closed source-level graph, this case is intentionally estimator-only for globally valid claims. The compiler report preserves the site, records unknown native callees, and refuses a complete certificate.</p>
+      <p>Whole-program score smoothing and common-random-number finite differences remain applicable. A residual experiment is retained only as a partial local surrogate and is never labeled globally unbiased.</p>
+      {{OPAQUE_FIGURES}}
+    </section>
+
+    <section id="gradient-quality">
+      <h2>Gradient quality and uncertainty</h2>
+      <p>Gradient summaries report relative error, cosine similarity, component sign agreement, empirical bias, contribution variance, and variance of the mean. These quantities are not interchangeable: antithetic positive and negative executions form one independent contribution, while finite-difference aggregates may expose no replicate-level variance estimate.</p>
+      <p>Confidence intervals and sample-count scaling are interpreted against accepted references. A small gradient norm alone is not evidence of agreement, and methods with different targets remain labeled separately.</p>
+      {{METHOD_SUMMARY_TABLE}}
+      {{QUALITY_FIGURES}}
+    </section>
+
+    <section id="optimization">
+      <h2>Optimization and held-out recovery</h2>
+      <p>Methods share starts and estimator-seed schedules. Reported outcomes use the hard objective, independent held-out rerenders or physical checks, and explicit box or scene constraints. Success rates summarize multiple schedules; they do not imply equal wall-time budgets when a method requires more hard, soft, or backward executions.</p>
+      {{OPTIMIZATION_TABLE}}
+      {{OPTIMIZATION_FIGURES}}
+    </section>
+
+    <section id="performance">
+      <h2>Measured cost</h2>
+      <p>Cold compilation is isolated from warmed execution. Timed regions synchronize the selected device, and tables retain forward/backward counts beside median and interquartile wall time. Python allocation peaks, process RSS, Warp allocation availability, and device-memory availability remain distinct measurements rather than being collapsed into one memory claim.</p>
+      {{PERFORMANCE_TABLE}}
+      {{PERFORMANCE_FIGURES}}
+    </section>
+
+    <section id="limitations">
+      <h2>Limitations</h2>
+      <ul>
+        <li>The source transform covers a conservative local grammar, not arbitrary control flow or native queries.</li>
+        <li>Eager soft evaluation requires both arms to be pure and total; it cannot mask invalid inactive operations.</li>
+        <li>Gate width is a modeling and optimization parameter, not a universally correct constant.</li>
+        <li>Straight-through gradients are pseudo-gradients and may not integrate to the crisp-forward objective.</li>
+        <li>Score estimators remain noisy, while finite differences retain finite-step bias and extra executions.</li>
+        <li>Fixed-loop rendering and contact cases provide controlled evidence rather than production-scale coverage.</li>
+        <li>Hardware claims are restricted to devices present in the manifest and measured performance rows.</li>
+      </ul>
+    </section>
+
+    <section id="reproducibility">
+      <h2>Reproducibility and provenance</h2>
+      {{REPRODUCIBILITY}}
+    </section>
+  </main>
+
+  <footer>
+    <p>Generated deterministically from the checked publication manifest; no simulation runs in the report builder.</p>
+  </footer>
+</body>
+</html>
