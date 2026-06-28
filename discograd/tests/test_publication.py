@@ -12,13 +12,17 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from fractions import Fraction
 from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
+import discograd.validate_report as validate_report_module
 from discograd.validate_report import (
     EXPECTED_REFERENCE_CELLS,
+    REFERENCE_POLICY,
+    REFERENCE_TRUNCATION_POLICY,
     REQUIRED_METHOD_IDS,
     REQUIRED_SECTION_IDS,
     ValidationError,
@@ -73,6 +77,32 @@ PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
 
+SCHEMA_VERSION = 2
+REPORT_PROTOCOL_FINGERPRINT = (
+    "49cc87ceb090bd7d8b0b9a3e023b618bb6cc12875109b50dfe3f374ccde918a1"
+)
+PROTOCOL_DISCLOSURE_PARAGRAPH_START = (
+    "<p>Reference cells use paired batched five-point stencils"
+)
+FIVE_POINT_STENCIL_FORWARD_EVALUATIONS_PER_DIMENSION = 4
+REAL_V2_REPORT_REFERENCE_COUNT_RATIONALE = (
+    "Accepted after a clean CPU protocol-v2 pilot projected 27,954.723406340072 seconds "
+    "for the report workload; the nominal reference counts are retained without reduction."
+)
+REAL_V2_REPORT_REFERENCE_COUNT_DECISION = {
+    "status": "accepted",
+    "pilot_tier": "pilot",
+    "pilot_manifest_sha256": "8312eb08a106446f6b689c71cb2c7a6140f708755bcd075ebd45fb48fc9f6d2e",
+    "pilot_source_commit": "28889267a0a8495d88c3ef668eee9c53dda6492c",
+    "pilot_projected_report_seconds": 27954.723406340072,
+    "decided_at_utc": "2026-06-28T20:15:09Z",
+    "protocol_fingerprint": REPORT_PROTOCOL_FINGERPRINT,
+    "path_reference_samples": 32768,
+    "contact_reference_samples": 65536,
+    "reference_seed_sets": 4,
+    "rationale": REAL_V2_REPORT_REFERENCE_COUNT_RATIONALE,
+}
+
 REPORT_CONFIG = {
     "width": 24,
     "height": 16,
@@ -85,23 +115,6 @@ REPORT_CONFIG = {
     "path_reference_samples": 32768,
     "contact_reference_samples": 65536,
     "reference_seed_sets": 4,
-}
-REPORT_REFERENCE_COUNT_RATIONALE = (
-    "Accepted after a clean CPU pilot projected 30,807.341991021996 seconds for the report workload; "
-    "the nominal reference counts are retained without reduction."
-)
-REPORT_REFERENCE_COUNT_DECISION = {
-    "status": "accepted",
-    "pilot_tier": "pilot",
-    "pilot_manifest_sha256": "d6ab265c77e3f08fe759fde02bf4d07e43b8c358a4bb46024da1422ba73dd6cb",
-    "pilot_source_commit": "e25b05937fa149a341177559f2fa7f7e2ff3f651",
-    "pilot_projected_report_seconds": 30807.341991021996,
-    "decided_at_utc": "2026-06-28T14:43:54Z",
-    "protocol_fingerprint": "f44b07543db9c793cc0fd16a2fde768cc7c7589b60f9489e9f600c31d729e0e9",
-    "path_reference_samples": 32768,
-    "contact_reference_samples": 65536,
-    "reference_seed_sets": 4,
-    "rationale": REPORT_REFERENCE_COUNT_RATIONALE,
 }
 PATH_CERTIFICATE_FINGERPRINT = (
     "8f4814d92d301575e1d79caa80ddb6dcdf3a89cce666950000b5d24aa3129676"
@@ -287,6 +300,26 @@ def write_fixture_json(path: Path, value: object) -> None:
     )
 
 
+def _replace_protocol_disclosure_paragraph(source: str, replacement: str) -> str:
+    start = source.index(PROTOCOL_DISCLOSURE_PARAGRAPH_START)
+    end = source.index("</p>", start) + len("</p>")
+    result = source[:start] + replacement + source[end:]
+    if result == source:
+        raise AssertionError(
+            "protocol disclosure mutation did not change rendered HTML"
+        )
+    return result
+
+
+def _append_before_body(source: str, fragment: str) -> str:
+    if "</body>" not in source:
+        raise AssertionError("canonical rendered HTML has no closing body tag")
+    result = source.replace("</body>", fragment + "</body>", 1)
+    if result == source:
+        raise AssertionError("HTML append mutation did not change rendered output")
+    return result
+
+
 def _refresh_manifest(root: Path) -> None:
     manifest_path = root / "data/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -301,6 +334,290 @@ def _refresh_manifest(root: Path) -> None:
         }
     manifest["files"] = files
     write_fixture_json(manifest_path, manifest)
+
+
+def _refresh_manifest_and_index(root: Path) -> None:
+    _refresh_manifest(root)
+    from discograd import build_report
+
+    (root / "index.html").write_bytes(
+        build_report.render_report(root=root, template_path=REPORT_TEMPLATE)
+    )
+
+
+def _canonical_reference_seed(
+    base_seed: int, inner_seed: int, replicate: int, domain: int
+) -> int:
+    domain_size = (2**31) // 4
+    digest = hashlib.sha256(f"{base_seed}:{inner_seed}".encode("ascii")).digest()
+    offset = int.from_bytes(digest[:8], "big") % domain_size
+    return domain * domain_size + ((offset + replicate) % domain_size)
+
+
+def _canonical_reference_seed_protocol(
+    cell_id: str,
+) -> tuple[int, int, dict[str, object] | None]:
+    path_table: dict[str, object] = {
+        "training": list(range(1000, 1032)),
+        "target": list(range(2000, 2016)),
+        "held_out": list(range(3000, 3016)),
+        "reference_base": 4000,
+        "reference_inner_base": 4001,
+    }
+    contact_table: dict[str, object] = {
+        "estimator_outer": list(range(5000, 5032)),
+        "optimization_outer": [6000 + 64 * schedule for schedule in range(16)],
+        "reference_base": 302,
+        "reference_inner_base": 402,
+    }
+    opaque_table: dict[str, object] = {
+        "estimator_outer": list(range(9000, 9032)),
+        "reference_base": 10000,
+        "reference_inner_base": 11000,
+    }
+    protocols: dict[str, tuple[int, int, dict[str, object] | None]] = {
+        "triangle_2d:edge_midpoints": (101, 111, None),
+        "path_tracer:initial_parameters": (4000, 4001, path_table),
+        "contact_3d:initial_launch_velocity": (302, 402, contact_table),
+        "opaque_mesh:camera_parameters": (10000, 11000, opaque_table),
+    }
+    base_seed = 201
+    for scenario in ("pinball_bank", "crowded_table"):
+        for start in range(3):
+            protocols[f"collision_2d:{scenario}:start_{start}"] = (
+                base_seed,
+                base_seed + 100,
+                None,
+            )
+            base_seed += 1
+    return protocols[cell_id]
+
+
+CANONICAL_REFERENCE_INPUTS = {
+    "triangle_2d:edge_midpoints": {
+        "parameters": [0.0, -0.385],
+        "sigma": [0.02, 0.02],
+        "h": [0.005, 0.005],
+        "h_half": [0.0025, 0.0025],
+    },
+    "collision_2d:pinball_bank:start_0": {
+        "parameters": [1.65, 0.12],
+        "sigma": [0.02, 0.02],
+        "h": [0.0033, 0.002],
+        "h_half": [0.00165, 0.001],
+    },
+    "collision_2d:pinball_bank:start_1": {
+        "parameters": [1.45, 0.42],
+        "sigma": [0.02, 0.02],
+        "h": [0.0029, 0.002],
+        "h_half": [0.00145, 0.001],
+    },
+    "collision_2d:pinball_bank:start_2": {
+        "parameters": [2.0, 0.5],
+        "sigma": [0.02, 0.02],
+        "h": [0.004, 0.002],
+        "h_half": [0.002, 0.001],
+    },
+    "collision_2d:crowded_table:start_0": {
+        "parameters": [1.35, -0.05],
+        "sigma": [0.02, 0.02],
+        "h": [0.0027, 0.002],
+        "h_half": [0.00135, 0.001],
+    },
+    "collision_2d:crowded_table:start_1": {
+        "parameters": [0.8, -0.2],
+        "sigma": [0.02, 0.02],
+        "h": [0.002, 0.002],
+        "h_half": [0.001, 0.001],
+    },
+    "collision_2d:crowded_table:start_2": {
+        "parameters": [2.2, -0.7],
+        "sigma": [0.02, 0.02],
+        "h": [0.0044, 0.002],
+        "h_half": [0.0022, 0.001],
+    },
+    "path_tracer:initial_parameters": {
+        "parameters": [-0.28, 0.16, -0.32],
+        "sigma": [0.03, 0.03, 0.03],
+        "h": [0.01, 0.01, 0.01],
+        "h_half": [0.005, 0.005, 0.005],
+    },
+    "contact_3d:initial_launch_velocity": {
+        "parameters": [2.2, -0.1, 0.65],
+        "sigma": [0.02, 0.02, 0.02],
+        "h": [0.0044, 0.002, 0.002],
+        "h_half": [0.0022, 0.001, 0.001],
+    },
+    "opaque_mesh:camera_parameters": {
+        "parameters": [-0.18, 0.1],
+        "sigma": [0.055, 0.055],
+        "h": [0.02, 0.02],
+        "h_half": [0.01, 0.01],
+    },
+}
+
+
+def _reference_interval_record(values: list[list[float]]) -> dict[str, object]:
+    replicates = len(values)
+    if replicates != REFERENCE_POLICY.replicates:
+        raise AssertionError("reference oracle received a noncanonical replicate count")
+    dimension = len(values[0])
+    means: list[float] = []
+    variances: list[float] = []
+    mean_variances: list[float] = []
+    for component in range(dimension):
+        exact_values = [Fraction.from_float(row[component]) for row in values]
+        exact_mean = sum(exact_values, Fraction()) / replicates
+        exact_variance = sum(
+            ((value - exact_mean) ** 2 for value in exact_values), Fraction()
+        ) / (replicates - 1)
+        means.append(float(exact_mean))
+        variances.append(float(exact_variance))
+        mean_variances.append(float(exact_variance / replicates))
+    raw_half_widths = [
+        REFERENCE_POLICY.student_t_critical * math.sqrt(value)
+        for value in mean_variances
+    ]
+    ci_low = [mean - width for mean, width in zip(means, raw_half_widths)]
+    ci_high = [mean + width for mean, width in zip(means, raw_half_widths)]
+    return {
+        "mean": means,
+        "variance": variances,
+        "mean_variance": mean_variances,
+        "half_width": [0.5 * (high - low) for low, high in zip(ci_low, ci_high)],
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "replicates": replicates,
+        "degrees_of_freedom": replicates - 1,
+        "confidence": REFERENCE_POLICY.confidence,
+    }
+
+
+def _populate_reference_evidence(row: dict[str, object]) -> None:
+    g_h = row["g_h"]
+    g_h2 = row["g_h2"]
+    score = row["score"]
+    assert isinstance(g_h, list)
+    assert isinstance(g_h2, list)
+    assert isinstance(score, list)
+    paired = [
+        [first - second for first, second in zip(h_row, h2_row)]
+        for h_row, h2_row in zip(g_h, g_h2)
+    ]
+    richardson_denominator = (
+        REFERENCE_POLICY.refinement_ratio**REFERENCE_POLICY.richardson_order - 1
+    )
+    fine_error = [
+        [
+            (first - second) / richardson_denominator
+            for first, second in zip(h_row, h2_row)
+        ]
+        for h_row, h2_row in zip(g_h, g_h2)
+    ]
+    richardson = [
+        [second - error for second, error in zip(h2_row, error_row)]
+        for h2_row, error_row in zip(g_h2, fine_error)
+    ]
+    intervals = {
+        "g_h": _reference_interval_record(g_h),
+        "g_h2": _reference_interval_record(g_h2),
+        "score": _reference_interval_record(score),
+        "paired_h_minus_h2": _reference_interval_record(paired),
+        "fine_truncation_error": _reference_interval_record(fine_error),
+        "richardson": _reference_interval_record(richardson),
+    }
+    h_interval = intervals["g_h"]
+    h2_interval = intervals["g_h2"]
+    score_interval = intervals["score"]
+    paired_interval = intervals["paired_h_minus_h2"]
+    error_interval = intervals["fine_truncation_error"]
+    richardson_interval = intervals["richardson"]
+    overlap = [
+        max(first, third) <= min(second, fourth)
+        for first, second, third, fourth in zip(
+            richardson_interval["ci_low"],
+            richardson_interval["ci_high"],
+            score_interval["ci_low"],
+            score_interval["ci_high"],
+        )
+    ]
+    marginal = [
+        abs(first - second) <= first_width + second_width
+        for first, second, first_width, second_width in zip(
+            h_interval["mean"],
+            h2_interval["mean"],
+            h_interval["half_width"],
+            h2_interval["half_width"],
+        )
+    ]
+    paired_zero = [
+        low <= 0.0 <= high
+        for low, high in zip(paired_interval["ci_low"], paired_interval["ci_high"])
+    ]
+    truncation_upper_bound = [
+        max(abs(low), abs(high))
+        for low, high in zip(error_interval["ci_low"], error_interval["ci_high"])
+    ]
+    statistical_budget = [
+        REFERENCE_POLICY.statistical_budget_fraction * width
+        for width in richardson_interval["half_width"]
+    ]
+    roundoff_floor = [
+        REFERENCE_POLICY.roundoff_floor_ulps
+        * sys.float_info.epsilon
+        * max(1.0, abs(h_mean), abs(h2_mean), abs(richardson_mean))
+        for h_mean, h2_mean, richardson_mean in zip(
+            h_interval["mean"],
+            h2_interval["mean"],
+            richardson_interval["mean"],
+        )
+    ]
+    effective_budget = [
+        max(statistical, floor)
+        for statistical, floor in zip(statistical_budget, roundoff_floor)
+    ]
+    floor_dominated = [
+        floor > statistical
+        for statistical, floor in zip(statistical_budget, roundoff_floor)
+    ]
+    truncation_components = [
+        upper <= effective
+        for upper, effective in zip(truncation_upper_bound, effective_budget)
+    ]
+    overlap_accepted = all(overlap)
+    truncation_accepted = all(truncation_components)
+    references_accepted = overlap_accepted and truncation_accepted and len(g_h) >= 4
+    row.update(
+        reference_gradient=list(richardson_interval["mean"]),
+        intervals=intervals,
+        truncation_policy=dict(REFERENCE_TRUNCATION_POLICY),
+        diagnostics={
+            "overlap_components": overlap,
+            "marginal_step_components": marginal,
+            "paired_step_components": paired_zero,
+            "truncation_upper_bound": truncation_upper_bound,
+            "truncation_statistical_budget": statistical_budget,
+            "truncation_roundoff_floor": roundoff_floor,
+            "truncation_effective_budget": effective_budget,
+            "truncation_floor_dominated": floor_dominated,
+            "truncation_components": truncation_components,
+        },
+        accepted={
+            "references": references_accepted,
+            "fd_score_overlap": overlap_accepted,
+            "step_consistency": truncation_accepted,
+            "marginal_step_consistency": all(marginal),
+            "paired_step_consistency": all(paired_zero),
+            "truncation_error_controlled": truncation_accepted,
+            "replicate_count_sufficient": len(g_h) >= 4,
+            "smoke_only": False,
+        },
+        reasons=(
+            []
+            if references_accepted
+            else ["synthetic fixture intentionally fails a publication gate"]
+        ),
+    )
 
 
 def _report_runtime_record() -> dict[str, object]:
@@ -674,9 +991,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
             "value": 0.5,
             "gradient": [0.0],
             "reference_gradient": [0.0],
-            "relative_error": 0.0,
-            "cosine_similarity": 1.0,
-            "sign_agreement": 1.0,
+            "relative_error": None,
+            "cosine_similarity": None,
+            "sign_agreement": None,
             "forward_executions": 1,
             "hard_forward_executions": None,
             "soft_forward_executions": None,
@@ -980,6 +1297,8 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "scenario": "three_sphere_floor_ramp",
         "start_id": "initial_launch_velocity",
         "target": "launch_velocity",
+        "gradient": [0.0, 0.0, 0.0],
+        "reference_gradient": [0.0, 0.0, 0.0],
     }
     contact_diagnostic = {
         "row_id": "contact:0",
@@ -1014,18 +1333,18 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "outer_seed": 9000,
         "inner_seed": 11000,
         "antithetic": True,
-        "gradient": [0.0, 0.0, 0.0],
-        "reference_gradient": [0.0, 0.0, 0.0],
+        "gradient": [0.0, 0.0],
+        "reference_gradient": [0.0, 0.0],
         "forward_executions": 8,
         "backward_executions": 0,
         "independent_contributions": 4,
         "parameter_perturbations": 8,
         "contribution_variance_available": True,
         "gradient_variance_available": True,
-        "contribution_variance": [0.0, 0.0, 0.0],
-        "gradient_variance": [0.0, 0.0, 0.0],
-        "ci_low": [0.0, 0.0, 0.0],
-        "ci_high": [0.0, 0.0, 0.0],
+        "contribution_variance": [0.0, 0.0],
+        "gradient_variance": [0.0, 0.0],
+        "ci_low": [0.0, 0.0],
+        "ci_high": [0.0, 0.0],
         "unbiased_target": True,
         "certificate_fingerprint": None,
         "numerical_gauge_assumption": False,
@@ -1035,7 +1354,7 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
             "forward_budget": 8,
             "mesh_rebuilt_per_sample": False,
             "native_operation": "mesh_query_ray",
-            "sigma": [0.03, 0.03, 0.03],
+            "sigma": [0.055, 0.055],
             "transform_status": "estimator_only",
             "unused_forward_budget": 0,
         },
@@ -1079,78 +1398,71 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         for method in REQUIRED_METHOD_IDS
     ]
     reference_rows = []
-    for reference_index, cell_id in enumerate(EXPECTED_REFERENCE_CELLS):
+    for cell_id in EXPECTED_REFERENCE_CELLS:
         samples = 65536 if cell_id.startswith("contact_3d:") else 32768
-        single_stencil = 16 * samples
-        offset = 100 + 10 * reference_index
-        reference_rows.append(
-            {
-                "row_id": f"reference:{cell_id}",
-                "cell_id": cell_id,
-                "parameters": [0.0],
-                "sigma": [0.05],
-                "h": [0.001],
-                "h_half": [0.0005],
-                "g_h": [[1.0], [1.0], [1.0], [1.0]],
-                "g_h2": [[1.0], [1.0], [1.0], [1.0]],
-                "score": [[1.0], [1.0], [1.0], [1.0]],
-                "reference_gradient": [1.0],
-                "intervals": {
-                    name: {
-                        "mean": [0.0 if name == "paired_h_minus_h2" else 1.0],
-                        "variance": [0.0],
-                        "mean_variance": [0.0],
-                        "half_width": [0.0],
-                        "ci_low": [0.0 if name == "paired_h_minus_h2" else 1.0],
-                        "ci_high": [0.0 if name == "paired_h_minus_h2" else 1.0],
-                        "replicates": 4,
-                        "degrees_of_freedom": 3,
-                        "confidence": 0.95,
-                    }
-                    for name in ("g_h", "g_h2", "score", "paired_h_minus_h2")
-                },
-                "diagnostics": {
-                    "overlap_components": [True],
-                    "marginal_step_components": [True],
-                    "paired_step_components": [True],
-                },
-                "accepted": {
-                    "references": True,
-                    "fd_score_overlap": True,
-                    "step_consistency": True,
-                    "marginal_step_consistency": True,
-                    "paired_step_consistency": True,
-                    "replicate_count_sufficient": True,
-                    "smoke_only": False,
-                },
-                "reasons": [],
-                "counts": {
-                    "samples": samples,
-                    "replicates": 4,
-                    "h_forward_executions": single_stencil,
-                    "h2_forward_executions": single_stencil,
-                    "five_point_forward_executions": 2 * single_stencil,
-                    "score_forward_executions": 4 * samples,
-                    "forward_executions": 2 * single_stencil + 4 * samples,
-                },
-                "seeds": {
-                    "five_point_outer": [offset + index for index in range(4)],
-                    "five_point_inner": [
-                        536870912 + offset + index for index in range(4)
-                    ],
-                    "score_outer": [1073741824 + offset + index for index in range(4)],
-                    "score_inner": [1610612736 + offset + index for index in range(4)],
-                },
-                "tier": "report",
-                "device": "cpu",
-                "source_commit": "1" * 40,
-            }
+        canonical_inputs = CANONICAL_REFERENCE_INPUTS[cell_id]
+        dimension = len(canonical_inputs["parameters"])
+        single_stencil = (
+            FIVE_POINT_STENCIL_FORWARD_EVALUATIONS_PER_DIMENSION
+            * dimension
+            * samples
+            * REFERENCE_POLICY.replicates
         )
+        base_seed, inner_seed, protocol_seed_table = _canonical_reference_seed_protocol(
+            cell_id
+        )
+        reference_row = {
+            "row_id": f"reference:{cell_id}",
+            "cell_id": cell_id,
+            **{name: list(values) for name, values in canonical_inputs.items()},
+            "g_h": [[0.0] * dimension for _ in range(REFERENCE_POLICY.replicates)],
+            "g_h2": [[0.0] * dimension for _ in range(REFERENCE_POLICY.replicates)],
+            "score": [[0.0] * dimension for _ in range(REFERENCE_POLICY.replicates)],
+            "counts": {
+                "samples": samples,
+                "replicates": REFERENCE_POLICY.replicates,
+                "h_forward_executions": single_stencil,
+                "h2_forward_executions": single_stencil,
+                "five_point_forward_executions": 2 * single_stencil,
+                "score_forward_executions": REFERENCE_POLICY.replicates * samples,
+                "forward_executions": 2 * single_stencil
+                + REFERENCE_POLICY.replicates * samples,
+            },
+            "seeds": {
+                name: [
+                    _canonical_reference_seed(base_seed, inner_seed, replicate, domain)
+                    for replicate in range(REFERENCE_POLICY.replicates)
+                ]
+                for domain, name in enumerate(
+                    (
+                        "five_point_outer",
+                        "five_point_inner",
+                        "score_outer",
+                        "score_inner",
+                    )
+                )
+            },
+            "tier": "report",
+            "device": "cpu",
+            "source_commit": "1" * 40,
+        }
+        if protocol_seed_table is not None:
+            reference_row["protocol_seed_table"] = protocol_seed_table
+            reference_row["protocol_seed_inputs"] = {
+                "reference_base": base_seed,
+                "reference_inner_base": inner_seed,
+            }
+        _populate_reference_evidence(reference_row)
+        reference_rows.append(reference_row)
     raw["references.json"] = reference_rows
     for name, rows in raw.items():
         write_fixture_json(
             root / "data/raw" / name,
-            {"schema_version": 1, "dataset": name.removesuffix(".json"), "rows": rows},
+            {
+                "schema_version": SCHEMA_VERSION,
+                "dataset": name.removesuffix(".json"),
+                "rows": rows,
+            },
         )
 
     method_summaries = [
@@ -1160,9 +1472,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
             "method": row["method"],
             "samples": 1,
             "mean_gradient": [0.0],
-            "relative_error": 0.0,
-            "cosine_similarity": 0.0,
-            "sign_agreement": 0.0,
+            "relative_error": None,
+            "cosine_similarity": None,
+            "sign_agreement": None,
             "empirical_bias": [0.0],
             "empirical_variance": [0.0],
             "mean_squared_error": [0.0],
@@ -1179,9 +1491,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "method": method,
                 "samples": 1,
                 "mean_gradient": [0.0, 0.0, 0.0],
-                "relative_error": 0.0,
-                "cosine_similarity": 0.0,
-                "sign_agreement": 0.0,
+                "relative_error": None,
+                "cosine_similarity": None,
+                "sign_agreement": None,
                 "empirical_bias": [0.0, 0.0, 0.0],
                 "empirical_variance": [0.0, 0.0, 0.0],
                 "mean_squared_error": [0.0, 0.0, 0.0],
@@ -1207,9 +1519,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                     "method": method,
                     "samples": samples,
                     "mean_gradient": [0.0, 0.0, 0.0],
-                    "relative_error": 0.0,
-                    "cosine_similarity": 0.0,
-                    "sign_agreement": 0.0,
+                    "relative_error": None,
+                    "cosine_similarity": None,
+                    "sign_agreement": None,
                     "empirical_bias": [0.0, 0.0, 0.0],
                     "empirical_variance": [0.0, 0.0, 0.0],
                     "mean_squared_error": [0.0, 0.0, 0.0],
@@ -1223,13 +1535,13 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "target": "launch_velocity",
                 "method": "soft_ad",
                 "samples": 1,
-                "mean_gradient": [0.0],
-                "relative_error": 0.0,
-                "cosine_similarity": 0.0,
-                "sign_agreement": 0.0,
-                "empirical_bias": [0.0],
-                "empirical_variance": [0.0],
-                "mean_squared_error": [0.0],
+                "mean_gradient": [0.0, 0.0, 0.0],
+                "relative_error": None,
+                "cosine_similarity": None,
+                "sign_agreement": None,
+                "empirical_bias": [0.0, 0.0, 0.0],
+                "empirical_variance": [0.0, 0.0, 0.0],
+                "mean_squared_error": [0.0, 0.0, 0.0],
                 "source_row_ids": [contact_gradient["row_id"]],
             },
             {
@@ -1237,13 +1549,13 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 "target": "gaussian_smoothed_hard",
                 "method": "score",
                 "samples": 8,
-                "mean_gradient": [0.0, 0.0, 0.0],
-                "relative_error": 0.0,
-                "cosine_similarity": 0.0,
-                "sign_agreement": 0.0,
-                "empirical_bias": [0.0, 0.0, 0.0],
-                "empirical_variance": [0.0, 0.0, 0.0],
-                "mean_squared_error": [0.0, 0.0, 0.0],
+                "mean_gradient": [0.0, 0.0],
+                "relative_error": None,
+                "cosine_similarity": None,
+                "sign_agreement": None,
+                "empirical_bias": [0.0, 0.0],
+                "empirical_variance": [0.0, 0.0],
+                "mean_squared_error": [0.0, 0.0],
                 "source_row_ids": [opaque_estimator["row_id"]],
             },
         )
@@ -1384,7 +1696,7 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         write_fixture_json(
             root / "data/plot_data" / name,
             {
-                "schema_version": 1,
+                "schema_version": SCHEMA_VERSION,
                 "dataset": name.removesuffix(".json"),
                 "rows": rows,
             },
@@ -1417,7 +1729,7 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         "references": reference_rows,
     }
     summary = {
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "method_labels": {method: method for method in REQUIRED_METHOD_IDS},
         "scenario_families": [
             "analytic",
@@ -1543,7 +1855,7 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
                 }
             )
     manifest = {
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "tier": "report",
         "source": {
             "commit": "1" * 40,
@@ -1599,7 +1911,9 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
         },
         "config": dict(REPORT_CONFIG),
         "accepted": {"analytic": True, "references": True, "scenario_validity": True},
-        "report_reference_count_decision": dict(REPORT_REFERENCE_COUNT_DECISION),
+        "report_reference_count_decision": dict(
+            REAL_V2_REPORT_REFERENCE_COUNT_DECISION
+        ),
         "reference_required_cells": list(EXPECTED_REFERENCE_CELLS),
         "applicability": applicability,
         "files": {},
@@ -1607,21 +1921,39 @@ def make_valid_fixture(test: unittest.TestCase) -> Path:
     write_fixture_json(root / "data/manifest.json", manifest)
     _refresh_manifest(root)
 
-    sections = "".join(
-        f'<section id="{item}">{"1" * 40 if item == "reproducibility" else item}</section>'
-        for item in REQUIRED_SECTION_IDS
-    )
-    methods = "".join(
-        f'<span data-method="{item}">{item}</span>' for item in REQUIRED_METHOD_IDS
-    )
-    (root / "index.html").write_text(
-        f'<!doctype html><html><body data-source-commit="{"1" * 40}">{sections}{methods}</body></html>',
-        encoding="utf-8",
+    from discograd import build_report
+
+    (root / "index.html").write_bytes(
+        build_report.render_report(root=root, template_path=REPORT_TEMPLATE)
     )
     return root
 
 
 class PublicationValidationTests(unittest.TestCase):
+    def test_reference_policy_is_frozen_and_derives_protocol_constants(self):
+        policy = getattr(validate_report_module, "REFERENCE_POLICY", None)
+        self.assertIsNotNone(policy)
+        assert policy is not None
+        self.assertEqual(policy.richardson_denominator, 15)
+        self.assertEqual(policy.degrees_of_freedom, 3)
+        self.assertEqual(policy.replicates, 4)
+        self.assertEqual(policy.student_t_critical, 3.182446305284263)
+        self.assertEqual(
+            dict(REFERENCE_TRUNCATION_POLICY),
+            {
+                "richardson_order": 4,
+                "refinement_ratio": 2,
+                "confidence": 0.95,
+                "statistical_budget_fraction": 0.25,
+                "roundoff_floor_ulps": 64,
+                "confidence_scope": "componentwise_not_simultaneous",
+            },
+        )
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            policy.replicates = 5
+        with self.assertRaises(TypeError):
+            REFERENCE_TRUNCATION_POLICY["confidence"] = 0.9
+
     def test_valid_fixture_is_accepted(self):
         root = make_valid_fixture(self)
         manifest = json.loads((root / "data/manifest.json").read_text(encoding="utf-8"))
@@ -1642,7 +1974,7 @@ class PublicationValidationTests(unittest.TestCase):
         self.assertEqual(manifest["config"], REPORT_CONFIG)
         self.assertEqual(
             manifest["report_reference_count_decision"],
-            REPORT_REFERENCE_COUNT_DECISION,
+            REAL_V2_REPORT_REFERENCE_COUNT_DECISION,
         )
         self.assertEqual(
             summary["runtime"]["elapsed_measurement"],
@@ -1673,6 +2005,92 @@ class PublicationValidationTests(unittest.TestCase):
         result = validate_publication(root)
         self.assertEqual(result["files"], 31)
         self.assertGreater(result["rows"], 32)
+
+    def test_publication_semantics_use_the_validated_bundle_snapshot(self):
+        root = make_valid_fixture(self)
+        real_validate_manifest = validate_report_module.validate_manifest
+        with mock.patch.object(
+            validate_report_module,
+            "validate_manifest",
+            wraps=real_validate_manifest,
+        ) as validate_manifest:
+            validate_publication(root)
+        self.assertEqual(validate_manifest.call_count, 1)
+
+    def test_malformed_hashed_png_cannot_be_rescued_by_post_hash_path_swap(self):
+        root = make_valid_fixture(self)
+        asset = root / "assets/figures/analytic_gates.png"
+        asset.write_bytes(b"malformed PNG bytes accepted by the manifest hash")
+        _refresh_manifest(root)
+
+        real_validate_protocol = validate_report_module._validate_protocol
+
+        def validate_protocol_after_swap(manifest, loaded):
+            asset.write_bytes(PNG_BYTES)
+            return real_validate_protocol(manifest, loaded)
+
+        with mock.patch.object(
+            validate_report_module,
+            "_validate_protocol",
+            side_effect=validate_protocol_after_swap,
+        ):
+            with self.assertRaisesRegex(ValidationError, "PNG|signature|image"):
+                validate_publication(root)
+
+        self.assertEqual(asset.read_bytes(), PNG_BYTES)
+
+    def test_schema_version_two_is_required_for_every_bundle_layer(self):
+        root = make_valid_fixture(self)
+        manifest = json.loads((root / "data/manifest.json").read_text(encoding="utf-8"))
+        summary = json.loads((root / "data/summary.json").read_text(encoding="utf-8"))
+        raw = json.loads(
+            (root / "data/raw/references.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["schema_version"], SCHEMA_VERSION)
+        self.assertEqual(summary["schema_version"], SCHEMA_VERSION)
+        self.assertEqual(raw["schema_version"], SCHEMA_VERSION)
+
+        cases = (
+            ("data/manifest.json", 1, False),
+            ("data/manifest.json", 2.0, False),
+            ("data/summary.json", 1, True),
+            ("data/summary.json", 2.0, True),
+            ("data/raw/references.json", 1, True),
+            ("data/raw/references.json", 2.0, True),
+            ("data/plot_data/validity.json", 1, True),
+            ("data/plot_data/validity.json", 2.0, True),
+        )
+        for relative, schema_version, refresh in cases:
+            with self.subTest(relative=relative, schema_version=schema_version):
+                root = make_valid_fixture(self)
+                path = root / relative
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                payload["schema_version"] = schema_version
+                write_fixture_json(path, payload)
+                if refresh:
+                    _refresh_manifest(root)
+                with self.assertRaisesRegex(ValidationError, "schema_version.*2"):
+                    validate_publication(root)
+
+    def test_v2_reference_count_decision_validation_fails_closed_if_unconfigured(self):
+        root = make_valid_fixture(self)
+        with mock.patch.object(
+            validate_report_module, "_V2_REPORT_REFERENCE_COUNT_DECISION", None
+        ):
+            with self.assertRaisesRegex(
+                ValidationError, "v2.*decision.*unavailable|clean.*pilot"
+            ):
+                validate_publication(root)
+
+    def test_real_v2_reference_count_decision_is_bound_exactly(self):
+        root = make_valid_fixture(self)
+        self.assertTrue(
+            validate_report_module._json_type_strict_equal(
+                validate_report_module._V2_REPORT_REFERENCE_COUNT_DECISION,
+                REAL_V2_REPORT_REFERENCE_COUNT_DECISION,
+            )
+        )
+        validate_publication(root)
 
     def test_canonical_path_seed_pairs_do_not_split_stochastic_strata(self):
         root = make_valid_fixture(self)
@@ -2186,11 +2604,11 @@ class PublicationValidationTests(unittest.TestCase):
     def test_missing_method_label_and_legacy_reference_are_rejected(self):
         root = make_valid_fixture(self)
         page = root / "index.html"
+        source = page.read_text(encoding="utf-8")
+        if 'data-method="score"' not in source:
+            self.fail("canonical report is missing score method labels")
         page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<span data-method="score">score</span>',
-                '<span data-method="removed"></span>',
-            ),
+            source.replace('data-method="score"', 'data-method="removed"'),
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValidationError, "score"):
@@ -2238,10 +2656,11 @@ class PublicationValidationTests(unittest.TestCase):
     def test_sections_must_be_sections_and_method_labels_must_be_visible(self):
         root = make_valid_fixture(self)
         page = root / "index.html"
+        source = page.read_text(encoding="utf-8")
+        if '<section id="scope">' not in source:
+            self.fail("canonical report is missing the scope section")
         page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<section id="scope">scope</section>', '<div id="scope">scope</div>'
-            ),
+            source.replace('<section id="scope">', '<div id="scope">', 1),
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValidationError, "scope"):
@@ -2249,10 +2668,15 @@ class PublicationValidationTests(unittest.TestCase):
 
         root = make_valid_fixture(self)
         page = root / "index.html"
+        source = page.read_text(encoding="utf-8")
+        score_label = '<span class="method" data-method="score">score</span>'
+        if score_label not in source:
+            self.fail("canonical report is missing rendered score labels")
         page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<span data-method="score">score</span>',
-                '<span data-method="score" style="display:none">score</span>',
+            source.replace(
+                score_label,
+                '<span class="method" data-method="score" '
+                'style="display:none">score</span>',
             ),
             encoding="utf-8",
         )
@@ -2261,10 +2685,11 @@ class PublicationValidationTests(unittest.TestCase):
 
         root = make_valid_fixture(self)
         page = root / "index.html"
+        source = page.read_text(encoding="utf-8")
+        if '<section id="scope">' not in source:
+            self.fail("canonical report is missing the scope section")
         page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<section id="scope">scope</section>', '<section id="scope"></section>'
-            ),
+            source.replace('<section id="scope">', '<section id="scope" hidden>', 1),
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValidationError, "scope|empty"):
@@ -2500,6 +2925,864 @@ class PublicationValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "missing:row"):
             validate_publication(root)
 
+    def test_reference_richardson_policy_intervals_and_diagnostics_are_exact(self):
+        mutations = (
+            (
+                "policy value",
+                lambda row: row["truncation_policy"].__setitem__("richardson_order", 3),
+                "truncation policy",
+            ),
+            (
+                "policy extra key",
+                lambda row: row["truncation_policy"].__setitem__("extra", True),
+                "truncation policy",
+            ),
+            (
+                "fine error interval",
+                lambda row: row["intervals"]["fine_truncation_error"][
+                    "mean"
+                ].__setitem__(0, 1.0),
+                "fine_truncation_error.*mean|stored replicates",
+            ),
+            (
+                "Richardson interval",
+                lambda row: row["intervals"]["richardson"]["mean"].__setitem__(0, 2.0),
+                "richardson.*mean|stored replicates",
+            ),
+            (
+                "truncation diagnostic",
+                lambda row: row["diagnostics"]["truncation_upper_bound"].__setitem__(
+                    0, 1.0
+                ),
+                "diagnostics|truncation",
+            ),
+            (
+                "statistical budget",
+                lambda row: row["diagnostics"][
+                    "truncation_statistical_budget"
+                ].__setitem__(0, 1.0),
+                "diagnostics|truncation",
+            ),
+            (
+                "roundoff floor",
+                lambda row: row["diagnostics"]["truncation_roundoff_floor"].__setitem__(
+                    0, 0.0
+                ),
+                "diagnostics|truncation",
+            ),
+            (
+                "effective budget",
+                lambda row: row["diagnostics"][
+                    "truncation_effective_budget"
+                ].__setitem__(0, 0.0),
+                "diagnostics|truncation",
+            ),
+            (
+                "floor dominated",
+                lambda row: row["diagnostics"][
+                    "truncation_floor_dominated"
+                ].__setitem__(0, False),
+                "diagnostics|truncation",
+            ),
+            (
+                "truncation components",
+                lambda row: row["diagnostics"]["truncation_components"].__setitem__(
+                    0, False
+                ),
+                "diagnostics|truncation",
+            ),
+            (
+                "truncation acceptance",
+                lambda row: row["accepted"].__setitem__(
+                    "truncation_error_controlled", False
+                ),
+                "acceptance flags|truncation",
+            ),
+            (
+                "acceptance extra key",
+                lambda row: row["accepted"].__setitem__("extra", True),
+                "acceptance flags|accepted keys",
+            ),
+            (
+                "paired-zero publication reason",
+                lambda row: row["reasons"].append(
+                    "paired-zero consistency is required for publication"
+                ),
+                "reasons|audit-only|publication gates",
+            ),
+        )
+        for name, mutate, message in mutations:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "data/raw/references.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                mutate(payload["rows"][0])
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+                with self.assertRaisesRegex(ValidationError, message):
+                    validate_publication(root)
+
+    def test_richardson_mean_and_score_overlap_define_the_published_reference(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = payload["rows"][0]
+        dimension = len(row["parameters"])
+        h2_value = 1.0
+        refinement_power = (
+            REFERENCE_POLICY.refinement_ratio**REFERENCE_POLICY.richardson_order
+        )
+        h_value = h2_value - refinement_power * sys.float_info.epsilon
+        richardson_denominator = (
+            REFERENCE_POLICY.refinement_ratio**REFERENCE_POLICY.richardson_order - 1
+        )
+        error = (h_value - h2_value) / richardson_denominator
+        richardson_value = h2_value - error
+        row["g_h"] = [[h_value] * dimension for _ in range(REFERENCE_POLICY.replicates)]
+        row["g_h2"] = [
+            [h2_value] * dimension for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        row["score"] = [
+            [richardson_value] * dimension for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        _populate_reference_evidence(row)
+        self.assertLess(
+            row["intervals"]["g_h2"]["ci_high"][0],
+            row["intervals"]["score"]["ci_low"][0],
+        )
+        self.assertTrue(row["accepted"]["fd_score_overlap"])
+        self.assertTrue(row["accepted"]["truncation_error_controlled"])
+        self.assertTrue(row["accepted"]["references"])
+        self.assertNotEqual(row["reference_gradient"], row["intervals"]["g_h2"]["mean"])
+        write_fixture_json(path, payload)
+        _refresh_manifest_and_index(root)
+        validate_publication(root)
+
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["rows"][0]["reference_gradient"] = payload["rows"][0]["intervals"][
+            "g_h2"
+        ]["mean"]
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+        with self.assertRaisesRegex(ValidationError, "Richardson|richardson"):
+            validate_publication(root)
+
+    def test_paired_zero_consistency_is_audit_only(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = payload["rows"][0]
+        dimension = len(row["parameters"])
+        row["g_h"] = [
+            [value] * dimension
+            for value in (
+                0.052928194633246696,
+                0.059918924803514795,
+                0.05693669810562195,
+                0.05633518264485265,
+            )
+        ]
+        row["g_h2"] = [
+            [value] * dimension
+            for value in (
+                0.05202573984714303,
+                0.057153629941258006,
+                0.05285441237882375,
+                0.05305384543401927,
+            )
+        ]
+        row["score"] = [
+            [value] * dimension
+            for value in (
+                0.15804882131814685,
+                -0.06574415975572863,
+                0.004704235406815165,
+                0.08671200702965258,
+            )
+        ]
+        _populate_reference_evidence(row)
+        self.assertFalse(row["accepted"]["paired_step_consistency"])
+        self.assertTrue(row["accepted"]["truncation_error_controlled"])
+        self.assertTrue(row["accepted"]["step_consistency"])
+        self.assertTrue(row["accepted"]["references"])
+        self.assertFalse(
+            any("paired" in reason.casefold() for reason in row["reasons"])
+        )
+        write_fixture_json(path, payload)
+        _refresh_manifest_and_index(root)
+        validate_publication(root)
+
+    def test_truncation_control_gates_references_when_paired_zero_check_passes(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = payload["rows"][0]
+        dimension = len(row["parameters"])
+        error_values = (-1.0, -0.5, 0.5, 1.0)
+        refinement_power = (
+            REFERENCE_POLICY.refinement_ratio**REFERENCE_POLICY.richardson_order
+        )
+        row["g_h"] = [
+            [2.0 + refinement_power * error] * dimension for error in error_values
+        ]
+        row["g_h2"] = [[2.0 + error] * dimension for error in error_values]
+        row["score"] = [[2.0] * dimension for _ in error_values]
+        _populate_reference_evidence(row)
+        self.assertTrue(row["accepted"]["paired_step_consistency"])
+        self.assertFalse(row["accepted"]["truncation_error_controlled"])
+        self.assertFalse(row["accepted"]["step_consistency"])
+        self.assertFalse(row["accepted"]["references"])
+        row["accepted"]["references"] = True
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+        with self.assertRaisesRegex(ValidationError, "truncation|numerical budget"):
+            validate_publication(root)
+
+    def test_tolerated_interval_rounding_cannot_drive_reference_acceptance(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = payload["rows"][0]
+        dimension = len(row["parameters"])
+        fine_error = 2.0e-13
+        richardson = 1.0
+        row["g_h"] = [
+            [
+                richardson
+                + (REFERENCE_POLICY.refinement_ratio**REFERENCE_POLICY.richardson_order)
+                * fine_error
+            ]
+            * dimension
+            for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        row["g_h2"] = [
+            [richardson + fine_error] * dimension
+            for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        row["score"] = [
+            [richardson] * dimension for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        _populate_reference_evidence(row)
+        self.assertFalse(row["accepted"]["truncation_error_controlled"])
+
+        error_interval = row["intervals"]["fine_truncation_error"]
+        error_interval["mean"] = [0.0] * dimension
+        error_interval["ci_low"] = [0.0] * dimension
+        error_interval["ci_high"] = [0.0] * dimension
+        row["diagnostics"]["truncation_upper_bound"] = [0.0] * dimension
+        row["diagnostics"]["truncation_components"] = [True] * dimension
+        row["accepted"]["references"] = True
+        row["accepted"]["step_consistency"] = True
+        row["accepted"]["truncation_error_controlled"] = True
+        row["reasons"] = []
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+
+        with self.assertRaisesRegex(
+            ValidationError, "fine_truncation_error|stored replicates|truncation"
+        ):
+            validate_publication(root)
+
+    def test_method_metrics_are_bound_to_the_accepted_richardson_reference(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = next(
+            item
+            for item in payload["rows"]
+            if item["cell_id"] == "path_tracer:initial_parameters"
+        )
+        dimension = len(row["parameters"])
+        reference_value = 1.0e-15
+        row["g_h"] = [
+            [reference_value] * dimension for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        row["g_h2"] = [
+            [reference_value] * dimension for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        row["score"] = [
+            [reference_value] * dimension for _ in range(REFERENCE_POLICY.replicates)
+        ]
+        _populate_reference_evidence(row)
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+
+        with self.assertRaisesRegex(
+            ValidationError, "method.*reference|accepted Richardson|reference_gradient"
+        ):
+            validate_publication(root)
+
+    def test_raw_method_metrics_are_exactly_recomputed_from_richardson(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/path_tracer_gradients.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = next(item for item in payload["rows"] if "gradient" in item)
+        row["relative_error"] = 999.0
+        row["cosine_similarity"] = -1.0
+        row["sign_agreement"] = 0.123
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+        with self.assertRaisesRegex(
+            ValidationError,
+            "relative_error|cosine_similarity|sign_agreement|reference metrics",
+        ):
+            validate_publication(root)
+
+    def test_validator_recomputes_method_summaries_and_plot_semantics(self):
+        mutations = (
+            (
+                "summary bias",
+                "data/summary.json",
+                lambda payload: payload["method_summaries"][0][
+                    "empirical_bias"
+                ].__setitem__(0, 123.0),
+                "summary|aggregate|bias|derived",
+            ),
+            (
+                "gradient plot",
+                "data/plot_data/gradient_quality.json",
+                lambda payload: payload["rows"][1]["values"].__setitem__(0, 123.0),
+                "plot|semantic|gradient|derived",
+            ),
+            (
+                "bias plot",
+                "data/plot_data/bias_variance.json",
+                lambda payload: payload["rows"][0]["values"].__setitem__(0, 123.0),
+                "plot|semantic|bias|derived",
+            ),
+        )
+        for name, relative, mutate, error in mutations:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / relative
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                mutate(payload)
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+                with self.assertRaisesRegex(ValidationError, error):
+                    validate_publication(root)
+
+    def test_reference_seed_streams_and_protocol_metadata_are_canonical(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = next(
+            item
+            for item in payload["rows"]
+            if item["cell_id"] == "path_tracer:initial_parameters"
+        )
+        self.assertEqual(
+            row["seeds"],
+            {
+                "five_point_outer": [184435890, 184435891, 184435892, 184435893],
+                "five_point_inner": [721306802, 721306803, 721306804, 721306805],
+                "score_outer": [1258177714, 1258177715, 1258177716, 1258177717],
+                "score_inner": [1795048626, 1795048627, 1795048628, 1795048629],
+            },
+        )
+        for stream in row["seeds"].values():
+            for index in range(len(stream)):
+                stream[index] += 12345
+        row["protocol_seed_table"] = {"reference_base": 1}
+        row["protocol_seed_inputs"] = {
+            "reference_base": 1,
+            "reference_inner_base": 2,
+        }
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+        with self.assertRaisesRegex(
+            ValidationError, "canonical reference seed|protocol seed|seed provenance"
+        ):
+            validate_publication(root)
+
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = payload["rows"][0]
+        row["protocol_seed_table"] = {"reference_base": 101}
+        row["protocol_seed_inputs"] = {
+            "reference_base": 101,
+            "reference_inner_base": 111,
+        }
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+        with self.assertRaisesRegex(
+            ValidationError, "must not contain protocol seed|seed provenance"
+        ):
+            validate_publication(root)
+
+    def test_reference_schema_rejects_numeric_aliases_and_extra_count_keys(self):
+        mutations = (
+            (
+                "interval scalar",
+                lambda row: row["intervals"]["g_h"]["mean"].__setitem__(0, 0),
+                "float|interval|type",
+            ),
+            (
+                "interval replicates",
+                lambda row: row["intervals"]["g_h"].__setitem__("replicates", 4.0),
+                "replicates|integer|interval",
+            ),
+            (
+                "interval degrees of freedom",
+                lambda row: row["intervals"]["g_h"].__setitem__(
+                    "degrees_of_freedom", 3.0
+                ),
+                "degrees_of_freedom|integer|interval",
+            ),
+            (
+                "diagnostic scalar",
+                lambda row: row["diagnostics"]["truncation_upper_bound"].__setitem__(
+                    0, 0
+                ),
+                "diagnostics|float|type",
+            ),
+            (
+                "count scalar",
+                lambda row: row["counts"].__setitem__("samples", 32768.0),
+                "counts|samples|integer",
+            ),
+            (
+                "count extra key",
+                lambda row: row["counts"].__setitem__("extra", "forged"),
+                "counts|canonical keys|schema",
+            ),
+        )
+        for name, mutate, error in mutations:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "data/raw/references.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                mutate(payload["rows"][0])
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+                with self.assertRaisesRegex(ValidationError, error):
+                    validate_publication(root)
+
+    def test_reference_inputs_reject_self_consistent_forged_dimension(self):
+        root = make_valid_fixture(self)
+        path = root / "data/raw/references.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        row = next(
+            item
+            for item in payload["rows"]
+            if item["cell_id"] == "collision_2d:pinball_bank:start_0"
+        )
+        dimension = 7
+        row["parameters"] = [42.0] * dimension
+        row["sigma"] = [0.02] * dimension
+        row["h"] = [0.2] * dimension
+        row["h_half"] = [0.1] * dimension
+        row["g_h"] = [[0.0] * dimension for _ in range(REFERENCE_POLICY.replicates)]
+        row["g_h2"] = [[0.0] * dimension for _ in range(REFERENCE_POLICY.replicates)]
+        row["score"] = [[0.0] * dimension for _ in range(REFERENCE_POLICY.replicates)]
+        samples = row["counts"]["samples"]
+        single_stencil = (
+            FIVE_POINT_STENCIL_FORWARD_EVALUATIONS_PER_DIMENSION
+            * dimension
+            * samples
+            * REFERENCE_POLICY.replicates
+        )
+        row["counts"].update(
+            h_forward_executions=single_stencil,
+            h2_forward_executions=single_stencil,
+            five_point_forward_executions=2 * single_stencil,
+            forward_executions=2 * single_stencil
+            + REFERENCE_POLICY.replicates * samples,
+        )
+        _populate_reference_evidence(row)
+        write_fixture_json(path, payload)
+        _refresh_manifest(root)
+
+        with self.assertRaisesRegex(
+            ValidationError, "canonical.*input|parameters|dimension"
+        ):
+            validate_publication(root)
+
+    def test_reference_inputs_reject_same_dimension_tampering(self):
+        cases = (
+            (
+                "parameters",
+                lambda row: row["parameters"].__setitem__(0, 42.0),
+            ),
+            ("sigma", lambda row: row["sigma"].__setitem__(0, 0.03)),
+            (
+                "realized steps",
+                lambda row: (
+                    row["h"].__setitem__(0, 0.2),
+                    row["h_half"].__setitem__(0, 0.1),
+                ),
+            ),
+        )
+        for name, tamper in cases:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "data/raw/references.json"
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                row = next(
+                    item
+                    for item in payload["rows"]
+                    if item["cell_id"] == "collision_2d:pinball_bank:start_0"
+                )
+                tamper(row)
+                write_fixture_json(path, payload)
+                _refresh_manifest(root)
+                with self.assertRaisesRegex(
+                    ValidationError, "canonical.*input|parameters|sigma|h"
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_is_fail_closed(self):
+        omissions = (
+            ("95%", "95%"),
+            ("componentwise", "componentwise"),
+            ("not simultaneous", "not simultaneous"),
+            ("E =", "<var>E</var> ="),
+            ("R =", "<var>R</var> ="),
+            ("largest absolute", "largest absolute"),
+            ("one quarter", "one quarter"),
+            ("64-ULP", "64-ULP"),
+            ("audit-only", "audit-only"),
+            ("do not gate publication", "do not gate publication"),
+        )
+        for name, rendered_phrase in omissions:
+            with self.subTest(phrase=name):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                if rendered_phrase not in source:
+                    self.fail(f"rendered protocol phrase is missing: {name}")
+                mutated = source.replace(rendered_phrase, "", 1)
+                if mutated == source:
+                    self.fail(f"protocol omission did not mutate HTML: {name}")
+                path.write_text(mutated, encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|protocol.*disclos|confidence|audit-only",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_rejects_forged_reference_formulas(self):
+        for name, original, forged in (
+            (
+                "fine truncation",
+                "<var>E</var> = (<var>g</var><sub>h</sub> − "
+                "<var>g</var><sub>h/2</sub>) ÷ 15",
+                "<var>E</var> = 0",
+            ),
+            (
+                "Richardson",
+                "<var>R</var> = <var>g</var><sub>h/2</sub> − <var>E</var>",
+                "<var>R</var> = 0",
+            ),
+        ):
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                if original not in source:
+                    self.fail(f"rendered formula is missing: {name}")
+                mutated = source.replace(original, forged, 1)
+                if mutated == source:
+                    self.fail(f"formula mutation did not change HTML: {name}")
+                path.write_text(
+                    mutated,
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|formula|truncation|Richardson|disclosure",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_rejects_disconnected_semantic_tokens(self):
+        cases = (
+            (
+                "confidence",
+                "Reference intervals use 95% confidence. The scope is componentwise. "
+                "These intervals are not simultaneous.",
+            ),
+            (
+                "budget",
+                "Publication requires Richardson-score interval overlap. The largest "
+                "absolute E interval endpoint is reported. One quarter of the Richardson "
+                "half-width is recorded. A 64-ULP binary64 numerical floor is recorded.",
+            ),
+            (
+                "overlap and budget",
+                "Richardson-score interval overlap is reported. Publication bounds the "
+                "largest absolute E interval endpoint by the larger of one quarter of the "
+                "Richardson half-width and a 64-ULP binary64 numerical floor.",
+            ),
+        )
+        for name, forged in cases:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                path.write_text(
+                    _replace_protocol_disclosure_paragraph(source, f"<p>{forged}</p>"),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|confidence|overlap|budget|disclosure",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_binds_each_audit_only_diagnostic(self):
+        canonical_audit = (
+            "Marginal step comparisons remain audit-only diagnostics and do not gate "
+            "publication. Paired-zero step comparisons remain audit-only diagnostics "
+            "and do not gate publication."
+        )
+        cases = (
+            (
+                "generic",
+                "Diagnostics are audit-only and do not gate publication. Marginal and "
+                "paired-zero step comparisons are recorded.",
+            ),
+            (
+                "marginal only",
+                "Marginal step comparisons are audit-only diagnostics and do not gate "
+                "publication. Paired-zero step comparisons are recorded.",
+            ),
+            (
+                "paired only",
+                "Paired-zero step comparisons are audit-only diagnostics and do not gate "
+                "publication. Marginal step comparisons are recorded.",
+            ),
+        )
+        for name, forged in cases:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                if canonical_audit not in source:
+                    self.fail("rendered protocol audit clauses are missing")
+                mutated = source.replace(canonical_audit, forged, 1)
+                if mutated == source:
+                    self.fail(f"audit-clause mutation did not change HTML: {name}")
+                path.write_text(
+                    mutated,
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|marginal|paired|audit-only|non-gating",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_rejects_negated_semantics(self):
+        cases = (
+            (
+                "formula",
+                "It is false that E = (g_h minus g_h2) divided by 15, while the "
+                "fourth-order Richardson reference R = g_h2 minus E.",
+            ),
+            (
+                "confidence",
+                "Reference intervals do not use 95% confidence componentwise, not "
+                "simultaneous.",
+            ),
+            (
+                "overlap and budget",
+                "Publication does not require Richardson-score interval overlap and "
+                "does not bound the largest absolute E interval endpoint by the larger "
+                "of one quarter of the Richardson half-width and a 64-ULP binary64 "
+                "numerical floor.",
+            ),
+            (
+                "marginal audit",
+                "Marginal step comparisons are not audit-only diagnostics and do not "
+                "gate publication.",
+            ),
+            (
+                "paired audit",
+                "Paired-zero step comparisons are not audit-only diagnostics and do not "
+                "gate publication.",
+            ),
+        )
+        for name, forged in cases:
+            with self.subTest(name=name):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                path.write_text(
+                    _replace_protocol_disclosure_paragraph(source, f"<p>{forged}</p>"),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|formula|confidence|overlap|budget|marginal|paired|audit-only",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_rejects_appended_contradictions(self):
+        contradictions = (
+            "Reference intervals do not use 95% confidence componentwise, not "
+            "simultaneous.",
+            "Publication does not require Richardson-score interval overlap and does "
+            "not bound the largest absolute E interval endpoint by the larger of one "
+            "quarter of the Richardson half-width and a 64-ULP binary64 numerical floor.",
+            "Marginal step comparisons are not audit-only diagnostics.",
+            "Paired-zero step comparisons are not audit-only diagnostics.",
+        )
+        for contradiction in contradictions:
+            with self.subTest(contradiction=contradiction):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                mutated = _append_before_body(source, f"<p>{contradiction}</p>")
+                path.write_text(
+                    mutated,
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|contradict|confidence|overlap|budget|marginal|paired|audit-only",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_cannot_be_hidden_by_stylesheet_class(self):
+        root = make_valid_fixture(self)
+        path = root / "index.html"
+        source = path.read_text(encoding="utf-8")
+        paragraph_start = source.index(PROTOCOL_DISCLOSURE_PARAGRAPH_START)
+        paragraph_end = source.index("</p>", paragraph_start) + len("</p>")
+        paragraph = source[paragraph_start:paragraph_end]
+        concealed = (
+            "<style>.concealed-disclosure { display: none; }</style>"
+            '<span class="concealed-disclosure">'
+            f"{paragraph}"
+            "</span>"
+            "<p>95% intervals are simultaneous.</p>"
+        )
+        path.write_text(
+            _replace_protocol_disclosure_paragraph(source, concealed),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(
+            ValidationError, "stylesheet|style|hidden|conceal|disclosure"
+        ):
+            validate_publication(root)
+
+    def test_visible_prose_rejects_all_protocol_contradiction_families(self):
+        contradictions = (
+            "95% intervals are simultaneous.",
+            "Overlap is optional.",
+            "Budget need not hold.",
+            "Marginal consistency may gate publication.",
+        )
+        for contradiction in contradictions:
+            with self.subTest(contradiction=contradiction):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                path.write_text(
+                    _append_before_body(source, f"<p>{contradiction}</p>"),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|contradict|confidence|simultaneous|overlap|budget|marginal|gate",
+                ):
+                    validate_publication(root)
+
+    def test_protocol_disclosure_cannot_be_concealed_by_visual_css(self):
+        hiding_rules = (
+            "opacity: 0",
+            "font-size: 0",
+            "clip-path: inset(100%)",
+            "position: absolute; left: -100000px",
+        )
+        for rule in hiding_rules:
+            with self.subTest(rule=rule):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                paragraph_start = source.index(PROTOCOL_DISCLOSURE_PARAGRAPH_START)
+                paragraph_end = source.index("</p>", paragraph_start) + len("</p>")
+                paragraph = source[paragraph_start:paragraph_end]
+                concealed = (
+                    f"<style>.concealed-disclosure {{ {rule}; }}</style>"
+                    '<span class="concealed-disclosure">'
+                    f"{paragraph}"
+                    "</span>"
+                    "<p>The intervals form a simultaneous 95% confidence region.</p>"
+                )
+                path.write_text(
+                    _replace_protocol_disclosure_paragraph(source, concealed),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError, "canonical|protocol|disclosure|style"
+                ):
+                    validate_publication(root)
+
+    def test_canonical_report_rejects_protocol_contradiction_synonyms(self):
+        contradictions = (
+            "The intervals form a simultaneous 95% confidence region.",
+            "Richardson-score interval overlap is not mandatory.",
+            "The truncation numerical budget can be ignored.",
+            "Marginal consistency sometimes gates publication.",
+        )
+        for contradiction in contradictions:
+            with self.subTest(contradiction=contradiction):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = path.read_text(encoding="utf-8")
+                path.write_text(
+                    _append_before_body(source, f"<p>{contradiction}</p>"),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|protocol|disclosure|confidence|overlap|budget|marginal",
+                ):
+                    validate_publication(root)
+
+    def test_reference_rows_exactly_cover_the_canonical_cells(self):
+        root = make_valid_fixture(self)
+        references_path = root / "data/raw/references.json"
+        references = json.loads(references_path.read_text(encoding="utf-8"))
+        extra = copy.deepcopy(references["rows"][0])
+        extra["row_id"] = "reference:forged-extra"
+        extra["cell_id"] = "aaa_forged:extra"
+        extra["truncation_policy"]["roundoff_floor_ulps"] = 999
+        extra["accepted"]["references"] = False
+        extra["reasons"] = ["synthetic rejected extra row"]
+        references["rows"].append(extra)
+        write_fixture_json(references_path, references)
+
+        validity_path = root / "data/plot_data/validity.json"
+        validity = json.loads(validity_path.read_text(encoding="utf-8"))
+        validity["rows"][0]["source_row_ids"].append(extra["row_id"])
+        write_fixture_json(validity_path, validity)
+        _refresh_manifest(root)
+
+        with self.assertRaisesRegex(
+            ValidationError, "reference rows.*canonical|reference.*coverage"
+        ):
+            validate_publication(root)
+
+    def test_step_consistency_publication_gate_claims_are_rejected(self):
+        for diagnostic in ("Marginal", "Paired-zero"):
+            with self.subTest(diagnostic=diagnostic):
+                root = make_valid_fixture(self)
+                path = root / "index.html"
+                source = _append_before_body(
+                    path.read_text(encoding="utf-8"),
+                    f"<p>{diagnostic} consistency is required for publication.</p>",
+                )
+                path.write_text(source, encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "canonical|marginal|paired.*audit|paired.*publication|publication gate",
+                ):
+                    validate_publication(root)
+
     def test_reference_dimensions_counts_and_crn_seed_streams_are_enforced(self):
         root = make_valid_fixture(self)
         path = root / "data/raw/references.json"
@@ -2541,51 +3824,40 @@ class PublicationValidationTests(unittest.TestCase):
         path = root / "data/raw/references.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         row = payload["rows"][0]
+        dimension = len(row["parameters"])
         large = 1.0e308
         for field in ("g_h", "g_h2", "score"):
-            row[field] = [[large], [large], [large], [large]]
-            interval = row["intervals"][field]
-            interval.update(
-                mean=[large],
-                variance=[0.0],
-                mean_variance=[0.0],
-                half_width=[0.0],
-                ci_low=[large],
-                ci_high=[large],
-            )
-        row["reference_gradient"] = [large]
+            row[field] = [
+                [large] * dimension for _ in range(REFERENCE_POLICY.replicates)
+            ]
+        _populate_reference_evidence(row)
         write_fixture_json(path, payload)
-        _refresh_manifest(root)
+        _refresh_manifest_and_index(root)
         validate_publication(root)
 
         root = make_valid_fixture(self)
         path = root / "data/raw/references.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         row = payload["rows"][0]
+        dimension = len(row["parameters"])
         values = [
             7.87073622007493e73,
             7.87073622007494e73,
             7.870736220074919e73,
             7.870736220074938e73,
         ]
-        interval = {
-            "mean": [7.870736220074931e73],
-            "variance": [9.180667443759914e117],
-            "mean_variance": [2.2951668609399784e117],
-            "half_width": [1.5065044164928034e59],
-            "ci_low": [7.870736220074916e73],
-            "ci_high": [7.870736220074946e73],
-            "replicates": 4,
-            "degrees_of_freedom": 3,
-            "confidence": 0.95,
-        }
         for field in ("g_h", "g_h2", "score"):
-            row[field] = [[value] for value in values]
-            row["intervals"][field] = dict(interval)
-        row["reference_gradient"] = list(interval["mean"])
+            row[field] = [[value] * dimension for value in values]
+        _populate_reference_evidence(row)
         write_fixture_json(path, payload)
-        _refresh_manifest(root)
+        _refresh_manifest_and_index(root)
         validate_publication(root)
+
+    def test_extreme_scale_reference_metric_raises_validation_error(self):
+        with self.assertRaisesRegex(
+            ValidationError, "reference-relative reference norm is unrepresentable"
+        ):
+            validate_report_module.compute_reference_metrics([1.0e308], [5e-324])
 
     def test_rejected_rows_cannot_feed_summary_or_headline_aggregates(self):
         root = make_valid_fixture(self)
@@ -2741,6 +4013,16 @@ class ReportBuilderTests(unittest.TestCase):
 
         return build_report
 
+    def test_extreme_scale_summary_metric_raises_build_error(self):
+        builder = self._builder()
+
+        with self.assertRaisesRegex(
+            builder.BuildError,
+            "summary reference metrics are invalid: "
+            "reference-relative reference norm is unrepresentable",
+        ):
+            builder._reference_metrics((1.0e308,), (5e-324,))
+
     def test_builder_rejects_invalid_full_bundle_protocol(self):
         builder = self._builder()
 
@@ -2797,6 +4079,21 @@ class ReportBuilderTests(unittest.TestCase):
                 mutate(root)
                 with self.assertRaisesRegex(builder.BuildError, message):
                     builder.render_report(root=root, template_path=REPORT_TEMPLATE)
+
+    def test_pure_render_uses_only_the_validated_model_snapshot(self):
+        builder = self._builder()
+        root = make_valid_fixture(self)
+        model = builder.load_report(root)
+        template = REPORT_TEMPLATE.read_text(encoding="utf-8")
+
+        expected = builder.render_validated_report(model=model, template=template)
+        (root / "data/summary.json").write_text("not JSON anymore", encoding="utf-8")
+        (root / "assets/figures/analytic_gates.png").write_bytes(b"not PNG anymore")
+
+        self.assertEqual(
+            builder.render_validated_report(model=model, template=template),
+            expected,
+        )
 
     def test_current_producer_gradient_plot_kind_and_ids_are_supported(self):
         builder = self._builder()
@@ -3415,6 +4712,74 @@ class ReportBuilderTests(unittest.TestCase):
                 ):
                     builder.render_report(root=root, template_path=REPORT_TEMPLATE)
 
+    def test_zero_reference_metrics_remain_unavailable_through_rendering(self):
+        builder = self._builder()
+        root = make_valid_fixture(self)
+
+        raw = json.loads((root / "data/raw/analytic.json").read_text(encoding="utf-8"))
+        for field in ("relative_error", "cosine_similarity", "sign_agreement"):
+            self.assertIsNone(raw["rows"][0][field])
+
+        summary_path = root / "data/summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        metric_fields = ("relative_error", "cosine_similarity", "sign_agreement")
+        for row in summary["method_summaries"]:
+            for field in metric_fields:
+                self.assertIsNone(row[field])
+
+        plot_path = root / "data/plot_data/gradient_quality.json"
+        plot = json.loads(plot_path.read_text(encoding="utf-8"))
+        for row in plot["rows"]:
+            if row.get("kind") in {
+                "path_tracer_gradient_quality",
+                "contact_3d_gradient_quality",
+            }:
+                self.assertEqual(row["values"], [None])
+
+        model = builder.load_report(root)
+        for row in model.summary.method_summaries:
+            for field in metric_fields:
+                self.assertIsNone(getattr(row, field))
+        gradient_plot = model.plots["data/plot_data/gradient_quality.json"]
+        self.assertTrue(
+            all(
+                record.raw["values"] == (None,)
+                for record in gradient_plot.rows
+                if record.raw.get("kind")
+                in {
+                    "path_tracer_gradient_quality",
+                    "contact_3d_gradient_quality",
+                }
+            )
+        )
+
+        page = builder.render_report(root=root, template_path=REPORT_TEMPLATE)
+        parser = _RenderedPageParser()
+        parser.feed(page.decode("utf-8"))
+        sourced_cells = {
+            unquote(attributes.get("data-source-key", "")): text
+            for attributes, text in parser.cells
+            if attributes.get("data-source-file") == "data/summary.json"
+        }
+        for index in range(len(summary["method_summaries"])):
+            for field in metric_fields:
+                self.assertEqual(
+                    sourced_cells[f"#/method_summaries/{index}/{field}"],
+                    "unavailable",
+                )
+
+    def test_summary_aggregate_rejects_sub_tolerance_binary64_drift(self):
+        builder = self._builder()
+        root = make_valid_fixture(self)
+        path = root / "data/summary.json"
+        summary = json.loads(path.read_text(encoding="utf-8"))
+        summary["method_summaries"][0]["empirical_bias"][0] = 5.0e-13
+        write_fixture_json(path, summary)
+        _refresh_manifest(root)
+
+        with self.assertRaisesRegex(builder.BuildError, "aggregate|mismatch|summary"):
+            builder.load_report(root)
+
     def test_direct_script_uses_custom_root_defaults(self):
         root = make_valid_fixture(self)
         (root / "report_template.html").write_bytes(REPORT_TEMPLATE.read_bytes())
@@ -3422,7 +4787,12 @@ class ReportBuilderTests(unittest.TestCase):
         live_before = live_index.read_bytes()
 
         completed = subprocess.run(
-            [sys.executable, str(BUILD_SCRIPT), "--root", str(root)],
+            [
+                sys.executable,
+                str(BUILD_SCRIPT),
+                "--root",
+                str(root),
+            ],
             cwd=REPORT_TEMPLATE.parents[1],
             text=True,
             capture_output=True,
@@ -3750,13 +5120,14 @@ class ReportBuilderTests(unittest.TestCase):
 
     def test_typed_model_exposes_immutable_publication_contract(self):
         builder = self._builder()
-        model = builder.load_report(make_valid_fixture(self))
+        root = make_valid_fixture(self)
+        model = builder.load_report(root)
 
         decision = model.manifest.report_reference_count_decision
         self.assertEqual(decision.status, "accepted")
         self.assertEqual(
             decision.protocol_fingerprint,
-            REPORT_REFERENCE_COUNT_DECISION["protocol_fingerprint"],
+            REAL_V2_REPORT_REFERENCE_COUNT_DECISION["protocol_fingerprint"],
         )
         self.assertEqual(decision.path_reference_samples, 32768)
         self.assertEqual(decision.contact_reference_samples, 65536)
@@ -3806,6 +5177,61 @@ class ReportBuilderTests(unittest.TestCase):
             all(row.hard_evaluation_forward_executions == 387 for row in contact_rows)
         )
 
+        reference = model.reference_rows[0]
+        self.assertEqual(reference.reference_gradient, (0.0, 0.0))
+        self.assertEqual(reference.richardson_ci_low, (0.0, 0.0))
+        self.assertEqual(reference.richardson_ci_high, (0.0, 0.0))
+        self.assertEqual(reference.fine_truncation_error_mean, (0.0, 0.0))
+        self.assertEqual(reference.truncation_upper_bound, (0.0, 0.0))
+        self.assertEqual(reference.truncation_statistical_budget, (0.0, 0.0))
+        self.assertGreater(reference.truncation_roundoff_floor[0], 0.0)
+        self.assertEqual(
+            reference.truncation_effective_budget,
+            reference.truncation_roundoff_floor,
+        )
+        self.assertEqual(reference.truncation_floor_dominated, (True, True))
+        self.assertEqual(reference.truncation_components, (True, True))
+        self.assertEqual(reference.overlap_components, (True, True))
+        self.assertEqual(reference.marginal_step_components, (True, True))
+        self.assertEqual(reference.paired_step_components, (True, True))
+        self.assertEqual(dict(reference.truncation_policy), REFERENCE_TRUNCATION_POLICY)
+        raw_reference = json.loads(
+            (root / reference.source_file).read_text(encoding="utf-8")
+        )["rows"][reference.source_index]
+        self.assertEqual(reference.h, tuple(raw_reference["h"]))
+        self.assertEqual(reference.h_half, tuple(raw_reference["h_half"]))
+        self.assertEqual(reference.samples, raw_reference["counts"]["samples"])
+        self.assertEqual(reference.replicates, raw_reference["counts"]["replicates"])
+        self.assertEqual(
+            reference.h_forward_executions,
+            raw_reference["counts"]["h_forward_executions"],
+        )
+        self.assertEqual(
+            reference.h2_forward_executions,
+            raw_reference["counts"]["h2_forward_executions"],
+        )
+        self.assertEqual(
+            reference.five_point_forward_executions,
+            raw_reference["counts"]["five_point_forward_executions"],
+        )
+        self.assertEqual(
+            reference.score_forward_executions,
+            raw_reference["counts"]["score_forward_executions"],
+        )
+        self.assertEqual(
+            reference.forward_executions,
+            raw_reference["counts"]["forward_executions"],
+        )
+        self.assertEqual(
+            dict(reference.seeds),
+            {name: tuple(stream) for name, stream in raw_reference["seeds"].items()},
+        )
+
+        gradient = model.gradient_rows[0]
+        self.assertEqual(gradient.relative_error, gradient.raw["relative_error"])
+        self.assertEqual(gradient.cosine_similarity, gradient.raw["cosine_similarity"])
+        self.assertEqual(gradient.sign_agreement, gradient.raw["sign_agreement"])
+
         with self.assertRaises(dataclasses.FrozenInstanceError):
             decision.status = "changed"
         with self.assertRaises(TypeError):
@@ -3827,12 +5253,69 @@ class ReportBuilderTests(unittest.TestCase):
         self.assertIn("fully smoothed", page.casefold())
         self.assertIn("almost everywhere", page.casefold())
         self.assertIn("not fully smoothed", page.casefold())
-        self.assertIn(REPORT_REFERENCE_COUNT_RATIONALE, page)
+
+    def test_report_renders_reference_step_seed_and_execution_provenance(self):
+        builder = self._builder()
+        root = make_valid_fixture(self)
+        page = builder.render_report(root=root, template_path=REPORT_TEMPLATE).decode(
+            "utf-8"
+        )
+        parser = _RenderedPageParser()
+        parser.feed(page)
+
+        self.assertIn("Reference execution and seed provenance", page)
+        for heading in (
+            "h",
+            "h/2",
+            "h forward executions",
+            "h/2 forward executions",
+            "Five-point forward executions",
+            "Score forward executions",
+            "Total forward executions",
+            "Five-point outer seeds",
+            "Five-point inner seeds",
+            "Score outer seeds",
+            "Score inner seeds",
+        ):
+            with self.subTest(heading=heading):
+                self.assertIn(heading, page)
+
+        source_keys = {
+            attributes.get("data-source-key") for attributes, _text in parser.cells
+        }
+        for index in range(len(EXPECTED_REFERENCE_CELLS)):
+            prefix = f"/rows/{index}"
+            for suffix in (
+                "/h",
+                "/h_half",
+                "/counts/h_forward_executions",
+                "/counts/h2_forward_executions",
+                "/counts/five_point_forward_executions",
+                "/counts/score_forward_executions",
+                "/counts/forward_executions",
+                "/seeds/five_point_outer",
+                "/seeds/five_point_inner",
+                "/seeds/score_outer",
+                "/seeds/score_inner",
+            ):
+                with self.subTest(index=index, suffix=suffix):
+                    self.assertIn(f"#{quote(prefix + suffix, safe='')}", source_keys)
+        self.assertIn(REAL_V2_REPORT_REFERENCE_COUNT_RATIONALE, page)
         self.assertIn(PATH_CERTIFICATE_FINGERPRINT, page)
         self.assertIn(PATH_GAUGE_TARGET, page)
         self.assertIn(PATH_GAUGE_TARGET_LABEL, page)
         self.assertIn("through_one_complete_descriptor_relative_install_pass", page)
         self.assertIn("final_metadata_bearing_reinstall_and_binding_verification", page)
+        self.assertIn("Accepted Richardson reference gradients", page)
+        self.assertIn("Reference truncation policy", page)
+        self.assertIn("Fine truncation mean", page)
+        self.assertIn("Overlap components", page)
+        self.assertIn("Paired step components (audit only)", page)
+        self.assertIn("fine-step truncation", page.casefold())
+        self.assertIn("componentwise, not simultaneous", page.casefold())
+        self.assertIn("audit-only", page.casefold())
+        self.assertIn("do not gate publication", page.casefold())
+        self.assertNotIn("paired-zero publication gate", page.casefold())
 
         sourced_cells = [
             (

@@ -8,14 +8,62 @@ import os
 import re
 import stat
 import sys
+from dataclasses import dataclass
 from fractions import Fraction
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+REPORT_PROTOCOL_FINGERPRINT = (
+    "49cc87ceb090bd7d8b0b9a3e023b618bb6cc12875109b50dfe3f374ccde918a1"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ReferencePolicy:
+    richardson_order: int
+    refinement_ratio: int
+    confidence: float
+    statistical_budget_fraction: float
+    roundoff_floor_ulps: int
+    confidence_scope: str
+    replicates: int
+    student_t_critical: float
+
+    @property
+    def richardson_denominator(self) -> int:
+        return self.refinement_ratio**self.richardson_order - 1
+
+    @property
+    def degrees_of_freedom(self) -> int:
+        return self.replicates - 1
+
+
+REFERENCE_POLICY = ReferencePolicy(
+    richardson_order=4,
+    refinement_ratio=2,
+    confidence=0.95,
+    statistical_budget_fraction=0.25,
+    roundoff_floor_ulps=64,
+    confidence_scope="componentwise_not_simultaneous",
+    replicates=4,
+    student_t_critical=3.182446305284263,
+)
+REFERENCE_TRUNCATION_POLICY = MappingProxyType(
+    {
+        "richardson_order": REFERENCE_POLICY.richardson_order,
+        "refinement_ratio": REFERENCE_POLICY.refinement_ratio,
+        "confidence": REFERENCE_POLICY.confidence,
+        "statistical_budget_fraction": REFERENCE_POLICY.statistical_budget_fraction,
+        "roundoff_floor_ulps": REFERENCE_POLICY.roundoff_floor_ulps,
+        "confidence_scope": REFERENCE_POLICY.confidence_scope,
+    }
+)
+_FIVE_POINT_FORWARD_EVALUATIONS_PER_DIMENSION = 4
 REQUIRED_SECTION_IDS = (
     "scope",
     "semantics",
@@ -143,22 +191,145 @@ _REPORT_CONFIG = {
     "contact_reference_samples": 65536,
     "reference_seed_sets": 4,
 }
-_REPORT_REFERENCE_COUNT_RATIONALE = (
-    "Accepted after a clean CPU pilot projected 30,807.341991021996 seconds for the report workload; "
-    "the nominal reference counts are retained without reduction."
+_REFERENCE_SEED_DOMAIN_SIZE = (2**31) // 4
+_REFERENCE_SEED_NAMES = (
+    "five_point_outer",
+    "five_point_inner",
+    "score_outer",
+    "score_inner",
 )
-_REPORT_REFERENCE_COUNT_DECISION = {
+_REFERENCE_SEED_ROOTS = {
+    "triangle_2d:edge_midpoints": (101, 111),
+    "collision_2d:pinball_bank:start_0": (201, 301),
+    "collision_2d:pinball_bank:start_1": (202, 302),
+    "collision_2d:pinball_bank:start_2": (203, 303),
+    "collision_2d:crowded_table:start_0": (204, 304),
+    "collision_2d:crowded_table:start_1": (205, 305),
+    "collision_2d:crowded_table:start_2": (206, 306),
+    "path_tracer:initial_parameters": (4000, 4001),
+    "contact_3d:initial_launch_velocity": (302, 402),
+    "opaque_mesh:camera_parameters": (10000, 11000),
+}
+_REFERENCE_INPUT_DESCRIPTORS = MappingProxyType(
+    {
+        "triangle_2d:edge_midpoints": MappingProxyType(
+            {
+                "parameters": (0.0, -0.385),
+                "sigma": (0.02, 0.02),
+                "h": (0.005, 0.005),
+                "h_half": (0.0025, 0.0025),
+            }
+        ),
+        "collision_2d:pinball_bank:start_0": MappingProxyType(
+            {
+                "parameters": (1.65, 0.12),
+                "sigma": (0.02, 0.02),
+                "h": (0.0033, 0.002),
+                "h_half": (0.00165, 0.001),
+            }
+        ),
+        "collision_2d:pinball_bank:start_1": MappingProxyType(
+            {
+                "parameters": (1.45, 0.42),
+                "sigma": (0.02, 0.02),
+                "h": (0.0029, 0.002),
+                "h_half": (0.00145, 0.001),
+            }
+        ),
+        "collision_2d:pinball_bank:start_2": MappingProxyType(
+            {
+                "parameters": (2.0, 0.5),
+                "sigma": (0.02, 0.02),
+                "h": (0.004, 0.002),
+                "h_half": (0.002, 0.001),
+            }
+        ),
+        "collision_2d:crowded_table:start_0": MappingProxyType(
+            {
+                "parameters": (1.35, -0.05),
+                "sigma": (0.02, 0.02),
+                "h": (0.0027, 0.002),
+                "h_half": (0.00135, 0.001),
+            }
+        ),
+        "collision_2d:crowded_table:start_1": MappingProxyType(
+            {
+                "parameters": (0.8, -0.2),
+                "sigma": (0.02, 0.02),
+                "h": (0.002, 0.002),
+                "h_half": (0.001, 0.001),
+            }
+        ),
+        "collision_2d:crowded_table:start_2": MappingProxyType(
+            {
+                "parameters": (2.2, -0.7),
+                "sigma": (0.02, 0.02),
+                "h": (0.0044, 0.002),
+                "h_half": (0.0022, 0.001),
+            }
+        ),
+        "path_tracer:initial_parameters": MappingProxyType(
+            {
+                "parameters": (-0.28, 0.16, -0.32),
+                "sigma": (0.03, 0.03, 0.03),
+                "h": (0.01, 0.01, 0.01),
+                "h_half": (0.005, 0.005, 0.005),
+            }
+        ),
+        "contact_3d:initial_launch_velocity": MappingProxyType(
+            {
+                "parameters": (2.2, -0.1, 0.65),
+                "sigma": (0.02, 0.02, 0.02),
+                "h": (0.0044, 0.002, 0.002),
+                "h_half": (0.0022, 0.001, 0.001),
+            }
+        ),
+        "opaque_mesh:camera_parameters": MappingProxyType(
+            {
+                "parameters": (-0.18, 0.1),
+                "sigma": (0.055, 0.055),
+                "h": (0.02, 0.02),
+                "h_half": (0.01, 0.01),
+            }
+        ),
+    }
+)
+_REFERENCE_PROTOCOL_SEEDS = {
+    "path_tracer:initial_parameters": {
+        "training": list(range(1000, 1032)),
+        "target": list(range(2000, 2016)),
+        "held_out": list(range(3000, 3016)),
+        "reference_base": 4000,
+        "reference_inner_base": 4001,
+    },
+    "contact_3d:initial_launch_velocity": {
+        "estimator_outer": list(range(5000, 5032)),
+        "optimization_outer": [6000 + 64 * index for index in range(16)],
+        "reference_base": 302,
+        "reference_inner_base": 402,
+    },
+    "opaque_mesh:camera_parameters": {
+        "estimator_outer": list(range(9000, 9032)),
+        "reference_base": 10000,
+        "reference_inner_base": 11000,
+    },
+}
+_V2_REPORT_REFERENCE_COUNT_RATIONALE = (
+    "Accepted after a clean CPU protocol-v2 pilot projected 27,954.723406340072 seconds "
+    "for the report workload; the nominal reference counts are retained without reduction."
+)
+_V2_REPORT_REFERENCE_COUNT_DECISION: dict[str, Any] | None = {
     "status": "accepted",
     "pilot_tier": "pilot",
-    "pilot_manifest_sha256": "d6ab265c77e3f08fe759fde02bf4d07e43b8c358a4bb46024da1422ba73dd6cb",
-    "pilot_source_commit": "e25b05937fa149a341177559f2fa7f7e2ff3f651",
-    "pilot_projected_report_seconds": 30807.341991021996,
-    "decided_at_utc": "2026-06-28T14:43:54Z",
-    "protocol_fingerprint": "f44b07543db9c793cc0fd16a2fde768cc7c7589b60f9489e9f600c31d729e0e9",
+    "pilot_manifest_sha256": "8312eb08a106446f6b689c71cb2c7a6140f708755bcd075ebd45fb48fc9f6d2e",
+    "pilot_source_commit": "28889267a0a8495d88c3ef668eee9c53dda6492c",
+    "pilot_projected_report_seconds": 27954.723406340072,
+    "decided_at_utc": "2026-06-28T20:15:09Z",
+    "protocol_fingerprint": REPORT_PROTOCOL_FINGERPRINT,
     "path_reference_samples": 32768,
     "contact_reference_samples": 65536,
     "reference_seed_sets": 4,
-    "rationale": _REPORT_REFERENCE_COUNT_RATIONALE,
+    "rationale": _V2_REPORT_REFERENCE_COUNT_RATIONALE,
 }
 _REPORT_RUNTIME_PHASES = (
     "gradients_analytic",
@@ -451,6 +622,150 @@ def _finite_vector(value: Any, *, name: str, nonnegative: bool = False) -> list[
     ]
 
 
+def _finite_float(value: Any, *, name: str, nonnegative: bool = False) -> float:
+    if type(value) is not float or not math.isfinite(value):
+        raise ValidationError(f"{name} must be a finite JSON float")
+    if nonnegative and value < 0.0:
+        raise ValidationError(f"{name} must be nonnegative")
+    return value
+
+
+def _finite_float_vector(
+    value: Any, *, name: str, nonnegative: bool = False
+) -> list[float]:
+    if not isinstance(value, list):
+        raise ValidationError(f"{name} must be a JSON array")
+    return [
+        _finite_float(item, name=f"{name}[{index}]", nonnegative=nonnegative)
+        for index, item in enumerate(value)
+    ]
+
+
+def _scaled_norm(values: list[float], *, name: str) -> float:
+    scale = max(abs(value) for value in values)
+    if scale == 0.0:
+        return 0.0
+    normalized = [abs(value) / scale for value in values]
+    norm = scale * math.sqrt(math.fsum(value * value for value in normalized))
+    if not math.isfinite(norm) or norm == 0.0:
+        raise ValidationError(f"{name} is unrepresentable")
+    return norm
+
+
+def compute_reference_metrics(
+    gradient: list[float] | tuple[float, ...],
+    reference: list[float] | tuple[float, ...],
+) -> tuple[float | None, float | None, float | None]:
+    """Recompute the producer's binary64 reference-relative metrics exactly."""
+
+    gradient_values = list(gradient)
+    reference_values = list(reference)
+    if (
+        not gradient_values
+        or len(gradient_values) != len(reference_values)
+        or any(
+            type(value) is not float or not math.isfinite(value)
+            for value in gradient_values + reference_values
+        )
+    ):
+        raise ValidationError(
+            "reference metrics require matching nonempty finite-float vectors"
+        )
+    reference_scale = max(abs(value) for value in reference_values)
+    gradient_scale = max(abs(value) for value in gradient_values)
+    if reference_scale == 0.0:
+        relative_error = None
+        cosine_similarity = None
+    elif gradient_values == reference_values:
+        relative_error = 0.0
+        cosine_similarity = 1.0
+    else:
+        common_scale = max(reference_scale, gradient_scale)
+        scaled_reference = [value / common_scale for value in reference_values]
+        scaled_gradient = [value / common_scale for value in gradient_values]
+        scaled_difference = [
+            first - second
+            for first, second in zip(scaled_gradient, scaled_reference, strict=True)
+        ]
+        reference_norm = _scaled_norm(
+            scaled_reference, name="reference-relative reference norm"
+        )
+        if reference_norm == 0.0:
+            raise ValidationError(
+                "reference-relative reference norm is unrepresentable"
+            )
+        difference_norm = (
+            _scaled_norm(scaled_difference, name="reference-relative difference norm")
+            if any(value != 0.0 for value in scaled_difference)
+            else 0.0
+        )
+        if difference_norm == 0.0:
+            raise ValidationError(
+                "reference-relative error is an unrepresentable nonzero value"
+            )
+        relative_error = difference_norm / reference_norm
+        if not math.isfinite(relative_error) or relative_error == 0.0:
+            raise ValidationError("reference-relative error is unrepresentable")
+        if gradient_scale == 0.0:
+            cosine_similarity = None
+        else:
+            normalized_gradient = [value / gradient_scale for value in gradient_values]
+            normalized_reference = [
+                value / reference_scale for value in reference_values
+            ]
+            cosine_similarity = math.fsum(
+                first * second
+                for first, second in zip(
+                    normalized_gradient, normalized_reference, strict=True
+                )
+            ) / (
+                _scaled_norm(normalized_gradient, name="normalized gradient norm")
+                * _scaled_norm(normalized_reference, name="normalized reference norm")
+            )
+            cosine_similarity = max(-1.0, min(1.0, cosine_similarity))
+    nonzero_reference = [
+        index for index, value in enumerate(reference_values) if value != 0.0
+    ]
+    sign_agreement = (
+        math.fsum(
+            float(
+                (gradient_values[index] > 0.0) - (gradient_values[index] < 0.0)
+                == (reference_values[index] > 0.0) - (reference_values[index] < 0.0)
+            )
+            for index in nonzero_reference
+        )
+        / len(nonzero_reference)
+        if nonzero_reference
+        else None
+    )
+    return relative_error, cosine_similarity, sign_agreement
+
+
+def _canonical_reference_seeds(cell: str, replicates: int) -> dict[str, list[int]]:
+    try:
+        base, inner = _REFERENCE_SEED_ROOTS[cell]
+    except KeyError as error:
+        raise ValidationError(f"unknown canonical reference cell {cell!r}") from error
+    digest = hashlib.sha256(f"{base}:{inner}".encode("ascii")).digest()
+    offset = int.from_bytes(digest[:8], "big") % _REFERENCE_SEED_DOMAIN_SIZE
+    return {
+        name: [
+            domain * _REFERENCE_SEED_DOMAIN_SIZE
+            + ((offset + replicate) % _REFERENCE_SEED_DOMAIN_SIZE)
+            for replicate in range(replicates)
+        ]
+        for domain, name in enumerate(_REFERENCE_SEED_NAMES)
+    }
+
+
+def _canonical_reference_inputs(cell: str) -> dict[str, list[float]]:
+    try:
+        descriptor = _REFERENCE_INPUT_DESCRIPTORS[cell]
+    except KeyError as error:
+        raise ValidationError(f"unknown canonical reference cell {cell!r}") from error
+    return {name: list(values) for name, values in descriptor.items()}
+
+
 def _json_type_strict_equal(actual: Any, expected: Any) -> bool:
     if type(actual) is not type(expected):
         return False
@@ -474,7 +789,16 @@ def _validate_report_config_and_decision(manifest: dict[str, Any]) -> dict[str, 
             "protocol fingerprint"
         )
     decision = manifest.get("report_reference_count_decision")
-    if not _json_type_strict_equal(decision, _REPORT_REFERENCE_COUNT_DECISION):
+    expected_decision = _V2_REPORT_REFERENCE_COUNT_DECISION
+    if expected_decision is None:
+        raise ValidationError(
+            "schema-v2 report reference-count decision is unavailable; exact clean-pilot evidence must be configured"
+        )
+    if expected_decision.get("protocol_fingerprint") != REPORT_PROTOCOL_FINGERPRINT:
+        raise ValidationError(
+            "configured schema-v2 report decision does not match the canonical protocol fingerprint"
+        )
+    if not _json_type_strict_equal(decision, expected_decision):
         raise ValidationError(
             "report reference-count decision must exactly match the accepted pilot evidence and protocol fingerprint"
         )
@@ -1612,9 +1936,12 @@ def validate_manifest(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(manifest, dict):
         os.close(root_descriptor)
         raise ValidationError("manifest must be a JSON object")
-    if manifest.get("schema_version") != SCHEMA_VERSION:
+    if (
+        type(manifest.get("schema_version")) is not int
+        or manifest["schema_version"] != SCHEMA_VERSION
+    ):
         os.close(root_descriptor)
-        raise ValidationError("manifest schema_version must be 1")
+        raise ValidationError(f"manifest schema_version must be {SCHEMA_VERSION}")
     if manifest.get("tier") != "report":
         os.close(root_descriptor)
         raise ValidationError("manifest tier must be 'report'")
@@ -1650,8 +1977,11 @@ def validate_manifest(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
                 raise ValidationError(f"byte count mismatch for {relative}")
             if hashlib.sha256(data).hexdigest() != digest:
                 raise ValidationError(f"SHA-256 mismatch for {relative}")
-            if relative.endswith(".json"):
-                loaded[relative] = _load_json_bytes_finite(data, location=relative)
+            loaded[relative] = (
+                _load_json_bytes_finite(data, location=relative)
+                if relative.endswith(".json")
+                else data
+            )
     finally:
         os.close(root_descriptor)
 
@@ -1688,8 +2018,12 @@ def validate_manifest(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def _dataset_rows(payload: Any, *, relative: str) -> list[dict[str, Any]]:
-    if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
-        raise ValidationError(f"{relative} must use schema_version 1")
+    if (
+        not isinstance(payload, dict)
+        or type(payload.get("schema_version")) is not int
+        or payload["schema_version"] != SCHEMA_VERSION
+    ):
+        raise ValidationError(f"{relative} must use schema_version {SCHEMA_VERSION}")
     if not isinstance(payload.get("dataset"), str) or not payload["dataset"]:
         raise ValidationError(f"{relative} has no dataset name")
     rows = payload.get("rows")
@@ -1755,10 +2089,25 @@ def _validate_method_row(row: dict[str, Any]) -> None:
     ):
         counts[field] = _nonnegative_int(row.get(field), name=f"{row_id}.{field}")
     _finite_number(row.get("wall_time"), name=f"{row_id}.wall_time", nonnegative=True)
-    gradient = _finite_vector(row.get("gradient"), name=f"{row_id}.gradient")
+    gradient = _finite_float_vector(row.get("gradient"), name=f"{row_id}.gradient")
     if not gradient:
         raise ValidationError(f"{row_id}.gradient must be nonempty")
     dimension = len(gradient)
+    reference = _finite_float_vector(
+        row.get("reference_gradient"), name=f"{row_id}.reference_gradient"
+    )
+    if len(reference) != dimension:
+        raise ValidationError(f"{row_id}.reference_gradient dimension mismatch")
+    expected_metrics = compute_reference_metrics(gradient, reference)
+    for field, expected in zip(
+        ("relative_error", "cosine_similarity", "sign_agreement"),
+        expected_metrics,
+        strict=True,
+    ):
+        if field not in row or not _json_type_strict_equal(row[field], expected):
+            raise ValidationError(
+                f"{row_id}.{field} disagrees with the canonical reference metrics"
+            )
     antithetic = row.get("antithetic")
     if not isinstance(antithetic, bool):
         raise ValidationError(f"{row_id}.antithetic must be boolean")
@@ -1818,11 +2167,28 @@ def _validate_method_row(row: dict[str, Any]) -> None:
 
 def _reference_interval(
     values: list[list[float]], record: Any, *, name: str
-) -> tuple[list[float], list[float], list[float]]:
+) -> tuple[list[float], list[float], list[float], list[float]]:
     if not isinstance(record, dict):
         raise ValidationError(f"{name} interval record must be an object")
+    required_keys = {
+        "mean",
+        "variance",
+        "mean_variance",
+        "half_width",
+        "ci_low",
+        "ci_high",
+        "replicates",
+        "degrees_of_freedom",
+        "confidence",
+    }
+    if set(record) != required_keys:
+        raise ValidationError(f"{name} interval record has noncanonical keys")
     dimension = len(values[0])
     replicates = len(values)
+    if replicates != REFERENCE_POLICY.replicates:
+        raise ValidationError(
+            f"{name} requires exactly {REFERENCE_POLICY.replicates} replicates"
+        )
     means: list[float] = []
     variances: list[float] = []
     mean_variances: list[float] = []
@@ -1830,10 +2196,13 @@ def _reference_interval(
         components = [Fraction.from_float(row[index]) for row in values]
         exact_total = sum(components, Fraction())
         exact_mean = exact_total / replicates
-        exact_variance = sum(
-            ((value - exact_mean) ** 2 for value in components),
-            Fraction(),
-        ) / (replicates - 1)
+        exact_variance = (
+            sum(
+                ((value - exact_mean) ** 2 for value in components),
+                Fraction(),
+            )
+            / REFERENCE_POLICY.degrees_of_freedom
+        )
         exact_mean_variance = exact_variance / replicates
         converted: list[float] = []
         for statistic, exact in (
@@ -1853,10 +2222,32 @@ def _reference_interval(
         means.append(converted[0])
         variances.append(converted[1])
         mean_variances.append(converted[2])
-    raw_half_widths = [3.182446305284263 * math.sqrt(value) for value in mean_variances]
+    raw_half_widths = [
+        REFERENCE_POLICY.student_t_critical * math.sqrt(value)
+        for value in mean_variances
+    ]
     ci_low = [mean - width for mean, width in zip(means, raw_half_widths)]
     ci_high = [mean + width for mean, width in zip(means, raw_half_widths)]
+    for index, mean_variance in enumerate(mean_variances):
+        if mean_variance > 0.0:
+            if ci_low[index] >= means[index]:
+                ci_low[index] = math.nextafter(means[index], -math.inf)
+            if ci_high[index] <= means[index]:
+                ci_high[index] = math.nextafter(means[index], math.inf)
+    if any(
+        not math.isfinite(value)
+        for vector in (raw_half_widths, ci_low, ci_high)
+        for value in vector
+    ):
+        raise ValidationError(f"{name} has an unrepresentable confidence interval")
     half_widths = [0.5 * (high - low) for low, high in zip(ci_low, ci_high)]
+    if any(
+        mean_variance > 0.0 and (width == 0.0 or low >= high)
+        for mean_variance, width, low, high in zip(
+            mean_variances, half_widths, ci_low, ci_high
+        )
+    ):
+        raise ValidationError(f"{name} has an unrepresentable confidence interval")
     expected_vectors = {
         "mean": means,
         "variance": variances,
@@ -1867,19 +2258,71 @@ def _reference_interval(
     }
     parsed: dict[str, list[float]] = {}
     for field, expected in expected_vectors.items():
-        parsed[field] = _finite_vector(record.get(field), name=f"{name}.{field}")
-        if len(parsed[field]) != dimension or any(
-            not math.isclose(actual, target, rel_tol=1.0e-10, abs_tol=1.0e-12)
-            for actual, target in zip(parsed[field], expected)
-        ):
+        parsed[field] = _finite_float_vector(record.get(field), name=f"{name}.{field}")
+        if len(parsed[field]) != dimension or parsed[field] != expected:
             raise ValidationError(f"{name}.{field} disagrees with stored replicates")
-    if record.get("replicates") != replicates:
+    if (
+        _nonnegative_int(record.get("replicates"), name=f"{name}.replicates")
+        != replicates
+    ):
         raise ValidationError(f"{name}.replicates is inconsistent")
-    if record.get("degrees_of_freedom") != replicates - 1:
+    if (
+        _nonnegative_int(
+            record.get("degrees_of_freedom"), name=f"{name}.degrees_of_freedom"
+        )
+        != REFERENCE_POLICY.degrees_of_freedom
+    ):
         raise ValidationError(f"{name}.degrees_of_freedom is inconsistent")
-    if _finite_number(record.get("confidence"), name=f"{name}.confidence") != 0.95:
-        raise ValidationError(f"{name}.confidence must be 0.95")
-    return parsed["mean"], parsed["ci_low"], parsed["ci_high"]
+    if (
+        _finite_float(record.get("confidence"), name=f"{name}.confidence")
+        != REFERENCE_POLICY.confidence
+    ):
+        raise ValidationError(
+            f"{name}.confidence must be {REFERENCE_POLICY.confidence}"
+        )
+    return (
+        means,
+        ci_low,
+        ci_high,
+        half_widths,
+    )
+
+
+def _diagnostic_numeric_vector(
+    diagnostics: dict[str, Any],
+    field: str,
+    expected: list[float],
+    *,
+    cell: str,
+) -> None:
+    actual = _finite_float_vector(
+        diagnostics.get(field), name=f"{cell}.diagnostics.{field}"
+    )
+    if len(actual) != len(expected) or any(
+        value != target for value, target in zip(actual, expected)
+    ):
+        raise ValidationError(
+            f"accepted reference {cell!r} diagnostics field {field!r} disagrees with replicates"
+        )
+
+
+def _diagnostic_boolean_vector(
+    diagnostics: dict[str, Any],
+    field: str,
+    expected: list[bool],
+    *,
+    cell: str,
+) -> None:
+    actual = diagnostics.get(field)
+    if (
+        not isinstance(actual, list)
+        or len(actual) != len(expected)
+        or any(type(value) is not bool for value in actual)
+        or any(value is not target for value, target in zip(actual, expected))
+    ):
+        raise ValidationError(
+            f"accepted reference {cell!r} diagnostics field {field!r} disagrees with replicates"
+        )
 
 
 def _validate_reference_rows(
@@ -1889,18 +2332,29 @@ def _validate_reference_rows(
     config: dict[str, Any],
     source_commit: str,
     device: str,
-) -> None:
+) -> dict[str, list[float]]:
     if not isinstance(required_cells, list) or any(
         not isinstance(cell, str) or not cell for cell in required_cells
     ):
         raise ValidationError(
             "reference_required_cells must be a list of nonempty strings"
         )
+    row_cells = [row.get("cell_id") for row in rows]
+    if (
+        len(rows) != len(required_cells)
+        or any(not isinstance(cell, str) for cell in row_cells)
+        or len(set(row_cells)) != len(row_cells)
+        or set(row_cells) != set(required_cells)
+    ):
+        raise ValidationError(
+            "reference rows must exactly cover the canonical publication cells"
+        )
     by_cell: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         cell = row.get("cell_id")
         if isinstance(cell, str):
             by_cell.setdefault(cell, []).append(row)
+    validated_gradients: dict[str, list[float]] = {}
     for cell in required_cells:
         accepted = [
             row
@@ -1923,7 +2377,15 @@ def _validate_reference_rows(
                 raise ValidationError(
                     f"accepted reference {cell!r} has wrong source_commit"
                 )
-            parameters = _finite_vector(
+            canonical_inputs = _canonical_reference_inputs(cell)
+            published_inputs = {
+                name: row.get(name) for name in ("parameters", "sigma", "h", "h_half")
+            }
+            if not _json_type_strict_equal(published_inputs, canonical_inputs):
+                raise ValidationError(
+                    f"accepted reference {cell!r} canonical input metadata is inconsistent"
+                )
+            parameters = _finite_float_vector(
                 row.get("parameters"), name=f"{cell}.parameters"
             )
             if not parameters:
@@ -1931,29 +2393,37 @@ def _validate_reference_rows(
                     f"accepted reference {cell!r} has empty parameters"
                 )
             dimension = len(parameters)
-            sigma = _finite_vector(row.get("sigma"), name=f"{cell}.sigma")
-            h = _finite_vector(row.get("h"), name=f"{cell}.h")
-            h_half = _finite_vector(row.get("h_half"), name=f"{cell}.h_half")
+            sigma = _finite_float_vector(row.get("sigma"), name=f"{cell}.sigma")
+            h = _finite_float_vector(row.get("h"), name=f"{cell}.h")
+            h_half = _finite_float_vector(row.get("h_half"), name=f"{cell}.h_half")
             if any(len(vector) != dimension for vector in (sigma, h, h_half)) or any(
                 step <= 0.0 for step in sigma + h + h_half
             ):
                 raise ValidationError(
                     f"accepted reference {cell!r} has invalid vector dimensions"
                 )
-            if any(first != 2.0 * second for first, second in zip(h, h_half)):
+            if any(
+                first != REFERENCE_POLICY.refinement_ratio * second
+                for first, second in zip(h, h_half)
+            ):
                 raise ValidationError(
-                    f"accepted reference {cell!r} must store exact h and h/2"
+                    f"accepted reference {cell!r} must store exact h and "
+                    f"h/{REFERENCE_POLICY.refinement_ratio}"
                 )
 
             matrices: dict[str, list[list[float]]] = {}
             for field in ("g_h", "g_h2", "score"):
                 raw_matrix = row.get(field)
-                if not isinstance(raw_matrix, list) or len(raw_matrix) != 4:
+                if (
+                    not isinstance(raw_matrix, list)
+                    or len(raw_matrix) != REFERENCE_POLICY.replicates
+                ):
                     raise ValidationError(
-                        f"accepted reference {cell!r} needs four {field} replicates"
+                        f"accepted reference {cell!r} needs "
+                        f"{REFERENCE_POLICY.replicates} {field} replicates"
                     )
                 matrix = [
-                    _finite_vector(vector, name=f"{cell}.{field}[{index}]")
+                    _finite_float_vector(vector, name=f"{cell}.{field}[{index}]")
                     for index, vector in enumerate(raw_matrix)
                 ]
                 if any(len(vector) != dimension for vector in matrix):
@@ -1965,92 +2435,194 @@ def _validate_reference_rows(
                 [first - second for first, second in zip(g_h, g_h2)]
                 for g_h, g_h2 in zip(matrices["g_h"], matrices["g_h2"])
             ]
-            if any(not math.isfinite(value) for vector in paired for value in vector):
+            fine_truncation_error = [
+                [value / REFERENCE_POLICY.richardson_denominator for value in vector]
+                for vector in paired
+            ]
+            richardson = [
+                [second - error for second, error in zip(g_h2, error_row)]
+                for g_h2, error_row in zip(matrices["g_h2"], fine_truncation_error)
+            ]
+            if any(
+                not math.isfinite(value)
+                for matrix in (paired, fine_truncation_error, richardson)
+                for vector in matrix
+                for value in vector
+            ):
                 raise ValidationError(
-                    f"accepted reference {cell!r} paired differences are non-finite"
+                    f"accepted reference {cell!r} derived Richardson values are non-finite"
                 )
             intervals = row.get("intervals")
-            if not isinstance(intervals, dict):
+            interval_names = {
+                "g_h",
+                "g_h2",
+                "score",
+                "paired_h_minus_h2",
+                "fine_truncation_error",
+                "richardson",
+            }
+            if not isinstance(intervals, dict) or set(intervals) != interval_names:
                 raise ValidationError(
-                    f"accepted reference {cell!r} intervals must be an object"
+                    f"accepted reference {cell!r} intervals must exactly cover the canonical estimators"
                 )
-            h_mean, h_low, h_high = _reference_interval(
+            h_mean, _h_low, _h_high, h_half_width = _reference_interval(
                 matrices["g_h"],
                 intervals.get("g_h"),
                 name=f"{cell}.intervals.g_h",
             )
-            h2_mean, h2_low, h2_high = _reference_interval(
+            h2_mean, _h2_low, _h2_high, h2_half_width = _reference_interval(
                 matrices["g_h2"],
                 intervals.get("g_h2"),
                 name=f"{cell}.intervals.g_h2",
             )
-            _score_mean, score_low, score_high = _reference_interval(
+            _score_mean, score_low, score_high, _score_half_width = _reference_interval(
                 matrices["score"],
                 intervals.get("score"),
                 name=f"{cell}.intervals.score",
             )
-            _paired_mean, paired_low, paired_high = _reference_interval(
-                paired,
-                intervals.get("paired_h_minus_h2"),
-                name=f"{cell}.intervals.paired_h_minus_h2",
+            _paired_mean, paired_low, paired_high, _paired_half_width = (
+                _reference_interval(
+                    paired,
+                    intervals.get("paired_h_minus_h2"),
+                    name=f"{cell}.intervals.paired_h_minus_h2",
+                )
             )
-            reference_gradient = _finite_vector(
+            _error_mean, error_low, error_high, _error_half_width = _reference_interval(
+                fine_truncation_error,
+                intervals.get("fine_truncation_error"),
+                name=f"{cell}.intervals.fine_truncation_error",
+            )
+            richardson_mean, richardson_low, richardson_high, richardson_half_width = (
+                _reference_interval(
+                    richardson,
+                    intervals.get("richardson"),
+                    name=f"{cell}.intervals.richardson",
+                )
+            )
+            policy = row.get("truncation_policy")
+            if not _json_type_strict_equal(policy, dict(REFERENCE_TRUNCATION_POLICY)):
+                raise ValidationError(
+                    f"accepted reference {cell!r} truncation policy is not canonical"
+                )
+            reference_gradient = _finite_float_vector(
                 row.get("reference_gradient"), name=f"{cell}.reference_gradient"
             )
-            if reference_gradient != h2_mean:
+            if reference_gradient != richardson_mean:
                 raise ValidationError(
-                    f"accepted reference {cell!r} reference_gradient must equal g_h2 mean"
+                    f"accepted reference {cell!r} reference_gradient must equal Richardson mean"
                 )
+            validated_gradients[cell] = reference_gradient
 
             overlap = [
                 max(first, third) <= min(second, fourth)
                 for first, second, third, fourth in zip(
-                    h2_low, h2_high, score_low, score_high
+                    richardson_low, richardson_high, score_low, score_high
                 )
             ]
             paired_consistency = [
                 low <= 0.0 <= high for low, high in zip(paired_low, paired_high)
             ]
             marginal_consistency = [
-                abs(first - second)
-                <= (first_high - first_low + second_high - second_low) / 2.0
-                for first, second, first_low, first_high, second_low, second_high in zip(
-                    h_mean, h2_mean, h_low, h_high, h2_low, h2_high
+                abs(first - second) <= first_width + second_width
+                for first, second, first_width, second_width in zip(
+                    h_mean, h2_mean, h_half_width, h2_half_width
                 )
             ]
-            if not all(overlap) or not all(paired_consistency):
+            truncation_upper_bound = [
+                max(abs(low), abs(high)) for low, high in zip(error_low, error_high)
+            ]
+            truncation_statistical_budget = [
+                REFERENCE_POLICY.statistical_budget_fraction * width
+                for width in richardson_half_width
+            ]
+            truncation_roundoff_floor = [
+                float(REFERENCE_POLICY.roundoff_floor_ulps)
+                * sys.float_info.epsilon
+                * max(1.0, abs(h_value), abs(h2_value), abs(richardson_value))
+                for h_value, h2_value, richardson_value in zip(
+                    h_mean, h2_mean, richardson_mean
+                )
+            ]
+            truncation_effective_budget = [
+                max(statistical, floor)
+                for statistical, floor in zip(
+                    truncation_statistical_budget, truncation_roundoff_floor
+                )
+            ]
+            truncation_floor_dominated = [
+                floor > statistical
+                for statistical, floor in zip(
+                    truncation_statistical_budget, truncation_roundoff_floor
+                )
+            ]
+            truncation_components = [
+                upper <= budget
+                for upper, budget in zip(
+                    truncation_upper_bound, truncation_effective_budget
+                )
+            ]
+            if not all(overlap) or not all(truncation_components):
                 raise ValidationError(
-                    f"accepted reference {cell!r} fails overlap or paired step consistency"
+                    f"accepted reference {cell!r} fails Richardson-score overlap or truncation numerical budget"
                 )
             diagnostics = row.get("diagnostics")
-            expected_diagnostics = {
-                "overlap_components": overlap,
-                "marginal_step_components": marginal_consistency,
-                "paired_step_components": paired_consistency,
+            diagnostic_names = {
+                "overlap_components",
+                "marginal_step_components",
+                "paired_step_components",
+                "truncation_upper_bound",
+                "truncation_statistical_budget",
+                "truncation_roundoff_floor",
+                "truncation_effective_budget",
+                "truncation_floor_dominated",
+                "truncation_components",
             }
-            if not isinstance(diagnostics, dict) or any(
-                diagnostics.get(name) != expected
-                for name, expected in expected_diagnostics.items()
+            if (
+                not isinstance(diagnostics, dict)
+                or set(diagnostics) != diagnostic_names
             ):
                 raise ValidationError(
-                    f"accepted reference {cell!r} diagnostics disagree with replicates"
+                    f"accepted reference {cell!r} diagnostics must have canonical keys"
                 )
+            for name, expected in (
+                ("overlap_components", overlap),
+                ("marginal_step_components", marginal_consistency),
+                ("paired_step_components", paired_consistency),
+                ("truncation_floor_dominated", truncation_floor_dominated),
+                ("truncation_components", truncation_components),
+            ):
+                _diagnostic_boolean_vector(diagnostics, name, expected, cell=cell)
+            for name, expected in (
+                ("truncation_upper_bound", truncation_upper_bound),
+                (
+                    "truncation_statistical_budget",
+                    truncation_statistical_budget,
+                ),
+                ("truncation_roundoff_floor", truncation_roundoff_floor),
+                ("truncation_effective_budget", truncation_effective_budget),
+            ):
+                _diagnostic_numeric_vector(diagnostics, name, expected, cell=cell)
             accepted_flags = row["accepted"]
             required_flags = {
                 "references": True,
                 "fd_score_overlap": all(overlap),
-                "step_consistency": all(paired_consistency),
+                "step_consistency": all(truncation_components),
                 "marginal_step_consistency": all(marginal_consistency),
                 "paired_step_consistency": all(paired_consistency),
+                "truncation_error_controlled": all(truncation_components),
                 "replicate_count_sufficient": True,
                 "smoke_only": False,
             }
-            if any(
+            if set(accepted_flags) != set(required_flags) or any(
                 accepted_flags.get(name) is not value
                 for name, value in required_flags.items()
             ):
                 raise ValidationError(
                     f"accepted reference {cell!r} acceptance flags are inconsistent"
+                )
+            if row.get("reasons") != []:
+                raise ValidationError(
+                    f"accepted reference {cell!r} reasons must be empty; audit-only step diagnostics are not publication gates"
                 )
 
             counts = row.get("counts")
@@ -2069,11 +2641,17 @@ def _validate_reference_rows(
             replicates = _nonnegative_int(
                 config.get("reference_seed_sets"), name="config.reference_seed_sets"
             )
-            if replicates != 4 or samples == 0 or samples % 2:
+            if replicates != REFERENCE_POLICY.replicates or samples == 0 or samples % 2:
                 raise ValidationError(
-                    "report reference configuration must use four replicates and even samples"
+                    "report reference configuration must use "
+                    f"{REFERENCE_POLICY.replicates} replicates and even samples"
                 )
-            expected_single = 4 * dimension * samples * replicates
+            expected_single = (
+                _FIVE_POINT_FORWARD_EVALUATIONS_PER_DIMENSION
+                * dimension
+                * samples
+                * replicates
+            )
             expected_counts = {
                 "samples": samples,
                 "replicates": replicates,
@@ -2083,58 +2661,108 @@ def _validate_reference_rows(
                 "score_forward_executions": samples * replicates,
                 "forward_executions": 2 * expected_single + samples * replicates,
             }
-            if any(
-                counts.get(name) != expected
-                for name, expected in expected_counts.items()
-            ):
+            if set(counts) != set(expected_counts):
+                raise ValidationError(
+                    f"accepted reference {cell!r} counts must have canonical keys"
+                )
+            parsed_counts = {
+                name: _nonnegative_int(value, name=f"{cell}.counts.{name}")
+                for name, value in counts.items()
+            }
+            if parsed_counts != expected_counts:
                 raise ValidationError(
                     f"accepted reference {cell!r} forward execution counts are inconsistent"
                 )
 
             seeds = row.get("seeds")
-            seed_names = (
-                "five_point_outer",
-                "five_point_inner",
-                "score_outer",
-                "score_inner",
-            )
-            if not isinstance(seeds, dict) or set(seeds) != set(seed_names):
+            if not isinstance(seeds, dict) or set(seeds) != set(_REFERENCE_SEED_NAMES):
                 raise ValidationError(
                     f"accepted reference {cell!r} seed streams are invalid"
                 )
-            domain_size = (2**31) // 4
-            flattened: list[int] = []
-            offsets: list[list[int]] = []
-            for domain, name in enumerate(seed_names):
+            parsed_seeds: dict[str, list[int]] = {}
+            for name in _REFERENCE_SEED_NAMES:
                 stream = seeds[name]
                 if not isinstance(stream, list) or len(stream) != replicates:
                     raise ValidationError(
                         f"accepted reference {cell!r} seed stream {name} has wrong length"
                     )
-                parsed = [
+                parsed_seeds[name] = [
                     _nonnegative_int(seed, name=f"{cell}.seeds.{name}")
                     for seed in stream
                 ]
-                if any(
-                    seed > 2**31 - 1 or seed // domain_size != domain for seed in parsed
+            if parsed_seeds != _canonical_reference_seeds(cell, replicates):
+                raise ValidationError(
+                    f"accepted reference {cell!r} seed streams do not match canonical reference seed roots"
+                )
+
+            protocol_table = _REFERENCE_PROTOCOL_SEEDS.get(cell)
+            if protocol_table is None:
+                if "protocol_seed_table" in row or "protocol_seed_inputs" in row:
+                    raise ValidationError(
+                        f"accepted reference {cell!r} must not contain protocol seed metadata"
+                    )
+            else:
+                base, inner = _REFERENCE_SEED_ROOTS[cell]
+                protocol_inputs = {
+                    "reference_base": base,
+                    "reference_inner_base": inner,
+                }
+                if not _json_type_strict_equal(
+                    row.get("protocol_seed_table"), protocol_table
+                ) or not _json_type_strict_equal(
+                    row.get("protocol_seed_inputs"), protocol_inputs
                 ):
                     raise ValidationError(
-                        f"accepted reference {cell!r} seed stream {name} has wrong domain"
+                        f"accepted reference {cell!r} protocol seed metadata is not canonical"
                     )
-                flattened.extend(parsed)
-                offsets.append([seed % domain_size for seed in parsed])
-            if len(flattened) != len(set(flattened)) or any(
-                offset != offsets[0] for offset in offsets[1:]
+            if any(
+                seed > 2**31 - 1 for stream in parsed_seeds.values() for seed in stream
             ):
                 raise ValidationError(
-                    f"accepted reference {cell!r} seed streams are not CRN-aligned and disjoint"
+                    f"accepted reference {cell!r} seed stream exceeds signed int32"
                 )
-            if offsets[0] != [
-                (offsets[0][0] + index) % domain_size for index in range(replicates)
-            ]:
-                raise ValidationError(
-                    f"accepted reference {cell!r} seed offsets are not consecutive"
-                )
+    return validated_gradients
+
+
+def _method_reference_cell(row: dict[str, Any]) -> str | None:
+    family = row.get("scenario_family")
+    if family in {"analytic", "triangle_2d"}:
+        return None
+    if family == "collision_2d":
+        scenario = row.get("scenario")
+        start_id = row.get("start_id")
+        if not isinstance(scenario, str) or not isinstance(start_id, str):
+            raise ValidationError(
+                "collision method row cannot resolve its canonical reference cell"
+            )
+        return f"collision_2d:{scenario}:{start_id}"
+    return {
+        "path_tracer": "path_tracer:initial_parameters",
+        "contact_3d": "contact_3d:initial_launch_velocity",
+        "opaque_mesh": "opaque_mesh:camera_parameters",
+    }.get(family)
+
+
+def _validate_method_reference_gradients(
+    method_rows: list[dict[str, Any]],
+    reference_gradients: dict[str, list[float]],
+) -> None:
+    for row in method_rows:
+        cell = _method_reference_cell(row)
+        if cell is None:
+            continue
+        if cell not in reference_gradients:
+            raise ValidationError(
+                f"method row references unknown canonical reference cell {cell!r}"
+            )
+        row_id = row.get("row_id")
+        actual = _finite_vector(
+            row.get("reference_gradient"), name=f"{row_id}.reference_gradient"
+        )
+        if actual != reference_gradients[cell]:
+            raise ValidationError(
+                f"method row {row_id!r} reference_gradient does not match accepted Richardson reference {cell!r}"
+            )
 
 
 def _validate_producer_command(command: Any, *, device: str) -> None:
@@ -2326,8 +2954,14 @@ def _validate_protocol(
         for name in PLOT_NAMES
     }
     summary = loaded["data/summary.json"]
-    if not isinstance(summary, dict) or summary.get("schema_version") != SCHEMA_VERSION:
-        raise ValidationError("data/summary.json must use schema_version 1")
+    if (
+        not isinstance(summary, dict)
+        or type(summary.get("schema_version")) is not int
+        or summary["schema_version"] != SCHEMA_VERSION
+    ):
+        raise ValidationError(
+            f"data/summary.json must use schema_version {SCHEMA_VERSION}"
+        )
     config = _validate_report_config_and_decision(manifest)
     _validate_installed_runtime(summary.get("runtime"))
 
@@ -2603,13 +3237,14 @@ def _validate_protocol(
         raise ValidationError(
             "reference_required_cells must declare each canonical publication reference exactly once"
         )
-    _validate_reference_rows(
+    reference_gradients = _validate_reference_rows(
         raw_rows["references.json"],
         required_reference_cells,
         config=config,
         source_commit=commit,
         device=source_device,
     )
+    _validate_method_reference_gradients(method_rows, reference_gradients)
 
     rejected_ids = {
         row["row_id"]
@@ -2736,7 +3371,7 @@ def _validate_protocol(
                 ):
                     raise ValidationError("method summary samples must be positive")
                 vectors = [
-                    _finite_vector(
+                    _finite_float_vector(
                         row.get(field),
                         name=f"summary.{collection}[{index}].{field}",
                         nonnegative=field
@@ -2753,44 +3388,50 @@ def _validate_protocol(
                     len(vector) != len(vectors[0]) for vector in vectors
                 ):
                     raise ValidationError("method summary gradient dimensions disagree")
-                _finite_number(
-                    row.get("relative_error"),
-                    name="method summary relative_error",
-                    nonnegative=True,
-                )
-                cosine = _finite_number(
-                    row.get("cosine_similarity"),
-                    name="method summary cosine_similarity",
-                )
-                sign = _finite_number(
-                    row.get("sign_agreement"), name="method summary sign_agreement"
-                )
-                if not -1.0 <= cosine <= 1.0 or not 0.0 <= sign <= 1.0:
+                relative_error = row.get("relative_error")
+                if relative_error is not None:
+                    _finite_float(
+                        relative_error,
+                        name="method summary relative_error",
+                        nonnegative=True,
+                    )
+                cosine = row.get("cosine_similarity")
+                if cosine is not None:
+                    cosine = _finite_float(
+                        cosine,
+                        name="method summary cosine_similarity",
+                    )
+                sign = row.get("sign_agreement")
+                if sign is not None:
+                    sign = _finite_float(sign, name="method summary sign_agreement")
+                if (cosine is not None and not -1.0 <= cosine <= 1.0) or (
+                    sign is not None and not 0.0 <= sign <= 1.0
+                ):
                     raise ValidationError(
                         "method summary similarity metrics are out of range"
                     )
             elif collection == "optimization_summaries":
-                low = _finite_number(
+                low = _finite_float(
                     row.get("final_hard_loss_ci_low"),
                     name="optimization CI low",
                     nonnegative=True,
                 )
-                mean = _finite_number(
+                mean = _finite_float(
                     row.get("final_hard_loss_mean"),
                     name="optimization mean",
                     nonnegative=True,
                 )
-                high = _finite_number(
+                high = _finite_float(
                     row.get("final_hard_loss_ci_high"),
                     name="optimization CI high",
                     nonnegative=True,
                 )
-                _finite_number(
+                _finite_float(
                     row.get("held_out_loss_mean"),
                     name="optimization held-out loss",
                     nonnegative=True,
                 )
-                success = _finite_number(
+                success = _finite_float(
                     row.get("success_rate"), name="optimization success rate"
                 )
                 if not low <= mean <= high or not 0.0 <= success <= 1.0:
@@ -2799,7 +3440,7 @@ def _validate_protocol(
                     )
             elif collection == "performance_summaries":
                 for field in ("cold_compile_time", "warm_median", "warm_iqr"):
-                    _finite_number(
+                    _finite_float(
                         row.get(field),
                         name=f"performance summary {field}",
                         nonnegative=True,
@@ -3069,7 +3710,7 @@ class _ReportHTMLParser(HTMLParser):
             self.reproducibility_text.append(data)
 
 
-def _validate_html(root: Path, commit: str) -> None:
+def _validate_html(root: Path, commit: str) -> bytes:
     root_flags = (
         os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     )
@@ -3171,6 +3812,7 @@ def _validate_html(root: Path, commit: str) -> None:
             raise ValidationError(
                 f"unexpected local reference element {tag!r} for {raw_reference!r}"
             )
+    return source_bytes
 
 
 def validate_bundle(
@@ -3188,8 +3830,29 @@ def validate_bundle(
 
 def validate_publication(root: Path) -> dict[str, int]:
     root = Path(root)
-    _manifest, _loaded, rows, commit = validate_bundle(root)
-    _validate_html(root.resolve(), commit)
+    manifest, loaded, rows, commit = validate_bundle(root)
+    from discograd import build_report as report_builder
+
+    try:
+        model = report_builder.load_validated_report(manifest, loaded)
+        template_bytes = Path(__file__).with_name("report_template.html").read_bytes()
+        template = template_bytes.decode("utf-8")
+        expected_index = report_builder.render_validated_report(
+            model=model, template=template
+        )
+    except report_builder.BuildError as error:
+        raise ValidationError(str(error)) from error
+    except (OSError, UnicodeError) as error:
+        raise ValidationError(
+            f"cannot read trusted report template: {error}"
+        ) from error
+    published_index = _validate_html(root.resolve(), commit)
+    if published_index != expected_index:
+        raise ValidationError(
+            "published index.html is not the canonical report rendered from the "
+            "validated snapshot and trusted template; protocol disclosure, styles, "
+            "prose, and evidence must match exactly"
+        )
     return {
         "files": len(EXPECTED_FILES),
         "rows": rows,

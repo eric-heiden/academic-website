@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from discograd.tests.test_publication import (
+    SCHEMA_VERSION,
     _refresh_manifest,
     make_valid_fixture,
     write_fixture_json,
@@ -225,7 +226,7 @@ def make_valid_contact_optimization_fixture(test: unittest.TestCase) -> Path:
     write_fixture_json(
         root / "data/raw/contact_3d_optimization.json",
         {
-            "schema_version": 1,
+            "schema_version": SCHEMA_VERSION,
             "dataset": "contact_3d_optimization",
             "rows": rows,
         },

@@ -145,7 +145,8 @@ def choose(x: float, width: float):
     <section id="protocol">
       <h2>Experimental protocol</h2>
       <p>All compared methods use manifest-declared devices, budgets, starts, and seed domains. Antithetic samples are adjacent positive/negative pairs, so uncertainty is computed over independent pair contributions. Common random numbers hold inner renderer or simulator randomness fixed across finite-difference sides and residual hard/soft evaluations.</p>
-      <p>Reference cells use batched five-point stencils at <var>h</var> and at a half-sized step, independent score replicates, Student-t intervals, and explicit acceptance checks. The exact report counts were retained only after the recorded clean pilot projected the accepted workload; the decision, protocol fingerprint, counts, and rationale are immutable evidence below. Optimization records retain held-out evaluations and parameter or physical-validity diagnostics. Performance records separate compilation from synchronized warmed execution and count conceptual forwards and backwards.</p>
+      <p>Reference cells use paired batched five-point stencils at <var>h</var> and at a half-sized step, independent score replicates, Student-t intervals, and explicit acceptance checks. For each replicate, the estimated fine-step truncation term is <var>E</var> = (<var>g</var><sub>h</sub> − <var>g</var><sub>h/2</sub>) ÷ 15 and the published fourth-order Richardson reference is <var>R</var> = <var>g</var><sub>h/2</sub> − <var>E</var>. Publication requires componentwise overlap between the Richardson and score intervals and requires the largest absolute endpoint of the <var>E</var> interval to fit within the larger of one quarter of the Richardson half-width and a 64-ULP binary64 floor. These 95% statements are componentwise, not simultaneous. Marginal step comparisons remain audit-only diagnostics and do not gate publication. Paired-zero step comparisons remain audit-only diagnostics and do not gate publication.</p>
+      <p>The exact report counts are retained only after a recorded clean pilot projects the accepted workload; the decision, protocol fingerprint, counts, and rationale are immutable evidence below. Optimization records retain held-out evaluations and parameter or physical-validity diagnostics. Performance records separate compilation from synchronized warmed execution and count conceptual forwards and backwards.</p>
       {{PROTOCOL_TABLES}}
       {{REFERENCE_DECISION_TABLE}}
       {{REFERENCE_TABLE}}
@@ -183,7 +184,7 @@ def choose(x: float, width: float):
     <section id="gradient-quality">
       <h2>Gradient quality and uncertainty</h2>
       <p>Gradient summaries report relative error, cosine similarity, component sign agreement, empirical bias, contribution variance, and variance of the mean. These quantities are not interchangeable: antithetic positive and negative executions form one independent contribution, while finite-difference aggregates may expose no replicate-level variance estimate.</p>
-      <p>Confidence intervals and sample-count scaling are interpreted against accepted references. A small gradient norm alone is not evidence of agreement, and methods with different targets remain labeled separately.</p>
+      <p>Confidence intervals and sample-count scaling are interpreted against accepted Richardson references. A small gradient norm alone is not evidence of agreement, and methods with different targets remain labeled separately.</p>
       {{METHOD_SUMMARY_TABLE}}
       {{QUALITY_FIGURES}}
     </section>
@@ -210,6 +211,7 @@ def choose(x: float, width: float):
         <li>Gate width is a modeling and optimization parameter, not a universally correct constant.</li>
         <li>Straight-through gradients are pseudo-gradients and may not integrate to the crisp-forward objective.</li>
         <li>Score estimators remain noisy, while finite differences retain finite-step bias and extra executions.</li>
+        <li>The truncation gate controls the estimated leading correction from the half-step stencil; without an additional refinement level it is not a confidence bound on the Richardson estimate's remaining higher-order bias.</li>
         <li>Fixed-loop rendering and contact cases provide controlled evidence rather than production-scale coverage.</li>
         <li>The path certificate is complete for its current callable projection but <code>fully_smoothed=false</code>; five numerical-gauge branches rely on exact selected-arm derivatives almost everywhere.</li>
         <li>Hardware claims are restricted to devices present in the manifest and measured performance rows.</li>

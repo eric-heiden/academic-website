@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import binascii
+import hashlib
 import html
 import json
 import math
@@ -29,9 +30,11 @@ if __package__ in {None, ""}:
 from discograd.validate_report import (
     REQUIRED_METHOD_IDS,
     REQUIRED_SECTION_IDS,
+    SCHEMA_VERSION,
     ValidationError,
     _assert_no_local_path,
     _ReportHTMLParser,
+    compute_reference_metrics,
     validate_bundle,
 )
 
@@ -151,6 +154,16 @@ def _vector(value: Any, *, name: str) -> tuple[float, ...]:
     return result
 
 
+def _boolean_vector(value: Any, *, name: str) -> tuple[bool, ...]:
+    result = tuple(
+        _boolean(item, name=f"{name}[{index}]")
+        for index, item in enumerate(_sequence(value, name=name))
+    )
+    if not result:
+        raise BuildError(f"{name} must be nonempty")
+    return result
+
+
 def _optional_vector(value: Any, *, name: str) -> tuple[float, ...] | None:
     if value is None:
         return None
@@ -258,12 +271,23 @@ def _validate_png_bytes(data: bytes, *, name: str) -> None:
         raise BuildError(f"PNG asset {name!r} decodes to no pixel data")
 
 
-def _validate_png_assets(root: Path, files: Mapping[str, Any]) -> None:
+def _validate_png_assets(
+    files: Mapping[str, Any], validated_snapshot: Mapping[str, Any]
+) -> None:
     for relative in sorted(name for name in files if name.endswith(".png")):
-        try:
-            data = (root / relative).read_bytes()
-        except OSError as error:
-            raise BuildError(f"cannot read PNG asset {relative!r}: {error}") from error
+        data = validated_snapshot.get(relative)
+        if type(data) is not bytes:
+            raise BuildError(
+                f"validated snapshot is missing PNG asset bytes for {relative!r}"
+            )
+        descriptor = _mapping(files.get(relative), name=f"manifest.files[{relative!r}]")
+        if (
+            descriptor.get("bytes") != len(data)
+            or descriptor.get("sha256") != hashlib.sha256(data).hexdigest()
+        ):
+            raise BuildError(
+                f"validated PNG snapshot for {relative!r} disagrees with its manifest descriptor"
+            )
         _validate_png_bytes(data, name=relative)
 
 
@@ -310,9 +334,9 @@ class MethodSummary:
     method: str
     samples: int
     mean_gradient: tuple[float, ...]
-    relative_error: float
-    cosine_similarity: float
-    sign_agreement: float
+    relative_error: float | None
+    cosine_similarity: float | None
+    sign_agreement: float | None
     empirical_bias: tuple[float, ...]
     empirical_variance: tuple[float, ...]
     mean_squared_error: tuple[float, ...]
@@ -406,6 +430,9 @@ class GradientRow:
     backward_executions: int
     gradient: tuple[float, ...]
     reference_gradient: tuple[float, ...]
+    relative_error: float | None
+    cosine_similarity: float | None
+    sign_agreement: float | None
     contribution_variance: tuple[float, ...] | None
     gradient_variance: tuple[float, ...] | None
     ci_low: tuple[float, ...] | None
@@ -503,9 +530,36 @@ class ReferenceRow:
     source_index: int
     row_id: str
     cell_id: str
-    counts: Mapping[str, Any]
+    h: tuple[float, ...]
+    h_half: tuple[float, ...]
+    samples: int
+    replicates: int
+    h_forward_executions: int
+    h2_forward_executions: int
+    five_point_forward_executions: int
+    score_forward_executions: int
+    forward_executions: int
+    seeds: Mapping[str, tuple[int, ...]]
     reference_gradient: tuple[float, ...]
-    raw: Mapping[str, Any]
+    fine_truncation_error_mean: tuple[float, ...]
+    fine_truncation_error_ci_low: tuple[float, ...]
+    fine_truncation_error_ci_high: tuple[float, ...]
+    richardson_ci_low: tuple[float, ...]
+    richardson_ci_high: tuple[float, ...]
+    truncation_upper_bound: tuple[float, ...]
+    truncation_statistical_budget: tuple[float, ...]
+    truncation_roundoff_floor: tuple[float, ...]
+    truncation_effective_budget: tuple[float, ...]
+    overlap_components: tuple[bool, ...]
+    marginal_step_components: tuple[bool, ...]
+    paired_step_components: tuple[bool, ...]
+    truncation_floor_dominated: tuple[bool, ...]
+    truncation_components: tuple[bool, ...]
+    fd_score_overlap: bool
+    truncation_error_controlled: bool
+    marginal_step_consistency: bool
+    paired_step_consistency: bool
+    truncation_policy: Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -556,8 +610,8 @@ class PerformanceAggregate:
 
 @dataclass(frozen=True, slots=True)
 class ReportModel:
-    root: Path
     manifest: ManifestRecord
+    validated_snapshot: Mapping[str, Any]
     summary: SummaryTables
     gradient_rows: tuple[GradientRow, ...]
     optimization_rows: tuple[OptimizationRow, ...]
@@ -573,8 +627,8 @@ class ReportModel:
 
 def _dataset_rows(payload: Any, *, source_file: str) -> tuple[Mapping[str, Any], ...]:
     mapping = _mapping(payload, name=source_file)
-    if mapping.get("schema_version") != 1:
-        raise BuildError(f"{source_file} must use schema_version 1")
+    if mapping.get("schema_version") != SCHEMA_VERSION:
+        raise BuildError(f"{source_file} must use schema_version {SCHEMA_VERSION}")
     _string(mapping.get("dataset"), name=f"{source_file}.dataset")
     rows = _sequence(mapping.get("rows"), name=f"{source_file}.rows")
     return tuple(
@@ -754,15 +808,15 @@ def _load_summary(value: Any) -> SummaryTables:
                     row.get("mean_gradient"),
                     name=f"method_summaries[{index}].mean_gradient",
                 ),
-                relative_error=_number(
+                relative_error=_optional_number(
                     row.get("relative_error"),
                     name=f"method_summaries[{index}].relative_error",
                 ),
-                cosine_similarity=_number(
+                cosine_similarity=_optional_number(
                     row.get("cosine_similarity"),
                     name=f"method_summaries[{index}].cosine_similarity",
                 ),
-                sign_agreement=_number(
+                sign_agreement=_optional_number(
                     row.get("sign_agreement"),
                     name=f"method_summaries[{index}].sign_agreement",
                 ),
@@ -954,6 +1008,33 @@ def _load_summary(value: Any) -> SummaryTables:
 
 def _gradient_row(source_file: str, index: int, row: Mapping[str, Any]) -> GradientRow:
     prefix = f"{source_file}.rows[{index}]"
+    gradient = _vector(row.get("gradient"), name=f"{prefix}.gradient")
+    reference_gradient = _vector(
+        row.get("reference_gradient"), name=f"{prefix}.reference_gradient"
+    )
+    relative_error = _optional_number(
+        row.get("relative_error"), name=f"{prefix}.relative_error"
+    )
+    cosine_similarity = _optional_number(
+        row.get("cosine_similarity"), name=f"{prefix}.cosine_similarity"
+    )
+    sign_agreement = _optional_number(
+        row.get("sign_agreement"), name=f"{prefix}.sign_agreement"
+    )
+    try:
+        expected_metrics = compute_reference_metrics(
+            list(gradient), list(reference_gradient)
+        )
+    except ValidationError as error:
+        raise BuildError(f"{prefix} has invalid reference metrics: {error}") from error
+    if (
+        relative_error,
+        cosine_similarity,
+        sign_agreement,
+    ) != expected_metrics:
+        raise BuildError(
+            f"{prefix} reference metrics disagree with its gradient and reference_gradient"
+        )
     return GradientRow(
         source_file=source_file,
         source_index=index,
@@ -985,10 +1066,11 @@ def _gradient_row(source_file: str, index: int, row: Mapping[str, Any]) -> Gradi
         backward_executions=_integer(
             row.get("backward_executions"), name=f"{prefix}.backward_executions"
         ),
-        gradient=_vector(row.get("gradient"), name=f"{prefix}.gradient"),
-        reference_gradient=_vector(
-            row.get("reference_gradient"), name=f"{prefix}.reference_gradient"
-        ),
+        gradient=gradient,
+        reference_gradient=reference_gradient,
+        relative_error=relative_error,
+        cosine_similarity=cosine_similarity,
+        sign_agreement=sign_agreement,
         contribution_variance=_optional_vector(
             row.get("contribution_variance"),
             name=f"{prefix}.contribution_variance",
@@ -1212,24 +1294,138 @@ def _reference_row(
     source_file: str, index: int, row: Mapping[str, Any]
 ) -> ReferenceRow:
     prefix = f"{source_file}.rows[{index}]"
-    gradient = tuple(
-        _number(value, name=f"{prefix}.reference_gradient[{component}]")
-        for component, value in enumerate(
-            _sequence(
-                row.get("reference_gradient"), name=f"{prefix}.reference_gradient"
+    gradient = _vector(
+        row.get("reference_gradient"), name=f"{prefix}.reference_gradient"
+    )
+    intervals = _mapping(row.get("intervals"), name=f"{prefix}.intervals")
+    fine_error = _mapping(
+        intervals.get("fine_truncation_error"),
+        name=f"{prefix}.intervals.fine_truncation_error",
+    )
+    richardson = _mapping(
+        intervals.get("richardson"), name=f"{prefix}.intervals.richardson"
+    )
+    diagnostics = _mapping(row.get("diagnostics"), name=f"{prefix}.diagnostics")
+    accepted = _mapping(row.get("accepted"), name=f"{prefix}.accepted")
+    counts = _mapping(row.get("counts"), name=f"{prefix}.counts")
+    raw_seeds = _mapping(row.get("seeds"), name=f"{prefix}.seeds")
+    seeds = {
+        name: tuple(
+            _integer(seed, name=f"{prefix}.seeds.{name}[{seed_index}]")
+            for seed_index, seed in enumerate(
+                _sequence(stream, name=f"{prefix}.seeds.{name}")
             )
         )
-    )
-    if not gradient:
-        raise BuildError(f"{prefix}.reference_gradient must be nonempty")
+        for name, stream in raw_seeds.items()
+    }
     return ReferenceRow(
         source_file=source_file,
         source_index=index,
         row_id=_string(row.get("row_id"), name=f"{prefix}.row_id"),
         cell_id=_string(row.get("cell_id"), name=f"{prefix}.cell_id"),
-        counts=_freeze(_mapping(row.get("counts"), name=f"{prefix}.counts")),
+        h=_vector(row.get("h"), name=f"{prefix}.h"),
+        h_half=_vector(row.get("h_half"), name=f"{prefix}.h_half"),
+        samples=_integer(counts.get("samples"), name=f"{prefix}.counts.samples"),
+        replicates=_integer(
+            counts.get("replicates"), name=f"{prefix}.counts.replicates"
+        ),
+        h_forward_executions=_integer(
+            counts.get("h_forward_executions"),
+            name=f"{prefix}.counts.h_forward_executions",
+        ),
+        h2_forward_executions=_integer(
+            counts.get("h2_forward_executions"),
+            name=f"{prefix}.counts.h2_forward_executions",
+        ),
+        five_point_forward_executions=_integer(
+            counts.get("five_point_forward_executions"),
+            name=f"{prefix}.counts.five_point_forward_executions",
+        ),
+        score_forward_executions=_integer(
+            counts.get("score_forward_executions"),
+            name=f"{prefix}.counts.score_forward_executions",
+        ),
+        forward_executions=_integer(
+            counts.get("forward_executions"),
+            name=f"{prefix}.counts.forward_executions",
+        ),
+        seeds=_freeze(seeds),
         reference_gradient=gradient,
-        raw=_freeze(row),
+        fine_truncation_error_mean=_vector(
+            fine_error.get("mean"),
+            name=f"{prefix}.intervals.fine_truncation_error.mean",
+        ),
+        fine_truncation_error_ci_low=_vector(
+            fine_error.get("ci_low"),
+            name=f"{prefix}.intervals.fine_truncation_error.ci_low",
+        ),
+        fine_truncation_error_ci_high=_vector(
+            fine_error.get("ci_high"),
+            name=f"{prefix}.intervals.fine_truncation_error.ci_high",
+        ),
+        richardson_ci_low=_vector(
+            richardson.get("ci_low"),
+            name=f"{prefix}.intervals.richardson.ci_low",
+        ),
+        richardson_ci_high=_vector(
+            richardson.get("ci_high"),
+            name=f"{prefix}.intervals.richardson.ci_high",
+        ),
+        truncation_upper_bound=_vector(
+            diagnostics.get("truncation_upper_bound"),
+            name=f"{prefix}.diagnostics.truncation_upper_bound",
+        ),
+        truncation_statistical_budget=_vector(
+            diagnostics.get("truncation_statistical_budget"),
+            name=f"{prefix}.diagnostics.truncation_statistical_budget",
+        ),
+        truncation_roundoff_floor=_vector(
+            diagnostics.get("truncation_roundoff_floor"),
+            name=f"{prefix}.diagnostics.truncation_roundoff_floor",
+        ),
+        truncation_effective_budget=_vector(
+            diagnostics.get("truncation_effective_budget"),
+            name=f"{prefix}.diagnostics.truncation_effective_budget",
+        ),
+        overlap_components=_boolean_vector(
+            diagnostics.get("overlap_components"),
+            name=f"{prefix}.diagnostics.overlap_components",
+        ),
+        marginal_step_components=_boolean_vector(
+            diagnostics.get("marginal_step_components"),
+            name=f"{prefix}.diagnostics.marginal_step_components",
+        ),
+        paired_step_components=_boolean_vector(
+            diagnostics.get("paired_step_components"),
+            name=f"{prefix}.diagnostics.paired_step_components",
+        ),
+        truncation_floor_dominated=_boolean_vector(
+            diagnostics.get("truncation_floor_dominated"),
+            name=f"{prefix}.diagnostics.truncation_floor_dominated",
+        ),
+        truncation_components=_boolean_vector(
+            diagnostics.get("truncation_components"),
+            name=f"{prefix}.diagnostics.truncation_components",
+        ),
+        fd_score_overlap=_boolean(
+            accepted.get("fd_score_overlap"),
+            name=f"{prefix}.accepted.fd_score_overlap",
+        ),
+        truncation_error_controlled=_boolean(
+            accepted.get("truncation_error_controlled"),
+            name=f"{prefix}.accepted.truncation_error_controlled",
+        ),
+        marginal_step_consistency=_boolean(
+            accepted.get("marginal_step_consistency"),
+            name=f"{prefix}.accepted.marginal_step_consistency",
+        ),
+        paired_step_consistency=_boolean(
+            accepted.get("paired_step_consistency"),
+            name=f"{prefix}.accepted.paired_step_consistency",
+        ),
+        truncation_policy=_freeze(
+            _mapping(row.get("truncation_policy"), name=f"{prefix}.truncation_policy")
+        ),
     )
 
 
@@ -1406,7 +1602,7 @@ def _aggregate_performance(
 
 
 def _assert_close(name: str, declared: float, expected: float) -> None:
-    if not math.isclose(declared, expected, rel_tol=1.0e-12, abs_tol=1.0e-12):
+    if declared != expected:
         raise BuildError(
             f"summary aggregate mismatch for {name}: declared={declared!r}, "
             f"expected={expected!r}"
@@ -1458,57 +1654,27 @@ def _sample_variance_vectors(
 
 def _reference_metrics(
     gradient: Sequence[float], reference: Sequence[float]
-) -> tuple[float, float, float]:
-    if len(gradient) != len(reference) or not gradient:
-        raise BuildError("summary reference metrics have inconsistent dimensions")
-    reference_scale = max(abs(value) for value in reference)
-    gradient_scale = max(abs(value) for value in gradient)
-    if reference_scale == 0.0:
-        relative_error = 0.0
-        cosine_similarity = 0.0
-    elif tuple(gradient) == tuple(reference):
-        relative_error = 0.0
-        cosine_similarity = 1.0
-    else:
-        common_scale = max(reference_scale, gradient_scale)
-        scaled_gradient = tuple(value / common_scale for value in gradient)
-        scaled_reference = tuple(value / common_scale for value in reference)
-        difference_norm = math.hypot(
-            *(
-                first - second
-                for first, second in zip(scaled_gradient, scaled_reference, strict=True)
-            )
+) -> tuple[float | None, float | None, float | None]:
+    try:
+        relative_error, cosine_similarity, sign_agreement = compute_reference_metrics(
+            list(gradient), list(reference)
         )
-        reference_norm = math.hypot(*scaled_reference)
-        if reference_norm == 0.0:
-            raise BuildError("summary reference-relative error is unrepresentable")
-        relative_error = difference_norm / reference_norm
-        if gradient_scale == 0.0:
-            cosine_similarity = 0.0
-        else:
-            gradient_norm = math.hypot(*scaled_gradient)
-            cosine_similarity = math.fsum(
-                first * second
-                for first, second in zip(scaled_gradient, scaled_reference, strict=True)
-            ) / (gradient_norm * reference_norm)
-            cosine_similarity = max(-1.0, min(1.0, cosine_similarity))
-    reference_signs = [index for index, value in enumerate(reference) if value != 0.0]
-    sign_agreement = (
-        checked_fmean(
-            tuple(
-                float(
-                    math.copysign(1.0, gradient[index])
-                    == math.copysign(1.0, reference[index])
-                )
-                if gradient[index] != 0.0
-                else 0.0
-                for index in reference_signs
-            )
-        )
-        if reference_signs
-        else 0.0
-    )
+    except ValidationError as error:
+        raise BuildError(f"summary reference metrics are invalid: {error}") from error
     return relative_error, cosine_similarity, sign_agreement
+
+
+def _assert_optional_close(
+    name: str, declared: float | None, expected: float | None
+) -> None:
+    if declared is None or expected is None:
+        if declared is not expected:
+            raise BuildError(
+                f"summary aggregate mismatch for {name}: declared={declared!r}, "
+                f"expected={expected!r}"
+            )
+        return
+    _assert_close(name, declared, expected)
 
 
 def _assert_exact_sources(
@@ -1577,15 +1743,15 @@ def _validate_method_summaries(
         _assert_vector_close(
             prefix + ".mean_squared_error", aggregate.mean_squared_error, mse
         )
-        _assert_close(
+        _assert_optional_close(
             prefix + ".relative_error", aggregate.relative_error, relative_error
         )
-        _assert_close(
+        _assert_optional_close(
             prefix + ".cosine_similarity",
             aggregate.cosine_similarity,
             cosine_similarity,
         )
-        _assert_close(
+        _assert_optional_close(
             prefix + ".sign_agreement", aggregate.sign_agreement, sign_agreement
         )
 
@@ -1829,15 +1995,12 @@ def _validate_summary_aggregates(
     _validate_headline_metrics(summary, raw_records, optimization_rows)
 
 
-def _load_report(root: Path) -> ReportModel:
-    root = Path(root)
-    try:
-        manifest_payload, loaded, _rows, _commit = validate_bundle(root)
-    except ValidationError as error:
-        raise BuildError(str(error)) from error
-
+def _load_validated_report(
+    manifest_payload: Mapping[str, Any],
+    loaded: Mapping[str, Any],
+) -> ReportModel:
     manifest = _load_manifest(manifest_payload)
-    _validate_png_assets(root, manifest.files)
+    _validate_png_assets(manifest.files, loaded)
     summary = _load_summary(loaded.get(SUMMARY_FILE))
     raw_row_ids: set[str] = set()
     raw_records: dict[str, RawRecord] = {}
@@ -1953,8 +2116,13 @@ def _load_report(root: Path) -> ReportModel:
         raw_records=raw_records,
     )
     model = ReportModel(
-        root=root,
         manifest=manifest,
+        validated_snapshot=MappingProxyType(
+            {
+                "data/manifest.json": _freeze(manifest_payload),
+                **{relative: _freeze(payload) for relative, payload in loaded.items()},
+            }
+        ),
         summary=summary,
         gradient_rows=ordered_gradients,
         optimization_rows=ordered_optimizations,
@@ -1969,6 +2137,36 @@ def _load_report(root: Path) -> ReportModel:
     )
     _validate_figure_semantics(model)
     return model
+
+
+def _load_report(root: Path) -> ReportModel:
+    root = Path(root)
+    try:
+        manifest_payload, loaded, _rows, _commit = validate_bundle(root)
+    except ValidationError as error:
+        raise BuildError(str(error)) from error
+    return _load_validated_report(manifest_payload, loaded)
+
+
+def load_validated_report(
+    manifest_payload: Mapping[str, Any],
+    loaded: Mapping[str, Any],
+) -> ReportModel:
+    """Build semantic checks from one already validated bundle snapshot."""
+
+    try:
+        return _load_validated_report(manifest_payload, loaded)
+    except BuildError:
+        raise
+    except (
+        IndexError,
+        KeyError,
+        OSError,
+        OverflowError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise BuildError(f"cannot load report evidence: {error}") from error
 
 
 def load_report(root: Path) -> ReportModel:
@@ -2869,9 +3067,9 @@ def _method_summary_table(model: ReportModel) -> str:
             f"{_vector_cell(row.empirical_bias, SUMMARY_FILE, prefix + '/empirical_bias')}"
             f"{_vector_cell(row.empirical_variance, SUMMARY_FILE, prefix + '/empirical_variance')}"
             f"{_vector_cell(row.mean_squared_error, SUMMARY_FILE, prefix + '/mean_squared_error')}"
-            f"{_numeric_cell(row.relative_error, SUMMARY_FILE, prefix + '/relative_error')}"
-            f"{_numeric_cell(row.cosine_similarity, SUMMARY_FILE, prefix + '/cosine_similarity')}"
-            f"{_numeric_cell(row.sign_agreement, SUMMARY_FILE, prefix + '/sign_agreement')}"
+            f"{_optional_numeric_cell(row.relative_error, SUMMARY_FILE, prefix + '/relative_error')}"
+            f"{_optional_numeric_cell(row.cosine_similarity, SUMMARY_FILE, prefix + '/cosine_similarity')}"
+            f"{_optional_numeric_cell(row.sign_agreement, SUMMARY_FILE, prefix + '/sign_agreement')}"
             f"{contribution_variance}{gradient_variance}{ci_low}{ci_high}"
             "</tr>"
         )
@@ -2995,26 +3193,112 @@ def _validity_table(model: ReportModel) -> str:
 
 def _reference_table(model: ReportModel) -> str:
     rows = []
+    execution_rows = []
     for row in model.reference_rows:
-        prefix = f"/rows/{row.source_index}/counts"
-        samples = _integer(
-            row.counts.get("samples"), name=f"{row.cell_id}.counts.samples"
-        )
-        replicates = _integer(
-            row.counts.get("replicates"), name=f"{row.cell_id}.counts.replicates"
-        )
+        row_prefix = f"/rows/{row.source_index}"
+        counts_prefix = row_prefix + "/counts"
         rows.append(
             "<tr>"
-            f"{_provenance_cell(row.cell_id, row.source_file, f'/rows/{row.source_index}/cell_id')}"
-            f"{_numeric_cell(samples, row.source_file, prefix + '/samples')}"
-            f"{_numeric_cell(replicates, row.source_file, prefix + '/replicates')}"
-            f"{_vector_cell(row.reference_gradient, row.source_file, f'/rows/{row.source_index}/reference_gradient')}"
+            f"{_provenance_cell(row.cell_id, row.source_file, row_prefix + '/cell_id')}"
+            f"{_numeric_cell(row.samples, row.source_file, counts_prefix + '/samples')}"
+            f"{_numeric_cell(row.replicates, row.source_file, counts_prefix + '/replicates')}"
+            f"{_vector_cell(row.reference_gradient, row.source_file, row_prefix + '/reference_gradient')}"
+            f"{_vector_cell(row.richardson_ci_low, row.source_file, row_prefix + '/intervals/richardson/ci_low')}"
+            f"{_vector_cell(row.richardson_ci_high, row.source_file, row_prefix + '/intervals/richardson/ci_high')}"
+            f"{_vector_cell(row.fine_truncation_error_mean, row.source_file, row_prefix + '/intervals/fine_truncation_error/mean')}"
+            f"{_vector_cell(row.fine_truncation_error_ci_low, row.source_file, row_prefix + '/intervals/fine_truncation_error/ci_low')}"
+            f"{_vector_cell(row.fine_truncation_error_ci_high, row.source_file, row_prefix + '/intervals/fine_truncation_error/ci_high')}"
+            f"{_vector_cell(row.truncation_upper_bound, row.source_file, row_prefix + '/diagnostics/truncation_upper_bound')}"
+            f"{_vector_cell(row.truncation_statistical_budget, row.source_file, row_prefix + '/diagnostics/truncation_statistical_budget')}"
+            f"{_vector_cell(row.truncation_roundoff_floor, row.source_file, row_prefix + '/diagnostics/truncation_roundoff_floor')}"
+            f"{_vector_cell(row.truncation_effective_budget, row.source_file, row_prefix + '/diagnostics/truncation_effective_budget')}"
+            f"{_value_cell(row.overlap_components, row.source_file, row_prefix + '/diagnostics/overlap_components')}"
+            f"{_value_cell(row.marginal_step_components, row.source_file, row_prefix + '/diagnostics/marginal_step_components')}"
+            f"{_value_cell(row.paired_step_components, row.source_file, row_prefix + '/diagnostics/paired_step_components')}"
+            f"{_value_cell(row.truncation_floor_dominated, row.source_file, row_prefix + '/diagnostics/truncation_floor_dominated')}"
+            f"{_value_cell(row.truncation_components, row.source_file, row_prefix + '/diagnostics/truncation_components')}"
+            f"{_value_cell(row.fd_score_overlap, row.source_file, row_prefix + '/accepted/fd_score_overlap')}"
+            f"{_value_cell(row.truncation_error_controlled, row.source_file, row_prefix + '/accepted/truncation_error_controlled')}"
+            f"{_value_cell(row.marginal_step_consistency, row.source_file, row_prefix + '/accepted/marginal_step_consistency')}"
+            f"{_value_cell(row.paired_step_consistency, row.source_file, row_prefix + '/accepted/paired_step_consistency')}"
             "</tr>"
         )
-    return _table(
-        "Accepted reference gradients",
-        ("Cell", "Samples", "Replicates", "Reference gradient"),
-        rows,
+        execution_rows.append(
+            "<tr>"
+            f"{_provenance_cell(row.cell_id, row.source_file, row_prefix + '/cell_id')}"
+            f"{_vector_cell(row.h, row.source_file, row_prefix + '/h')}"
+            f"{_vector_cell(row.h_half, row.source_file, row_prefix + '/h_half')}"
+            f"{_numeric_cell(row.h_forward_executions, row.source_file, counts_prefix + '/h_forward_executions')}"
+            f"{_numeric_cell(row.h2_forward_executions, row.source_file, counts_prefix + '/h2_forward_executions')}"
+            f"{_numeric_cell(row.five_point_forward_executions, row.source_file, counts_prefix + '/five_point_forward_executions')}"
+            f"{_numeric_cell(row.score_forward_executions, row.source_file, counts_prefix + '/score_forward_executions')}"
+            f"{_numeric_cell(row.forward_executions, row.source_file, counts_prefix + '/forward_executions')}"
+            f"{_vector_cell(row.seeds['five_point_outer'], row.source_file, row_prefix + '/seeds/five_point_outer')}"
+            f"{_vector_cell(row.seeds['five_point_inner'], row.source_file, row_prefix + '/seeds/five_point_inner')}"
+            f"{_vector_cell(row.seeds['score_outer'], row.source_file, row_prefix + '/seeds/score_outer')}"
+            f"{_vector_cell(row.seeds['score_inner'], row.source_file, row_prefix + '/seeds/score_inner')}"
+            "</tr>"
+        )
+    first = model.reference_rows[0]
+    policy_rows = [
+        "<tr>"
+        f"{_text_cell(field.replace('_', ' '))}"
+        f"{_value_cell(value, first.source_file, f'/rows/{first.source_index}/truncation_policy/{_json_pointer_part(field)}')}"
+        "</tr>"
+        for field, value in first.truncation_policy.items()
+    ]
+    return (
+        _table(
+            "Reference truncation policy",
+            ("Policy field", "Value"),
+            policy_rows,
+        )
+        + _table(
+            "Accepted Richardson reference gradients",
+            (
+                "Cell",
+                "Samples",
+                "Replicates",
+                "Richardson reference",
+                "Richardson CI low",
+                "Richardson CI high",
+                "Fine truncation mean",
+                "Fine truncation CI low",
+                "Fine truncation CI high",
+                "Truncation upper bound",
+                "Statistical budget",
+                "Roundoff floor",
+                "Effective budget",
+                "Overlap components",
+                "Marginal step components (audit only)",
+                "Paired step components (audit only)",
+                "Floor dominated",
+                "Truncation components",
+                "Richardson-score overlap",
+                "Truncation controlled",
+                "Marginal step (audit only)",
+                "Paired step (audit only)",
+            ),
+            rows,
+        )
+        + _table(
+            "Reference execution and seed provenance",
+            (
+                "Cell",
+                "h",
+                "h/2",
+                "h forward executions",
+                "h/2 forward executions",
+                "Five-point forward executions",
+                "Score forward executions",
+                "Total forward executions",
+                "Five-point outer seeds",
+                "Five-point inner seeds",
+                "Score outer seeds",
+                "Score inner seeds",
+            ),
+            execution_rows,
+        )
     )
 
 
@@ -3663,14 +3947,14 @@ def _resolve_pointer(value: Any, pointer: str, *, name: str) -> Any:
     current = value
     for raw_part in pointer[1:].split("/"):
         part = raw_part.replace("~1", "/").replace("~0", "~")
-        if isinstance(current, list):
+        if isinstance(current, (list, tuple)):
             if not part.isdigit():
                 raise BuildError(f"{name} has a non-index array pointer component")
             index = int(part)
             if index >= len(current):
                 raise BuildError(f"{name} points outside an evidence array")
             current = current[index]
-        elif isinstance(current, dict):
+        elif isinstance(current, Mapping):
             if part not in current:
                 raise BuildError(f"{name} points to a missing evidence key {part!r}")
             current = current[part]
@@ -3692,12 +3976,9 @@ def _resolve_evidence_source(
     if relative not in allowed or not relative.endswith(".json"):
         raise BuildError(f"{name} cites undeclared JSON evidence {relative!r}")
     if relative not in cache:
-        try:
-            cache[relative] = json.loads(
-                (model.root / relative).read_text(encoding="utf-8")
-            )
-        except (OSError, UnicodeError, json.JSONDecodeError) as error:
-            raise BuildError(f"cannot resolve {name} evidence: {error}") from error
+        if relative not in model.validated_snapshot:
+            raise BuildError(f"validated snapshot omits {name} evidence {relative!r}")
+        cache[relative] = model.validated_snapshot[relative]
     pointer = _decode_source_key(source_key, name=f"{name}.source_key")
     return _resolve_pointer(cache[relative], pointer, name=name)
 
@@ -3789,7 +4070,7 @@ def _validate_evidence_provenance(page: str, model: ReportModel) -> None:
             cache,
             name=f"figure {asset}",
         )
-        if not isinstance(primary, dict) or primary.get("plot_id") != attributes.get(
+        if not isinstance(primary, Mapping) or primary.get("plot_id") != attributes.get(
             "data-plot-id"
         ):
             raise BuildError(f"figure {asset!r} primary plot provenance mismatch")
@@ -3827,7 +4108,7 @@ def _validate_evidence_provenance(page: str, model: ReportModel) -> None:
                 cache,
                 name=f"figure {asset} record {record_index}",
             )
-            if not isinstance(record, dict) or record.get("plot_id") != plot_id:
+            if not isinstance(record, Mapping) or record.get("plot_id") != plot_id:
                 raise BuildError(f"figure {asset!r} plot provenance mismatch")
         image_field = IMAGE_FIELDS.get(asset)
         value_key = attributes.get("data-source-value-key")
@@ -3839,7 +4120,7 @@ def _validate_evidence_provenance(page: str, model: ReportModel) -> None:
                 cache,
                 name=f"figure {asset} image",
             )
-            if not isinstance(image, list) or not image:
+            if not isinstance(image, (list, tuple)) or not image:
                 raise BuildError(f"figure {asset!r} image provenance is empty")
         elif value_key is not None:
             raise BuildError(f"non-image figure {asset!r} has image provenance")
@@ -3968,6 +4249,16 @@ def _validate_rendered_contract(page: str, model: ReportModel) -> None:
             )
 
 
+def render_validated_report(*, model: ReportModel, template: str) -> bytes:
+    """Render one already validated immutable evidence snapshot."""
+
+    if not isinstance(template, str) or not template:
+        raise BuildError("validated report template must be nonempty text")
+    rendered = _render_template(template, _token_values(model))
+    _validate_rendered_contract(rendered, model)
+    return rendered.encode("utf-8")
+
+
 def render_report(*, root: Path, template_path: Path | None = None) -> bytes:
     root = Path(root)
     template_path = (
@@ -3980,9 +4271,7 @@ def render_report(*, root: Path, template_path: Path | None = None) -> bytes:
         raise BuildError(
             f"cannot read UTF-8 report template {template_path}: {error}"
         ) from error
-    rendered = _render_template(template, _token_values(model))
-    _validate_rendered_contract(rendered, model)
-    return rendered.encode("utf-8")
+    return render_validated_report(model=model, template=template)
 
 
 def _resolve_filesystem_path(path: Path, *, name: str, strict: bool) -> Path:
