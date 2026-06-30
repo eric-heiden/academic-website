@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ViewerGL Transparency Orbit Comparison</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #151820; color: #f5f7fb; }
+    body { margin: 0; padding: 20px; }
+    main { max-width: 1500px; margin: 0 auto; }
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    select, input, button { font: inherit; }
+    button, select { background: #252b36; color: #f5f7fb; border: 1px solid #495161; padding: 6px 10px; }
+    input[type="range"] { width: min(520px, 80vw); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    figure { margin: 0; }
+    figcaption { margin-bottom: 6px; color: #cbd3e1; font-size: 14px; }
+    img { display: block; width: 100%; background: #0a0c10; }
+    .note { color: #cbd3e1; margin: 0 0 16px; }
+    .sheet { margin-top: 18px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>ViewerGL Transparency Orbit Comparison</h1>
+  <div class="toolbar">
+    <label>Scene <select id="scene"><option value="0">franka_cloth</option>
+<option value="1">h1_cloth</option>
+<option value="2">franka_robot</option>
+<option value="3">franka_robot_grid</option></select></label>
+    <label>Frame <input id="frame" type="range" min="0" max="0" value="0"></label>
+    <span id="frameLabel"></span>
+    <button id="play" type="button">Play</button>
+  </div>
+  <p id="note" class="note"></p>
+  <section class="grid">
+    <figure><figcaption>Sorted transparency</figcaption><img id="sorted" alt="Sorted transparency frame"></figure>
+    <figure><figcaption>Weighted OIT</figcaption><img id="weighted" alt="Weighted OIT frame"></figure>
+    <figure><figcaption>Amplified absolute difference</figcaption><img id="diff" alt="Difference frame"></figure>
+  </section>
+  <figure class="sheet"><figcaption>Contact sheet: sorted / weighted OIT / difference rows</figcaption><img id="sheet" alt="Contact sheet"></figure>
+</main>
+<script>
+const scenes = [{"scene": "franka_cloth", "note": "Franka arm with transparent unisex_shirt.usd cloth (12736 cloth triangles).", "sorted": ["franka_cloth/sorted/frame_000.png", "franka_cloth/sorted/frame_001.png", "franka_cloth/sorted/frame_002.png", "franka_cloth/sorted/frame_003.png", "franka_cloth/sorted/frame_004.png", "franka_cloth/sorted/frame_005.png", "franka_cloth/sorted/frame_006.png", "franka_cloth/sorted/frame_007.png", "franka_cloth/sorted/frame_008.png", "franka_cloth/sorted/frame_009.png", "franka_cloth/sorted/frame_010.png", "franka_cloth/sorted/frame_011.png"], "weighted": ["franka_cloth/weighted_oit/frame_000.png", "franka_cloth/weighted_oit/frame_001.png", "franka_cloth/weighted_oit/frame_002.png", "franka_cloth/weighted_oit/frame_003.png", "franka_cloth/weighted_oit/frame_004.png", "franka_cloth/weighted_oit/frame_005.png", "franka_cloth/weighted_oit/frame_006.png", "franka_cloth/weighted_oit/frame_007.png", "franka_cloth/weighted_oit/frame_008.png", "franka_cloth/weighted_oit/frame_009.png", "franka_cloth/weighted_oit/frame_010.png", "franka_cloth/weighted_oit/frame_011.png"], "diff": ["franka_cloth/diff/frame_000.png", "franka_cloth/diff/frame_001.png", "franka_cloth/diff/frame_002.png", "franka_cloth/diff/frame_003.png", "franka_cloth/diff/frame_004.png", "franka_cloth/diff/frame_005.png", "franka_cloth/diff/frame_006.png", "franka_cloth/diff/frame_007.png", "franka_cloth/diff/frame_008.png", "franka_cloth/diff/frame_009.png", "franka_cloth/diff/frame_010.png", "franka_cloth/diff/frame_011.png"], "contactSheet": "franka_cloth/franka_cloth_orbit_compare.png"}, {"scene": "h1_cloth", "note": "H1 robot with transparent Style3D h1_jacket cloth (66930 cloth triangles).", "sorted": ["h1_cloth/sorted/frame_000.png", "h1_cloth/sorted/frame_001.png", "h1_cloth/sorted/frame_002.png", "h1_cloth/sorted/frame_003.png", "h1_cloth/sorted/frame_004.png", "h1_cloth/sorted/frame_005.png", "h1_cloth/sorted/frame_006.png", "h1_cloth/sorted/frame_007.png", "h1_cloth/sorted/frame_008.png", "h1_cloth/sorted/frame_009.png", "h1_cloth/sorted/frame_010.png", "h1_cloth/sorted/frame_011.png"], "weighted": ["h1_cloth/weighted_oit/frame_000.png", "h1_cloth/weighted_oit/frame_001.png", "h1_cloth/weighted_oit/frame_002.png", "h1_cloth/weighted_oit/frame_003.png", "h1_cloth/weighted_oit/frame_004.png", "h1_cloth/weighted_oit/frame_005.png", "h1_cloth/weighted_oit/frame_006.png", "h1_cloth/weighted_oit/frame_007.png", "h1_cloth/weighted_oit/frame_008.png", "h1_cloth/weighted_oit/frame_009.png", "h1_cloth/weighted_oit/frame_010.png", "h1_cloth/weighted_oit/frame_011.png"], "diff": ["h1_cloth/diff/frame_000.png", "h1_cloth/diff/frame_001.png", "h1_cloth/diff/frame_002.png", "h1_cloth/diff/frame_003.png", "h1_cloth/diff/frame_004.png", "h1_cloth/diff/frame_005.png", "h1_cloth/diff/frame_006.png", "h1_cloth/diff/frame_007.png", "h1_cloth/diff/frame_008.png", "h1_cloth/diff/frame_009.png", "h1_cloth/diff/frame_010.png", "h1_cloth/diff/frame_011.png"], "contactSheet": "h1_cloth/h1_cloth_orbit_compare.png"}, {"scene": "franka_robot", "note": "Single transparent Franka arm (54 transparent shapes).", "sorted": ["franka_robot/sorted/frame_000.png", "franka_robot/sorted/frame_001.png", "franka_robot/sorted/frame_002.png", "franka_robot/sorted/frame_003.png", "franka_robot/sorted/frame_004.png", "franka_robot/sorted/frame_005.png", "franka_robot/sorted/frame_006.png", "franka_robot/sorted/frame_007.png", "franka_robot/sorted/frame_008.png", "franka_robot/sorted/frame_009.png", "franka_robot/sorted/frame_010.png", "franka_robot/sorted/frame_011.png"], "weighted": ["franka_robot/weighted_oit/frame_000.png", "franka_robot/weighted_oit/frame_001.png", "franka_robot/weighted_oit/frame_002.png", "franka_robot/weighted_oit/frame_003.png", "franka_robot/weighted_oit/frame_004.png", "franka_robot/weighted_oit/frame_005.png", "franka_robot/weighted_oit/frame_006.png", "franka_robot/weighted_oit/frame_007.png", "franka_robot/weighted_oit/frame_008.png", "franka_robot/weighted_oit/frame_009.png", "franka_robot/weighted_oit/frame_010.png", "franka_robot/weighted_oit/frame_011.png"], "diff": ["franka_robot/diff/frame_000.png", "franka_robot/diff/frame_001.png", "franka_robot/diff/frame_002.png", "franka_robot/diff/frame_003.png", "franka_robot/diff/frame_004.png", "franka_robot/diff/frame_005.png", "franka_robot/diff/frame_006.png", "franka_robot/diff/frame_007.png", "franka_robot/diff/frame_008.png", "franka_robot/diff/frame_009.png", "franka_robot/diff/frame_010.png", "franka_robot/diff/frame_011.png"], "contactSheet": "franka_robot/franka_robot_orbit_compare.png"}, {"scene": "franka_robot_grid", "note": "3x3 transparent Franka arm grid (486 transparent shapes).", "sorted": ["franka_robot_grid/sorted/frame_000.png", "franka_robot_grid/sorted/frame_001.png", "franka_robot_grid/sorted/frame_002.png", "franka_robot_grid/sorted/frame_003.png", "franka_robot_grid/sorted/frame_004.png", "franka_robot_grid/sorted/frame_005.png", "franka_robot_grid/sorted/frame_006.png", "franka_robot_grid/sorted/frame_007.png", "franka_robot_grid/sorted/frame_008.png", "franka_robot_grid/sorted/frame_009.png", "franka_robot_grid/sorted/frame_010.png", "franka_robot_grid/sorted/frame_011.png"], "weighted": ["franka_robot_grid/weighted_oit/frame_000.png", "franka_robot_grid/weighted_oit/frame_001.png", "franka_robot_grid/weighted_oit/frame_002.png", "franka_robot_grid/weighted_oit/frame_003.png", "franka_robot_grid/weighted_oit/frame_004.png", "franka_robot_grid/weighted_oit/frame_005.png", "franka_robot_grid/weighted_oit/frame_006.png", "franka_robot_grid/weighted_oit/frame_007.png", "franka_robot_grid/weighted_oit/frame_008.png", "franka_robot_grid/weighted_oit/frame_009.png", "franka_robot_grid/weighted_oit/frame_010.png", "franka_robot_grid/weighted_oit/frame_011.png"], "diff": ["franka_robot_grid/diff/frame_000.png", "franka_robot_grid/diff/frame_001.png", "franka_robot_grid/diff/frame_002.png", "franka_robot_grid/diff/frame_003.png", "franka_robot_grid/diff/frame_004.png", "franka_robot_grid/diff/frame_005.png", "franka_robot_grid/diff/frame_006.png", "franka_robot_grid/diff/frame_007.png", "franka_robot_grid/diff/frame_008.png", "franka_robot_grid/diff/frame_009.png", "franka_robot_grid/diff/frame_010.png", "franka_robot_grid/diff/frame_011.png"], "contactSheet": "franka_robot_grid/franka_robot_grid_orbit_compare.png"}];
+let timer = null;
+const sceneSelect = document.getElementById('scene');
+const frameInput = document.getElementById('frame');
+const frameLabel = document.getElementById('frameLabel');
+const playButton = document.getElementById('play');
+const note = document.getElementById('note');
+function update() {
+  const scene = scenes[Number(sceneSelect.value)];
+  const frame = Number(frameInput.value);
+  document.getElementById('sorted').src = scene.sorted[frame];
+  document.getElementById('weighted').src = scene.weighted[frame];
+  document.getElementById('diff').src = scene.diff[frame];
+  document.getElementById('sheet').src = scene.contactSheet;
+  note.textContent = scene.note;
+  frameLabel.textContent = `${frame + 1} / ${scene.sorted.length}`;
+}
+function loadScene() {
+  const scene = scenes[Number(sceneSelect.value)];
+  frameInput.max = scene.sorted.length - 1;
+  frameInput.value = 0;
+  update();
+}
+sceneSelect.addEventListener('change', loadScene);
+frameInput.addEventListener('input', update);
+playButton.addEventListener('click', () => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+    playButton.textContent = 'Play';
+    return;
+  }
+  playButton.textContent = 'Pause';
+  timer = setInterval(() => {
+    const next = (Number(frameInput.value) + 1) % (Number(frameInput.max) + 1);
+    frameInput.value = next;
+    update();
+  }, 180);
+});
+loadScene();
+</script>
+</body>
+</html>
