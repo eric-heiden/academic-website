@@ -159,6 +159,11 @@
       font-size: 13px;
     }
 
+    .summary-system {
+      margin: 22px 0 10px;
+      color: #344054;
+    }
+
     .good {
       color: var(--good);
     }
@@ -210,6 +215,10 @@
       background: #eef7fc;
       border: 1px solid #c8dfef;
       border-radius: 8px;
+    }
+
+    .callout p + p {
+      margin-top: 10px;
     }
 
     .scene-card img,
@@ -412,13 +421,14 @@
     <header>
       <h1>ViewerGL Transparency Rendering: Sorted Blending vs Weighted OIT</h1>
       <p class="subtitle">
-        Fresh 1080p benchmark results plus orbiting visual comparisons for transparent cloth, robots,
+        Cross-system benchmark results plus orbiting visual comparisons for transparent cloth, robots,
         and repeated mesh-heavy scenes. The visual comparison viewer updates frame-by-frame with a
         mouse-draggable timeline.
       </p>
       <div class="meta">
         <span class="pill">Run date: June 30, 2026</span>
-        <span class="pill">Benchmark: 1920 x 1080, 30 measured frames</span>
+        <span class="pill">Benchmark request: 1920 x 1080, 30 measured frames</span>
+        <span class="pill">M1 framebuffer: 3840 x 2160, Retina 2x</span>
         <span class="pill">Orbit comparison: 960 x 540, 12 camera frames</span>
         <span class="pill">Opacity defaults: cloth 0.42, robot 0.34, benchmark 0.45</span>
       </div>
@@ -435,6 +445,7 @@
             <th>RAM</th>
             <th>OS</th>
             <th>Driver</th>
+            <th>Framebuffer</th>
             <th>Newton</th>
             <th>Warp</th>
             <th>Python</th>
@@ -448,9 +459,22 @@
             <td>64 GiB</td>
             <td>Windows 11 10.0.22635</td>
             <td>595.79</td>
+            <td>1920 x 1080</td>
             <td>1.4.0.dev0</td>
             <td>1.14.0</td>
             <td>3.12.3</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td>Apple M1, 8-core integrated GPU</td>
+            <td>Apple M1, 8 cores (4 performance, 4 efficiency)</td>
+            <td>8 GiB unified memory</td>
+            <td>macOS 26.2 (25C56), arm64</td>
+            <td>OpenGL 4.1 Metal - 90.5</td>
+            <td>3840 x 2160 (1920 x 1080 request, Retina 2x)</td>
+            <td>1.4.0.dev0</td>
+            <td>1.14.0</td>
+            <td>3.12.12</td>
           </tr>
         </tbody>
       </table>
@@ -458,6 +482,7 @@
 
     <section>
       <h2>Benchmark Summary</h2>
+      <h3 class="summary-system">RTX 4090 desktop · 1920 x 1080</h3>
       <div class="grid">
         <div class="card">
           <div class="card-body metric">
@@ -484,12 +509,46 @@
           </div>
         </div>
       </div>
+      <h3 class="summary-system">MacBook Pro M1 · 3840 x 2160 Retina framebuffer</h3>
+      <div class="grid">
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-16.2%</strong>
+            <span><code>cloth_shirt_4</code> OIT speedup. OIT takes 16.152 ms versus 13.541 ms sorted.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-21.7%</strong>
+            <span><code>shape_cloud_240</code> OIT speedup. OIT takes 12.519 ms versus 9.801 ms sorted.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-27.8%</strong>
+            <span><code>mesh_spheres_160</code> OIT speedup. OIT takes 12.313 ms versus 8.889 ms sorted.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-28.1%</strong>
+            <span><code>bunny_meshes_24</code> OIT speedup. OIT takes 11.386 ms versus 8.190 ms sorted.</span>
+          </div>
+        </div>
+      </div>
       <div class="callout">
         <p>
           <strong>Sorted blending</strong> draws transparent objects back-to-front and uses conventional alpha blending.
           <strong>Weighted OIT</strong> accumulates transparent fragments into order-independent buffers and resolves
           the result approximately. The OIT path avoids object-level ordering sensitivity, while visual differences
           remain scene-dependent.
+        </p>
+        <p>
+          <strong>Reading the results:</strong> OIT speedup is
+          <code>(sorted mean / OIT mean - 1) x 100</code>, so negative values mean OIT is slower.
+          The M1 requested a 1920 x 1080 window, but the native macOS Retina context produced a
+          3840 x 2160 backing framebuffer. It therefore shaded four times as many pixels as the RTX run;
+          compare each system's sorted-versus-OIT behavior rather than treating the two systems as equal-resolution tests.
         </p>
       </div>
     </section>
@@ -555,12 +614,56 @@
             <td class="num">3.112</td>
             <td class="num">93</td>
           </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>cloth_shirt_4</code></td>
+            <td>4 transparent shirt cloth meshes, 50,944 cloth triangles</td>
+            <td class="num">13.541</td>
+            <td class="num">16.152</td>
+            <td class="num warn">-16.2%</td>
+            <td class="num">0.839</td>
+            <td class="num">3.049</td>
+            <td class="num">66</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>shape_cloud_240</code></td>
+            <td>240 transparent primitive shapes plus opaque ground</td>
+            <td class="num">9.801</td>
+            <td class="num">12.519</td>
+            <td class="num warn">-21.7%</td>
+            <td class="num">1.815</td>
+            <td class="num">6.264</td>
+            <td class="num">72</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>mesh_spheres_160</code></td>
+            <td>160 transparent generated sphere mesh instances</td>
+            <td class="num">8.889</td>
+            <td class="num">12.313</td>
+            <td class="num warn">-27.8%</td>
+            <td class="num">0.971</td>
+            <td class="num">4.367</td>
+            <td class="num">66</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>bunny_meshes_24</code></td>
+            <td>24 transparent bunny.usd mesh instances, 292,800 mesh triangles</td>
+            <td class="num">8.190</td>
+            <td class="num">11.386</td>
+            <td class="num warn">-28.1%</td>
+            <td class="num">0.356</td>
+            <td class="num">3.101</td>
+            <td class="num">98</td>
+          </tr>
         </tbody>
       </table>
     </section>
 
     <section>
-      <h2>Benchmark Screenshots</h2>
+      <h2>Benchmark Screenshots (RTX 4090 desktop)</h2>
       <div class="grid two">
         <article class="card scene-card">
           <a href="benchmark/cloth_shirt_4_compare.png">
@@ -697,10 +800,14 @@
     </section>
 
     <p class="foot">
-      Data sources: <a href="benchmark/results.json"><code>benchmark/results.json</code></a>,
-      <a href="benchmark/summary.md"><code>benchmark/summary.md</code></a>, and
-      <a href="orbit/summary.md"><code>orbit/summary.md</code></a>. The difference images multiply
-      absolute RGB differences to make subtle ordering/resolution differences visible.
+      Data sources: RTX 4090
+      <a href="benchmark/results.json"><code>benchmark/results.json</code></a> and
+      <a href="benchmark/summary.md"><code>benchmark/summary.md</code></a>; MacBook Pro M1
+      <a href="benchmark/macbook-pro-m1/results.json"><code>results.json</code></a>,
+      <a href="benchmark/macbook-pro-m1/summary.md"><code>summary.md</code></a>, and
+      <a href="benchmark/macbook-pro-m1/run-info.json"><code>run-info.json</code></a>; orbit
+      <a href="orbit/summary.md"><code>summary.md</code></a>. The difference images multiply absolute
+      RGB differences to make subtle ordering/resolution differences visible.
     </p>
   </main>
 
