@@ -101,9 +101,13 @@
     <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/flying_knot_knot_track_slowmo.mp4"></video>
     <p class="caption">Knot-tracking camera, 4&times; slow motion: the camera follows the smoothed centroid
     of the rope's self-contact cluster, keeping the evolving knot centered through the whole tying sequence
-    &mdash; loop formation, the tip threading it, and the knotted rope falling to the floor. (The static side
-    view above loses the knot below the frame as the rope falls; here the knot cluster stays fully in view
-    for all 120 recorded frames, max |NDC| 0.81.)</p>
+    &mdash; loop formation, the tip threading it, and the knotted rope swinging down. This clip uses the
+    0.53&nbsp;s-throw variant of the tuned command (time scale 0.75, 60&nbsp;g tip, bend 5&times;10<sup>&minus;4</sup>;
+    also 100% knot success in our trials), which leaves the finished knot higher up the rope &mdash; final knot
+    position 0.78 along the arc length instead of 0.88, so a clear free tail hangs below it instead of the
+    knot cinching directly against the end weight. (The static side view above loses the knot below the
+    frame as the rope falls; here the knot cluster stays fully in view for all 120 recorded frames,
+    max |NDC| 0.88.)</p>
     <figure>
       <img src="assets/comparison_strip.png" alt="Human demo vs Newton simulation phase comparison">
       <figcaption>Phase-by-phase comparison: the paper's slow-motion human demonstration (top,
@@ -325,7 +329,8 @@ uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the c
 uv run python scripts/flying_knot/sweep.py --grid basin --repeats 3   # success-rate sweeps
 uv run python scripts/flying_knot/record_video.py out.mp4        # ViewerGL headless rendering (xvfb)
 uv run python scripts/flying_knot/record_video.py knot.mp4 --camera track \
-    --start 1.6 --end 3.6 --slowmo 4 --require-knot --verify-in-frame   # knot-tracking slow-mo
+    --start 1.6 --end 3.6 --slowmo 4 --time-scale 0.75 --tip-mass 0.06 --bend-stiffness 5e-4 \
+    --require-knot --verify-in-frame --max-knot-pos 0.80   # knot-tracking slow-mo, knot ends high
 uv run python scripts/flying_knot/fixed_base_search.py           # base-motion diagnosis + mount search
 uv run python scripts/flying_knot/verify_fixed_base.py           # probe: base/pedestal must not move
   </pre>
