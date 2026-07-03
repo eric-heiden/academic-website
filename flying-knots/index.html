@@ -76,7 +76,8 @@
   throw trajectory and a simulated weighted rope ties itself into an overhand knot in under a second of
   motion.</p>
   <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-03 with a
-  fixed pedestal (see <a href="#revision">Revision</a>). Newton branch <code>flying-knots</code> off
+  fixed pedestal (see <a href="#revision">Revision</a>). Newton branch
+  <a href="https://github.com/eric-heiden/newton/tree/flying-knots"><code>flying-knots</code></a> off
   <code>origin/main</code> <code>31b06fe0</code>.</p>
 
   <section class="example-intro">
@@ -321,8 +322,15 @@
   </div>
 
   <h2>Reproduction</h2>
+  <p>The complete branch (example, digitization, sweep/recording tooling, and specs) is published at
+  <a href="https://github.com/eric-heiden/newton/tree/flying-knots">eric-heiden/newton@flying-knots</a>;
+  the example lives at
+  <a href="https://github.com/eric-heiden/newton/blob/flying-knots/newton/examples/cable/example_cable_flying_knot.py"><code>newton/examples/cable/example_cable_flying_knot.py</code></a>
+  with the analysis scripts under
+  <a href="https://github.com/eric-heiden/newton/tree/flying-knots/scripts/flying_knot"><code>scripts/flying_knot/</code></a>.</p>
   <pre>
-# Newton branch: flying-knots (worktree off origin/main 31b06fe0)
+git clone -b flying-knots https://github.com/eric-heiden/newton.git
+# Newton branch: flying-knots (off origin/main 31b06fe0)
 uv run -m newton.examples cable_flying_knot                      # interactive, knots by default
 uv run -m newton.examples cable_flying_knot --viewer null --test --expect-knot
 uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the command from the figure
