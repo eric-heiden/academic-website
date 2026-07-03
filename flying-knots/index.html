@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flying Knots in Newton — SolverVBD Cable Replication</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18212a;
+      --muted: #5e6b76;
+      --line: #d8e0e7;
+      --panel: #f7f9fb;
+      --accent: #178a64;
+      --warn: #b5483a;
+    }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: #fff;
+      line-height: 1.5;
+    }
+    main { max-width: 1080px; margin: 0 auto; padding: 42px 32px 72px; }
+    h1 { font-size: 34px; line-height: 1.12; margin: 0 0 10px; }
+    h2 { margin: 36px 0 12px; font-size: 22px; }
+    h3 { margin: 24px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    code { background: #eef3f6; padding: 1px 5px; border-radius: 4px; }
+    pre { background: #eef3f6; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+    .lede { color: var(--muted); font-size: 17px; max-width: 850px; }
+    .stamp { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+    .example-video {
+      display: block;
+      width: 100%;
+      max-width: 960px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0f1720;
+    }
+    .video-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+    .video-pair video { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #0f1720; }
+    .caption { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      background: var(--panel);
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .callout.warn { border-left-color: var(--warn); }
+    .grid-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0 28px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fff; }
+    .metric { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .label { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f8; font-weight: 650; }
+    ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    figure { margin: 18px 0; }
+    figure img { width: 100%; max-width: 960px; border: 1px solid var(--line); border-radius: 8px; }
+    figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .good { color: var(--accent); font-weight: 650; }
+    .bad { color: var(--warn); font-weight: 650; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Flying Knots in Newton</h1>
+  <p class="lede">Replicating the mid-air overhand "flying knot" of Suresh &amp; Atkeson
+  (<a href="https://flying-knots.github.io/">flying-knots.github.io</a>, arXiv:2602.21302) in Newton
+  with <code>SolverVBD</code> cable joints: an xArm7 replays the paper's throw trajectory and a
+  simulated weighted rope ties itself into an overhand knot in under a second of motion.</p>
+  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40. Newton branch
+  <code>flying-knots</code> off <code>origin/main</code> <code>31b06fe0</code>.</p>
+
+  <section class="example-intro">
+    <h2>Result</h2>
+    <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/flying_knot_main.mp4"></video>
+    <p class="caption">Full sequence, real time: settle &rarr; 0.56&nbsp;s throw &rarr; free flight &rarr; slow
+    lift. The rope root replays the digitized end-effector command of the paper; the xArm7 tracks the same
+    trajectory through Newton's IK module and is animated kinematically. The knot cinches against the tip
+    weight during the lift and remains in the hanging rope.</p>
+    <div class="video-pair">
+      <div>
+        <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_throw_slowmo.mp4"></video>
+        <p class="caption">Throw at 4&times; slow motion, side view: the rope is thrown over the top, opens
+        into a loop, and the weighted tip whips through the loop &mdash; the paper's "collision" critical point.</p>
+      </div>
+      <div>
+        <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_knot_closeup.mp4"></video>
+        <p class="caption">Close-up of the lift phase: the loose knot travels down the rope and tightens
+        against the weighted tip.</p>
+      </div>
+    </div>
+    <figure>
+      <img src="assets/comparison_strip.png" alt="Human demo vs Newton simulation phase comparison">
+      <figcaption>Phase-by-phase comparison: the paper's slow-motion human demonstration (top,
+      &copy; Suresh &amp; Atkeson, flying-knots.github.io) against the Newton SolverVBD replication (bottom,
+      4&times; slow-motion side view). Rest &rarr; upswing &rarr; loop opens &rarr; tip threads the loop
+      &rarr; knot in flight &rarr; knot in the hanging rope.</figcaption>
+    </figure>
+  </section>
+
+  <div class="grid-cards">
+    <div class="card"><div class="label">Knot success (tuned command, 20 trials)</div><div class="metric good">17/20</div></div>
+    <div class="card"><div class="label">Knot success (full example with arm, 8 trials)</div><div class="metric good">8/8</div></div>
+    <div class="card"><div class="label">Verbatim demonstration replay</div><div class="metric bad">0 knots</div></div>
+    <div class="card"><div class="label">IK flange tracking error (mean / max)</div><div class="metric">0.1 / 8.7 mm</div></div>
+  </div>
+
+  <h2>What the paper released, and what it didn't</h2>
+  <p>The public code (<a href="https://github.com/krish-suresh/flying_knots_public">flying_knots_public</a>)
+  contains the full learning pipeline (mocap capture, IK, task-level ILC, three rope models) but ships
+  <strong>no recorded demonstrations or commands</strong> &mdash; all trial data lives under a local
+  <code>$FLYING_KNOT_DATA</code> directory that was never published, and the repo has no releases. The
+  project site hosts videos only.</p>
+  <p>The usable quantitative record of the throw is the paper's follow-through figure: the executed
+  end-effector x/y/z position trajectory of the overhand throw over 0.7&nbsp;s. I digitized the three curves
+  by color extraction, calibrated the axes from the tick marks, and refit the paper's own command
+  parametrization (Appendix&nbsp;D): an 8-control-point B&eacute;zier per axis. Fit residual is below 3.6&nbsp;cm
+  everywhere (below 1.5&nbsp;cm on z, the dominant axis). The figure plots both the demonstration and the
+  learned command; they differ by a few centimeters, and the extraction blends them where they overlap.</p>
+  <figure>
+    <img src="assets/fttraj_digitized_overlay.png" alt="Digitized trajectory with Bezier fit">
+    <figcaption>Digitized end-effector trajectory (dots) and the 8-knot B&eacute;zier refit (lines) used as the
+    throw command. Compare with the follow-through figure at
+    <a href="https://flying-knots.github.io/">flying-knots.github.io</a>.</figcaption>
+  </figure>
+  <p>Physical parameters come from the paper: rope&nbsp;1 (#10 sash spot cord) is 1.1&nbsp;m long, 9&nbsp;mm
+  diameter, 0.040&nbsp;kg/m, with an affixed end weight; the handle is 15&nbsp;cm flange-to-tip; the command
+  space is 10-DOF (7 arm joints + 3 base translations); the initial hand height must let the rope dangle
+  freely (z<sub>min</sub> = 1.2&nbsp;m).</p>
+
+  <h2>Newton scene</h2>
+  <ul>
+    <li><strong>Rope</strong>: <code>ModelBuilder.add_rod</code> &mdash; 36 capsules over 1.1&nbsp;m
+    (5&nbsp;mm radius), coupled by cable joints, simulated by <code>SolverVBD</code> (10 iterations,
+    32 substeps at 60&nbsp;FPS). Capsule density reproduces the paper's 0.040&ndash;0.05&nbsp;kg/m linear density; a
+    sphere on the last capsule is the end weight. Rope self-collision and rope&ndash;ground contact are active
+    (<code>rigid_contact_history</code> on) &mdash; the knot <em>is</em> a self-contact structure.</li>
+    <li><strong>Driving</strong>: the rope's root capsule is kinematic and follows the B&eacute;zier command,
+    exactly mirroring the paper's rope model, where the fingertip position drives the first rope node through
+    a distance constraint. The root orientation blends from "hanging" to "trailing the hand velocity" with
+    twist-free quaternion transport.</li>
+    <li><strong>Robot</strong>: the paper's xArm7 URDF (vendored from their repo, gripper and ROS cruft
+    stripped) mounted on a lift column with the paper's 3-DOF translating base (a D6 joint with
+    &plusmn;0.2&nbsp;m linear limits). Newton's <code>newton.ik</code> LM solver tracks two position
+    objectives per frame &mdash; flange and handle tip &mdash; which aligns the handle axis without
+    constraining tool twist. The arm is animated kinematically (all links zero-mass; per-substep transforms
+    interpolated from the 60&nbsp;Hz IK solution), so it visualizes the commanded motion while the rope
+    physics is driven by the same trajectory.</li>
+  </ul>
+  <figure>
+    <img src="assets/ik_error.png" alt="IK tracking error">
+    <figcaption>IK flange tracking error over the sequence. Mean 0.09&nbsp;mm; peaks of a few millimeters
+    occur only inside the 0.56&nbsp;s throw window, where the commanded end-effector speed reaches
+    3.5&nbsp;m/s (about 4.4&nbsp;m/s scaled) near the workspace boundary.</figcaption>
+  </figure>
+
+  <h2>Tuning: replaying the demonstration is not enough</h2>
+  <p>Replaying the digitized command verbatim on the paper's rope-1 parameters
+  (<span class="bad">0 knots</span>) reproduces the paper's own headline observation: direct tracking of a
+  demonstration fails, because the rope dynamics differ between the demonstrator's rope and the executing
+  system. In the paper the gap is human&rarr;robot hardware; here it is real rope&rarr;VBD cable. Their
+  answer is task-level ILC over the command; mine is a parameter search over command timing/amplitude and
+  rope properties, playing the same role offline.</p>
+  <p>A broad sweep (54 runs) showed the failure mode clearly: the rope coils to a transient writhe of
+  &plusmn;3 and the loop collapses before the weighted tip threads it, or the loose knot slides off the free
+  end during flight. Two knobs move the collision point decisively: a <strong>slightly faster throw</strong>
+  (time scale 0.75&ndash;0.8, i.e. 0.53&ndash;0.56&nbsp;s instead of 0.7&nbsp;s) and a <strong>heavier tip
+  weight</strong> (50&ndash;70&nbsp;g vs. the paper's 18&nbsp;g) that carries momentum through the loop and
+  later cinches the knot.</p>
+  <div class="video-pair">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_verbatim_replay.mp4"></video>
+      <p class="caption">Failure mode, 4&times; slow motion: the verbatim digitized command with the paper's
+      exact rope-1 parameters (18&nbsp;g tip, 0.7&nbsp;s throw). The rope coils but the tip never threads the
+      loop, and the rope lands unknotted.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_throw_slowmo.mp4"></video>
+      <p class="caption">Success, same view: with the tuned command (0.56&nbsp;s throw, 50&nbsp;g tip) the tip
+      carries through the loop and the knot survives the landing.</p>
+    </div>
+  </div>
+  <figure>
+    <img src="assets/writhe_over_time.png" alt="Writhe over time">
+    <figcaption>Rope centerline writhe over time. With the tuned command the writhe jumps to +3.5 as the tip
+    threads the loop 0.4&nbsp;s after throw onset, then locks near +2.5 as the knot tightens &mdash; the
+    signature of a trapped overhand (trefoil) knot. The verbatim command's writhe returns to zero.</figcaption>
+  </figure>
+
+  <h3>Success rates</h3>
+  <p>Because VBD contact resolution is not bitwise deterministic across runs, single successes are
+  meaningless near the critical manifold &mdash; the same parameters can knot in one run and miss in the next.
+  All configurations were therefore scored by repeated trials (the paper analogously reports a 40-trial
+  robustness evaluation). Success = final |writhe| &gt; 2 <em>and</em> end-to-end/arc-length ratio &lt; 0.95
+  in the hanging rope.</p>
+  <table id="success-table">
+    <thead><tr><th>Throw time scale</th><th>Tip mass [g]</th><th>Bend stiffness [N·m/rad]</th><th>Success</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p>The success basin is sharp &mdash; neighboring configurations flip from 5/5 to 0/5 with a 10&nbsp;g tip
+  change &mdash; which matches the paper's premise that the flying knot is a precision event requiring
+  iteration-level correction rather than robust open-loop replay. The selected default
+  (time scale 0.8, 50&nbsp;g tip, bend stiffness 2&times;10<sup>&minus;3</sup>) achieved
+  <strong>17/20</strong> standalone and <strong>8/8</strong> in the full arm example.</p>
+
+  <h2>In-flight cable PRs</h2>
+  <p>This branch runs on plain <code>origin/main</code> (<code>31b06fe0</code>). JC Chang's (jumyungc)
+  merged VBD-cable work is already in that baseline and this example depends on it (capsule COM origin
+  <a href="https://github.com/newton-physics/newton/pull/2670">#2670</a>, absolute VBD damping
+  <a href="https://github.com/newton-physics/newton/pull/2877">#2877</a>, rigid-contact energy fix
+  <a href="https://github.com/newton-physics/newton/pull/3147">#3147</a>). His open PRs were evaluated but
+  not required: <a href="https://github.com/newton-physics/newton/pull/3122">#3122</a>
+  (split cable stretch/shear + bend/twist constraints) <span id="pr3122-verdict">was additionally merged into a scratch branch and re-scored &mdash;
+  it shifts the cable dynamics enough to move the tuned command off the knotting manifold (the loop still
+  forms, max writhe 3.2, but the tip no longer threads it), and a small retune restores full success</span>;
+  <a href="https://github.com/newton-physics/newton/pull/3180">#3180</a> (separate rest/initial poses) is
+  unnecessary because the rope starts at its rest shape; and
+  <a href="https://github.com/newton-physics/newton/pull/3316">#3316</a> (masked rigid resets) targets
+  resets, which this example does not use.</p>
+  <table id="pr-table">
+    <thead><tr><th>Configuration</th><th>Champion success</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>origin/main</code> 31b06fe0</td><td id="pr-main">17/20</td><td>report baseline</td></tr>
+      <tr><td>+ PR #3122, same command</td><td id="pr-3122" class="bad">0/10</td><td>loop forms (max writhe 3.2) but tip misses; knot never locks</td></tr>
+      <tr><td>+ PR #3122, retuned (time scale 0.78, tip 45&nbsp;g)</td><td class="good">10/10</td><td>one-step retune inside the same search grid recovers the knot</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Verifying the knot</h2>
+  <p>Success is scored topologically on the rope centerline, not visually:</p>
+  <ul>
+    <li><strong>Writhe</strong> via the discrete Gauss integral (Klenin &amp; Langowski segment-pair solid
+    angles). A tightened open overhand knot scores |Wr| &asymp; 2.5&ndash;3.4; unknotted slack rope stays
+    near 0. Unit-tested against closed/open trefoils, circles, and slack curves.</li>
+    <li><strong>Length deficit</strong>: an overhand knot consumes rope, so the hanging end-to-end distance
+    drops to &asymp;0.80&ndash;0.85 of arc length after the lift tightens it against the tip weight
+    (unknotted: &gt;0.95). This mirrors the paper's success definition &mdash; a knot that survives in the
+    hanging rope.</li>
+    <li><strong>Crossing count</strong> of the projected centerline (&ge;3 for a trefoil projection),
+    reported for confirmation.</li>
+  </ul>
+  <p>The example's <code>test_final()</code> asserts these criteria when run with <code>--expect-knot</code>.</p>
+
+  <h2>Deviations from the paper</h2>
+  <ul>
+    <li><strong>Command source</strong>: digitized from a published figure (position only, solid/dashed
+    curves blended), not the released mocap. Handle orientation is reconstructed heuristically since the
+    paper's rope model is position-driven anyway.</li>
+    <li><strong>Command tuning</strong>: 20% faster throw and 50&nbsp;g tip weight (paper: 18&nbsp;g for
+    rope 1). The VBD cable at this discretization needs a more energetic throw than the real cotton cord;
+    the paper compensates per-rope with ILC and per-rope end weights up to 80&nbsp;g.</li>
+    <li><strong>Arm is kinematic</strong> and arm&ndash;rope collision is disabled; the rope interacts with
+    itself and the ground only, as in the paper's particle model. The loop passes close to the wrist during
+    the throw.</li>
+    <li><strong>Rope discretization</strong>: 36 capsules (3&nbsp;cm segments) versus 11 mocap markers in
+    their model; the tight knot bundle spans ~8 segments, so finer discretization would sharpen the knot
+    geometry at higher cost.</li>
+    <li><strong>No learning loop</strong>: this is a tuned open-loop replay; the ILC algorithm itself was not
+    ported.</li>
+  </ul>
+  <div class="callout warn" id="bug-callout">
+    <strong>Newton observations along the way:</strong>
+    <ul>
+      <li><code>newton.ik</code> with <code>IKJacobianType.ANALYTIC</code> raises CUDA illegal-memory-access
+      for this 10-coordinate model with a 3-DOF D6 base joint; <code>AUTODIFF</code> works. Worth a minimal
+      repro/issue.</li>
+      <li>VBD rigid contact outcomes are not run-to-run deterministic, which matters for near-critical
+      contact events like knot formation; repeated-trial scoring was required.</li>
+      <li><code>Model</code> has no public body-label lookup (<code>ModelBuilder.body_label</code> must be
+      read before <code>finalize()</code>).</li>
+    </ul>
+  </div>
+
+  <h2>Reproduction</h2>
+  <pre>
+# Newton branch: flying-knots (worktree off origin/main 31b06fe0)
+uv run -m newton.examples cable_flying_knot                      # interactive, knots by default
+uv run -m newton.examples cable_flying_knot --viewer null --test --expect-knot
+uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the command from the figure
+uv run python scripts/flying_knot/sweep.py --grid basin --repeats 3   # success-rate sweeps
+uv run python scripts/flying_knot/record_video.py out.mp4        # ViewerGL headless rendering (xvfb)
+  </pre>
+  <p class="caption">Assets: xArm7 URDF + meshes are read from a clone of
+  <code>flying_knots_public</code> (override with <code>FLYING_KNOTS_XARM_DIR</code>); without it the example
+  runs handle-only. Videos rendered with ViewerGL offscreen capture piped to ffmpeg.</p>
+
+</main>
+<script>
+fetch('assets/success_rates.json').then(r => r.json()).then(rows => {
+  const tb = document.querySelector('#success-table tbody');
+  rows.sort((a, b) => (b.success / b.trials) - (a.success / a.trials) ||
+                      a.time_scale - b.time_scale || a.tip_mass - b.tip_mass);
+  let zeros = 0, zeroTrials = 0;
+  for (const r of rows) {
+    if (r.success === 0) { zeros += 1; zeroTrials += r.trials; continue; }
+    const tr = document.createElement('tr');
+    const frac = r.success / r.trials;
+    tr.innerHTML = `<td>${r.time_scale}</td><td>${Math.round(r.tip_mass * 1000)}</td>` +
+      `<td>${r.bend_stiffness}</td>` +
+      `<td class="${frac >= 0.8 ? 'good' : ''}">${r.success}/${r.trials}</td>`;
+    tb.appendChild(tr);
+  }
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td colspan="3">all ${zeros} other swept configurations ` +
+    `(time scale 0.75&ndash;1.0, tip 15&ndash;70 g, bend 5e-4&ndash;2e-2)</td>` +
+    `<td class="bad">0/${zeroTrials}</td>`;
+  tb.appendChild(tr);
+});
+</script>
+</body>
+</html>
