@@ -72,10 +72,12 @@
   <h1>Flying Knots in Newton</h1>
   <p class="lede">Replicating the mid-air overhand "flying knot" of Suresh &amp; Atkeson
   (<a href="https://flying-knots.github.io/">flying-knots.github.io</a>, arXiv:2602.21302) in Newton
-  with <code>SolverVBD</code> cable joints: an xArm7 replays the paper's throw trajectory and a
-  simulated weighted rope ties itself into an overhand knot in under a second of motion.</p>
-  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40. Newton branch
-  <code>flying-knots</code> off <code>origin/main</code> <code>31b06fe0</code>.</p>
+  with <code>SolverVBD</code> cable joints: an xArm7 bolted to a fixed pedestal replays the paper's
+  throw trajectory and a simulated weighted rope ties itself into an overhand knot in under a second of
+  motion.</p>
+  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-03 with a
+  fixed pedestal (see <a href="#revision">Revision</a>). Newton branch <code>flying-knots</code> off
+  <code>origin/main</code> <code>31b06fe0</code>.</p>
 
   <section class="example-intro">
     <h2>Result</h2>
@@ -107,9 +109,9 @@
 
   <div class="grid-cards">
     <div class="card"><div class="label">Knot success (tuned command, 20 trials)</div><div class="metric good">17/20</div></div>
-    <div class="card"><div class="label">Knot success (full example with arm, 8 trials)</div><div class="metric good">8/8</div></div>
+    <div class="card"><div class="label">Knot success (full example, fixed-base arm, 8 trials)</div><div class="metric good">7/8</div></div>
     <div class="card"><div class="label">Verbatim demonstration replay</div><div class="metric bad">0 knots</div></div>
-    <div class="card"><div class="label">IK flange tracking error (mean / max)</div><div class="metric">0.1 / 8.7 mm</div></div>
+    <div class="card"><div class="label">Fixed-base IK error (mean / max)</div><div class="metric">0.04 / 13.5 mm</div></div>
   </div>
 
   <h2>What the paper released, and what it didn't</h2>
@@ -147,19 +149,48 @@
     a distance constraint. The root orientation blends from "hanging" to "trailing the hand velocity" with
     twist-free quaternion transport.</li>
     <li><strong>Robot</strong>: the paper's xArm7 URDF (vendored from their repo, gripper and ROS cruft
-    stripped) mounted on a lift column with the paper's 3-DOF translating base (a D6 joint with
-    &plusmn;0.2&nbsp;m linear limits). Newton's <code>newton.ik</code> LM solver tracks two position
-    objectives per frame &mdash; flange and handle tip &mdash; which aligns the handle axis without
-    constraining tool twist. The arm is animated kinematically (all links zero-mass; per-substep transforms
-    interpolated from the 60&nbsp;Hz IK solution), so it visualizes the commanded motion while the rope
-    physics is driven by the same trajectory.</li>
+    stripped) bolted to a <strong>fixed pedestal</strong> (static world geometry; the rope can rest against
+    it). Newton's <code>newton.ik</code> LM solver tracks two position objectives per frame &mdash; flange
+    and handle tip &mdash; with the 7 arm joints only, which aligns the handle axis without constraining
+    tool twist. The arm is animated kinematically (all links zero-mass; per-substep transforms interpolated
+    from the 60&nbsp;Hz IK solution), so it visualizes the commanded motion while the rope physics is driven
+    by the same trajectory.</li>
   </ul>
   <figure>
     <img src="assets/ik_error.png" alt="IK tracking error">
-    <figcaption>IK flange tracking error over the sequence. Mean 0.09&nbsp;mm; peaks of a few millimeters
-    occur only inside the 0.56&nbsp;s throw window, where the commanded end-effector speed reaches
-    3.5&nbsp;m/s (about 4.4&nbsp;m/s scaled) near the workspace boundary.</figcaption>
+    <figcaption>IK flange tracking error over the sequence with the fixed base (7-DOF). Sub-millimeter
+    everywhere except a single 13.5&nbsp;mm peak inside the 0.56&nbsp;s throw window, where the commanded
+    end-effector speed exceeds 4&nbsp;m/s at the edge of the fixed-base workspace &mdash; a one-frame
+    handle/rope-root offset that is invisible at speed.</figcaption>
   </figure>
+
+  <h2 id="revision">Revision: keeping the pedestal fixed</h2>
+  <p>The first version of this report gave the arm the paper's <em>3-DOF translating base</em> (their
+  B&eacute;zier command is 10-DOF: 7 joints + 3 base translations) as a D6 joint with &plusmn;0.2&nbsp;m
+  limits, and parented the pedestal to the base link. The IK solver exploited this freely: the solved base
+  trajectory slid <strong>0.25&nbsp;m in x and rail-to-rail 0.40&nbsp;m in y and z</strong> during the
+  throw, so the whole robot &mdash; pedestal included &mdash; visibly flew around the scene. Physically
+  plausible for their gantry-style setup, but it read as an unrealistic floating robot.</p>
+  <p>The fix removes the base joint entirely (the URDF root is welded to the world) and instead
+  <em>searches for a mount pose</em> from which the fixed-base arm can reach the entire command:
+  candidate mounts are pruned by a workspace annulus around the shoulder, then scored by solving the full
+  7-DOF IK schedule (<code>scripts/flying_knot/fixed_base_search.py</code>). The selected mount
+  (x&nbsp;=&nbsp;0.30, y&nbsp;=&nbsp;&minus;0.20, flange height 1.30&nbsp;m) tracks the whole
+  trajectory with mean 0.03&nbsp;mm / max 13.5&nbsp;mm flange error (the movable base achieved
+  8.7&nbsp;mm max &mdash; the fixed base costs 5&nbsp;mm at one whip frame). The pedestal is now static
+  world geometry with collision enabled, so the rope rests against it rather than passing through. Enabling
+  that contact exposed a real failure mode &mdash; the loose knot could snag on the column and be stripped
+  off while the rope is lifted (4/8 with-arm trials) &mdash; so the final lift now drifts 0.12&nbsp;m away
+  from the pedestal, restoring 7/8.</p>
+  <div class="callout">
+    <strong>Verification:</strong> <code>scripts/flying_knot/verify_fixed_base.py</code> steps the full
+    animation and asserts the base link's world transform never changes and the pedestal is static geometry
+    (shape parent body &minus;1). Result: <span class="good">max transform drift 0.000e+00 over 484
+    frames</span>. The same assertion now runs inside the example's <code>test_final()</code> on every test
+    execution. The rope simulation itself is untouched by this change &mdash; the rope root replays the same
+    command &mdash; so the standalone success statistics remain valid; the with-arm trials below were re-run
+    on the fixed-base scene.</p>
+  </div>
 
   <h2>Tuning: replaying the demonstration is not enough</h2>
   <p>Replaying the digitized command verbatim on the paper's rope-1 parameters
@@ -208,7 +239,7 @@
   change &mdash; which matches the paper's premise that the flying knot is a precision event requiring
   iteration-level correction rather than robust open-loop replay. The selected default
   (time scale 0.8, 50&nbsp;g tip, bend stiffness 2&times;10<sup>&minus;3</sup>) achieved
-  <strong>17/20</strong> standalone and <strong>8/8</strong> in the full arm example.</p>
+  <strong>17/20</strong> standalone and <strong>7/8</strong> in the full fixed-base arm example.</p>
 
   <h2>In-flight cable PRs</h2>
   <p>This branch runs on plain <code>origin/main</code> (<code>31b06fe0</code>). JC Chang's (jumyungc)
@@ -257,8 +288,9 @@
     rope 1). The VBD cable at this discretization needs a more energetic throw than the real cotton cord;
     the paper compensates per-rope with ILC and per-rope end weights up to 80&nbsp;g.</li>
     <li><strong>Arm is kinematic</strong> and arm&ndash;rope collision is disabled; the rope interacts with
-    itself and the ground only, as in the paper's particle model. The loop passes close to the wrist during
-    the throw.</li>
+    itself, the ground, and the pedestal column, as in the paper's particle model. The loop passes close to
+    the wrist during the throw. The final lift drifts 0.12&nbsp;m away from the pedestal so the tightening
+    knot cannot snag on the column.</li>
     <li><strong>Rope discretization</strong>: 36 capsules (3&nbsp;cm segments) versus 11 mocap markers in
     their model; the tight knot bundle spans ~8 segments, so finer discretization would sharpen the knot
     geometry at higher cost.</li>
@@ -269,8 +301,8 @@
     <strong>Newton observations along the way:</strong>
     <ul>
       <li><code>newton.ik</code> with <code>IKJacobianType.ANALYTIC</code> raises CUDA illegal-memory-access
-      for this 10-coordinate model with a 3-DOF D6 base joint; <code>AUTODIFF</code> works. Worth a minimal
-      repro/issue.</li>
+      for a 10-coordinate model with a 3-DOF D6 base joint (used in the first version of this scene);
+      <code>AUTODIFF</code> works. Worth a minimal repro/issue.</li>
       <li>VBD rigid contact outcomes are not run-to-run deterministic, which matters for near-critical
       contact events like knot formation; repeated-trial scoring was required.</li>
       <li><code>Model</code> has no public body-label lookup (<code>ModelBuilder.body_label</code> must be
@@ -286,6 +318,8 @@ uv run -m newton.examples cable_flying_knot --viewer null --test --expect-knot
 uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the command from the figure
 uv run python scripts/flying_knot/sweep.py --grid basin --repeats 3   # success-rate sweeps
 uv run python scripts/flying_knot/record_video.py out.mp4        # ViewerGL headless rendering (xvfb)
+uv run python scripts/flying_knot/fixed_base_search.py           # base-motion diagnosis + mount search
+uv run python scripts/flying_knot/verify_fixed_base.py           # probe: base/pedestal must not move
   </pre>
   <p class="caption">Assets: xArm7 URDF + meshes are read from a clone of
   <code>flying_knots_public</code> (override with <code>FLYING_KNOTS_XARM_DIR</code>); without it the example
