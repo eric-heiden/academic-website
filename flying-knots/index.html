@@ -75,7 +75,7 @@
   with <code>SolverVBD</code> cable joints: an xArm7 bolted to a fixed pedestal replays the paper's
   throw trajectory and a simulated weighted rope ties itself into an overhand knot in under a second of
   motion.</p>
-  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-03 with a
+  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-05 with the MuJoCo-coupled variant and 2026-07-03 with a
   fixed pedestal (see <a href="#revision">Revision</a>). Newton branch
   <a href="https://github.com/eric-heiden/newton/tree/flying-knots"><code>flying-knots</code></a> off
   <code>origin/main</code> <code>31b06fe0</code>.</p>
@@ -252,6 +252,74 @@
   (time scale 0.8, 50&nbsp;g tip, bend stiffness 2&times;10<sup>&minus;3</sup>) achieved
   <strong>17/20</strong> standalone and <strong>7/8</strong> in the full fixed-base arm example.</p>
 
+
+  <h2 id="mujoco">Dynamically driven variant: MuJoCo arm + coupled VBD rope</h2>
+  <p>The kinematic example's robot motion is choppy: its per-frame IK flips elbow/wrist branches
+  freely in the 7-DOF nullspace (peak joint velocity 112&nbsp;rad/s, acceleration 7,800&nbsp;rad/s&sup2;),
+  and per-frame interpolation steps the velocity at 60&nbsp;Hz.
+  <code>example_cable_flying_knot_mujoco</code> replaces this with a dynamically simulated arm on the
+  experimental coupled-solver framework merged in
+  <a href="https://github.com/newton-physics/newton/pull/2848">#2848</a>:</p>
+  <ul>
+    <li><strong>C&sup2;-continuous reference</strong>: branch-continuous IK (subdivided targets, warm
+    starts, and a custom posture objective that anchors each solve at the previous solution) tracks the
+    handle-tip position only &mdash; constraining the flange or handle axis as well demands infeasible
+    wrist rates near the workspace boundary. The 60&nbsp;Hz solution is zero-phase filtered and
+    interpolated with a natural cubic spline, giving smooth velocity and continuous acceleration by
+    construction. The mount is re-searched to minimize peak joint velocity
+    (<code>mount_velocity_search.py</code>: 12&nbsp;rad/s instead of 33+).</li>
+    <li><strong>MuJoCo dynamics</strong>: <code>SolverMuJoCo</code> simulates the xArm7 with
+    POSITION_VELOCITY PD drives (the spline's velocity feeds forward, removing the classic
+    (k<sub>d</sub>/k<sub>e</sub>)&middot;q&#775; position-actuator lag &mdash; tracking error drops
+    5&times; to 0.07&nbsp;rad), gravity compensation, and the paper's effort limits.</li>
+    <li><strong>Coupling</strong>: <code>SolverCoupledProxy</code> runs the arm (MuJoCo) and rope (VBD)
+    as entries; the EE body is exposed to the VBD entry as a proxy, and the rope root attaches to the
+    handle tip by a cable joint owned by the VBD entry, so rope reaction forces feed back onto the arm.
+    The attachment holds to 2&nbsp;mm through the 5&nbsp;m/s whip.</li>
+  </ul>
+  <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/flying_knot_mujoco_main.mp4"></video>
+  <p class="caption">MuJoCo-coupled variant with the searched throw command: the dynamically driven arm
+  executes the whip with smooth, physical joint motion; the rope coils mid-air (transient writhe 2.7).</p>
+  <div class="video-pair">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_smoothness_sidebyside.mp4"></video>
+      <p class="caption">Throw at 5&times; slow motion, kinematic example (left) vs MuJoCo-coupled
+      example (right): the branch-flip twitches of the raw per-frame IK vanish under the C&sup2;
+      reference and dynamic tracking.</p>
+    </div>
+    <div>
+      <img src="assets/smoothness_comparison.png" alt="Smoothness comparison" style="width:100%; border:1px solid var(--line); border-radius:8px;">
+      <p class="caption">Max per-joint velocity/acceleration (log scale): peak joint velocity drops
+      112&rarr;11&nbsp;rad/s, acceleration 7,780&rarr;181&nbsp;rad/s&sup2;, jerk by 123&times;.</p>
+    </div>
+  </div>
+  <h3>Knot status in the coupled variant &mdash; honest assessment</h3>
+  <p>The tuned kinematic command does <em>not</em> knot under the coupled dynamics, and the reason is
+  instructive: the kinematic example's coil formation secretly relied on <em>prescribing the rope-root
+  orientation</em> along the trailing-velocity axis &mdash; effectively an unbounded wrist that snaps the
+  root axis at up to 4,800&nbsp;&deg;/s. A physical free-pivot attachment cannot transmit that input, and
+  the xArm7's wrist cannot reproduce it kinematically (adding an orientation objective drives IK to
+  100+&nbsp;rad/s branch flips). A cross-entropy search over B&eacute;zier control-point deltas plus
+  timing and tip mass (<code>command_search.py</code>, 96 rollouts &mdash; the offline analogue of the
+  paper's task-level ILC) recovers mid-air coiling to |writhe|&nbsp;2.7 (bundled as
+  <code>--command searched</code>), but the weighted tip does not yet thread the loop reliably.
+  Closing that gap likely requires the paper's actual rope-state-targeted ILC &mdash; consistent with
+  their core claim that open-loop replay does not survive a change of dynamics.</p>
+  <div class="callout warn">
+    <strong>Coupled-framework observations</strong> (all on <code>195454cc</code>, experimental API):
+    <ul>
+      <li>A <code>SolverCoupledProxy</code> with an <em>empty proxy list</em> silently breaks entry
+      stepping (arm PD tracking degrades by an order of magnitude); keeping a benign body proxy restores
+      it.</li>
+      <li>Prescribed kinematic bodies inside an entry snap back to their rest pose: entry output states
+      are reconciled over the parent state, and VBD leaves kinematic bodies untouched in its output.
+      Re-prescribing after <code>step()</code> keeps the pose exact, but the rope still receives
+      dt-dependent reduced energy from a prescribed root (tip speed drops ~2&times;, worse with more
+      substeps) &mdash; kinematic driving inside coupled entries needs first-class support.</li>
+      <li><code>Control.joint_target_qd</code> + <code>JointTargetMode.POSITION_VELOCITY</code> works
+      well through the coupled MuJoCo entry and is essential for fast tracking.</li>
+    </ul>
+  </div>
   <h2>In-flight cable PRs</h2>
   <p>This branch runs on plain <code>origin/main</code> (<code>31b06fe0</code>). JC Chang's (jumyungc)
   merged VBD-cable work is already in that baseline and this example depends on it (capsule COM origin
@@ -332,6 +400,7 @@
 git clone -b flying-knots https://github.com/eric-heiden/newton.git
 # Newton branch: flying-knots (off origin/main 31b06fe0)
 uv run -m newton.examples cable_flying_knot                      # interactive, knots by default
+uv run -m newton.examples cable_flying_knot_mujoco --command searched   # MuJoCo-coupled variant
 uv run -m newton.examples cable_flying_knot --viewer null --test --expect-knot
 uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the command from the figure
 uv run python scripts/flying_knot/sweep.py --grid basin --repeats 3   # success-rate sweeps
