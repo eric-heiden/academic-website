@@ -75,7 +75,7 @@
   with <code>SolverVBD</code> cable joints: an xArm7 bolted to a fixed pedestal replays the paper's
   throw trajectory and a simulated weighted rope ties itself into an overhand knot in under a second of
   motion.</p>
-  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-05 with the MuJoCo-coupled variant and 2026-07-03 with a
+  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-06: the MuJoCo-coupled variant now ties the knot fully dynamically (12/12). Earlier revisions: 2026-07-05 MuJoCo-coupled variant, 2026-07-03 a
   fixed pedestal (see <a href="#revision">Revision</a>). Newton branch
   <a href="https://github.com/eric-heiden/newton/tree/flying-knots"><code>flying-knots</code></a> off
   <code>origin/main</code> <code>31b06fe0</code>.</p>
@@ -278,8 +278,22 @@
     The attachment holds to 2&nbsp;mm through the 5&nbsp;m/s whip.</li>
   </ul>
   <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/flying_knot_mujoco_main.mp4"></video>
-  <p class="caption">MuJoCo-coupled variant with the searched throw command: the dynamically driven arm
-  executes the whip with smooth, physical joint motion; the rope coils mid-air (transient writhe 2.7).</p>
+  <p class="caption">MuJoCo-coupled variant with the searched throw command
+  (<code>--command searched</code>): the dynamically driven arm executes the whip with smooth, physical
+  joint motion, and the rope ties an overhand knot that locks in the hanging rope &mdash; fully dynamic
+  end to end.</p>
+  <div class="video-pair">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_mujoco_throw_slowmo.mp4"></video>
+      <p class="caption">Throw and capture at 4&times; slow motion, side view: loop opens, the tip
+      threads it, and the knot survives the landing.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_mujoco_knot_track.mp4"></video>
+      <p class="caption">Knot-tracking camera through formation, flight, and the lift that cinches the
+      knot against the tip weight.</p>
+    </div>
+  </div>
   <div class="video-pair">
     <div>
       <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_smoothness_sidebyside.mp4"></video>
@@ -293,18 +307,36 @@
       112&rarr;11&nbsp;rad/s, acceleration 7,780&rarr;181&nbsp;rad/s&sup2;, jerk by 123&times;.</p>
     </div>
   </div>
-  <h3>Knot status in the coupled variant &mdash; honest assessment</h3>
+  <h3>Getting the knot back: command search against the coupled dynamics</h3>
   <p>The tuned kinematic command does <em>not</em> knot under the coupled dynamics, and the reason is
   instructive: the kinematic example's coil formation secretly relied on <em>prescribing the rope-root
   orientation</em> along the trailing-velocity axis &mdash; effectively an unbounded wrist that snaps the
   root axis at up to 4,800&nbsp;&deg;/s. A physical free-pivot attachment cannot transmit that input, and
   the xArm7's wrist cannot reproduce it kinematically (adding an orientation objective drives IK to
-  100+&nbsp;rad/s branch flips). A cross-entropy search over B&eacute;zier control-point deltas plus
-  timing and tip mass (<code>command_search.py</code>, 96 rollouts &mdash; the offline analogue of the
-  paper's task-level ILC) recovers mid-air coiling to |writhe|&nbsp;2.7 (bundled as
-  <code>--command searched</code>), but the weighted tip does not yet thread the loop reliably.
-  Closing that gap likely requires the paper's actual rope-state-targeted ILC &mdash; consistent with
-  their core claim that open-loop replay does not survive a change of dynamics.</p>
+  100+&nbsp;rad/s branch flips). The throw command itself had to be re-derived for the coupled
+  dynamics.</p>
+  <p>A cross-entropy search over B&eacute;zier control-point deltas on all seven free control points plus
+  throw timing and tip mass (<code>command_search.py</code>, roughly 300 rollouts total &mdash; the
+  offline analogue of the paper's task-level ILC) found it. Two objective terms made the difference over
+  a first, failed search that only rewarded transient coiling: a <strong>threading-persistence</strong>
+  term (mean |writhe| held in the second <em>after</em> the throw &mdash; a coil that collapses scores
+  low, so the optimizer is pushed toward capture, not just coiling) and a <strong>dynamic-feasibility
+  penalty</strong> on the arm's joint tracking error, which keeps candidate commands executable by the
+  torque-limited MuJoCo arm. The winning command (bundled as <code>--command searched</code>) throws in
+  0.55&nbsp;s with a 40&nbsp;g tip &mdash; much closer to the paper's 18&nbsp;g than the kinematic
+  champion's 50&nbsp;g &mdash; and tracks with 0.058&nbsp;rad peak joint error.</p>
+  <div class="grid-cards">
+    <div class="card"><div class="label">Coupled-variant knot success (12 trials, incl. 9 under GPU contention)</div><div class="metric good">12/12</div></div>
+    <div class="card"><div class="label">Final writhe (locked overhand)</div><div class="metric good">+3.2&ndash;3.3</div></div>
+    <div class="card"><div class="label">Peak joint tracking error</div><div class="metric">0.058 rad</div></div>
+    <div class="card"><div class="label">Throw / tip weight</div><div class="metric">0.55 s / 40 g</div></div>
+  </div>
+  <p>One sensitivity worth recording: the command is tuned to its own C&sup2; reference, and re-solving
+  the IK at a finer target subdivision shifts the reference by millimeters &mdash; enough to fall off the
+  knot manifold. The IK discretization is therefore pinned alongside the command in the
+  <code>searched</code> preset: the reference trajectory <em>is</em> the command. This mirrors the
+  paper's central observation that flying-knot commands are precision events; their answer is per-system
+  ILC, ours is a per-system offline search with the same role.</p>
   <div class="callout warn">
     <strong>Coupled-framework observations</strong> (all on <code>195454cc</code>, experimental API):
     <ul>
@@ -400,7 +432,8 @@
 git clone -b flying-knots https://github.com/eric-heiden/newton.git
 # Newton branch: flying-knots (off origin/main 31b06fe0)
 uv run -m newton.examples cable_flying_knot                      # interactive, knots by default
-uv run -m newton.examples cable_flying_knot_mujoco --command searched   # MuJoCo-coupled variant
+uv run -m newton.examples cable_flying_knot_mujoco --command searched --expect-knot  # fully dynamic knot
+uv run python scripts/flying_knot/command_search.py    # re-derive the coupled-dynamics command
 uv run -m newton.examples cable_flying_knot --viewer null --test --expect-knot
 uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the command from the figure
 uv run python scripts/flying_knot/sweep.py --grid basin --repeats 3   # success-rate sweeps
