@@ -75,7 +75,7 @@
   with <code>SolverVBD</code> cable joints: an xArm7 bolted to a fixed pedestal replays the paper's
   throw trajectory and a simulated weighted rope ties itself into an overhand knot in under a second of
   motion.</p>
-  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-06: the MuJoCo-coupled variant now ties the knot fully dynamically (12/12). Earlier revisions: 2026-07-05 MuJoCo-coupled variant, 2026-07-03 a
+  <p class="stamp" id="stamp">Generated 2026-07-03 from CUDA runs on NVIDIA L40; revised 2026-07-07: high-resolution 72-segment cable preset resolves the knot shape (9/9); 2026-07-06: the MuJoCo-coupled variant ties the knot fully dynamically (12/12). Earlier revisions: 2026-07-05 MuJoCo-coupled variant, 2026-07-03 a
   fixed pedestal (see <a href="#revision">Revision</a>). Newton branch
   <a href="https://github.com/eric-heiden/newton/tree/flying-knots"><code>flying-knots</code></a> off
   <code>origin/main</code> <code>31b06fe0</code>.</p>
@@ -352,6 +352,50 @@
       well through the coupled MuJoCo entry and is essential for fast tracking.</li>
     </ul>
   </div>
+
+  <h3>Higher-resolution cable: resolving the knot shape</h3>
+  <p>The 36-segment rope ties reliably but renders the knot bundle as a dozen angular nodes. A
+  high-resolution preset (<code>--command searched-hires</code>) doubles the discretization to
+  <strong>72 segments (15.3&nbsp;mm at 5&nbsp;mm radius)</strong>. Three things were required:</p>
+  <ul>
+    <li><strong>Resolution-aware material scaling.</strong> Cable-joint stiffness and damping are
+    per-joint quantities: for the same physical rope (fixed EA, EI), they scale inversely with segment
+    length. <code>--rope-segments</code> now rescales them from the 36-segment reference automatically,
+    so resolution changes discretization, not the rope.</li>
+    <li><strong>Re-deriving the command.</strong> Even with correct scaling, the 36-segment command sits
+    on a razor-thin manifold: it still knots at 38 segments and misses at 40. A homotopy search
+    (36&rarr;48&rarr;60&rarr;72, each stage warm-started) recovered knotting commands, but the first
+    72-segment winners were <em>environment-marginal</em> &mdash; they reproduced deterministically
+    inside the search harness and missed deterministically from a fresh shell (the two contexts differ in
+    free GPU memory, enough to change low-level kernel behavior at floating-point level). The search now
+    scores <strong>basin membership</strong> &mdash; knotting candidates are re-evaluated at small
+    parameter perturbations and only basin interiors score fully &mdash; and verifies every new incumbent
+    with an independent re-run before accepting it.</li>
+    <li><strong>A finer solve at the cinch.</strong> The decisive fix was physical: at 15&nbsp;mm
+    segments the knot bundle involves twice as many self-contacts, and 10 VBD iterations at 32 substeps
+    under-resolve the capture, leaving the outcome at the mercy of floating-point noise. At
+    <strong>48 substeps and 16 VBD iterations</strong> the same command knots everywhere: 9/9 across
+    fresh shells and concurrent GPU load, writhe +3.2&ndash;3.4. The preset pins the solver settings,
+    IK discretization, cinch yank, and command together.</li>
+  </ul>
+  <figure>
+    <img src="assets/knot_resolution_comparison.png" alt="Knot centerline at 36 vs 72 segments">
+    <figcaption>Final hanging knot centerline, node-resolved: the 36-segment bundle is a coarse polygon
+    (12 nodes through the knot); at 72 segments the bundle is a smooth, well-formed overhand loop
+    (24 nodes). Same rope, same physics &mdash; twice the fidelity.</figcaption>
+  </figure>
+  <div class="video-pair">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_hires_main.mp4"></video>
+      <p class="caption">High-resolution variant, full sequence: 72 segments, 0.43&nbsp;s throw,
+      30&nbsp;g tip, cinch yank; fully dynamic MuJoCo arm.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/flying_knot_hires_knot_track.mp4"></video>
+      <p class="caption">Knot-tracking camera at 72 segments: the knot bundle forms, tightens against the
+      tip weight, and reads as a smooth overhand knot rather than a polygon.</p>
+    </div>
+  </div>
   <h2>In-flight cable PRs</h2>
   <p>This branch runs on plain <code>origin/main</code> (<code>31b06fe0</code>). JC Chang's (jumyungc)
   merged VBD-cable work is already in that baseline and this example depends on it (capsule COM origin
@@ -433,6 +477,7 @@ git clone -b flying-knots https://github.com/eric-heiden/newton.git
 # Newton branch: flying-knots (off origin/main 31b06fe0)
 uv run -m newton.examples cable_flying_knot                      # interactive, knots by default
 uv run -m newton.examples cable_flying_knot_mujoco --command searched --expect-knot  # fully dynamic knot
+uv run -m newton.examples cable_flying_knot_mujoco --command searched-hires --expect-knot  # 72-segment knot
 uv run python scripts/flying_knot/command_search.py    # re-derive the coupled-dynamics command
 uv run -m newton.examples cable_flying_knot --viewer null --test --expect-knot
 uv run python scripts/flying_knot/digitize_fttraj.py             # rebuild the command from the figure
