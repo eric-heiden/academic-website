@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neural connections inside Warp kernels · Reports · Eric Heiden</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2430;
+      --muted: #687283;
+      --line: #d9dee7;
+      --paper: #f7f5f0;
+      --panel: #fffdf8;
+      --accent: #0f766e;
+      --accent-2: #2563eb;
+      --warn: #92400e;
+      --bad: #991b1b;
+      --good-bg: #d1fae5;
+      --warn-bg: #fef3c7;
+      --bad-bg: #fee2e2;
+      --blue-bg: #dbeafe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    main {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 56px 0;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: baseline;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+      margin-bottom: 30px;
+    }
+    header a, a { color: var(--accent); text-decoration: none; }
+    h1 { margin: 0; font-size: clamp(1.9rem, 4vw, 2.8rem); line-height: 1.1; letter-spacing: 0; }
+    h2 { margin: 42px 0 14px; font-size: 1.35rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    h3 { margin: 24px 0 8px; font-size: 1.05rem; color: var(--muted); }
+    p, li { line-height: 1.62; font-size: 1rem; }
+    .meta, small { color: var(--muted); }
+    code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+    pre { background: #f0eee7; border-left: 3px solid var(--accent); padding: 12px 14px; overflow-x: auto; border-radius: 6px; }
+    .tldr {
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+      padding: 15px 18px;
+      border-radius: 4px;
+      margin-bottom: 22px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin: 16px 0 20px;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .metric strong { display: block; font-size: 1.35rem; margin-top: 4px; }
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      margin: 12px 0 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 0.93rem;
+    }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #efece4; color: #4b5563; font-weight: 650; font-size: 0.86rem; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .good { background: var(--good-bg); color: #065f46; font-weight: 650; }
+    .warn { background: var(--warn-bg); color: var(--warn); font-weight: 650; }
+    .caption { color: var(--muted); margin-top: -12px; font-size: 0.92rem; }
+    .audio-row { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0 20px; }
+    .audio-row figure { margin: 0; flex: 1 1 200px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+    .audio-row figcaption { font-size: 0.86rem; color: var(--muted); margin-bottom: 6px; }
+    .audio-row audio { width: 100%; }
+    .footnote { color: var(--muted); font-size: 0.86rem; border-top: 1px solid var(--line); margin-top: 38px; padding-top: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Neural connections inside Warp kernels</h1>
+    <a href="../">All reports</a>
+  </header>
+
+  <div class="meta">July 9, 2026 · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commit <code>8869f746</code>, based on main <code>3f387ad3</code>)</div>
+
+  <div class="tldr">
+    <p>
+      I prototyped <code>warp.patchbay</code>: intermediate values inside Warp kernels can be tagged as <em>named
+      wires</em> (<code>jack("drag.force", -C1 * v)</code>) and re-wired from Python without editing the kernel —
+      like plugging cables into a modular synthesizer. Wires can be patched with <code>@wp.func</code> nonlinearities
+      or tiny MLPs that are generated as Warp functions and inlined into the kernel as plain CUDA device functions
+      (no extra launches), probed into buffers, or connected across kernels with cables. Everything goes through
+      Warp's regular code generator, so each patch configuration is hashed and cached like an ordinary module and
+      remains fully differentiable: in the demos, a neural waveshaper is trained end-to-end <em>through a synthesizer
+      kernel</em>, and a NeuralSim-style residual drag network trained through a differentiable rollout reduces
+      trajectory error by 230× while recovering the true nonlinear force law.
+    </p>
+  </div>
+
+  <div class="grid">
+    <div class="metric">Kernel edits needed to re-wire<strong>0 lines</strong></div>
+    <div class="metric">MLP execution<strong>inlined CUDA func</strong></div>
+    <div class="metric">Neural damping trajectory MSE<strong>48.5 → 0.21</strong></div>
+    <div class="metric">Waveshaper MSE (sine→triangle)<strong>0.119 → 0.0007</strong></div>
+  </div>
+
+  <h2>1. Motivation</h2>
+  <p>
+    <a href="https://arxiv.org/abs/2011.04217">NeuralSim</a> augments differentiable simulators by letting variables
+    in the computational graph be replaced or corrected by neural networks ("neural scalars"): the analytical model
+    provides structure and priors, and small data-driven components capture what the equations miss (contact effects,
+    drag, actuator nonlinearities). The connection points are <em>named quantities</em> in the simulator, and the
+    augmentations are specified from the outside — the simulator code itself does not know which of its variables
+    will be learned.
+  </p>
+  <p>
+    <a href="https://github.com/NVIDIA/warp">Warp</a> kernels are a natural host for this idea, but Warp programs are
+    compiled Python functions: there is no graph object to splice a network into after the fact. The question this
+    prototype answers is how Warp's code generation can be adapted so that (a) kernels expose named variables, (b)
+    connections between those variables — optionally through NNs and nonlinearities — are declared externally, like a
+    modular synthesizer patchbay, and (c) the networks run <em>inside</em> the kernel as CUDA functions rather than as
+    separate kernel launches. That last point distinguishes this from
+    <a href="https://github.com/NVIDIA/warp-nn">warp-nn</a>, which provides compact CUDA-graphable network modules for
+    Warp pipelines at the kernel-launch level; here the network lives between two expressions of a single kernel, so
+    it can sit directly inside a simulation step, a per-sample audio path, or a per-ray shading computation.
+    The two are complementary: warp-nn-style layers could be used as the patched-in functions.
+  </p>
+
+  <h2>2. Design: jacks, patches, cables, probes</h2>
+  <p>
+    The user-facing model is a patchbay. A kernel declares named wires with <code>jack(name, expr)</code>; by default
+    a jack is a pass-through that compiles to nothing. All external re-wiring happens on a <code>Patchbay</code>
+    object:
+  </p>
+  <pre><code>from warp.patchbay import MLP, Patchbay, jack
+
+pb = Patchbay()
+
+@pb.kernel
+def step(x: wp.array(dtype=float), v: wp.array(dtype=float), ...):
+    i = wp.tid()
+    f_spring = -SPRING_K * x[i]
+    f_drag = jack("drag.force", -C1 * v[i])   # named wire, default: analytical model
+    ...
+
+pb.patch("drag.force", my_wp_func)            # insert a @wp.func into the wire
+pb.patch("drag.force", MLP((1, 16, 16, 1)), mode="add")   # residual neural augmentation
+pb.cable("lfo.out", "vco.freq", via=depth_fn, mode="add") # patch cord between two wires
+pb.probe("drag.force")                        # record the wire into a buffer
+pb.launch(step, dim=n, inputs=[x, v, ...])    # hidden params appended automatically</code></pre>
+  <table>
+    <tr><th>Primitive</th><th>Meaning</th><th>Modular-synth analogy</th></tr>
+    <tr><td><code>jack(name, expr)</code></td><td>named intermediate value with a default (pass-through / analytical model)</td><td>a jack socket with a normalled connection</td></tr>
+    <tr><td><code>pb.patch(name, f, mode)</code></td><td>insert <code>@wp.func</code> / <code>MLP</code> / chain into the wire; <code>replace</code>, <code>add</code> (residual), <code>mul</code></td><td>an insert effect</td></tr>
+    <tr><td><code>pb.cable(src, dst, via, mode)</code></td><td>route wire <code>src</code> (any kernel) into wire <code>dst</code>, optionally through a function/NN</td><td>a patch cable</td></tr>
+    <tr><td><code>pb.probe(name)</code> / <code>pb.read(name)</code></td><td>record every value flowing through the wire into a differentiable buffer</td><td>an oscilloscope tap</td></tr>
+  </table>
+  <p>
+    <code>MLP(dims, activation, ...)</code> is a tiny fully-connected network whose forward pass is <em>generated as a
+    <code>@wp.func</code></em> for the given architecture and whose weights live in one flat differentiable
+    <code>wp.array</code>. Patching the same <code>MLP</code> instance into several wires (even in different kernels)
+    shares weights. <code>zero_init_output=True</code> makes an <code>add</code>-mode patch start as an exact no-op,
+    so training begins from the analytical model — the NeuralSim recipe.
+  </p>
+
+  <h2>3. How Warp's codegen is adapted</h2>
+  <p>
+    Warp compiles kernels by transforming the Python AST of the decorated function
+    (<code>warp/_src/codegen.py</code>). Two existing hooks make external re-wiring possible without touching the
+    compiler itself: <code>wp.Kernel(func, ...)</code> can be constructed at runtime from any Python function in any
+    module, and <code>wp.static()</code> already demonstrates that codegen-time function binding (including
+    <code>wp.static(fn_map[key])(x)</code> dispatch) is hashed into the module so changed bindings trigger rebuilds.
+    The patchbay builds on the first hook with a specialization-by-regeneration scheme:
+  </p>
+  <ol>
+    <li><strong>AST rewrite.</strong> On launch, the kernel's source is parsed and a <code>NodeTransformer</code>
+      replaces each <code>jack("name", expr)</code> according to the current configuration: unpatched jacks become
+      <code>expr</code> (zero overhead); patched jacks become <code>fn(expr)</code>, <code>expr + net(theta, expr)</code>,
+      etc.; cable destinations read <code>buf[wp.tid()]</code>; probes wrap the value in a recording
+      <code>@wp.func</code>.</li>
+    <li><strong>Hidden parameters.</strong> Network weight arrays, cable buffers and probe buffers are appended to the
+      kernel signature as extra typed arguments. <code>pb.launch()</code> supplies them automatically, so the visible
+      launch signature never changes.</li>
+    <li><strong>Re-entry into Warp.</strong> The rewritten function is <code>exec</code>'d with the original globals
+      plus the bound functions (a <code>linecache</code> entry keeps <code>inspect.getsource</code> working) and
+      wrapped in <code>wp.Kernel(func, key=..., module=...)</code> with a module name derived from a hash of the patch
+      configuration. From here Warp's normal pipeline takes over: the patched <code>@wp.func</code>s are inlined,
+      adjoints are generated, and the module is hashed and cached — re-plugging a previous configuration reuses the
+      compiled binary instead of recompiling.</li>
+  </ol>
+  <p>
+    The specialized Python source is inspectable (<code>pb.source(kernel)</code>). For the neural-damping kernel with a
+    residual MLP patched into the drag wire:
+  </p>
+  <pre><code>def step_pb_68f1db63(x: wp.array(dtype=float), v: wp.array(dtype=float), ...,
+                     _pb_theta_1: _pb_arrayf):          # &lt;- hidden weights param
+    i = wp.tid()
+    f_spring = -SPRING_K * x[i]
+    f_drag = -C1 * v[i] + _pb_fn_2(_pb_theta_1, -C1 * v[i])   # &lt;- injected residual MLP
+    a = f_spring + f_drag
+    ...</code></pre>
+  <p>
+    And in the generated CUDA, the network is an ordinary device function called from the kernel body — Warp also
+    emits its adjoint (<code>adj__pb_mlp_...</code>) automatically, which is what makes in-place training work:
+  </p>
+  <pre><code>static CUDA_CALLABLE wp::float32 _pb_mlp_e07ed821_0(      // generated MLP forward
+    wp::array_t&lt;wp::float32&gt; var_theta, wp::float32 var_x) { ... }
+
+extern "C" __global__ void process_pb_8f5c91c8_..._cuda_kernel_forward(
+    wp::launch_bounds_t&lt;1&gt; dim,
+    wp::array_t&lt;wp::float32&gt; var_x,
+    wp::array_t&lt;wp::float32&gt; var_y,
+    wp::array_t&lt;wp::float32&gt; var__pb_theta_1)             // hidden weights param
+{
+    ...
+    var_2 = _pb_mlp_e07ed821_0(var__pb_theta_1, var_3);    // NN inlined in the kernel
+    wp::array_store(var_y, var_0, var_2);
+}</code></pre>
+  <p>
+    The MLP <code>@wp.func</code> itself is also produced by codegen-on-codegen: for a requested architecture, the
+    patchbay emits an unrolled fixed-size forward pass over <code>wp.vec</code> intermediates with literal weight
+    offsets into the flat parameter array, and registers it with <code>wp.func</code>. Architectures are cached, so a
+    thousand patched kernels with <code>MLP((1,16,16,1))</code> share one device function.
+  </p>
+  <h3>Alternatives considered</h3>
+  <ul>
+    <li><em><code>wp.static()</code> closure dispatch</em> — works for pure function substitution (bindings are hashed
+      into the module, so re-wiring triggers rebuilds), but cannot add the hidden weight/buffer parameters that
+      networks, cables, and probes need; the AST route subsumes it.</li>
+    <li><em>Runtime function pointers in CUDA</em> — Warp deliberately specializes all function calls at codegen time
+      (as does its <code>Callable</code> function-parameter feature), and indirect calls would break inlining and
+      adjoint generation. Compile-time specialization with caching keeps CUDA-graph capture and full performance.</li>
+    <li><em>NN as separate kernel launches (warp-nn style)</em> — right for larger networks and batched layers, but a
+      wire in the middle of a simulation step needs the network <em>between two expressions of the same thread</em>;
+      splitting the kernel at every wire would force materializing all intermediate state.</li>
+  </ul>
+
+  <h2>4. Workflow</h2>
+  <ol>
+    <li>Write kernels normally; wrap interesting quantities in <code>jack("module.wire", expr)</code> with their
+      analytical default. This is the only intrusion into simulation code, and it compiles to nothing until patched.</li>
+    <li>From outside, declare connections: <code>patch</code> nonlinearities or <code>MLP</code>s into wires
+      (replace/residual/gain), run <code>cable</code>s between wires across kernels, <code>probe</code> anything you
+      want to observe.</li>
+    <li>Launch through <code>pb.launch(...)</code>; the first launch of a new configuration specializes and compiles,
+      subsequent launches are ordinary cached kernel launches.</li>
+    <li>To train a patched network, record launches on a <code>wp.Tape</code> and step <code>net.theta</code> with
+      <code>warp.optim.Adam</code> — gradients flow through the inlined network adjoint like any other Warp code.</li>
+    <li>Re-plug at will: configurations are cached by hash, so A/B-ing "analytical vs. neural" is two launches.</li>
+  </ol>
+
+  <h2>5. Demo: a modular synthesizer with a learned waveshaper</h2>
+  <p>
+    <code>example_modular_synth.py</code> takes the metaphor literally: an LFO kernel and a VCO kernel expose jacks
+    (<code>lfo.out</code>, <code>vco.freq</code>, <code>vco.phase</code>, <code>vco.out</code>). Four configurations of
+    the <em>same unmodified kernels</em>: dry sine; a tremolo patch cable (<code>lfo.out → vco.out</code>,
+    <code>mode="mul"</code>); a <code>@wp.func</code> soft-clip insert; and an <code>MLP((1,16,16,1))</code> waveshaper
+    patched into <code>vco.out</code> and trained end-to-end through the synth kernel to turn the sine into a triangle
+    wave (MSE 0.119 → 0.0007 in 400 Adam iterations).
+  </p>
+  <img src="synth_waveforms.png" alt="Waveforms for the four patch configurations of the same oscillator kernel">
+  <p class="caption">One oscillator kernel, four external wirings. The bottom panel shows the trained neural waveshaper
+    tracking the triangle-wave target.</p>
+  <img src="synth_transfer.png" alt="Learned transfer curve vs ideal arcsine, and training loss">
+  <p class="caption">The trained network recovers the ideal sine→triangle transfer curve 2/π·asin(x) it was never told
+    about — it only ever saw waveform-matching loss through the kernel.</p>
+  <div class="audio-row">
+    <figure><figcaption>1. dry sine</figcaption><audio controls src="synth_dry.wav"></audio></figure>
+    <figure><figcaption>2. tremolo cable</figcaption><audio controls src="synth_tremolo.wav"></audio></figure>
+    <figure><figcaption>3. soft-clip patch</figcaption><audio controls src="synth_softclip.wav"></audio></figure>
+    <figure><figcaption>4. neural waveshaper</figcaption><audio controls src="synth_neural.wav"></audio></figure>
+    <figure><figcaption>5. neural + vibrato cable</figcaption><audio controls src="synth_neural_vibrato.wav"></audio></figure>
+  </div>
+
+  <h2>6. Demo: NeuralSim-style hybrid simulation</h2>
+  <p>
+    <code>example_neural_damping.py</code> reproduces the NeuralSim recipe on a differentiable oscillator. The
+    simulation kernel models a spring with viscous damping and tags the drag force:
+    <code>f_drag = jack("drag.force", -C1 * v[i])</code>. The "real" system has additional quadratic aerodynamic drag
+    (−C2·v|v|) the analytical model doesn't know about — ground truth is generated by patching a known
+    <code>@wp.func</code> into the same wire. A zero-initialized residual MLP is then patched in
+    (<code>mode="add"</code>, so training starts from the analytical model) and trained through 250-step
+    differentiable rollouts of 16 trajectories.
+  </p>
+  <img src="damping_trajectories.png" alt="Ground truth vs analytical-only vs neural-augmented trajectories">
+  <p class="caption">The analytical model (dashed) under-damps badly; the neural-augmented hybrid (magenta) tracks the
+    ground truth (black) after training.</p>
+  <img src="damping_force.png" alt="Learned drag force law vs true law, and training loss">
+  <p class="caption">Left: evaluating the patched wire over a velocity sweep shows the network recovered the true
+    nonlinear force law −C1·v − C2·v|v| within the training regime (|v| ≲ 2.5). Right: trajectory MSE over 800 Adam
+    iterations.</p>
+  <table>
+    <tr><th>Model of the drag wire</th><th class="num">Trajectory MSE (sum over 250 steps × 16 traj.)</th></tr>
+    <tr><td>analytical only: −C1·v</td><td class="num warn">48.48</td></tr>
+    <tr><td>analytical + trained MLP(1,16,16,1) residual</td><td class="num good">0.21</td></tr>
+  </table>
+
+  <h2>7. Status, limitations, next steps</h2>
+  <ul>
+    <li><strong>Status.</strong> ~470-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 5 unit
+      tests passing on CPU and CUDA (pass-through, re-wiring, add-mode, MLP forward vs. NumPy reference + gradient
+      flow, probe/cable routing), 3 runnable examples. No changes to Warp's compiler were required — which is itself a
+      finding: <code>wp.Kernel</code>'s runtime-construction path plus AST transformers are sufficient hooks.</li>
+    <li><strong>Wire types.</strong> Prototype wires are <code>float</code>; <code>MLP</code> already supports
+      <code>wp.vec</code> inputs/outputs, but probes/cables assume scalar wires and 1D launches indexed by
+      <code>wp.tid()</code>. Generalizing to vec/matrix wires and multi-dim launches is mechanical.</li>
+    <li><strong>Cable semantics.</strong> Cables route through probe buffers, so a source must be launched before its
+      destination (same-launch, same-thread cables within one kernel work but reuse of a probe buffer across steps
+      inside one tape can double-count adjoints — the residual-patch path avoids this and is the recommended pattern
+      for training loops).</li>
+    <li><strong>Recompilation granularity.</strong> The configuration hash is currently patchbay-global; scoping it to
+      the jacks a kernel actually contains would avoid some spurious respecializations.</li>
+    <li><strong>Next steps.</strong> Tile-based <code>MLP</code> forward for wider networks
+      (Warp's <code>example_tile_mlp.py</code> shows the pattern); warp-nn interop so its trained modules can be
+      patched into wires; automatic augmentation discovery à la NeuralSim §V (probe all wires, sparsify which
+      connections a network is allowed to use); CUDA-graph capture of train loops (all launches are graphable since
+      specialization happens before capture).</li>
+  </ul>
+
+  <h2>8. Reproducing</h2>
+  <pre><code>git clone https://github.com/NVIDIA/warp && cd warp
+git checkout eric/neural-connections   # worktree branch, based on main 3f387ad3
+python build_lib.py
+python -m warp.tests.test_patchbay
+python -m warp.examples.patchbay.example_hello_patchbay
+python -m warp.examples.patchbay.example_modular_synth  --device cuda:0 --outdir out
+python -m warp.examples.patchbay.example_neural_damping --device cuda:0 --train_iters 800 --outdir out</code></pre>
+
+  <div class="footnote">
+    Prototype and report generated with Claude Code on July 9, 2026. Hardware: RTX PRO 6000 Blackwell (MIG 1g.24gb),
+    CUDA 12.6, Warp 1.16.0.dev0. References: Heiden et al., <em>NeuralSim: Augmenting Differentiable Simulators with
+    Neural Networks</em>, ICRA 2021 (<a href="https://arxiv.org/abs/2011.04217">arXiv:2011.04217</a>);
+    <a href="https://github.com/NVIDIA/warp-nn">NVIDIA warp-nn</a>; <a href="https://github.com/NVIDIA/warp">NVIDIA Warp</a>.
+  </div>
+</main>
+</body>
+</html>
