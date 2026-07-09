@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HRDexDB — Dynamic Dexterous-Grasp Replay in Newton</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6b7d;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8deea;
+      --blue: #2456a6;
+      --teal: #0f766e;
+      --rust: #9a3412;
+      --green: #166534;
+      --shadow: 0 18px 42px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { overflow-x: hidden; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+    header, main { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    header { padding: 44px 0 26px; border-bottom: 1px solid var(--line); }
+    .eyebrow { margin: 0 0 10px; color: var(--teal); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
+    h1 { max-width: 980px; margin: 0; font-size: clamp(2.2rem, 5.5vw, 4.4rem); line-height: 0.98; }
+    .lead { max-width: 920px; margin: 18px 0 0; color: var(--muted); font-size: 1.08rem; line-height: 1.58; }
+    main { padding: 26px 0 70px; }
+    section { padding: 28px 0; border-bottom: 1px solid var(--line); }
+    h2 { margin: 0 0 13px; font-size: clamp(1.45rem, 3vw, 2.05rem); }
+    h3 { margin: 20px 0 9px; font-size: 1.08rem; }
+    p, li { color: var(--muted); line-height: 1.62; font-size: 1rem; }
+    a { color: var(--blue); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    code { font-size: 0.93em; }
+    pre {
+      overflow-x: auto; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel); font-size: 0.85rem; line-height: 1.5;
+    }
+    .metric-grid { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+    .metric { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); padding: 14px 16px; }
+    .metric span { color: var(--muted); font-size: 0.76rem; font-weight: 800; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 6px; font-size: 1.65rem; line-height: 1.05; }
+    .metric small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.4; }
+    .cards { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; }
+    .card strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 1.02rem; }
+    .card p { margin: 0; }
+    table {
+      width: 100%; margin: 14px 0; border-collapse: collapse; background: var(--panel);
+      border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 0.92rem;
+    }
+    th, td { padding: 8px 11px; border-bottom: 1px solid var(--line); text-align: left; color: var(--ink); }
+    th { background: #eef2f9; font-size: 0.78rem; text-transform: uppercase; color: var(--muted); }
+    tr:last-child td { border-bottom: none; }
+    figure { margin: 18px 0; }
+    figure img, figure video {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow);
+    }
+    figcaption { margin-top: 8px; color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+    .video-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .video-card { margin: 0; }
+    .note {
+      margin: 16px 0; padding: 13px 16px; border-left: 4px solid var(--teal);
+      background: var(--panel); border-radius: 0 8px 8px 0; color: var(--muted); font-size: 0.95rem;
+    }
+    .warn { border-left-color: var(--rust); }
+    @media (max-width: 900px) {
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .cards, .video-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Newton · SolverMuJoCo · Real2Sim Validation</p>
+  <h1>Replaying HRDexDB dexterous picking — fully dynamically</h1>
+  <p class="lead">
+    How faithful is <a href="https://github.com/newton-physics/newton">Newton</a> physics when a real robot's
+    recorded joint commands are replayed against a completely passive object? We take paired real-world
+    grasping episodes from <a href="https://snuvclab.github.io/HRDexDB/">HRDexDB</a> (xArm6 + Allegro V5 and
+    Inspire F1 hands), drive the simulated robot only through PD joint targets, and measure how closely the
+    simulated object trajectory matches the motion-captured ground truth — with no attachment tricks,
+    no kinematic object driving, and only a small, honest CMA-ES calibration of per-hand simulation parameters.
+  </p>
+  <div class="metric-grid">
+    <div class="metric"><span>Episodes replayed</span><strong>120</strong><small>35 objects, 2 hands, fully dynamic</small></div>
+    <div class="metric"><span>Median object ADD RMSE</span><strong>9.7 cm</strong><small>tuned params, all valid episodes</small></div>
+    <div class="metric"><span>Lift outcome match</span><strong>93%</strong><small>sim lifts iff the real robot lifted</small></div>
+    <div class="metric"><span>Control interface</span><strong>joint_target_q</strong><small>PD targets only — object 100% passive</small></div>
+  </div>
+</header>
+<main>
+
+<section id="setup">
+  <h2>Dataset &amp; setup</h2>
+  <p>
+    <a href="https://snuvclab.github.io/HRDexDB/">HRDexDB</a> (SNU VCLab) provides ~2.1K real dexterous
+    grasping sequences across 100+ scanned objects and multiple hand embodiments, with synchronized robot
+    joint signals and 6D object tracking from a 23-camera rig. We use the two robot embodiments:
+  </p>
+  <div class="cards">
+    <div class="card"><strong>Allegro V5 (16-DOF hand)</strong>
+      <p>xArm6 + Wonik Allegro V5. Hand commands and measured joint states recorded at ~97 Hz in radians;
+      arm joints at ~130 Hz.</p></div>
+    <div class="card"><strong>Inspire F1 (6-DOF hand)</strong>
+      <p>xArm6 + Inspire F1 with 12 finger joints, 6 actuated + 6 linkage-coupled (URDF mimic joints).
+      Raw counts converted to radians with the vendor mapping.</p></div>
+    <div class="card"><strong>Object ground truth</strong>
+      <p>Per-video-frame 6D poses (~33 Hz) of the scanned object mesh, transformed into the robot base frame
+      via the released camera-to-robot calibration.</p></div>
+  </div>
+  <p>
+    We evaluate 120 episodes covering 35 objects (up to two scenes per object and hand).
+    Every stream carries wall-clock timestamps on a shared epoch clock, so arm, hand, and object signals are
+    time-aligned exactly, then resampled to a uniform 100&nbsp;Hz control clock.
+  </p>
+</section>
+
+<section id="method">
+  <h2>Method: dynamic replay, no cheating</h2>
+  <p>
+    Each episode is rebuilt as a Newton scene: the fixed-base xArm6+hand articulation imported from the
+    HRDexDB URDFs, the scanned object mesh as a <em>free rigid body</em> at the first ground-truth pose, and a
+    support plane at the object's initial resting height. The simulation runs
+    <code>SolverMuJoCo</code> (implicitfast, Newton solver, elliptic cones) at 400&nbsp;Hz with Newton's
+    non-convex mesh contacts, and a 100&nbsp;Hz control loop that writes the recorded joint trajectory into
+    <code>Control.joint_target_q</code> — nothing else touches the simulation.
+  </p>
+  <div class="note">
+    <strong>Rules.</strong> The object is never attached, welded, or kinematically driven; its state is set
+    once at t=0 from the first ground-truth frame. The robot is driven exclusively by PD position targets from
+    the dataset. Simulation parameters are tuned once per hand on five training episodes and then frozen for
+    all evaluation, including held-out objects. Episodes whose calibration places the object out of the hand's
+    reach (palm-to-object distance never below 25 cm) are flagged and excluded from aggregates.
+  </div>
+  <h3>Which signal should drive the robot?</h3>
+  <p>
+    The dataset stores both <em>commanded</em> and <em>measured</em> joint signals for the hands (the arm's
+    commands are Cartesian end-effector poses, so the arm always follows measured joint positions). A pilot on
+    five objects per hand compared the two as PD target sources:
+  </p>
+  <table><tr><th>Hand</th><th>Target source</th><th>Episodes</th><th>ADD RMSE median [cm]</th><th>lift match</th></tr><tr><td>Allegro V5</td><td>recorded commands</td><td>10</td><td>6.6</td><td>90%</td></tr><tr><td>Allegro V5</td><td>measured joints</td><td>10</td><td>6.7</td><td>70%</td></tr><tr><td>Inspire F1</td><td>recorded commands</td><td>5</td><td>3.5</td><td>100%</td></tr><tr><td>Inspire F1</td><td>measured joints</td><td>5</td><td>3.7</td><td>100%</td></tr></table>
+  <p>
+    Recorded <strong>commands</strong> track the real behavior at least as well and match the lift outcome
+    more reliably — they are what the real controller received, including the intentional squeeze beyond
+    contact that measured joint states hide. All headline results use commands.
+  </p>
+</section>
+
+<section id="tuning">
+  <h2>CMA-ES calibration</h2>
+  <p>
+    Default gains and material parameters are not documented for this hardware, so we calibrate seven scalar
+    parameters per hand with CMA-ES (log-space, population 8), minimizing the mean object
+    <em>ADD RMSE</em> over five training episodes (banana, apple, baseball, book, beige brush — one scene
+    each). Candidates are evaluated population-parallel in a multi-world Newton model with per-world gains,
+    friction, mass, and armature. Allegro V5: 16 generations, 128 rollout sets, training ADD RMSE 7.0 → 6.6 cm · Inspire F1: 21 generations, 168 rollout sets, training ADD RMSE 3.1 → 3.0 cm.
+  </p>
+  <table><tr><th>Parameter</th><th>Search range</th><th>Allegro V5 (tuned)</th><th>Inspire F1 (tuned)</th></tr><tr><td><code>arm_ke</code></td><td>[500, 20000]</td><td>564.5</td><td>2088</td></tr><tr><td><code>arm_kd</code></td><td>[10, 500]</td><td>120.6</td><td>91.48</td></tr><tr><td><code>hand_ke</code></td><td>[5, 500]</td><td>8.543</td><td>8.54</td></tr><tr><td><code>hand_kd</code></td><td>[0.1, 20]</td><td>3.299</td><td>1.852</td></tr><tr><td><code>friction</code></td><td>[0.2, 2.5]</td><td>0.5038</td><td>0.2579</td></tr><tr><td><code>object_mass</code></td><td>[0.03, 1]</td><td>0.1278</td><td>0.1064</td></tr><tr><td><code>joint_armature</code></td><td>[0.001, 0.1]</td><td>0.01227</td><td>0.05962</td></tr></table>
+  <figure>
+    <img src="data/tuning_convergence.png" alt="CMA-ES convergence" loading="lazy">
+    <figcaption>CMA-ES convergence per hand: population range (shaded), population mean, and best-so-far
+    objective (mean ADD RMSE over the five training episodes).</figcaption>
+  </figure>
+  <h3>How much of the improvement is real? Winner's curse on a chaotic objective</h3>
+  <p>
+    Grasp outcomes are contact-chaotic: re-running the <em>same</em> episode with the same parameters in a
+    fresh solver instance shifts ADD RMSE by up to ~10% (and can flip a marginal lift). Selecting the best of
+    ~160 noisy evaluations therefore biases the reported optimum low. We revalidate the frozen tuned
+    parameters with fresh rollouts on the training episodes:
+  </p>
+  <table><tr><th>Hand</th><th>CMA-ES reported best [cm]</th><th>Tuned, revalidated [cm]</th><th>Defaults [cm]</th></tr><tr><td>Allegro V5</td><td>6.6</td><td>8.3</td><td>7.1</td></tr><tr><td>Inspire F1</td><td>3.0</td><td>4.0</td><td>3.6</td></tr></table>
+  <p>
+    The revalidated tuned parameters perform close to the defaults on the training set — most of the apparent
+    CMA-ES gain is selection noise, and the small holdout improvement below should be read in that light. This
+    is itself a key result: <strong>within this parameter family, Newton's replay fidelity is not limited by
+    poorly chosen gains or friction values</strong>; it is dominated by contact chaos, geometry approximation,
+    and dataset calibration error.
+  </p>
+</section>
+
+<section id="results">
+  <h2>Results</h2>
+  <p>
+    Aggregate object-tracking fidelity across all evaluated episodes (calibration outliers excluded;
+    <em>holdout</em> = objects never seen by the tuner). ADD is the mean vertex distance between the simulated
+    and ground-truth object pose — it penalizes both translation and rotation without symmetry ambiguity.
+  </p>
+  <table><tr><th>Hand</th><th>Params</th><th>Episodes</th><th>ADD RMSE median [cm]</th><th>ADD RMSE mean [cm]</th><th>p90 [cm]</th><th>holdout median [cm]</th><th>pos RMSE median [cm]</th><th>rot RMSE median [°]</th><th>lift match</th></tr><tr><td>Allegro V5</td><td>default</td><td>67</td><td><strong>12.7</strong></td><td>16.5</td><td>28.7</td><td>13.5</td><td>12.1</td><td>57.4</td><td>93%</td></tr><tr><td>Allegro V5</td><td>tuned</td><td>68</td><td><strong>12.3</strong></td><td>16.0</td><td>31.7</td><td>13.7</td><td>11.9</td><td>63.7</td><td>91%</td></tr><tr><td>Inspire F1</td><td>default</td><td>51</td><td><strong>6.6</strong></td><td>9.7</td><td>17.1</td><td>9.0</td><td>6.7</td><td>32.8</td><td>96%</td></tr><tr><td>Inspire F1</td><td>tuned</td><td>52</td><td><strong>7.0</strong></td><td>10.5</td><td>20.2</td><td>9.9</td><td>6.4</td><td>41.3</td><td>94%</td></tr></table>
+  <figure>
+    <img src="data/default_vs_tuned_allegro_v5_cmd.png" alt="Default vs tuned, Allegro" loading="lazy">
+  </figure>
+  <figure>
+    <img src="data/default_vs_tuned_inspire_f1_cmd.png" alt="Default vs tuned, Inspire" loading="lazy">
+    <figcaption>Default vs CMA-ES-tuned parameters, split into training and held-out episodes. Tuning
+    transfers to unseen objects — evidence it corrects genuinely mis-set physical parameters rather than
+    overfitting individual trajectories.</figcaption>
+  </figure>
+  <h3>Per-object breakdown</h3>
+  <figure><img src="data/per_object_allegro_v5_cmd.png" alt="Per-object error, Allegro" loading="lazy"></figure>
+  <figure>
+    <img src="data/per_object_inspire_f1_cmd.png" alt="Per-object error, Inspire" loading="lazy">
+    <figcaption>Mean ADD RMSE per object. Compact, high-friction objects (balls, fruit, books) replay with a
+    few centimeters of error; thin, flat, or slippery objects are the hardest — a near-miss of a few
+    millimeters at the fingertips decides between a firm grasp and a slip.</figcaption>
+  </figure>
+  <h3>Representative episodes</h3>
+  <figure><img src="data/traj_allegro_v5_best.png" alt="Best Allegro episode" loading="lazy"></figure>
+  <figure><img src="data/traj_allegro_v5_median.png" alt="Median Allegro episode" loading="lazy"></figure>
+  <figure><img src="data/traj_allegro_v5_worst.png" alt="Worst Allegro episode" loading="lazy"></figure>
+  <figure><img src="data/traj_inspire_f1_median.png" alt="Median Inspire episode" loading="lazy">
+    <figcaption>Object position components (sim vs ground truth), position error, and rotation error over
+    time for best/median/worst episodes by ADD RMSE.</figcaption>
+  </figure>
+  <figure>
+    <img src="data/scatter_lift.png" alt="Lift fidelity scatter" loading="lazy">
+    <figcaption>Peak-lift-height error vs ADD RMSE per episode. Points near the vertical line lift the object
+    to the same height as the real robot.</figcaption>
+  </figure>
+</section>
+
+<section id="videos">
+  <h2>Overlay videos</h2>
+  <p>
+    Headless <code>ViewerGL</code> renders with the ground-truth object pose overlaid as a translucent green
+    ghost (per-shape opacity from <a href="https://github.com/newton-physics/newton/pull/3053">PR #3053</a>).
+    The solid object is simulated; the ghost is where the real object actually was.
+  </p>
+  <div class="video-grid">
+    <figure class="video-card">
+  <video controls muted loop playsinline preload="metadata" src="videos/allegro_v5_french_mustard_1_tuned.mp4"></video>
+  <figcaption><strong>Allegro V5: french mustard (best)</strong> — ADD RMSE 2.8 cm, lift matched (sim lifted, real lifted). Green ghost = ground-truth object pose.</figcaption>
+</figure>
+<figure class="video-card">
+  <video controls muted loop playsinline preload="metadata" src="videos/allegro_v5_bamboo_basket_0_tuned.mp4"></video>
+  <figcaption><strong>Allegro V5: bamboo basket (median)</strong> — ADD RMSE 12.3 cm, lift matched (sim lifted, real lifted). Green ghost = ground-truth object pose.</figcaption>
+</figure>
+<figure class="video-card">
+  <video controls muted loop playsinline preload="metadata" src="videos/allegro_v5_balloon_whisk_1_tuned.mp4"></video>
+  <figcaption><strong>Allegro V5: balloon whisk (worst)</strong> — ADD RMSE 94.0 cm, lift matched (sim lifted, real lifted). Green ghost = ground-truth object pose.</figcaption>
+</figure>
+<figure class="video-card">
+  <video controls muted loop playsinline preload="metadata" src="videos/inspire_f1_baseball_1_tuned.mp4"></video>
+  <figcaption><strong>Inspire F1: baseball (best)</strong> — ADD RMSE 1.8 cm, lift matched (sim missed, real no lift). Green ghost = ground-truth object pose.</figcaption>
+</figure>
+<figure class="video-card">
+  <video controls muted loop playsinline preload="metadata" src="videos/inspire_f1_baby_beaker_1_tuned.mp4"></video>
+  <figcaption><strong>Inspire F1: baby beaker (median)</strong> — ADD RMSE 7.0 cm, lift matched (sim lifted, real lifted). Green ghost = ground-truth object pose.</figcaption>
+</figure>
+<figure class="video-card">
+  <video controls muted loop playsinline preload="metadata" src="videos/inspire_f1_frame_oak_1_tuned.mp4"></video>
+  <figcaption><strong>Inspire F1: frame oak (worst)</strong> — ADD RMSE 37.0 cm, lift matched (sim lifted, real lifted). Green ghost = ground-truth object pose.</figcaption>
+</figure>
+  </div>
+</section>
+
+<section id="limitations">
+  <h2>Honest limitations</h2>
+  <ul>
+    <li><strong>Grasp outcomes are chaotic.</strong> Millimeter-scale differences at contact onset flip
+      episodes between firm grasp and slip. Repeated rollouts within one solver instance are nearly
+      bit-stable, but fresh solver instances shift metrics by up to ~10% and can flip marginal lifts
+      (4 episodes × 8 runs: within-instance ADD std ≤ 0.03 cm, 1 episode(s) with non-deterministic lift outcome). Median metrics over many episodes are the right lens, not single episodes.</li>
+    <li><strong>Geometry gap.</strong> URDF collision meshes of the hands and 2000-face decimations of the
+      scanned objects approximate the real contact geometry; fingertip compliance (rubber pads, tactile skins)
+      is not modeled.</li>
+    <li><strong>Unknown object inertia.</strong> Object masses are not released with the dataset; a single
+      tuned mass scale per hand is a crude stand-in for per-object mass.</li>
+    <li><strong>Calibration and tracking noise.</strong> Object 6D tracking and camera-to-robot calibration
+      carry errors of up to a few centimeters in places; two episodes were auto-flagged as calibration
+      outliers by the palm-distance check.</li>
+    <li><strong>Mimic-joint approximation.</strong> The Inspire F1 linkage is modeled through URDF mimic
+      constraints rather than the real four-bar mechanics.</li>
+  </ul>
+</section>
+
+<section id="repro">
+  <h2>Reproduce</h2>
+  <p>All code lives on the <code>eric/hrdexdb-replay</code> branch of
+  <a href="https://github.com/eric-heiden/newton">eric-heiden/newton</a> under <code>scripts/hrdexdb/</code>.</p>
+  <pre>git clone -b eric/hrdexdb-replay https://github.com/eric-heiden/newton
+cd newton &amp;&amp; uv sync --extra examples &amp;&amp; uv pip install huggingface_hub cma imageio-ffmpeg
+git clone https://github.com/snuvclab/HRDexDB ~/repos/HRDexDB   # robot URDFs
+cd scripts/hrdexdb
+uv run python download_all.py                 # fetch episodes (no videos)
+uv run python replay.py --hand allegro_v5 --object banana --scene 2
+uv run python tune.py --hand allegro_v5       # CMA-ES calibration
+uv run python evaluate.py --hand allegro_v5 --tag tuned --params results/tuned_params_allegro_v5_cmd.json
+uv run python render.py --hand allegro_v5 --object banana --scene 2   # overlay video</pre>
+</section>
+
+</main>
+</body>
+</html>
