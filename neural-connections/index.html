@@ -110,7 +110,7 @@
     <a href="../">All reports</a>
   </header>
 
-  <div class="meta">July 9, 2026 · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commit <code>8869f746</code>, based on main <code>3f387ad3</code>)</div>
+  <div class="meta">July 9, 2026 (updated July 10) · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commits <code>8869f746</code>, <code>947d1493</code>, based on main <code>3f387ad3</code>)</div>
 
   <div class="tldr">
     <p>
@@ -118,11 +118,14 @@
       wires</em> (<code>jack("drag.force", -C1 * v)</code>) and re-wired from Python without editing the kernel —
       like plugging cables into a modular synthesizer. Wires can be patched with <code>@wp.func</code> nonlinearities
       or tiny MLPs that are generated as Warp functions and inlined into the kernel as plain CUDA device functions
-      (no extra launches), probed into buffers, or connected across kernels with cables. Everything goes through
-      Warp's regular code generator, so each patch configuration is hashed and cached like an ordinary module and
-      remains fully differentiable: in the demos, a neural waveshaper is trained end-to-end <em>through a synthesizer
-      kernel</em>, and a NeuralSim-style residual drag network trained through a differentiable rollout reduces
-      trajectory error by 230× while recovering the true nonlinear force law.
+      (no extra launches), probed into buffers, connected across kernels with cables, or — via
+      <code>inputs=</code> — driven by <em>other</em> named wires, reproducing NeuralSim's neural-scalar connections.
+      Everything goes through Warp's regular code generator, so each patch configuration is hashed and cached like an
+      ordinary module and remains fully differentiable. In the demos, a neural waveshaper is trained end-to-end
+      <em>through a synthesizer kernel</em>; a residual drag network trained through a differentiable rollout reduces
+      trajectory error by 230× while recovering the true nonlinear force law; and for a puck sliding on a table with
+      spatially varying friction, a network patched between the position wires and the friction wire recovers the full
+      friction heatmap (map MAE 0.094 → 0.011) where the analytical simulator only has one constant μ.
     </p>
   </div>
 
@@ -130,7 +133,7 @@
     <div class="metric">Kernel edits needed to re-wire<strong>0 lines</strong></div>
     <div class="metric">MLP execution<strong>inlined CUDA func</strong></div>
     <div class="metric">Neural damping trajectory MSE<strong>48.5 → 0.21</strong></div>
-    <div class="metric">Waveshaper MSE (sine→triangle)<strong>0.119 → 0.0007</strong></div>
+    <div class="metric">Friction map MAE (const → learned)<strong>0.094 → 0.011</strong></div>
   </div>
 
   <h2>1. Motivation</h2>
@@ -174,6 +177,8 @@ def step(x: wp.array(dtype=float), v: wp.array(dtype=float), ...):
 
 pb.patch("drag.force", my_wp_func)            # insert a @wp.func into the wire
 pb.patch("drag.force", MLP((1, 16, 16, 1)), mode="add")   # residual neural augmentation
+pb.patch("contact.mu", MLP((2, 32, 32, 1)), mode="add",   # neural scalars: other wires
+         inputs=("puck.x", "puck.y"))                     #   feed the network
 pb.cable("lfo.out", "vco.freq", via=depth_fn, mode="add") # patch cord between two wires
 pb.probe("drag.force")                        # record the wire into a buffer
 pb.launch(step, dim=n, inputs=[x, v, ...])    # hidden params appended automatically</code></pre>
@@ -181,6 +186,7 @@ pb.launch(step, dim=n, inputs=[x, v, ...])    # hidden params appended automatic
     <tr><th>Primitive</th><th>Meaning</th><th>Modular-synth analogy</th></tr>
     <tr><td><code>jack(name, expr)</code></td><td>named intermediate value with a default (pass-through / analytical model)</td><td>a jack socket with a normalled connection</td></tr>
     <tr><td><code>pb.patch(name, f, mode)</code></td><td>insert <code>@wp.func</code> / <code>MLP</code> / chain into the wire; <code>replace</code>, <code>add</code> (residual), <code>mul</code></td><td>an insert effect</td></tr>
+    <tr><td><code>pb.patch(..., inputs=(a, b))</code></td><td>feed the inserted function the values of <em>other</em> named wires (packed into a <code>wp.vec</code>) — NeuralSim's neural scalars, where the network's inputs and the augmented quantity are different named variables</td><td>a CV input driven from other jacks</td></tr>
     <tr><td><code>pb.cable(src, dst, via, mode)</code></td><td>route wire <code>src</code> (any kernel) into wire <code>dst</code>, optionally through a function/NN</td><td>a patch cable</td></tr>
     <tr><td><code>pb.probe(name)</code> / <code>pb.read(name)</code></td><td>record every value flowing through the wire into a differentiable buffer</td><td>an oscilloscope tap</td></tr>
   </table>
@@ -205,8 +211,9 @@ pb.launch(step, dim=n, inputs=[x, v, ...])    # hidden params appended automatic
     <li><strong>AST rewrite.</strong> On launch, the kernel's source is parsed and a <code>NodeTransformer</code>
       replaces each <code>jack("name", expr)</code> according to the current configuration: unpatched jacks become
       <code>expr</code> (zero overhead); patched jacks become <code>fn(expr)</code>, <code>expr + net(theta, expr)</code>,
-      etc.; cable destinations read <code>buf[wp.tid()]</code>; probes wrap the value in a recording
-      <code>@wp.func</code>.</li>
+      etc.; with <code>inputs=</code>, the default expressions of the named input jacks are inlined at the patch site
+      (packed into a <code>wp.vec</code>); cable destinations read <code>buf[wp.tid()]</code>; probes wrap the value in
+      a recording <code>@wp.func</code>.</li>
     <li><strong>Hidden parameters.</strong> Network weight arrays, cable buffers and probe buffers are appended to the
       kernel signature as extra typed arguments. <code>pb.launch()</code> supplies them automatically, so the visible
       launch signature never changes.</li>
@@ -324,12 +331,65 @@ extern "C" __global__ void process_pb_8f5c91c8_..._cuda_kernel_forward(
     <tr><td>analytical + trained MLP(1,16,16,1) residual</td><td class="num good">0.21</td></tr>
   </table>
 
-  <h2>7. Status, limitations, next steps</h2>
+  <h2>7. Demo: recovering a spatial friction map (puck on a table)</h2>
+  <p>
+    <code>example_neural_friction.py</code> extends the NeuralSim recipe to <em>spatially varying</em> unmodeled
+    physics — the tabletop scenario you would set up in <a href="https://github.com/newton-physics/newton">Newton</a>:
+    a puck slides on a table, pushed from random positions in random directions (256 pucks, 150-step rollouts). The
+    real table has position-dependent friction μ(x, y) — two high-friction patches plus a gentle ramp — while the
+    analytical simulator knows only a single constant μ₀ = 0.25. The step kernel names three wires:
+  </p>
+  <pre><code>px = jack("puck.x", x[i])
+py = jack("puck.y", y[i])
+...
+mu = jack("contact.mu", MU0)          # analytical default: one constant for the whole table</code></pre>
+  <p>
+    The neural connection is declared entirely from the outside, plugging the two position wires into the friction
+    wire through a zero-initialized residual network — this is the <code>inputs=</code> mechanism, matching
+    NeuralSim's neural scalars where a network reads one set of named simulation quantities and augments another:
+  </p>
+  <pre><code>pb.patch("contact.mu", MLP((2, 32, 32, 1)), mode="add", inputs=("puck.x", "puck.y"))</code></pre>
+  <p>which specializes the simulation kernel to</p>
+  <pre><code>mu = MU0 + _pb_fn_2(_pb_theta_1, _pb_vec2(x[i], y[i]))   # inlined CUDA, differentiable</code></pre>
+  <p>
+    The network is trained by system identification on teacher-forced one-step transitions of the observed
+    trajectories (differentiating through the step kernel), then validated on full 150-step rollouts. Evaluating the
+    patched wire over a position grid — with the same <code>mu_view</code> viewer kernel that shares the network's
+    weights — produces the recovered friction heatmap:
+  </p>
+  <img src="friction_heatmaps.png" alt="True friction map with training trajectories, recovered neural friction map, and absolute error">
+  <p class="caption">Left: the true μ(x, y) with the training trajectories overlaid. Middle: the recovered map
+    μ₀ + MLP(x, y) evaluated on a grid through the patched wire — both friction patches and the background ramp are
+    reproduced. Right: absolute error (MAE 0.011 vs. 0.094 for the constant-μ model); the largest errors sit in
+    corners and low-speed regions where friction is weakly observable from the data.</p>
+  <img src="friction_trajectories.png" alt="Puck trajectories comparing ground truth, analytical, and neural-augmented models, and training loss">
+  <p class="caption">Friction errors integrate into stopping-distance errors: the analytical model's rest positions
+    (✕) fall far from the truth (■), while the neural-augmented pucks (●) come to rest on target
+    (full-rollout MSE 9.68 → 0.14).</p>
+  <table>
+    <tr><th>Model of the friction wire</th><th class="num">Friction map MAE</th><th class="num">Rollout MSE (150 steps × 256 pucks)</th></tr>
+    <tr><td>analytical: constant μ₀ = 0.25</td><td class="num warn">0.094</td><td class="num warn">9.68</td></tr>
+    <tr><td>μ₀ + MLP(2,32,32,1)(x, y)</td><td class="num good">0.011</td><td class="num good">0.14</td></tr>
+  </table>
+  <p>
+    Two methodological notes. First, training the same objective by naive BPTT through the full 150-step rollout
+    plateaus at ~40% error reduction: once early friction errors displace a puck's path, the long-horizon position
+    loss becomes rugged. One-step identification (the standard system-ID setup — NeuralSim likewise trains on short
+    windows) converges cleanly, and the result is validated on full rollouts. Second, this experiment surfaced a
+    genuine Warp autodiff issue: gradients through 32-wide MLP layers were silently wrong (verified against finite
+    differences), because Warp's dynamic-loop adjoint mishandles vector-indexed loops beyond the
+    <code>max_unroll</code> threshold; the patchbay now raises <code>max_unroll</code> on specialized modules so
+    patched networks always compile to fully unrolled straight-line code, whose adjoint is exact. This is being
+    reported upstream.
+  </p>
+
+  <h2>8. Status, limitations, next steps</h2>
   <ul>
-    <li><strong>Status.</strong> ~470-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 5 unit
+    <li><strong>Status.</strong> ~500-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 10 unit
       tests passing on CPU and CUDA (pass-through, re-wiring, add-mode, MLP forward vs. NumPy reference + gradient
-      flow, probe/cable routing), 3 runnable examples. No changes to Warp's compiler were required — which is itself a
-      finding: <code>wp.Kernel</code>'s runtime-construction path plus AST transformers are sufficient hooks.</li>
+      flow, multi-input patches, probe/cable routing), 4 runnable examples. No changes to Warp's compiler were
+      required — which is itself a finding: <code>wp.Kernel</code>'s runtime-construction path plus AST transformers
+      are sufficient hooks.</li>
     <li><strong>Wire types.</strong> Prototype wires are <code>float</code>; <code>MLP</code> already supports
       <code>wp.vec</code> inputs/outputs, but probes/cables assume scalar wires and 1D launches indexed by
       <code>wp.tid()</code>. Generalizing to vec/matrix wires and multi-dim launches is mechanical.</li>
@@ -339,24 +399,32 @@ extern "C" __global__ void process_pb_8f5c91c8_..._cuda_kernel_forward(
       for training loops).</li>
     <li><strong>Recompilation granularity.</strong> The configuration hash is currently patchbay-global; scoping it to
       the jacks a kernel actually contains would avoid some spurious respecializations.</li>
+    <li><strong>Newton integration.</strong> The friction demo implements the puck-on-table dynamics directly in a
+      Warp kernel; the natural next step is declaring jacks inside <a href="https://github.com/newton-physics/newton">Newton</a>'s
+      solver kernels themselves — e.g. the friction computations in
+      <code>newton/_src/solvers/xpbd/kernels.py</code> — so that per-contact quantities (μ, restitution, contact
+      stiffness) become patchable wires fed by world-position and material wires. Since Newton solvers are ordinary
+      Warp kernels, the same specialization machinery applies; the main work is threading <code>Patchbay.launch</code>
+      through the solver's launch sites.</li>
     <li><strong>Next steps.</strong> Tile-based <code>MLP</code> forward for wider networks
       (Warp's <code>example_tile_mlp.py</code> shows the pattern); warp-nn interop so its trained modules can be
       patched into wires; automatic augmentation discovery à la NeuralSim §V (probe all wires, sparsify which
       connections a network is allowed to use); CUDA-graph capture of train loops (all launches are graphable since
-      specialization happens before capture).</li>
+      specialization happens before capture); upstreaming the dynamic-loop adjoint fix.</li>
   </ul>
 
-  <h2>8. Reproducing</h2>
+  <h2>9. Reproducing</h2>
   <pre><code>git clone https://github.com/NVIDIA/warp && cd warp
 git checkout eric/neural-connections   # worktree branch, based on main 3f387ad3
 python build_lib.py
 python -m warp.tests.test_patchbay
 python -m warp.examples.patchbay.example_hello_patchbay
-python -m warp.examples.patchbay.example_modular_synth  --device cuda:0 --outdir out
-python -m warp.examples.patchbay.example_neural_damping --device cuda:0 --train_iters 800 --outdir out</code></pre>
+python -m warp.examples.patchbay.example_modular_synth   --device cuda:0 --outdir out
+python -m warp.examples.patchbay.example_neural_damping  --device cuda:0 --train_iters 800 --outdir out
+python -m warp.examples.patchbay.example_neural_friction --device cuda:0 --train_iters 400 --outdir out</code></pre>
 
   <div class="footnote">
-    Prototype and report generated with Claude Code on July 9, 2026. Hardware: RTX PRO 6000 Blackwell (MIG 1g.24gb),
+    Prototype and report generated with Claude Code on July 9–10, 2026. Hardware: RTX PRO 6000 Blackwell (MIG 1g.24gb),
     CUDA 12.6, Warp 1.16.0.dev0. References: Heiden et al., <em>NeuralSim: Augmenting Differentiable Simulators with
     Neural Networks</em>, ICRA 2021 (<a href="https://arxiv.org/abs/2011.04217">arXiv:2011.04217</a>);
     <a href="https://github.com/NVIDIA/warp-nn">NVIDIA warp-nn</a>; <a href="https://github.com/NVIDIA/warp">NVIDIA Warp</a>.
