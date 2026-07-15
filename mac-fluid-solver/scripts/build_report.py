@@ -101,6 +101,8 @@ def build(report_dir):
     sp, pa, sw = summary["sphere"], summary["paddle"], summary["swimmer"]
     large_path = os.path.join(data, "summary_large.json")
     large = load(large_path) if os.path.exists(large_path) else None
+    example_perf_path = os.path.join(data, "example_perf.json")
+    example_perf = load(example_perf_path) if os.path.exists(example_perf_path) else None
     sp_arr = sp.get("max_action_reaction_error", 0.0)
     sp_gross = sp.get("gross_boundary_impulse_Ns", 1.0)
     sp_rel = sp.get("action_reaction_rel", 0.0)
@@ -112,10 +114,12 @@ def build(report_dir):
             continue
         mode = "CUDA graph" if r["capture"] else ("eager" if r["device"].startswith("cuda") else "CPU")
         dev = "NVIDIA L40" if r["device"].startswith("cuda") else "CPU (single core)"
+        rt = (1000.0 / 60.0) / r["ms_per_step"]
+        rt_cell = f'<span class="ok">{rt:.2f}×</span>' if rt >= 1.0 else f"{rt:.2f}×"
         bench_rows += (
             f"<tr><td>{r['resolution']}³</td><td>{r['cells']:,}</td><td>{dev}</td>"
             f"<td>{mode}</td><td>{r['ms_per_step']:.1f}</td>"
-            f"<td>{1000.0 / r['ms_per_step']:.0f}</td></tr>\n"
+            f"<td>{1000.0 / r['ms_per_step']:.0f}</td><td>{rt_cell}</td></tr>\n"
         )
 
     stage = next(r for r in bench if "stage_ms" in r)
@@ -188,8 +192,25 @@ def build(report_dir):
   </table>
   <p class="caption">"sim-only" launches the captured coupled frame graph (MuJoCo substeps + fluid);
     "+ diagnostics" adds the per-frame host readback of wrenches and fluid diagnostics used for the
-    metrics logs. Rendering and video encoding are excluded.</p>
+    metrics logs. Rendering and video encoding are excluded. At 60 steps per simulated second these
+    large rollouts run at 0.2–0.5× real time (e.g. the 30.5 s marathon simulates in ≈63 s); the
+    standard-size examples above them run faster than real time.</p>
 """
+
+    example_perf_rows = ""
+    if example_perf is not None:
+        labels = {
+            "settling_sphere": "Settling sphere (48³ tank)",
+            "paddle": "Paddle (48×48×24 tank)",
+            "swimmer": "Swimmer, default 2 m tank (48×19×14)",
+        }
+        for r in example_perf:
+            rt = r["realtime_factor"]
+            rt_cell = f'<span class="ok">{rt:.1f}×</span>' if rt >= 1.0 else f"{rt:.1f}×"
+            example_perf_rows += (
+                f"<tr><td>{labels.get(r['case'], r['case'])}</td><td>{r['fluid_cells']:,}</td>"
+                f"<td>{r['bodies']}</td><td>{r['sim_only_ms']:.1f}</td><td>{rt_cell}</td></tr>\n"
+            )
 
     buoy_rows = ""
     for res, b in val["buoyancy_convergence"].items():
@@ -257,8 +278,9 @@ def build(report_dir):
       <div class="metric">{val["momentum_balance"]["relative"]:.1e}</div></div>
     <div class="card"><div class="label">Coupled-restart state restore</div>
       <div class="metric">{"bit-exact" if val["coupled_restart_restore"]["bit_exact"] else "FAILED"}</div></div>
-    <div class="card"><div class="label">Step time, 48³ (CUDA graph)</div>
-      <div class="metric">{next(r["ms_per_step"] for r in bench if r["resolution"] == 48 and r["capture"]):.1f} ms</div></div>
+    <div class="card"><div class="label">Step time, 48³ (CUDA graph, 60 steps/s sim)</div>
+      <div class="metric">{next(r["ms_per_step"] for r in bench if r["resolution"] == 48 and r["capture"]):.1f} ms
+        <span style="font-size:14px; color:var(--ok)">{(1000.0 / 60.0) / next(r["ms_per_step"] for r in bench if r["resolution"] == 48 and r["capture"]):.1f}× real time</span></div></div>
   </div>
 
   <h2>Feature overview</h2>
@@ -430,15 +452,29 @@ def build(report_dir):
 
 {large_section}
   <h2>Performance</h2>
+  <div class="callout">
+    <b>Step rate and real time.</b> Everything here steps at a fixed <b>60 coupled steps per
+    simulated second</b> (frame dt = 1/60 s): the fluid takes exactly one step per frame, and
+    MuJoCo's 4 substeps run inside that same coupled step. So simulating 1 s of wall-clock physics
+    costs 60 steps, and <b>real time means ≤ 16.7 ms per step</b>. The "× real time" columns below
+    are (1000/60) / (ms per step): above 1× the simulation runs faster than the physics it depicts.
+  </div>
   <p>
-    Cubic tank with one rigid sphere, 120 pressure CG iterations per step, viscosity on, full
-    diagnostics on. The pressure solve dominates; at small grids the step is launch-overhead-bound,
-    so CUDA graph capture gives up to 7× (the whole coupled step, including MuJoCo, is captured in
-    the examples).
+    Standalone solver benchmark: cubic tank with one rigid sphere, 120 pressure CG iterations per
+    step, viscosity on, full diagnostics on. The pressure solve dominates; at small grids the step
+    is launch-overhead-bound, so CUDA graph capture gives up to 7× (the whole coupled step,
+    including MuJoCo, is captured in the examples). With graph capture the solver stays real-time
+    up to roughly 64³ (≈260 k cells) at this iteration count.
   </p>
   <table>
-    <tr><th>Grid</th><th>Cells</th><th>Device</th><th>Mode</th><th>ms / step</th><th>steps / s</th></tr>
+    <tr><th>Grid</th><th>Cells</th><th>Device</th><th>Mode</th><th>ms / step</th><th>steps / s</th><th>× real time</th></tr>
     {bench_rows}
+  </table>
+  <h3>Shipped coupled examples (measured, CUDA graph, MuJoCo + fluid)</h3>
+  <p>All three standard examples run <b>faster than real time</b> on the L40:</p>
+  <table style="max-width:720px">
+    <tr><th>Example</th><th>Fluid cells</th><th>Bodies</th><th>ms / coupled step</th><th>× real time</th></tr>
+    {example_perf_rows}
   </table>
   <img class="plot" src="media/plot_benchmarks.png" alt="benchmark plots">
   <table style="max-width:460px">

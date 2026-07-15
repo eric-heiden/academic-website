@@ -57,8 +57,9 @@
       <div class="metric">3.2e-07</div></div>
     <div class="card"><div class="label">Coupled-restart state restore</div>
       <div class="metric">bit-exact</div></div>
-    <div class="card"><div class="label">Step time, 48³ (CUDA graph)</div>
-      <div class="metric">6.7 ms</div></div>
+    <div class="card"><div class="label">Step time, 48³ (CUDA graph, 60 steps/s sim)</div>
+      <div class="metric">6.7 ms
+        <span style="font-size:14px; color:var(--ok)">2.5× real time</span></div></div>
   </div>
 
   <h2>Feature overview</h2>
@@ -347,26 +348,45 @@
   </table>
   <p class="caption">"sim-only" launches the captured coupled frame graph (MuJoCo substeps + fluid);
     "+ diagnostics" adds the per-frame host readback of wrenches and fluid diagnostics used for the
-    metrics logs. Rendering and video encoding are excluded.</p>
+    metrics logs. Rendering and video encoding are excluded. At 60 steps per simulated second these
+    large rollouts run at 0.2–0.5× real time (e.g. the 30.5 s marathon simulates in ≈63 s); the
+    standard-size examples above them run faster than real time.</p>
 
   <h2>Performance</h2>
+  <div class="callout">
+    <b>Step rate and real time.</b> Everything here steps at a fixed <b>60 coupled steps per
+    simulated second</b> (frame dt = 1/60 s): the fluid takes exactly one step per frame, and
+    MuJoCo's 4 substeps run inside that same coupled step. So simulating 1 s of wall-clock physics
+    costs 60 steps, and <b>real time means ≤ 16.7 ms per step</b>. The "× real time" columns below
+    are (1000/60) / (ms per step): above 1× the simulation runs faster than the physics it depicts.
+  </div>
   <p>
-    Cubic tank with one rigid sphere, 120 pressure CG iterations per step, viscosity on, full
-    diagnostics on. The pressure solve dominates; at small grids the step is launch-overhead-bound,
-    so CUDA graph capture gives up to 7× (the whole coupled step, including MuJoCo, is captured in
-    the examples).
+    Standalone solver benchmark: cubic tank with one rigid sphere, 120 pressure CG iterations per
+    step, viscosity on, full diagnostics on. The pressure solve dominates; at small grids the step
+    is launch-overhead-bound, so CUDA graph capture gives up to 7× (the whole coupled step,
+    including MuJoCo, is captured in the examples). With graph capture the solver stays real-time
+    up to roughly 64³ (≈260 k cells) at this iteration count.
   </p>
   <table>
-    <tr><th>Grid</th><th>Cells</th><th>Device</th><th>Mode</th><th>ms / step</th><th>steps / s</th></tr>
-    <tr><td>32³</td><td>32,768</td><td>NVIDIA L40</td><td>eager</td><td>26.5</td><td>38</td></tr>
-<tr><td>32³</td><td>32,768</td><td>NVIDIA L40</td><td>CUDA graph</td><td>3.6</td><td>276</td></tr>
-<tr><td>48³</td><td>110,592</td><td>NVIDIA L40</td><td>eager</td><td>21.3</td><td>47</td></tr>
-<tr><td>48³</td><td>110,592</td><td>NVIDIA L40</td><td>CUDA graph</td><td>6.7</td><td>150</td></tr>
-<tr><td>64³</td><td>262,144</td><td>NVIDIA L40</td><td>eager</td><td>25.3</td><td>40</td></tr>
-<tr><td>64³</td><td>262,144</td><td>NVIDIA L40</td><td>CUDA graph</td><td>12.3</td><td>81</td></tr>
-<tr><td>96³</td><td>884,736</td><td>NVIDIA L40</td><td>eager</td><td>37.1</td><td>27</td></tr>
-<tr><td>96³</td><td>884,736</td><td>NVIDIA L40</td><td>CUDA graph</td><td>35.4</td><td>28</td></tr>
-<tr><td>32³</td><td>32,768</td><td>CPU (single core)</td><td>CPU</td><td>342.3</td><td>3</td></tr>
+    <tr><th>Grid</th><th>Cells</th><th>Device</th><th>Mode</th><th>ms / step</th><th>steps / s</th><th>× real time</th></tr>
+    <tr><td>32³</td><td>32,768</td><td>NVIDIA L40</td><td>eager</td><td>26.5</td><td>38</td><td>0.63×</td></tr>
+<tr><td>32³</td><td>32,768</td><td>NVIDIA L40</td><td>CUDA graph</td><td>3.6</td><td>276</td><td><span class="ok">4.59×</span></td></tr>
+<tr><td>48³</td><td>110,592</td><td>NVIDIA L40</td><td>eager</td><td>21.3</td><td>47</td><td>0.78×</td></tr>
+<tr><td>48³</td><td>110,592</td><td>NVIDIA L40</td><td>CUDA graph</td><td>6.7</td><td>150</td><td><span class="ok">2.50×</span></td></tr>
+<tr><td>64³</td><td>262,144</td><td>NVIDIA L40</td><td>eager</td><td>25.3</td><td>40</td><td>0.66×</td></tr>
+<tr><td>64³</td><td>262,144</td><td>NVIDIA L40</td><td>CUDA graph</td><td>12.3</td><td>81</td><td><span class="ok">1.35×</span></td></tr>
+<tr><td>96³</td><td>884,736</td><td>NVIDIA L40</td><td>eager</td><td>37.1</td><td>27</td><td>0.45×</td></tr>
+<tr><td>96³</td><td>884,736</td><td>NVIDIA L40</td><td>CUDA graph</td><td>35.4</td><td>28</td><td>0.47×</td></tr>
+<tr><td>32³</td><td>32,768</td><td>CPU (single core)</td><td>CPU</td><td>342.3</td><td>3</td><td>0.05×</td></tr>
+
+  </table>
+  <h3>Shipped coupled examples (measured, CUDA graph, MuJoCo + fluid)</h3>
+  <p>All three standard examples run <b>faster than real time</b> on the L40:</p>
+  <table style="max-width:720px">
+    <tr><th>Example</th><th>Fluid cells</th><th>Bodies</th><th>ms / coupled step</th><th>× real time</th></tr>
+    <tr><td>Settling sphere (48³ tank)</td><td>110,592</td><td>1</td><td>7.2</td><td><span class="ok">2.3×</span></td></tr>
+<tr><td>Paddle (48×48×24 tank)</td><td>55,296</td><td>1</td><td>5.1</td><td><span class="ok">3.3×</span></td></tr>
+<tr><td>Swimmer, default 2 m tank (48×19×14)</td><td>12,768</td><td>5</td><td>3.5</td><td><span class="ok">4.7×</span></td></tr>
 
   </table>
   <img class="plot" src="media/plot_benchmarks.png" alt="benchmark plots">
