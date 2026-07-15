@@ -344,7 +344,9 @@ def build(report_dir):
     (cruise ≈ {sw["cruise_speed"]:.2f} m/s), the reversed wave {sw["dx_reverse"]:+.2f} m — the
     swimming direction follows the wave direction — while the dry run drifts only
     {sw["dx_dry"]:+.2f} m (rigid-solver numerical drift, ~{abs(sw["dx_forward"] / max(abs(sw["dx_dry"]), 1e-9)):.0f}×
-    smaller than the propulsion).
+    smaller than the propulsion). The tank walls are fluid boundaries only: near the end of the run
+    the head links pass out of the fluid domain, where their hydrodynamic force is exactly zero and
+    they coast at constant momentum (gravity is off) while the still-submerged links keep thrusting.
   </p>
   <div class="video-pair">
     <div><video src="media/swimmer_forward.mp4" controls loop muted playsinline></video>
