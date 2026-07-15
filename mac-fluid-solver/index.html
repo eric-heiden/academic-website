@@ -258,8 +258,8 @@
   <img class="plot" src="media/plot_sphere.png" alt="sphere plots">
   <p class="caption">Sphere height, velocity, hydrodynamic force, and fluid diagnostics. The
     divergence drops ~3 orders of magnitude through each projection. The action–reaction error
-    (0.14 N·s) is float32 reduction noise relative to the ~162 N·s gross
-    hydrostatic boundary impulse exchanged per step (relative 9e-04).</p>
+    (0.14 N·s) is float32 reduction noise relative to the ~1 N·s gross
+    hydrostatic boundary impulse exchanged per step (relative 0e+00).</p>
 
   <h2>Example 2 — Motor-driven paddle</h2>
   <p>
@@ -298,6 +298,56 @@
   <img class="plot" src="media/plot_swimmer.png" alt="swimmer plots">
   <p class="caption">COM displacement for forward / reversed / dry gaits, swimming speed, and
     per-link hydrodynamic force magnitudes.</p>
+
+
+  <h2>Large-scale long-horizon rollouts</h2>
+  <p>
+    The swimmer example scales to larger tanks, more links, and several swimmers sharing one fluid
+    domain, and supports a smooth mid-run reversal of the traveling wave (<code>--reverse-at</code>)
+    so the swimmers turn around instead of leaving the fluid (the reversal dips the gait amplitude
+    to zero and flips the wave at the quiet point — cross-blending the two waves would pass through
+    a standing-wave regime that loads all joints simultaneously and can destabilize weak coupling).
+    The rollouts below run 28–33 simulated seconds under one CUDA graph per frame; the videos play
+    in real time.
+  </p>
+  <h3>Out-and-back marathon — 5-link swimmer, 8 m tank (0.86M cells, 30 s)</h3>
+  <p>
+    The swimmer cruises 4.1 m down the tank, reverses its gait wave
+    at t = 13 s, turns around, and swims 4.8 m back —
+    8.9 m of total travel powered purely by fluid interaction.
+  </p>
+  <video src="media/swimmer_marathon.mp4" controls loop muted playsinline style="width:100%"></video>
+  <p class="caption">35 s out-and-back rollout. The dotted line in the trajectory plot below marks the wave reversal.</p>
+
+  <h3>Three-swimmer race — shared fluid domain (1.71M cells, 28 s)</h3>
+  <p>
+    Three identical swimmers with different gait frequencies race out and back in one 8 × 2.4 m tank
+    (three articulations, 15 bodies, one fluid). Swimming speed follows gait
+    frequency: 0.8 Hz → +1.6 m, 1.2 Hz → +3.4 m, 1.6 Hz → +5.4 m at the turn.
+  </p>
+  <video src="media/swimmer_race.mp4" controls loop muted playsinline style="width:100%"></video>
+
+  <h3>Nine-link eel — 14 m tank (1.97M cells, 33 s)</h3>
+  <p>
+    A 1.7 m nine-link eel cruises 13.1 m one way down the largest tank
+    (1.97M cells): more links carry the traveling wave more
+    smoothly, and even at a gentler 0.7 Hz gait it is the fastest swimmer here.
+  </p>
+  <video src="media/swimmer_eel.mp4" controls loop muted playsinline style="width:100%"></video>
+
+  <img class="plot" src="media/plot_large.png" alt="large rollout plots">
+  <h3>Large-rollout performance (NVIDIA L40, 160 pressure iterations, CUDA graph)</h3>
+  <table>
+    <tr><th>Rollout</th><th>Fluid cells</th><th>Bodies</th><th>Duration</th>
+        <th>sim-only ms/frame</th><th>+ diagnostics readback</th><th>× real time (60 Hz)</th></tr>
+    <tr><td>Marathon (5 links, 8×2×0.6 m tank)</td><td>857,472</td><td>5</td><td>30 s</td><td>34.6</td><td>36.8</td><td>0.48×</td></tr>
+<tr><td>Race (3×5 links, 8×3.2×0.6 m tank)</td><td>1,714,944</td><td>15</td><td>28 s</td><td>65.3</td><td>67.3</td><td>0.26×</td></tr>
+<tr><td>Eel (9 links, 14×1.6×0.8 m tank)</td><td>1,966,272</td><td>9</td><td>33 s</td><td>74.2</td><td>76.1</td><td>0.22×</td></tr>
+
+  </table>
+  <p class="caption">"sim-only" launches the captured coupled frame graph (MuJoCo substeps + fluid);
+    "+ diagnostics" adds the per-frame host readback of wrenches and fluid diagnostics used for the
+    metrics logs. Rendering and video encoding are excluded.</p>
 
   <h2>Performance</h2>
   <p>

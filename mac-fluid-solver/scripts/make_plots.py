@@ -179,6 +179,102 @@ def plot_benchmarks(data_dir, media_dir):
     plt.close(fig)
 
 
+def plot_large(data_dir, media_dir):
+    """Trajectory and perf plots for the large-scale rollouts."""
+    import os.path
+
+    cases = ["swimmer_marathon", "swimmer_race", "swimmer_eel"]
+    if not all(os.path.exists(os.path.join(data_dir, f"{c}.json")) for c in cases):
+        print("large-rollout data incomplete; skipping plot_large")
+        return
+
+    marathon = load(data_dir, "swimmer_marathon")
+    race = load(data_dir, "swimmer_race")
+    eel = load(data_dir, "swimmer_eel")
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
+
+    ax = axes[0]
+    for d, key in ((marathon, "wet"), (eel, "rise")):
+        fr = d["frames"]
+        meta = d["meta"]
+        label = f"{meta['num_links']}-link, {meta['tank'][0]:g} m tank"
+        if meta.get("reverse_at"):
+            label += " (out and back)"
+            ax.axvline(meta["reverse_at"], color=COLORS[key], ls=":", lw=1)
+        ax.plot(series(fr, "time"), series(fr, "com", 0), color=COLORS[key], label=label)
+    ax.set_xlabel("time [s]"), ax.set_ylabel("COM x [m]")
+    ax.set_title("Marathon & eel (reversal at dotted line)")
+    ax.legend(fontsize=8)
+
+    ax = axes[1]
+    fr = race["frames"]
+    t = series(fr, "time")
+    coms = np.array([f["swimmer_coms"] for f in fr])  # (T, 3, 3)
+    freqs = race["meta"]["frequencies"]
+    for s_i in range(coms.shape[1]):
+        ax.plot(t, coms[:, s_i, 0], label=f"{freqs[s_i]:g} Hz")
+    if race["meta"].get("reverse_at"):
+        ax.axvline(race["meta"]["reverse_at"], color="k", ls=":", lw=1)
+    ax.set_xlabel("time [s]"), ax.set_ylabel("COM x [m]")
+    ax.set_title("Race: speed follows gait frequency")
+    ax.legend(fontsize=8)
+
+    ax = axes[2]
+    names, sim_ms, diag_ms, cells = [], [], [], []
+    for c in cases:
+        with open(os.path.join(data_dir, f"{c}_perf.json")) as f:
+            p = json.load(f)
+        names.append(c.replace("swimmer_", ""))
+        sim_ms.append(p["sim_only_ms"])
+        diag_ms.append(p["step_ms_with_diagnostics"])
+        cells.append(p["fluid_cells"])
+    x = np.arange(len(names))
+    ax.bar(x - 0.2, sim_ms, width=0.4, color=COLORS["wet"], label="sim only")
+    ax.bar(x + 0.2, diag_ms, width=0.4, color=COLORS["extra"], label="+ per-frame diagnostics")
+    ax.axhline(1000 / 60, color="k", ls=":", lw=1, label="real time (60 Hz)")
+    for i, c in enumerate(cells):
+        ax.annotate(f"{c / 1e6:.2f}M cells", (x[i], max(sim_ms[i], diag_ms[i]) + 1), ha="center", fontsize=8)
+    ax.set_xticks(x, names)
+    ax.set_ylabel("ms / frame"), ax.set_title("Step time (NVIDIA L40, CUDA graph)")
+    ax.legend(fontsize=8)
+
+    fig.suptitle("Large-scale long-horizon rollouts", fontsize=12)
+    fig.savefig(os.path.join(media_dir, "plot_large.png"))
+    plt.close(fig)
+
+
+def summarize_large(data_dir):
+    import os.path
+
+    cases = ["swimmer_marathon", "swimmer_race", "swimmer_eel"]
+    if not all(os.path.exists(os.path.join(data_dir, f"{c}.json")) for c in cases):
+        return
+    out = {}
+    for c in cases:
+        d = load(data_dir, c)
+        fr = d["frames"]
+        x = series(fr, "com", 0)
+        entry = {
+            "duration_s": fr[-1]["time"],
+            "x_start": float(x[0]),
+            "x_peak": float(x.max()),
+            "x_end": float(x[-1]),
+            "distance_traveled": float(np.abs(np.diff(x)).sum()),
+            "reverse_at": d["meta"].get("reverse_at"),
+        }
+        if "swimmer_coms" in fr[-1]:
+            coms = np.array([f["swimmer_coms"] for f in fr])
+            entry["per_swimmer_peak_x"] = coms[:, :, 0].max(axis=0).tolist()
+            entry["frequencies"] = d["meta"]["frequencies"]
+        with open(os.path.join(data_dir, f"{c}_perf.json")) as f:
+            entry["perf"] = json.load(f)
+        out[c] = entry
+    with open(os.path.join(data_dir, "summary_large.json"), "w") as f:
+        json.dump(out, f, indent=1)
+    print(json.dumps(out, indent=1))
+
+
 def summarize(data_dir):
     """Emit a summary JSON with headline numbers for the report text."""
     out = {}
@@ -229,7 +325,9 @@ def main():
     plot_paddle(data_dir, media_dir)
     plot_swimmer(data_dir, media_dir)
     plot_benchmarks(data_dir, media_dir)
+    plot_large(data_dir, media_dir)
     summarize(data_dir)
+    summarize_large(data_dir)
     print("plots written to", media_dir)
 
 

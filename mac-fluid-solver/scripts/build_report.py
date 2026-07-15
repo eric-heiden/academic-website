@@ -99,6 +99,8 @@ def build(report_dir):
     bench = load(os.path.join(data, "benchmarks.json"))
 
     sp, pa, sw = summary["sphere"], summary["paddle"], summary["swimmer"]
+    large_path = os.path.join(data, "summary_large.json")
+    large = load(large_path) if os.path.exists(large_path) else None
     sp_arr = sp.get("max_action_reaction_error", 0.0)
     sp_gross = sp.get("gross_boundary_impulse_Ns", 1.0)
     sp_rel = sp.get("action_reaction_rel", 0.0)
@@ -120,6 +122,74 @@ def build(report_dir):
     stage_rows = "".join(
         f"<tr><td>{k}</td><td>{v:.2f}</td></tr>\n" for k, v in sorted(stage["stage_ms"].items(), key=lambda kv: -kv[1])
     )
+
+    large_section = ""
+    if large is not None:
+        mar, rac, eel = large["swimmer_marathon"], large["swimmer_race"], large["swimmer_eel"]
+        perf_rows = ""
+        for c, label in (
+            ("swimmer_marathon", "Marathon (5 links, 8×2×0.6 m tank)"),
+            ("swimmer_race", "Race (3×5 links, 8×3.2×0.6 m tank)"),
+            ("swimmer_eel", "Eel (9 links, 14×1.6×0.8 m tank)"),
+        ):
+            pf = large[c]["perf"]
+            perf_rows += (
+                f"<tr><td>{label}</td><td>{pf['fluid_cells']:,}</td><td>{pf['bodies']}</td>"
+                f"<td>{pf['sim_seconds']:.0f} s</td><td>{pf['sim_only_ms']:.1f}</td>"
+                f"<td>{pf['step_ms_with_diagnostics']:.1f}</td>"
+                f"<td>{pf['realtime_factor_sim_only']:.2f}×</td></tr>\n"
+            )
+        race_speeds = ", ".join(
+            f"{f:g} Hz → {x - rac['x_start']:+.1f} m"
+            for f, x in zip(rac["frequencies"], rac["per_swimmer_peak_x"], strict=True)
+        )
+        large_section = f"""
+  <h2>Large-scale long-horizon rollouts</h2>
+  <p>
+    The swimmer example scales to larger tanks, more links, and several swimmers sharing one fluid
+    domain, and supports a smooth mid-run reversal of the traveling wave (<code>--reverse-at</code>)
+    so the swimmers turn around instead of leaving the fluid (the reversal dips the gait amplitude
+    to zero and flips the wave at the quiet point — cross-blending the two waves would pass through
+    a standing-wave regime that loads all joints simultaneously and can destabilize weak coupling).
+    The rollouts below run 28–33 simulated seconds under one CUDA graph per frame; the videos play
+    in real time.
+  </p>
+  <h3>Out-and-back marathon — 5-link swimmer, 8 m tank ({mar["perf"]["fluid_cells"] / 1e6:.2f}M cells, {mar["duration_s"]:.0f} s)</h3>
+  <p>
+    The swimmer cruises {mar["x_peak"] - mar["x_start"]:.1f} m down the tank, reverses its gait wave
+    at t = {mar["reverse_at"]:g} s, turns around, and swims {mar["x_peak"] - mar["x_end"]:.1f} m back —
+    {mar["distance_traveled"]:.1f} m of total travel powered purely by fluid interaction.
+  </p>
+  <video src="media/swimmer_marathon.mp4" controls loop muted playsinline style="width:100%"></video>
+  <p class="caption">35 s out-and-back rollout. The dotted line in the trajectory plot below marks the wave reversal.</p>
+
+  <h3>Three-swimmer race — shared fluid domain ({rac["perf"]["fluid_cells"] / 1e6:.2f}M cells, {rac["duration_s"]:.0f} s)</h3>
+  <p>
+    Three identical swimmers with different gait frequencies race out and back in one 8 × 2.4 m tank
+    (three articulations, {rac["perf"]["bodies"]} bodies, one fluid). Swimming speed follows gait
+    frequency: {race_speeds} at the turn.
+  </p>
+  <video src="media/swimmer_race.mp4" controls loop muted playsinline style="width:100%"></video>
+
+  <h3>Nine-link eel — 14 m tank ({eel["perf"]["fluid_cells"] / 1e6:.2f}M cells, {eel["duration_s"]:.0f} s)</h3>
+  <p>
+    A 1.7 m nine-link eel cruises {eel["distance_traveled"]:.1f} m one way down the largest tank
+    ({eel["perf"]["fluid_cells"] / 1e6:.2f}M cells): more links carry the traveling wave more
+    smoothly, and even at a gentler 0.7 Hz gait it is the fastest swimmer here.
+  </p>
+  <video src="media/swimmer_eel.mp4" controls loop muted playsinline style="width:100%"></video>
+
+  <img class="plot" src="media/plot_large.png" alt="large rollout plots">
+  <h3>Large-rollout performance (NVIDIA L40, 160 pressure iterations, CUDA graph)</h3>
+  <table>
+    <tr><th>Rollout</th><th>Fluid cells</th><th>Bodies</th><th>Duration</th>
+        <th>sim-only ms/frame</th><th>+ diagnostics readback</th><th>× real time (60 Hz)</th></tr>
+    {perf_rows}
+  </table>
+  <p class="caption">"sim-only" launches the captured coupled frame graph (MuJoCo substeps + fluid);
+    "+ diagnostics" adds the per-frame host readback of wrenches and fluid diagnostics used for the
+    metrics logs. Rendering and video encoding are excluded.</p>
+"""
 
     buoy_rows = ""
     for res, b in val["buoyancy_convergence"].items():
@@ -358,6 +428,7 @@ def build(report_dir):
   <p class="caption">COM displacement for forward / reversed / dry gaits, swimming speed, and
     per-link hydrodynamic force magnitudes.</p>
 
+{large_section}
   <h2>Performance</h2>
   <p>
     Cubic tank with one rigid sphere, 120 pressure CG iterations per step, viscosity on, full
