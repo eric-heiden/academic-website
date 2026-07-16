@@ -103,6 +103,8 @@ def build(report_dir):
     large = load(large_path) if os.path.exists(large_path) else None
     example_perf_path = os.path.join(data, "example_perf.json")
     example_perf = load(example_perf_path) if os.path.exists(example_perf_path) else None
+    wake_path = os.path.join(data, "summary_wake.json")
+    wake = load(wake_path) if os.path.exists(wake_path) else None
     sp_arr = sp.get("max_action_reaction_error", 0.0)
     sp_gross = sp.get("gross_boundary_impulse_Ns", 1.0)
     sp_rel = sp.get("action_reaction_rel", 0.0)
@@ -212,6 +214,71 @@ def build(report_dir):
                 f"<td>{r['bodies']}</td><td>{r['sim_only_ms']:.1f}</td><td>{rt_cell}</td></tr>\n"
             )
 
+    wake_section = ""
+    if wake is not None:
+        w50 = wake["swimmer_50cm"]
+        wmc = wake["wake_maccormack"]
+        wsl = wake["wake_semi_lagrangian"]
+        wake_perf_rows = ""
+        for c, label in (
+            ("swimmer_50cm", "50 cm robot, out and back (4×0.8×0.4 m, MacCormack)"),
+            ("wake_maccormack", "Wake cruise, MacCormack"),
+            ("wake_semi_lagrangian", "Wake cruise, semi-Lagrangian"),
+        ):
+            pf = wake[c]["perf"]
+            wake_perf_rows += (
+                f"<tr><td>{label}</td><td>{pf['fluid_cells']:,}</td>"
+                f"<td>{pf['sim_seconds']:.0f} s</td><td>{pf['sim_only_ms']:.1f}</td>"
+                f"<td>{pf['realtime_factor_sim_only']:.2f}×</td></tr>\n"
+            )
+        bl_s = w50["cruise_speed"] / 0.5
+        wake_section = f"""
+  <h2>Wake fidelity and scale realism (50 cm robot)</h2>
+  <p>
+    The wakes in the earlier rollouts fade within a couple of body lengths. That is mostly
+    <em>numerical</em>, not physical: first-order semi-Lagrangian advection has an effective
+    numerical viscosity of roughly u·dx/2 ≈ 3×10⁻³ m²/s at these grids — about <b>30× larger
+    than the explicit viscosity</b> and ~3000× water. It is tunable on three axes: the new
+    clamped <b>MacCormack advection</b> option (<code>SolverMACFluid.Config(advection="maccormack")</code>,
+    a second-order error-corrected scheme that retains ≈1.8× the kinetic energy of semi-Lagrangian
+    over 1 s of inviscid evolution at 32³), finer grids, and true water viscosity.
+  </p>
+  <p>
+    The scenarios here also fix the <em>scale</em>: a <b>0.50 m five-link robot</b> (the earlier
+    swimmers were ≈0.93 m and 2500 kg/m³ for coupling-stability margin). At an 7.8 mm grid the
+    added-mass stability margin allows a near-realistic <b>1200 kg/m³</b> body (with Aitken
+    feedback relaxation), and the fluid uses real water viscosity (ν = 10⁻⁶ m²/s). The robot
+    cruises at {w50["cruise_speed"]:.2f} m/s ≈ <b>{bl_s:.1f} body lengths/s</b> — squarely in the
+    range of real undulatory swimming robots — and covers {w50["distance_traveled"]:.1f} m in
+    {w50["duration_s"]:.0f} s including a turnaround. (At this speed the physical Reynolds number
+    is ≈10⁵; the resolved effective Reynolds number is a few thousand, so the wake is a
+    laminar-scale model of the real turbulent one.)
+  </p>
+  <video src="media/swimmer_50cm.mp4" controls loop muted playsinline style="width:100%"></video>
+  <p class="caption">50 cm robot at ρ = 1200 kg/m³, water viscosity, MacCormack advection,
+    2.66 M cells (7.8 mm). The slice shows <b>vorticity</b>: the alternating-sign vortex street
+    now persists many body lengths behind the robot.</p>
+
+  <h3>Semi-Lagrangian vs. MacCormack: identical cruises</h3>
+  <div class="video-pair">
+    <div><video src="media/wake_maccormack.mp4" controls loop muted playsinline></video>
+      <p class="caption">MacCormack: the shed vortices survive and the wake trail spans the tank.</p></div>
+    <div><video src="media/wake_semi_lagrangian.mp4" controls loop muted playsinline></video>
+      <p class="caption">Semi-Lagrangian: the same gait, but the wake diffuses within ~1–2 body lengths.</p></div>
+  </div>
+  <img class="plot" src="media/plot_wake.png" alt="wake plots">
+  <p class="caption">Kinetic energy left in the water during the two identical cruises:
+    with MacCormack the fluid retains {wmc["final_wake_energy_mJ"]:.0f} mJ at the end vs
+    {wsl["final_wake_energy_mJ"]:.0f} mJ with semi-Lagrangian
+    ({wmc["final_wake_energy_mJ"] / max(wsl["final_wake_energy_mJ"], 1e-9):.1f}× more wake energy
+    preserved). Swimming speed itself changes only mildly — thrust is dominated by near-body
+    pressure, which both schemes resolve.</p>
+  <table style="max-width:760px">
+    <tr><th>Scenario</th><th>Fluid cells</th><th>Duration</th><th>sim-only ms/frame</th><th>× real time</th></tr>
+    {wake_perf_rows}
+  </table>
+"""
+
     buoy_rows = ""
     for res, b in val["buoyancy_convergence"].items():
         buoy_rows += (
@@ -290,7 +357,7 @@ def build(report_dir):
       <ul>
         <li>3D incompressible Newtonian fluid, closed (sealed) domains</li>
         <li>Staggered MAC grid: pressure at cell centers, velocity on faces</li>
-        <li>Semi-Lagrangian RK2 advection, trilinear MAC interpolation</li>
+        <li>Semi-Lagrangian RK2 advection, trilinear MAC interpolation; optional clamped second-order MacCormack scheme</li>
         <li>Explicit viscosity with stability check</li>
         <li>Gravity + uniform external acceleration</li>
         <li>Matrix-free Jacobi-preconditioned CG pressure projection, fixed iteration count, zero host sync</li>
@@ -312,7 +379,7 @@ def build(report_dir):
         <li>Cut-cell / variational boundary fractions (forces converge first order)</li>
         <li>Implicit viscosity</li>
         <li>Strong (added-mass-stable) coupling — light thin bodies need dense bodies or feedback relaxation</li>
-        <li>MacCormack / FLIP advection</li>
+        <li>FLIP/APIC advection</li>
         <li>Multigrid pressure preconditioning</li>
       </ul>
     </td></tr>
@@ -450,6 +517,7 @@ def build(report_dir):
   <p class="caption">COM displacement for forward / reversed / dry gaits, swimming speed, and
     per-link hydrodynamic force magnitudes.</p>
 
+{wake_section}
 {large_section}
   <h2>Performance</h2>
   <div class="callout">

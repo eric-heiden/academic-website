@@ -275,6 +275,86 @@ def summarize_large(data_dir):
     print(json.dumps(out, indent=1))
 
 
+def plot_wake(data_dir, media_dir):
+    """Wake-persistence comparison and realistic-scale swimmer plots."""
+    import os.path
+
+    cases = ["swimmer_50cm", "wake_maccormack", "wake_semi_lagrangian"]
+    if not all(os.path.exists(os.path.join(data_dir, f"{c}_perf.json")) for c in cases):
+        print("wake data incomplete; skipping plot_wake")
+        return
+
+    perf = {}
+    for c in cases:
+        with open(os.path.join(data_dir, f"{c}_perf.json")) as f:
+            perf[c] = json.load(f)
+
+    d50 = load(data_dir, "swimmer_50cm")
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
+
+    ax = axes[0]
+    fr = d50["frames"]
+    t = series(fr, "time")
+    ax.plot(t, series(fr, "com", 0) - fr[0]["com"][0], color=COLORS["wet"])
+    if d50["meta"].get("reverse_at"):
+        ax.axvline(d50["meta"]["reverse_at"], color="k", ls=":", lw=1, label="wave reversal")
+    ax.set_xlabel("time [s]"), ax.set_ylabel("COM displacement x [m]")
+    ax.set_title("50 cm robot, out and back (ρ = 1200 kg/m³)")
+    ax.legend(fontsize=8)
+
+    ax = axes[1]
+    for c, key, label in (
+        ("wake_maccormack", "wet", "MacCormack"),
+        ("wake_semi_lagrangian", "extra", "semi-Lagrangian"),
+    ):
+        we = np.array(perf[c]["wake_energy"])
+        ax.plot(we[:, 0], 1000.0 * we[:, 1], color=COLORS[key], label=label)
+    ax.set_xlabel("time [s]"), ax.set_ylabel("fluid kinetic energy [mJ]")
+    ax.set_title("Energy left in the water (identical cruises)")
+    ax.legend(fontsize=8)
+
+    ax = axes[2]
+    fr_mc = load(data_dir, "wake_maccormack")["frames"]
+    fr_sl = load(data_dir, "wake_semi_lagrangian")["frames"]
+    for fr2, key, label in ((fr_mc, "wet", "MacCormack"), (fr_sl, "extra", "semi-Lagrangian")):
+        ax.plot(series(fr2, "time"), series(fr2, "com_velocity", 0), color=COLORS[key], lw=0.8, label=label)
+    ax.set_xlabel("time [s]"), ax.set_ylabel("swim speed [m/s]")
+    ax.set_title("Swimming speed under each scheme")
+    ax.legend(fontsize=8)
+
+    fig.suptitle("Wake fidelity at realistic scale (50 cm swimmer, water viscosity, 7.8 mm cells)", fontsize=12)
+    fig.savefig(os.path.join(media_dir, "plot_wake.png"))
+    plt.close(fig)
+
+
+def summarize_wake(data_dir):
+    import os.path
+
+    cases = ["swimmer_50cm", "wake_maccormack", "wake_semi_lagrangian"]
+    if not all(os.path.exists(os.path.join(data_dir, f"{c}_perf.json")) for c in cases):
+        return
+    out = {}
+    for c in cases:
+        with open(os.path.join(data_dir, f"{c}_perf.json")) as f:
+            p = json.load(f)
+        d = load(data_dir, c)
+        fr = d["frames"]
+        x = series(fr, "com", 0)
+        we = np.array(p["wake_energy"])
+        out[c] = {
+            "duration_s": fr[-1]["time"],
+            "distance_traveled": float(np.abs(np.diff(x)).sum()),
+            "cruise_speed": float(np.abs(series(fr, "com_velocity", 0)[-180:]).mean()),
+            "final_wake_energy_mJ": 1000.0 * float(we[-1, 1]),
+            "peak_wake_energy_mJ": 1000.0 * float(we[:, 1].max()),
+            "perf": {k: v for k, v in p.items() if k != "wake_energy"},
+        }
+    with open(os.path.join(data_dir, "summary_wake.json"), "w") as f:
+        json.dump(out, f, indent=1)
+    print(json.dumps(out, indent=1))
+
+
 def summarize(data_dir):
     """Emit a summary JSON with headline numbers for the report text."""
     out = {}
@@ -326,8 +406,10 @@ def main():
     plot_swimmer(data_dir, media_dir)
     plot_benchmarks(data_dir, media_dir)
     plot_large(data_dir, media_dir)
+    plot_wake(data_dir, media_dir)
     summarize(data_dir)
     summarize_large(data_dir)
+    summarize_wake(data_dir)
     print("plots written to", media_dir)
 
 
