@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newton Gym: graph-captured RL environments for Newton</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2430;
+      --muted: #687283;
+      --line: #d9dee7;
+      --paper: #f7f5f0;
+      --panel: #fffdf8;
+      --accent: #0f766e;
+      --warn: #b45309;
+    }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: #fff;
+      line-height: 1.55;
+    }
+    main { max-width: 1080px; margin: 0 auto; padding: 42px 32px 80px; }
+    h1 { font-size: 33px; line-height: 1.12; margin: 0 0 10px; }
+    h2 { margin: 44px 0 12px; font-size: 22px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    h3 { margin: 24px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    code { background: #eef3f6; padding: 1px 5px; border-radius: 4px; font-size: 0.91em; }
+    pre { background: #eef3f6; padding: 12px 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+    .eyebrow { color: var(--accent); font-size: 13px; font-weight: 650; letter-spacing: 0.06em;
+                text-transform: uppercase; margin-bottom: 8px; }
+    .lede { color: var(--muted); font-size: 17px; max-width: 860px; margin: 0 0 10px; }
+    .stamp { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+    .grid-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0 32px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 16px 14px; background: var(--panel); }
+    .metric { font-size: 24px; font-weight: 700; margin-top: 6px; color: var(--ink); }
+    .metric.todo { color: var(--muted); font-size: 16px; }
+    .label { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f8; font-weight: 650; }
+    .muted { color: var(--muted); }
+    ul { padding-left: 22px; margin: 8px 0; }
+    li { margin: 5px 0; }
+    figure { margin: 18px 0; }
+    figure img { width: 100%; max-width: 1000px; border: 1px solid var(--line); border-radius: 8px; }
+    figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .image-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+    .image-pair figure { margin: 0; }
+    .video-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+    .video-block { margin: 18px 0; }
+    video { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #0f1720; }
+    .caption { color: var(--muted); font-size: 13px; margin: 4px 0 14px; }
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      background: var(--panel);
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .callout.warn { border-left-color: var(--warn); }
+    svg text { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+  </style>
+</head>
+<body>
+<main>
+
+  <p class="eyebrow">Newton reinforcement-learning report</p>
+  <h1>Newton Gym: graph-captured RL environments for Newton</h1>
+  <p class="lede">A suite of massively parallel, fully CUDA-graph-captured reinforcement-learning
+  environments built on Newton, benchmarked with FlashSAC (off-policy) and PPO (on-policy) across
+  cartpole balancing, ant locomotion, and G1 humanoid walking. Every environment step dispatches a
+  single CUDA-graph launch: no host-device syncs, no Python overhead mid-step.</p>
+  <p class="stamp">Eric Heiden &middot; 2026-07-18 &middot; 1&times; NVIDIA L40 (48&nbsp;GB),
+  driver 550.127 &middot; Newton 1.5.0.dev0 &middot; Warp 1.16.0.dev20260717 &middot; PyTorch 2.6.0+cu124</p>
+
+  <!-- Metric cards -->
+  <div class="grid-cards">
+    <div class="card">
+      <div class="label">Peak env-steps/s (cartpole)</div>
+      <div class="metric">22M</div>
+    </div>
+    <div class="card">
+      <div class="label">Best Ant return (FlashSAC)</div>
+      <div class="metric">585.8</div>
+    </div>
+    <div class="card">
+      <div class="label">wall-clock to walking (return &gt; 700)</div>
+      <div class="metric">10.4 min</div>
+    </div>
+    <div class="card">
+      <div class="label">Total runs (3 tasks &times; algos &times; seeds)</div>
+      <div class="metric">15</div>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <section id="architecture">
+    <h2>Architecture: single-graph step pipeline</h2>
+
+    <!-- SVG pipeline diagram -->
+    <figure>
+<svg viewBox="0 0 820 210" xmlns="http://www.w3.org/2000/svg"
+     font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="13">
+  <!-- Background -->
+  <rect width="820" height="210" fill="#fffdf8" rx="10"/>
+
+  <!-- Boxes: actions, substeps, obs/reward/done, solver.reset, task reset, post-reset obs -->
+  <!-- actions -->
+  <rect x="16" y="70" width="80" height="44" rx="6" fill="#e8f4f2" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="56" y="88" text-anchor="middle" fill="#1d2430" font-weight="600">actions</text>
+  <text x="56" y="104" text-anchor="middle" fill="#687283" font-size="11">(policy out)</text>
+
+  <!-- arrow 1 -->
+  <line x1="96" y1="92" x2="116" y2="92" stroke="#687283" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- N× SolverMuJoCo substeps -->
+  <rect x="116" y="55" width="130" height="74" rx="6" fill="#e8f4f2" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="181" y="80" text-anchor="middle" fill="#1d2430" font-weight="600">N&times; SolverMuJoCo</text>
+  <text x="181" y="98" text-anchor="middle" fill="#687283" font-size="11">substeps</text>
+  <text x="181" y="113" text-anchor="middle" fill="#687283" font-size="11">(physics)</text>
+
+  <!-- arrow 2 -->
+  <line x1="246" y1="92" x2="266" y2="92" stroke="#687283" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- obs/reward/done kernels -->
+  <rect x="266" y="55" width="130" height="74" rx="6" fill="#e8f4f2" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="331" y="80" text-anchor="middle" fill="#1d2430" font-weight="600">obs / reward</text>
+  <text x="331" y="98" text-anchor="middle" fill="#687283" font-size="11">/ done kernels</text>
+  <text x="331" y="113" text-anchor="middle" fill="#687283" font-size="11">(per-task Warp)</text>
+
+  <!-- arrow 3 -->
+  <line x1="396" y1="92" x2="416" y2="92" stroke="#687283" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- solver.reset(world_mask) -->
+  <rect x="416" y="55" width="130" height="74" rx="6" fill="#e8f4f2" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="481" y="78" text-anchor="middle" fill="#1d2430" font-weight="600">solver.reset</text>
+  <text x="481" y="95" text-anchor="middle" fill="#687283" font-size="11">(world_mask)</text>
+  <text x="481" y="113" text-anchor="middle" fill="#687283" font-size="11">warm-start clear</text>
+
+  <!-- arrow 4 -->
+  <line x1="546" y1="92" x2="566" y2="92" stroke="#687283" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- task reset kernel -->
+  <rect x="566" y="55" width="120" height="74" rx="6" fill="#e8f4f2" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="626" y="80" text-anchor="middle" fill="#1d2430" font-weight="600">task reset</text>
+  <text x="626" y="98" text-anchor="middle" fill="#687283" font-size="11">kernel</text>
+  <text x="626" y="113" text-anchor="middle" fill="#687283" font-size="11">(per-task Warp)</text>
+
+  <!-- arrow 5 -->
+  <line x1="686" y1="92" x2="706" y2="92" stroke="#687283" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- post-reset obs -->
+  <rect x="706" y="70" width="96" height="44" rx="6" fill="#e8f4f2" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="754" y="88" text-anchor="middle" fill="#1d2430" font-weight="600">post-reset</text>
+  <text x="754" y="104" text-anchor="middle" fill="#687283" font-size="11">obs</text>
+
+  <!-- Accent callout box: one CUDA graph launch per step -->
+  <rect x="220" y="155" width="372" height="36" rx="7" fill="#0f766e" opacity="0.09"
+        stroke="#0f766e" stroke-width="1.5"/>
+  <text x="406" y="169" text-anchor="middle" fill="#0f766e" font-weight="700" font-size="13">
+    one CUDA graph launch per step
+  </text>
+  <text x="406" y="183" text-anchor="middle" fill="#0f766e" font-size="11">
+    no host&ndash;device syncs; full pipeline captured at warmup
+  </text>
+  <!-- connector line -->
+  <line x1="406" y1="155" x2="406" y2="130" stroke="#0f766e" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- arrowhead marker -->
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#687283"/>
+    </marker>
+  </defs>
+</svg>
+      <figcaption>Single-step CUDA graph: all kernels from action application through post-reset
+      observation are captured into one graph at warmup and replayed every step with a single
+      CUDA graph launch, eliminating Python overhead and host&ndash;device syncs.</figcaption>
+    </figure>
+
+    <h3>Task-as-kernels design</h3>
+    <p>Each task (cartpole, ant, G1) is implemented as a set of Warp CUDA kernels for observation
+    extraction, reward computation, and done detection. These kernels share the same Newton physics
+    state (<code>SolverMuJoCo</code> body transforms, joint velocities, contact forces) and write
+    directly into pre-allocated GPU arrays that are part of the captured graph. Reward weights are
+    exposed as <code>wp.array</code> parameters, enabling live tuning between episodes without
+    breaking the captured graph &mdash; the graph operates on the underlying memory, not the Python
+    variable.</p>
+
+    <h3>NaN self-heal path</h3>
+    <p>Numerically diverged environments are detected by the done kernel (NaN or Inf in any
+    observation component). On reset, <code>SolverMuJoCo.reset</code> clears warm-start buffers
+    (velocity guess, Jacobian cache) for the affected worlds, preventing the corrupted state from
+    contaminating subsequent solves. The observation and reward sanitization pass then replaces any
+    remaining NaN/Inf values with zeros before they reach the policy network, so a single unstable
+    environment does not corrupt the full batch gradient.</p>
+  </section>
+
+  <!-- Per-task sections -->
+  <section id="task-cartpole">
+    <h2>Cartpole</h2>
+    <div class="image-pair">
+      <figure>
+        <img src="assets/cartpole_steps.png" alt="Cartpole learning curves vs env steps">
+        <figcaption>Episode return vs environment steps.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/cartpole_wall.png" alt="Cartpole learning curves vs wall-clock">
+        <figcaption>Episode return vs wall-clock time.</figcaption>
+      </figure>
+    </div>
+    <table>
+      <thead><tr><th>Algorithm</th><th>Seeds</th><th>Final return (mean)</th><th>Best return</th><th>Wall-clock</th></tr></thead>
+      <tbody>
+        <tr><td>FlashSAC</td><td>3</td><td>386.2</td><td>434.1</td><td>4.1 min</td></tr>
+        <tr><td>PPO</td><td>3</td><td>499.6</td><td>499.8</td><td>2.3 min</td></tr>
+      </tbody>
+    </table>
+    <div class="video-block">
+      <video controls muted loop playsinline preload="metadata" poster="assets/cartpole_flashsac.jpg" src="assets/cartpole_flashsac.mp4"></video>
+      <p class="caption">FlashSAC rollout — best return 434.1, final mean 386.2.</p>
+    </div>
+    <div class="video-block">
+      <video controls muted loop playsinline preload="metadata" poster="assets/cartpole_ppo.jpg" src="assets/cartpole_ppo.mp4"></video>
+      <p class="caption">PPO rollout — best return 499.8, final mean 499.6.</p>
+    </div>
+  </section>
+  <section id="task-ant">
+    <h2>Ant</h2>
+    <div class="image-pair">
+      <figure>
+        <img src="assets/ant_steps.png" alt="Ant learning curves vs env steps">
+        <figcaption>Episode return vs environment steps.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/ant_wall.png" alt="Ant learning curves vs wall-clock">
+        <figcaption>Episode return vs wall-clock time.</figcaption>
+      </figure>
+    </div>
+    <table>
+      <thead><tr><th>Algorithm</th><th>Seeds</th><th>Final return (mean)</th><th>Best return</th><th>Wall-clock</th></tr></thead>
+      <tbody>
+        <tr><td>FlashSAC</td><td>3</td><td>527.6</td><td>585.8</td><td>8.6 min</td></tr>
+        <tr><td>PPO</td><td>3</td><td>464.6</td><td>672.6</td><td>8.4 min</td></tr>
+      </tbody>
+    </table>
+    <div class="video-block">
+      <video controls muted loop playsinline preload="metadata" poster="assets/ant_flashsac.jpg" src="assets/ant_flashsac.mp4"></video>
+      <p class="caption">FlashSAC rollout — best return 585.8, final mean 527.6.</p>
+    </div>
+    <div class="video-block">
+      <video controls muted loop playsinline preload="metadata" poster="assets/ant_ppo.jpg" src="assets/ant_ppo.mp4"></video>
+      <p class="caption">PPO rollout — best return 672.6, final mean 464.6.</p>
+    </div>
+  </section>
+  <section id="task-g1">
+    <h2>G1 Locomotion</h2>
+    <div class="image-pair">
+      <figure>
+        <img src="assets/g1_steps.png" alt="G1 Locomotion learning curves vs env steps">
+        <figcaption>Episode return vs environment steps.</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/g1_wall.png" alt="G1 Locomotion learning curves vs wall-clock">
+        <figcaption>Episode return vs wall-clock time.</figcaption>
+      </figure>
+    </div>
+    <table>
+      <thead><tr><th>Algorithm</th><th>Seeds</th><th>Final return (mean)</th><th>Best return</th><th>Wall-clock</th></tr></thead>
+      <tbody>
+        <tr><td>FlashSAC</td><td>2</td><td>1.0k</td><td>1.1k</td><td>21.7 min</td></tr>
+        <tr><td>PPO</td><td>1</td><td>592.8</td><td>745.6</td><td>20.6 min</td></tr>
+      </tbody>
+    </table>
+    <div class="video-block">
+      <video controls muted loop playsinline preload="metadata" poster="assets/g1_flashsac.jpg" src="assets/g1_flashsac.mp4"></video>
+      <p class="caption">FlashSAC rollout — best return 1.1k, final mean 1.0k.</p>
+    </div>
+    <div class="video-block">
+      <video controls muted loop playsinline preload="metadata" poster="assets/g1_ppo.jpg" src="assets/g1_ppo.mp4"></video>
+      <p class="caption">PPO rollout — best return 745.6, final mean 592.8.</p>
+    </div>
+  </section>
+
+  <section id="algo-comparison">
+    <h2>FlashSAC vs PPO</h2>
+    <h3>Wall-clock efficiency</h3>
+    <p>On cartpole, PPO converges to near-ceiling in 2.3 min (best return 499.8, final mean 499.6). FlashSAC takes 4.1 min to reach final mean 386.2 (best 434.1). The off-policy overhead — experience replay, twin critics, target-network updates — dominates on this short-horizon task. PPO's on-policy batching over 1024 simultaneous envs is hard to beat when episodes are fast and sparse returns are not a concern.</p>
+    <h3>Sample efficiency</h3>
+    <p>FlashSAC shows stronger early learning per environment step on cartpole: it achieves high returns before 1M steps, while PPO requires the full batch budget. On ant (3 seeds each), FlashSAC achieved a best return of 585.8 versus PPO's 672.6, with FlashSAC requiring fewer environment steps to reach comparable performance despite the higher per-step overhead of the off-policy update.</p>
+    <h3>Caveats</h3>
+    <div class="callout warn">
+      <ul>
+        <li><strong>G1 budget-capped:</strong> G1 training ran for a fixed step budget on a single machine; the agent may not have converged.</li>
+        <li><strong>Single machine:</strong> all results are from one L40. Cross-machine variance is unknown.</li>
+        <li><strong>Training-env returns:</strong> episode returns are measured in the training environments, not in a separate evaluation environment with fixed seeds. Episode length and domain-randomization distributions may differ from a dedicated eval setting.</li>
+        <li><strong>Cartpole FlashSAC config:</strong> FlashSAC required 256 parallel environments (vs PPO's 1024) to avoid critic update starvation at the fixed 2M-step budget. With 1024 envs the replay buffer fills too slowly relative to batch size, giving fewer than 2k gradient updates — insufficient for this task.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="scaling">
+    <h2>Throughput Scaling</h2>
+    <figure>
+      <img src="assets/scaling.png" alt="Env steps per second vs number of envs">
+      <figcaption>Captured-graph env-steps/s vs number of parallel environments (log-log). Each point is a benchmark run with a fully captured CUDA graph.</figcaption>
+    </figure>
+    <table>
+      <thead><tr><th>Task</th><th>Peak env-steps/s</th></tr></thead>
+      <tbody>
+        <tr><td>cartpole</td><td>22M</td></tr>
+        <tr><td>ant</td><td>5M</td></tr>
+        <tr><td>g1</td><td>379k</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Multi-GPU -->
+  <section id="multi-gpu">
+    <h2>Multi-GPU Design</h2>
+    <p>Newton Gym is designed to scale across GPUs via standard PyTorch distributed training.
+    Each rank instantiates an independent Newton environment (its own <code>NvGymEnv</code>,
+    physics model, and captured CUDA graph) with a disjoint slice of parallel environments.
+    Policy gradients are synchronized across ranks with <code>torch.distributed</code>
+    all-reduce after each backward pass; the target critic weights are broadcast from rank 0
+    to keep target networks consistent.</p>
+    <div class="callout">
+      <strong>Validated evidence:</strong>
+      <ul>
+        <li>2-rank <code>gloo</code> smoke test on a single GPU
+        (<code>scripts/smoke_distributed.py</code>) passes &mdash; verifies the distributed
+        init, env construction, and tensor communication paths end-to-end.</li>
+        <li><code>torchrun --nproc-per-node=1 scripts/train_ppo.py</code> completes without
+        error (world_size=1 PPO path exercised).</li>
+      </ul>
+      <strong>Status:</strong> validated up to 1 GPU. Multi-GPU runs on 2+ physical GPUs require
+      access to a multi-GPU node; the communication scaffold is in place.
+    </div>
+  </section>
+
+  <section id="reproduction">
+    <h2>Reproduction</h2>
+    <h3>Repository layout</h3>
+    <pre>newton-gym/
+  newton_gym/           # library: tasks, envs, algorithms
+    tasks/              # cartpole.py, ant.py, g1.py  (kernel-based tasks)
+    core/               # NvGymEnv, StepResult, randomize
+    algorithms/         # flashsac/, ppo_rsl.py, logging
+    compat/             # GymVectorWrapper
+  scripts/
+    train_flashsac.py   # FlashSAC runner
+    train_ppo.py        # PPO (rsl_rl) runner
+    benchmark.py        # throughput sweep
+    record_rollout.py   # rollout video recorder
+    make_plots.py       # plot + summary generator
+    build_report.py     # this script
+    run_matrix.sh       # full experiment matrix
+  tests/                # unittest suite
+  runs/                 # training outputs (gitignored)
+  bench_results/        # benchmark outputs (gitignored)
+  videos/               # rollout videos (gitignored)
+  report_assets/        # generated plots + summary (gitignored)
+  report_out/           # generated report (gitignored)</pre>
+    <h3>Commands</h3>
+    <p>Install: <code>uv sync</code> inside the repo (requires CUDA 12.4, L40 or compatible GPU).</p>
+    <pre># Stage 1: cartpole training (FlashSAC + PPO, 3 seeds each)
+bash scripts/run_matrix.sh 1
+
+# Stage 2: ant training (FlashSAC + PPO, 3 seeds each)
+bash scripts/run_matrix.sh 2
+
+# Stage 3: G1 locomotion training
+bash scripts/run_matrix.sh 3
+
+# Stage 4: throughput benchmark sweep
+bash scripts/run_matrix.sh 4
+
+# Stage 5: record rollout videos
+bash scripts/run_matrix.sh 5
+
+# Generate plots and results_summary.json
+uv run scripts/make_plots.py
+
+# Generate this report
+uv run scripts/build_report.py</pre>
+    <p>All scripts accept <code>--help</code> for per-flag documentation.</p>
+  </section>
+
+</main>
+</body>
+</html>
