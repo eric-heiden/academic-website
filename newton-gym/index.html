@@ -330,7 +330,7 @@
   <section id="multi-gpu">
     <h2>Multi-GPU Design</h2>
     <p>Newton Gym is designed to scale across GPUs via standard PyTorch distributed training.
-    Each rank instantiates an independent Newton environment (its own <code>NvGymEnv</code>,
+    Each rank instantiates an independent Newton environment (its own <code>Environment</code>,
     physics model, and captured CUDA graph) with a disjoint slice of parallel environments.
     Policy gradients are synchronized across ranks with <code>torch.distributed</code>
     all-reduce after each backward pass; the target critic weights are broadcast from rank 0
@@ -351,11 +351,13 @@
 
   <section id="reproduction">
     <h2>Reproduction</h2>
+    <p>Code: <a href="https://github.com/eric-heiden/newton-gym">github.com/eric-heiden/newton-gym</a>
+    (commit <code>2cf18bc</code> for the results on this page).</p>
     <h3>Repository layout</h3>
     <pre>newton-gym/
   newton_gym/           # library: tasks, envs, algorithms
     tasks/              # cartpole.py, ant.py, g1.py  (kernel-based tasks)
-    core/               # NvGymEnv, StepResult, randomize
+    core/               # Environment, StepResult, Task, randomize
     algorithms/         # flashsac/, ppo_rsl.py, logging
     compat/             # GymVectorWrapper
   scripts/
