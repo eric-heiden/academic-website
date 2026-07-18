@@ -193,12 +193,15 @@
     variable.</p>
 
     <h3>NaN self-heal path</h3>
-    <p>Numerically diverged environments are detected by the done kernel (NaN or Inf in any
-    observation component). On reset, <code>SolverMuJoCo.reset</code> clears warm-start buffers
-    (velocity guess, Jacobian cache) for the affected worlds, preventing the corrupted state from
-    contaminating subsequent solves. The observation and reward sanitization pass then replaces any
-    remaining NaN/Inf values with zeros before they reach the policy network, so a single unstable
-    environment does not corrupt the full batch gradient.</p>
+    <p>A dedicated NaN-guard kernel runs after the task's <em>terminated</em> kernel and marks
+    environments whose joint positions contain NaN or exceed |q|&gt;10<sup>6</sup>, or whose joint
+    velocities contain NaN or exceed |q&#775;|&gt;10<sup>4</sup>, as terminated.
+    <code>SolverMuJoCo.reset(world_mask)</code> then clears MuJoCo's carried buffers
+    (<code>qacc_warmstart</code>, <code>qfrc_applied</code>, <code>ctrl</code>, <code>act</code>)
+    for those worlds, preventing corrupted state from contaminating subsequent solves. Sanitize
+    kernels then scrub reward, final observation, and observation tensors so no NaN reaches the
+    replay buffers, keeping a single unstable environment from corrupting the full batch
+    gradient.</p>
   </section>
 
   <!-- Per-task sections -->
@@ -293,6 +296,9 @@
     <p>On cartpole, PPO converges to near-ceiling in 2.3 min (best return 499.8, final mean 499.6). FlashSAC takes 4.1 min to reach final mean 386.2 (best 434.1). The off-policy overhead — experience replay, twin critics, target-network updates — dominates on this short-horizon task. PPO's on-policy batching over 1024 simultaneous envs is hard to beat when episodes are fast and sparse returns are not a concern.</p>
     <h3>Sample efficiency</h3>
     <p>FlashSAC shows stronger early learning per environment step on cartpole: it achieves high returns before 1M steps, while PPO requires the full batch budget. On ant (3 seeds each), FlashSAC achieved a best return of 585.8 versus PPO's 672.6, with FlashSAC requiring fewer environment steps to reach comparable performance despite the higher per-step overhead of the off-policy update.</p>
+
+    <h3>G1 humanoid: off-policy scaling on high-dimensional control</h3>
+    <p>On the highest-dimensional task — G1 with 43 actuated DoFs — FlashSAC clearly dominates: best return 1.1k (2 seeds) versus PPO's 745.6 (1 seed), reached with roughly half the environment steps (25M vs 49M) at comparable wall-clock (21.7 min vs 20.6 min). This is consistent with the FlashSAC paper's claim that off-policy experience replay confers the greatest advantage on high-dimensional control tasks, where sample efficiency matters most.</p>
     <h3>Caveats</h3>
     <div class="callout warn">
       <ul>
@@ -314,8 +320,8 @@
       <thead><tr><th>Task</th><th>Peak env-steps/s</th></tr></thead>
       <tbody>
         <tr><td>cartpole</td><td>22M</td></tr>
-        <tr><td>ant</td><td>5M</td></tr>
-        <tr><td>g1</td><td>379k</td></tr>
+        <tr><td>ant</td><td>4.6M</td></tr>
+        <tr><td>g1</td><td>379.0k</td></tr>
       </tbody>
     </table>
   </section>
