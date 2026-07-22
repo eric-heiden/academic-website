@@ -110,7 +110,7 @@
     <a href="../">All reports</a>
   </header>
 
-  <div class="meta">July 9, 2026 (updated July 10) · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commits <code>8869f746</code> … <code>6da9598e</code>, based on main <code>3f387ad3</code>)</div>
+  <div class="meta">July 9, 2026 (updated July 10) · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commits <code>8869f746</code> … <code>8ac86066</code>, based on main <code>3f387ad3</code>)</div>
 
   <div class="tldr">
     <p>
@@ -423,7 +423,10 @@ pb.get_param("puck.mu").assign([0.4])           # or just hot-swap it, no recomp
     <code>@wp.kernel</code> and wraps every <code>name = expr</code> assignment in an implicit
     <code>jack("&lt;alias&gt;.name", expr)</code> via an AST transformer, so each internal variable becomes a wire
     addressable from the outside. <code>taps=</code> selects which variables to expose; repeated assignments get
-    <code>#2</code>, <code>#3</code> suffixes; the original kernel is copied, not mutated:
+    <code>#2</code>, <code>#3</code> suffixes; the original kernel is copied, not mutated. Annotated assignments
+    (<code>scale: float = 2.0</code>) are tapped too — Warp's code generator rejects <code>AnnAssign</code> nodes
+    outright, so the transformer normalizes them to plain assignments along the way, which as a side effect makes
+    type-annotated Python functions adoptable that Warp could not otherwise compile:
   </p>
   <pre><code>def puck_step(...):        # a plain Warp kernel, no patchbay awareness
     ...
@@ -476,10 +479,10 @@ pb2.load("friction_preset")                # reconnect the trained wiring elsewh
 
   <h2>9. Status, limitations, next steps</h2>
   <ul>
-    <li><strong>Status.</strong> ~800-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 16 unit
+    <li><strong>Status.</strong> ~800-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 18 unit
       tests passing on CPU and CUDA (pass-through, re-wiring, add-mode, MLP forward vs. NumPy reference + gradient
-      flow, multi-input patches, probe/cable routing, const/param + learnable-scalar gradient, kernel adoption,
-      save/load round-trip), 5 runnable examples. No changes to Warp's compiler were
+      flow, multi-input patches, probe/cable routing, const/param + learnable-scalar gradient, kernel adoption
+      including annotated assignments, save/load round-trip), 5 runnable examples. No changes to Warp's compiler were
       required — which is itself a finding: <code>wp.Kernel</code>'s runtime-construction path plus AST transformers
       are sufficient hooks.</li>
     <li><strong>Wire types.</strong> Prototype wires are <code>float</code>; <code>MLP</code> already supports
