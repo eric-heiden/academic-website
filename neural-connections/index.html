@@ -110,7 +110,7 @@
     <a href="../">All reports</a>
   </header>
 
-  <div class="meta">July 9, 2026 (updated July 10) · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commits <code>8869f746</code>, <code>947d1493</code>, based on main <code>3f387ad3</code>)</div>
+  <div class="meta">July 9, 2026 (updated July 10) · prototype on branch <code>eric/neural-connections</code> of NVIDIA/warp (commits <code>8869f746</code> … <code>6da9598e</code>, based on main <code>3f387ad3</code>)</div>
 
   <div class="tldr">
     <p>
@@ -125,7 +125,11 @@
       <em>through a synthesizer kernel</em>; a residual drag network trained through a differentiable rollout reduces
       trajectory error by 230× while recovering the true nonlinear force law; and for a puck sliding on a table with
       spatially varying friction, a network patched between the position wires and the friction wire recovers the full
-      friction heatmap (map MAE 0.094 → 0.011) where the analytical simulator only has one constant μ.
+      friction heatmap (map MAE 0.094 → 0.011) where the analytical simulator only has one constant μ. To make this
+      maintainable, wires can also be driven by compile-time constants or runtime learnable parameters, existing
+      kernels with no jacks can be <em>adopted</em> so their internal variables become patchable by name
+      (<code>"puck.mu"</code>) — the entry point for tapping Newton solver kernels — and a trained wiring can be saved
+      and reloaded as a portable "preset".
     </p>
   </div>
 
@@ -189,6 +193,10 @@ pb.launch(step, dim=n, inputs=[x, v, ...])    # hidden params appended automatic
     <tr><td><code>pb.patch(..., inputs=(a, b))</code></td><td>feed the inserted function the values of <em>other</em> named wires (packed into a <code>wp.vec</code>) — NeuralSim's neural scalars, where the network's inputs and the augmented quantity are different named variables</td><td>a CV input driven from other jacks</td></tr>
     <tr><td><code>pb.cable(src, dst, via, mode)</code></td><td>route wire <code>src</code> (any kernel) into wire <code>dst</code>, optionally through a function/NN</td><td>a patch cable</td></tr>
     <tr><td><code>pb.probe(name)</code> / <code>pb.read(name)</code></td><td>record every value flowing through the wire into a differentiable buffer</td><td>an oscilloscope tap</td></tr>
+    <tr><td><code>pb.const(name, value)</code></td><td>drive the wire with a compile-time constant (baked into the code)</td><td>a fixed knob position</td></tr>
+    <tr><td><code>pb.param(name, init)</code></td><td>drive the wire with a runtime, differentiable array — hot-swappable and trainable without recompiling (a single learnable scalar)</td><td>a live knob / CV you can automate</td></tr>
+    <tr><td><code>pb.adopt(kernel, taps, alias)</code></td><td>expose the internal variables of a kernel that has <em>no</em> jacks as wires named <code>"alias.var"</code> (§8)</td><td>hardwiring test points into a sealed module</td></tr>
+    <tr><td><code>pb.save/load</code>, <code>pb.summary()</code></td><td>serialize the wiring + trained weights as a preset; list all wires and connections (§8)</td><td>a patch memory / preset bank</td></tr>
   </table>
   <p>
     <code>MLP(dims, activation, ...)</code> is a tiny fully-connected network whose forward pass is <em>generated as a
@@ -212,8 +220,10 @@ pb.launch(step, dim=n, inputs=[x, v, ...])    # hidden params appended automatic
       replaces each <code>jack("name", expr)</code> according to the current configuration: unpatched jacks become
       <code>expr</code> (zero overhead); patched jacks become <code>fn(expr)</code>, <code>expr + net(theta, expr)</code>,
       etc.; with <code>inputs=</code>, the default expressions of the named input jacks are inlined at the patch site
-      (packed into a <code>wp.vec</code>); cable destinations read <code>buf[wp.tid()]</code>; probes wrap the value in
-      a recording <code>@wp.func</code>.</li>
+      (packed into a <code>wp.vec</code>); cable destinations read <code>buf[wp.tid()]</code>; a <code>const</code>
+      becomes a literal, a <code>param</code> reads a hidden array; probes wrap the value in a recording
+      <code>@wp.func</code>. Adopted kernels (§8) are pre-processed by a second transformer that wraps their bare
+      assignments in <code>jack()</code> calls before this step runs.</li>
     <li><strong>Hidden parameters.</strong> Network weight arrays, cable buffers and probe buffers are appended to the
       kernel signature as extra typed arguments. <code>pb.launch()</code> supplies them automatically, so the visible
       launch signature never changes.</li>
@@ -383,11 +393,93 @@ mu = jack("contact.mu", MU0)          # analytical default: one constant for the
     reported upstream.
   </p>
 
-  <h2>8. Status, limitations, next steps</h2>
+  <h2>8. Maintainability: constants, params, adopting kernels, and packaging</h2>
+  <p>
+    For this to be usable beyond a demo, the wiring a user writes has to be easy to author, share, and version, and it
+    has to reach kernels that were never written with the patchbay in mind. Three additions cover that; all are shown
+    in <code>example_adopt_and_package.py</code>, which adopts a plain puck-physics kernel and compares two
+    augmentations of the same wire.
+  </p>
+
+  <h3>Constants and runtime parameters</h3>
+  <p>
+    A wire can be driven by a plain value, in two flavors. <code>pb.const("gain", 10.0)</code> bakes a
+    compile-time constant into the generated code (changing it re-specializes). <code>pb.param("mu", 0.25)</code>
+    instead binds a <em>runtime</em>, differentiable <code>wp.array</code> that is appended to the launch as a hidden
+    parameter — so it can be hot-swapped or <em>trained</em> without recompiling. A single learnable scalar is the
+    smallest possible neural augmentation, and it drops straight into an optimizer via
+    <code>pb.parameters()</code> (which gathers every learnable array — <code>param</code> scalars and patched-in
+    network weights alike):
+  </p>
+  <pre><code>pb.param("puck.mu", 0.25)                       # one learnable friction coefficient
+opt = wp.optim.Adam(pb.parameters(), lr=1e-2)   # trains params + any patched MLPs
+...
+pb.get_param("puck.mu").assign([0.4])           # or just hot-swap it, no recompile</code></pre>
+
+  <h3>Adopting kernels that have no jacks</h3>
+  <p>
+    You should not have to edit a kernel — least of all someone else's — to make its internals patchable. The address
+    you asked for, <code>"warp_function_x.var_y"</code>, is <code>pb.adopt()</code>: it parses an existing
+    <code>@wp.kernel</code> and wraps every <code>name = expr</code> assignment in an implicit
+    <code>jack("&lt;alias&gt;.name", expr)</code> via an AST transformer, so each internal variable becomes a wire
+    addressable from the outside. <code>taps=</code> selects which variables to expose; repeated assignments get
+    <code>#2</code>, <code>#3</code> suffixes; the original kernel is copied, not mutated:
+  </p>
+  <pre><code>def puck_step(...):        # a plain Warp kernel, no patchbay awareness
+    ...
+    mu = MU0               # &lt;- becomes the wire "puck.mu"
+    ...
+
+step   = pb.adopt(puck_step, alias="puck", taps=["px", "py", "mu"])
+pb.patch("puck.mu", MLP((2, 32, 32, 1)), mode="add", inputs=("puck.px", "puck.py"))</code></pre>
+  <p>
+    Wires are keyed by name across the whole patchbay, so a second kernel adopted under the same alias sees the same
+    patched quantity — in the example a lightweight <code>mu_probe</code> viewer, adopted as <code>"puck"</code>, reads
+    the learned friction over a grid through the very same <code>puck.mu</code> wire the simulation uses. This is how
+    the map below is measured. The same mechanism is the intended entry point for Newton: adopt a solver kernel such as
+    <code>xpbd/kernels.py</code>'s contact solve and patch <code>"solve.friction"</code> without forking Newton.
+  </p>
+  <p>
+    Adopting the puck kernel and patching <code>puck.mu</code> two ways — a single learnable scalar
+    (<code>param</code>) versus a spatial network fed by the position wires — shows what each augmentation class can
+    represent. The scalar recovers the best-fit global friction (μ ≈ 0.18, map MAE 0.061) but is flat by
+    construction; the network recovers the field (MAE 0.011). Neither required touching the kernel:
+  </p>
+  <img src="package_friction_maps.png" alt="True friction map vs a single learnable scalar vs a spatial neural field, all patched into the same adopted wire">
+  <p class="caption">The same adopted <code>puck.mu</code> wire, driven by a single learnable scalar (middle, flat by
+    construction) and by a position-fed network (right). Both are declared entirely from outside the kernel.</p>
+
+  <h3>Packaging a wiring as a portable preset</h3>
+  <p>
+    The design separates three layers that version independently: the <em>instrument</em> (kernels with jacks, or
+    adopted kernels), the <em>preset</em> (which cables/patches are connected), and the <em>state</em> (trained
+    weights and parameter values). <code>pb.save(path)</code> writes the preset as JSON (the connection graph) plus an
+    <code>.npz</code> of MLP weights and runtime params; <code>pb.load(path, registry=...)</code> reconnects it onto
+    any patchbay exposing the same wire names, rebuilding MLPs from their stored architecture and looking up
+    <code>@wp.func</code> patches by key in a user-supplied registry. In the example the trained wiring round-trips
+    onto a fresh patchbay bit-for-bit. <code>pb.summary()</code> prints every wire and its current connection for
+    quick inspection. This is what makes a trained augmentation a shippable artifact — a "neural patch" you can commit,
+    diff, and hand to a colleague, separate from the simulator it plugs into.
+  </p>
+  <pre><code>pb.summary()          # list every wire and how it is currently wired
+pb.save("friction_preset")                 # -> friction_preset.json + .npz
+...
+pb2 = Patchbay(); pb2.adopt(puck_step, alias="puck")
+pb2.load("friction_preset")                # reconnect the trained wiring elsewhere</code></pre>
+  <p>
+    Further packaging ideas that fit this structure but are not yet built: a declarative wiring spec (author the whole
+    patchbay from a YAML/dict rather than imperative calls), type/shape validation of connections at wire-up time
+    (catch an <code>MLP((3, …))</code> plugged into two input jacks before codegen), a Graphviz render of the patch
+    graph, and <code>pip</code>-installable augmentation packages that bundle preset + weights + a registry of the
+    functions they reference.
+  </p>
+
+  <h2>9. Status, limitations, next steps</h2>
   <ul>
-    <li><strong>Status.</strong> ~500-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 10 unit
+    <li><strong>Status.</strong> ~800-line prototype module (<code>warp/_src/patchbay.py</code> + public shim), 16 unit
       tests passing on CPU and CUDA (pass-through, re-wiring, add-mode, MLP forward vs. NumPy reference + gradient
-      flow, multi-input patches, probe/cable routing), 4 runnable examples. No changes to Warp's compiler were
+      flow, multi-input patches, probe/cable routing, const/param + learnable-scalar gradient, kernel adoption,
+      save/load round-trip), 5 runnable examples. No changes to Warp's compiler were
       required — which is itself a finding: <code>wp.Kernel</code>'s runtime-construction path plus AST transformers
       are sufficient hooks.</li>
     <li><strong>Wire types.</strong> Prototype wires are <code>float</code>; <code>MLP</code> already supports
@@ -400,12 +492,12 @@ mu = jack("contact.mu", MU0)          # analytical default: one constant for the
     <li><strong>Recompilation granularity.</strong> The configuration hash is currently patchbay-global; scoping it to
       the jacks a kernel actually contains would avoid some spurious respecializations.</li>
     <li><strong>Newton integration.</strong> The friction demo implements the puck-on-table dynamics directly in a
-      Warp kernel; the natural next step is declaring jacks inside <a href="https://github.com/newton-physics/newton">Newton</a>'s
-      solver kernels themselves — e.g. the friction computations in
-      <code>newton/_src/solvers/xpbd/kernels.py</code> — so that per-contact quantities (μ, restitution, contact
-      stiffness) become patchable wires fed by world-position and material wires. Since Newton solvers are ordinary
-      Warp kernels, the same specialization machinery applies; the main work is threading <code>Patchbay.launch</code>
-      through the solver's launch sites.</li>
+      Warp kernel; with <code>adopt()</code> (§8) the same wiring reaches <a href="https://github.com/newton-physics/newton">Newton</a>'s
+      own solver kernels without editing them — e.g. adopting the friction computations in
+      <code>newton/_src/solvers/xpbd/kernels.py</code> so per-contact quantities (μ, restitution, contact stiffness)
+      become patchable wires fed by world-position and material wires. Since Newton solvers are ordinary Warp kernels,
+      the same specialization machinery applies; the main work is threading <code>Patchbay.launch</code> through the
+      solver's launch sites.</li>
     <li><strong>Next steps.</strong> Tile-based <code>MLP</code> forward for wider networks
       (Warp's <code>example_tile_mlp.py</code> shows the pattern); warp-nn interop so its trained modules can be
       patched into wires; automatic augmentation discovery à la NeuralSim §V (probe all wires, sparsify which
@@ -413,15 +505,16 @@ mu = jack("contact.mu", MU0)          # analytical default: one constant for the
       specialization happens before capture); upstreaming the dynamic-loop adjoint fix.</li>
   </ul>
 
-  <h2>9. Reproducing</h2>
+  <h2>10. Reproducing</h2>
   <pre><code>git clone https://github.com/NVIDIA/warp && cd warp
 git checkout eric/neural-connections   # worktree branch, based on main 3f387ad3
 python build_lib.py
 python -m warp.tests.test_patchbay
 python -m warp.examples.patchbay.example_hello_patchbay
-python -m warp.examples.patchbay.example_modular_synth   --device cuda:0 --outdir out
-python -m warp.examples.patchbay.example_neural_damping  --device cuda:0 --train_iters 800 --outdir out
-python -m warp.examples.patchbay.example_neural_friction --device cuda:0 --train_iters 400 --outdir out</code></pre>
+python -m warp.examples.patchbay.example_modular_synth     --device cuda:0 --outdir out
+python -m warp.examples.patchbay.example_neural_damping    --device cuda:0 --train_iters 800 --outdir out
+python -m warp.examples.patchbay.example_neural_friction   --device cuda:0 --train_iters 400 --outdir out
+python -m warp.examples.patchbay.example_adopt_and_package --device cuda:0 --train_iters 300 --outdir out</code></pre>
 
   <div class="footnote">
     Prototype and report generated with Claude Code on July 9–10, 2026. Hardware: RTX PRO 6000 Blackwell (MIG 1g.24gb),
