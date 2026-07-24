@@ -260,17 +260,22 @@
   </div>
 
   <h2>What's next</h2>
+  <p>The measurement is in place, and it reordered the queue: the interesting comparison (can a
+  constraint-based solver run at 100–200&nbsp;Hz without tunnelling?) is currently blocked by two correctness
+  bugs rather than by tuning.</p>
   <ul>
-    <li><strong>Collision filtering</strong> to <code>plug↔socket + fingers↔plug</code> via a per-task filter
-    config applied in a Newton builder hook (<code>add_shape_collision_filter_pair</code> / collision groups).
-    Re-test VBD (overflow should vanish) and Kamino (should build).</li>
-    <li><strong>Contact gap / offset</strong> exposure for speculative contacts, plus on-disk <strong>SDF
-    caching</strong> to cut startup time.</li>
-    <li><strong>Tunnelling detector</strong> (keypoint depth vs. contact-force history) + a scripted
-    <strong>forced-insertion proxy</strong> that jams the plug/gear in at escalating speed/misalignment — a
-    fast proxy for the worst-case training moment.</li>
-    <li><strong>Solver × dt sweep</strong> (MuJoCo / hydroelastic / VBD / Kamino × 1000→200→100&nbsp;Hz) with a
-    throughput-vs-tunnelling Pareto and a recommended config per task.</li>
+    <li><strong>Make VBD advance the simulation.</strong> Write <code>body_q</code> back to
+    <code>joint_q</code> after a VBD step (or skip the forward-kinematics refresh for maximal-coordinate
+    solvers). Without this, every VBD number is meaningless — and with it, VBD becomes the most promising
+    candidate for the larger time step.</li>
+    <li><strong>Fix DisplayPort contact.</strong> The plug currently falls through the socket and is never
+    really gripped; both need to work before the DP task can train at all, let alone be tuned.</li>
+    <li><strong>Make Kamino tractable</strong> on contact-dense scenes (it did not finish a 30-step,
+    4-environment gear run within 15 minutes; MuJoCo does it in about a second). Worth retrying with a
+    smaller contact budget and fewer P-ADMM iterations before drawing conclusions.</li>
+    <li><strong>Then</strong> the original sweep: solver × <code>dt</code> (1000→200→100&nbsp;Hz) with the
+    tunnelling rate above as the stability axis, giving a throughput-vs-stability Pareto and a recommended
+    config per task. Contact gap/offset and on-disk SDF caching fold into that sweep.</li>
   </ul>
 
   <h2>Reproduce</h2>
