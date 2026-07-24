@@ -78,11 +78,26 @@
     <li><span class="todo">◻</span> Tunnelling detector + solver&nbsp;×&nbsp;dt sweep (1000→200→100&nbsp;Hz) → throughput-vs-stability Pareto.</li>
   </ul>
 
-  <h2>Baseline rollout</h2>
+  <h2>Rollouts</h2>
+  <p>All videos are rendered fully headless through Newton's <code>ViewerGL.get_frame()</code> into mp4 (no
+  Isaac&nbsp;Sim / Kit). The close-ups use the forced-insertion proxy — a scripted Jacobian push that presses
+  the grasped part straight down into the socket / onto the shaft.</p>
+  <div class="video-pair">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/dp_insertion_closeup.mp4"></video>
+      <p class="caption">DisplayPort insertion — close-up. The gripper presses the plug (dark connector) down
+      toward the socket. The connector is ~2&nbsp;cm and sits near the floor, so it renders small against the
+      ground plane.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/gear_insertion_closeup.mp4"></video>
+      <p class="caption">Gear assembly — close-up. The gripper presses the grasped gear down onto its shaft on
+      the base.</p>
+    </div>
+  </div>
   <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/dp_baseline_rollout.mp4"></video>
-  <p class="caption">DisplayPort insertion, default preset (Newton + MuJoCo soft contacts), 4 environments, rendered
-  headless via <code>ViewerGL</code>. The gripper holds the plug at its grasp pose above the socket; richer
-  forced-insertion clips follow once the proxy scenario lands.</p>
+  <p class="caption">Wide overview (4 environments) of the DisplayPort task — the Flexiv Rizon&nbsp;4s arms holding
+  the plug at the grasp pose, for scale and context.</p>
 
   <h2>The two tasks (as shipped)</h2>
   <table>
@@ -153,6 +168,12 @@
     speed-up. With the whitelist in place, both VBD and Kamino work, and the dt sweep / tunnelling study can
     proceed on a scene that no longer silently drops contacts.
   </div>
+  <p>The <strong>gear task</strong> gets the same treatment (gears are the hub; they collide with the base /
+  shafts and finger tips, not with one another). VBD and Kamino build and step there too — but the gear
+  <em>teeth</em> are intrinsically contact-dense: ~500 contacts per environment even after filtering, across
+  the three shaft-pinned gears, which overflows Newton's auto-sized global contact buffer. So the gear is the
+  case that will most need SDF-based contact reduction (fewer, wider contact patches) — a good next lever, and
+  exactly the kind of thing the dt / solver sweep is meant to quantify.</p>
 
   <h2>What's next</h2>
   <ul>
