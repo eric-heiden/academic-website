@@ -188,6 +188,77 @@
   environment count). At 3× the gear runs VBD and Kamino with <strong>zero dropped contacts</strong> — full
   contact fidelity, and still env-count-scalable.</p>
 
+
+  <h2 id="tunnelling">Forced insertion: measuring tunnelling</h2>
+  <p>Tunnelling — the grasped part passing <em>through</em> the socket instead of seating against it — is the
+  failure that forces these tasks down to a 1&nbsp;ms time step. To measure it rather than argue about it, the
+  probe tracks the <strong>signed insertion depth</strong>: the distance from the seat plane to the part's tip
+  along the insertion axis. A correct insertion drives that depth toward <code>0</code> and <em>stops</em> —
+  solid parts cannot go further. Two signals are flagged: <strong>through-penetration</strong> (depth ends
+  &gt;2&nbsp;mm below the seat) and a <strong>fly-through jump</strong> (&gt;5&nbsp;mm of depth change in one
+  control step, ending below the seat).</p>
+  <p>The depth zero-point is <em>verified against the task's own mate helpers</em>: the authored mated pose
+  gives depth <code>0.0000&nbsp;m</code>, the authored reset pose (68&nbsp;mm clearance) gives
+  <code>+0.0680&nbsp;m</code>. To keep the measurement independent of grasp quality, the part is
+  <strong>fired at the shaft</strong> from a known 30&nbsp;mm gap at a set impact speed — the same approach as
+  Newton's RJ45 demo, which drives its plug directly rather than through a gripper. Gear task, 4 environments,
+  <code>dt&nbsp;=&nbsp;1&nbsp;ms</code>.</p>
+
+  <div id="tunnel-rate-chart" class="chart"></div>
+  <p class="caption">Environments that tunnelled, by solver and impact speed. MuJoCo shows a clean onset —
+  it holds the gear at 0.5&nbsp;m/s, loses half the environments at 2&nbsp;m/s, and all of them at 8&nbsp;m/s.
+  The hydroelastic preset fails at <em>every</em> speed. VBD's 0% is hatched because it is
+  <strong>not a pass</strong>: see the travel column below.</p>
+
+  <div id="depth-trace-chart" class="chart"></div>
+  <p class="caption">Insertion depth of the deepest environment during the 2&nbsp;m/s impact. Zero is the seat
+  plane; below it (shaded) is inside solid material. MuJoCo descends, chatters around the seat and dips ~9&nbsp;mm
+  into it; hydroelastic sails straight through and keeps going (off-scale, reaching −5.3&nbsp;m); VBD never
+  moves at all.</p>
+
+  <h3>Full results</h3>
+  <table>
+    <thead><tr><th>Solver</th><th>Impact speed</th><th>Tunnelled</th><th>Min depth</th><th>Travel</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Hydroelastic (SDF)</td><td>0.5 m/s</td><td>4/4</td><td>-4012.0 mm</td><td>4020.1 mm</td><td class="bad">no contact at all</td></tr>
+      <tr><td>MuJoCo (default)</td><td>0.5 m/s</td><td>0/4</td><td>17.2 mm</td><td>7.7 mm</td><td class="good">contact held the gear</td></tr>
+      <tr><td>VBD</td><td>0.5 m/s</td><td>0/4</td><td>30.0 mm</td><td>0.0 mm</td><td class="bad">invalid — part never moved</td></tr>
+      <tr><td>Hydroelastic (SDF)</td><td>2.0 m/s</td><td>4/4</td><td>-5299.0 mm</td><td>5257.6 mm</td><td class="bad">no contact at all</td></tr>
+      <tr><td>MuJoCo (default)</td><td>2.0 m/s</td><td>2/4</td><td>-8.9 mm</td><td>12.6 mm</td><td class="bad">half the envs pushed ~9 mm into the shaft</td></tr>
+      <tr><td>VBD</td><td>2.0 m/s</td><td>0/4</td><td>30.0 mm</td><td>0.0 mm</td><td class="bad">invalid — part never moved</td></tr>
+      <tr><td>Hydroelastic (SDF)</td><td>8.0 m/s</td><td>4/4</td><td>-10446.8 mm</td><td>10207.4 mm</td><td class="bad">no contact at all</td></tr>
+      <tr><td>MuJoCo (default)</td><td>8.0 m/s</td><td>4/4</td><td>-7062.2 mm</td><td>6936.6 mm</td><td class="bad">blasted straight through</td></tr>
+      <tr><td>VBD</td><td>8.0 m/s</td><td>0/4</td><td>30.0 mm</td><td>0.0 mm</td><td class="bad">invalid — part never moved</td></tr>
+    </tbody>
+  </table>
+  <p class="caption"><strong>Travel</strong> is how far the part actually moved. It is the honesty check that
+  separates "contact stopped the part" from "the solver never moved it" — without it, a frozen body looks
+  like perfect tunnelling immunity.</p>
+
+  <div class="callout warn">
+    <strong>Two blockers this measurement exposed.</strong>
+    <br><strong>1. VBD does not advance the simulation.</strong> Under <code>newton_vbd</code> the gear, the
+    fingertips and even the robot's joint positions stay at exactly their initial values. Reading Newton's own
+    state shows why: VBD moves <code>body_q</code> (max |Δ| ≈ 18&nbsp;mm) but leaves <code>joint_q</code>
+    untouched, and the manager re-runs forward kinematics from that stale <code>joint_q</code> every step,
+    overwriting VBD's result. VBD is a <em>maximal-coordinate</em> solver, so it needs a body→joint write-back
+    (Kamino exposes <code>use_fk_solver</code> for exactly this class of problem). Not a CUDA-graph or
+    state-buffering issue — both were ruled out. Until this is fixed, VBD numbers are not comparable.
+    <br><strong>2. The hydroelastic preset generates no contact here</strong>, letting the gear free-fall
+    through the base at every speed.
+  </div>
+
+  <div class="callout warn">
+    <strong>DisplayPort contact is broken at the asset level.</strong> A correctly aligned plug dropped from
+    15–20&nbsp;mm above the seat falls straight through the socket and never stops — at zero impact speed, and
+    also when dropped 12&nbsp;mm <em>off-centre onto the socket body</em>. Collision flags are correct (plug,
+    socket colliders and finger tips all report <code>collide=True</code> in the right groups), and it happens
+    with the collision filter both on and off. The plug also is never really gripped: the task closes the hand
+    to <code>hand_close_width = -0.1</code>, and the fingers settle at exactly that target with zero deviation —
+    nothing between them. So the DisplayPort task cannot currently produce a meaningful insertion, which is why
+    the quantitative comparison above runs on the gear.
+  </div>
+
   <h2>What's next</h2>
   <ul>
     <li><strong>Collision filtering</strong> to <code>plug↔socket + fingers↔plug</code> via a per-task filter
@@ -246,6 +317,33 @@ Plotly.newPlot("throughput-chart", [{
 }], Object.assign({}, LIGHT, {
   xaxis: { title: "control env-steps / s (4 envs, preliminary)", range: [0, 34] },
   yaxis: { automargin: true }
+}), CFG);
+
+const TUN = {"speeds": [0.5, 2.0, 8.0], "rate": {"mujoco": [0.0, 50.0, 100.0], "hydro": [100.0, 100.0, 100.0], "vbd": [0.0, 0.0, 0.0]}, "traces": {"mujoco": [7.99, 14.09, 15.88, 16.36, 12.6, 15.45, 15.37, 11.65, 1.78, 4.85, 7.23, 10.88, 17.84, 12.27, 5.69, 4.16, 3.92, -2.41, -7.32, -4.1, 3.06, 6.95, 4.03, -3.17, -8.92, -5.98], "hydro": [-41.42, -123.53, -216.32, -319.79, -433.94, -558.78, -694.3, -840.51, -997.39, -1164.97, -1343.22, -1532.16, -1731.78, -1942.09, -2163.08, -2394.75, -2637.11, -2890.15, -3153.87, -3428.28, -3713.37, -4009.14, -4315.59, -4632.73, -4960.55, -5299.05], "vbd": [30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0]}, "table": [{"solver": "hydro", "speed": 0.5, "tunnelled": "4/4", "min_depth_mm": -4012.0, "travel_mm": 4020.1, "fps": 53.8}, {"solver": "mujoco", "speed": 0.5, "tunnelled": "0/4", "min_depth_mm": 17.2, "travel_mm": 7.7, "fps": 43.96}, {"solver": "vbd", "speed": 0.5, "tunnelled": "0/4", "min_depth_mm": 30.0, "travel_mm": 0.0, "fps": 2.57}, {"solver": "hydro", "speed": 2.0, "tunnelled": "4/4", "min_depth_mm": -5299.0, "travel_mm": 5257.6, "fps": 53.65}, {"solver": "mujoco", "speed": 2.0, "tunnelled": "2/4", "min_depth_mm": -8.9, "travel_mm": 12.6, "fps": 43.43}, {"solver": "vbd", "speed": 2.0, "tunnelled": "0/4", "min_depth_mm": 30.0, "travel_mm": 0.0, "fps": 2.6}, {"solver": "hydro", "speed": 8.0, "tunnelled": "4/4", "min_depth_mm": -10446.8, "travel_mm": 10207.4, "fps": 53.76}, {"solver": "mujoco", "speed": 8.0, "tunnelled": "4/4", "min_depth_mm": -7062.2, "travel_mm": 6936.6, "fps": 46.29}, {"solver": "vbd", "speed": 8.0, "tunnelled": "0/4", "min_depth_mm": 30.0, "travel_mm": 0.0, "fps": 2.51}]};
+const SOLV = [["mujoco","MuJoCo (default)","#2a78d6",""],["hydro","Hydroelastic (SDF)","#eb6834",""],["vbd","VBD (invalid — frozen)","#1baf7a","/"]];
+Plotly.newPlot("tunnel-rate-chart", SOLV.map(([k,label,col,pat]) => ({
+  type:"bar", name:label, x:TUN.speeds.map(s=>s+" m/s"), y:TUN.rate[k],
+  marker:{color:col, pattern:{shape:pat, fgcolor:"#fcfcfb", size:6, solidity:0.35},
+          line:{color:"#fcfcfb", width:2}},
+  text:TUN.rate[k].map(v=>v+"%"), textposition:"outside", textfont:{color:"#52514e", size:12},
+  hovertemplate:"%{fullData.name}<br>%{x} → %{y}% of envs tunnelled<extra></extra>"
+})), Object.assign({}, LIGHT, {
+  barmode:"group", bargap:0.28, bargroupgap:0.06,
+  xaxis:{title:"impact speed", showgrid:false},
+  yaxis:{title:"environments tunnelled (%)", range:[0,118], ticksuffix:"%", gridcolor:"#e8ecf0", zerolinecolor:"#d8e0e7"},
+  legend:{orientation:"h", y:-0.22}, hovermode:"closest"
+}), CFG);
+
+Plotly.newPlot("depth-trace-chart", SOLV.map(([k,label,col,pat]) => ({
+  type:"scatter", mode:"lines", name:label, y:TUN.traces[k],
+  line:{color:col, width:2, dash: pat ? "dot" : "solid"},
+  hovertemplate:"%{fullData.name}<br>step %{x} → depth %{y:.1f} mm<extra></extra>"
+})), Object.assign({}, LIGHT, {
+  xaxis:{title:"control step (33 ms each)", showgrid:false},
+  yaxis:{title:"insertion depth (mm) — 0 is the seat", range:[-45,36], gridcolor:"#e8ecf0", zerolinecolor:"#98a3ad"},
+  shapes:[{type:"rect", xref:"paper", x0:0, x1:1, y0:-45, y1:0, fillcolor:"#b5483a", opacity:0.07, line:{width:0}}],
+  annotations:[{xref:"paper", x:0.015, y:-38, text:"inside the solid", showarrow:false, font:{color:"#b5483a", size:11}, xanchor:"left"}],
+  legend:{orientation:"h", y:-0.22}, hovermode:"x unified"
 }), CFG);
 </script>
 </body>
