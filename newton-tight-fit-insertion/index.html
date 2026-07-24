@@ -169,11 +169,13 @@
     proceed on a scene that no longer silently drops contacts.
   </div>
   <p>The <strong>gear task</strong> gets the same treatment (gears are the hub; they collide with the base /
-  shafts and finger tips, not with one another). VBD and Kamino build and step there too — but the gear
-  <em>teeth</em> are intrinsically contact-dense: ~500 contacts per environment even after filtering, across
-  the three shaft-pinned gears, which overflows Newton's auto-sized global contact buffer. So the gear is the
-  case that will most need SDF-based contact reduction (fewer, wider contact patches) — a good next lever, and
-  exactly the kind of thing the dt / solver sweep is meant to quantify.</p>
+  shafts and finger tips, not with one another). The gear <em>teeth</em> are intrinsically contact-dense —
+  ~500 contacts per environment even after filtering, across the three shaft-pinned gears — which initially
+  overflowed Newton's <em>auto-sized global</em> contact buffer. For sub-mm-precision assembly the answer is to
+  keep every contact, not thin them out, so we over-provision the buffer instead: a new
+  <code>rigid_contact_max_scale</code> multiplier on Newton's auto-estimate (which itself scales with the
+  environment count). At 3× the gear runs VBD and Kamino with <strong>zero dropped contacts</strong> — full
+  contact fidelity, and still env-count-scalable.</p>
 
   <h2>What's next</h2>
   <ul>
