@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tight-Fit Assembly in Newton — Solvers &amp; Tunnelling</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18212a;
+      --muted: #5e6b76;
+      --line: #d8e0e7;
+      --panel: #f7f9fb;
+      --accent: #178a64;
+      --warn: #b5483a;
+    }
+    body { margin: 0; font-family: Inter, "Segoe UI", Arial, sans-serif; color: var(--ink); background: #fff; line-height: 1.5; }
+    main { max-width: 1080px; margin: 0 auto; padding: 42px 32px 72px; }
+    h1 { font-size: 34px; line-height: 1.12; margin: 0 0 10px; }
+    h2 { margin: 40px 0 12px; font-size: 22px; }
+    h3 { margin: 24px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    a { color: var(--accent); }
+    code { background: #eef3f6; padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+    pre { background: #eef3f6; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+    .lede { color: var(--muted); font-size: 17px; max-width: 880px; }
+    .stamp { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .live { display: inline-block; font-size: 12px; font-weight: 650; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 20px; }
+    .example-video { display: block; width: 100%; max-width: 720px; border: 1px solid var(--line); border-radius: 8px; background: #0f1720; }
+    .caption { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+    .callout { border: 1px solid var(--line); border-left: 5px solid var(--accent); background: var(--panel); padding: 14px 16px; border-radius: 8px; margin: 20px 0; }
+    .callout.warn { border-left-color: var(--warn); }
+    .grid-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0 28px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fff; }
+    .metric { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .label { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f8; font-weight: 650; }
+    ul { padding-left: 22px; } li { margin: 6px 0; }
+    .good { color: var(--accent); font-weight: 650; }
+    .bad { color: var(--warn); font-weight: 650; }
+    .chart { width: 100%; height: 380px; margin: 10px 0 4px; }
+    .todo { color: var(--muted); } .done { color: var(--accent); font-weight: 650; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Tight-Fit Assembly in Newton: Solvers &amp; Tunnelling</h1>
+  <p class="lede">Bring-up and solver investigation for two contact-rich insertion tasks — a
+  <strong>gear-on-shaft assembly</strong> and a <strong>DisplayPort cable insertion</strong> — on a Flexiv
+  Rizon&nbsp;4s + Grav gripper in Isaac Lab / Newton. The goal is to run both tasks at a much larger time
+  step than the current 2&nbsp;kHz soft-contact regime by moving to Newton's constraint-based solvers
+  (<code>SolverVBD</code>, <code>SolverKamino</code>), while quantifying throughput and detecting tunnelling
+  before committing to a two-day training run.</p>
+  <p class="stamp" id="stamp">Generated 2026-07-24 · Newton <code>1.4.0.dev0</code> (ships <code>SolverVBD</code> +
+  <code>SolverKamino</code>) · Isaac&nbsp;Lab worktree <code>newton/gear-dp-combined</code> · NVIDIA RTX&nbsp;PRO&nbsp;6000
+  Blackwell (MIG 1g.24&nbsp;GB) · runs are Kit-free (no Isaac&nbsp;Sim).</p>
+  <span class="live">● Live — updated as the investigation progresses</span>
+
+  <div class="grid-cards">
+    <div class="card"><div class="label">Tasks combined</div><div class="metric">2</div><div class="label">gear + DisplayPort, one branch</div></div>
+    <div class="card"><div class="label">Solvers selectable</div><div class="metric">5</div><div class="label">MuJoCo · hydroelastic · XPBD · VBD · Kamino</div></div>
+    <div class="card"><div class="label">Contacts / body (unfiltered)</div><div class="metric">~680</div><div class="label">median; vs 256 VBD buffer</div></div>
+    <div class="card"><div class="label">Video pipeline</div><div class="metric">✓</div><div class="label">ViewerGL.get_frame → mp4, headless</div></div>
+  </div>
+
+  <h2>Where things stand</h2>
+  <ul>
+    <li><span class="done">✓</span> Combined the gear-assembly and DisplayPort-insertion branches into one worktree (both tasks + LEAPP export).</li>
+    <li><span class="done">✓</span> Rebuilt a <strong>Kit-free</strong> environment (Newton needs no Isaac&nbsp;Sim); both tasks build and step; asset resolution works over S3/CloudFront.</li>
+    <li><span class="done">✓</span> Verified <strong>video rollouts</strong> render through Newton's <code>ViewerGL.get_frame()</code> into an mp4, fully headless.</li>
+    <li><span class="done">✓</span> Wrote the missing <strong>VBD solver manager</strong> and added <code>newton_vbd</code> / <code>newton_kamino</code> presets; dt / substep / solver sweeps run from the CLI with no code edits.</li>
+    <li><span class="todo">◻</span> Collision filtering (plug↔socket + fingers↔plug only) — <em>in progress</em>, on the critical path (see finding below).</li>
+    <li><span class="todo">◻</span> Benchmark harness + tunnelling detector + forced-insertion proxy → solver&nbsp;×&nbsp;dt sweep.</li>
+  </ul>
+
+  <h2>Baseline rollout</h2>
+  <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/dp_baseline_rollout.mp4"></video>
+  <p class="caption">DisplayPort insertion, default preset (Newton + MuJoCo soft contacts), 4 environments, rendered
+  headless via <code>ViewerGL</code>. The gripper holds the plug at its grasp pose above the socket; richer
+  forced-insertion clips follow once the proxy scenario lands.</p>
+
+  <h2>The two tasks (as shipped)</h2>
+  <table>
+    <thead><tr><th>Setting</th><th>Gear assembly</th><th>DisplayPort insertion</th></tr></thead>
+    <tbody>
+      <tr><td>Physics dt / decimation</td><td>1&nbsp;ms · 33</td><td>1&nbsp;ms · 33</td></tr>
+      <tr><td>Effective solver rate</td><td colspan="2">1&nbsp;kHz × 2 substeps = <strong>2&nbsp;kHz</strong>, control at 30.3&nbsp;Hz</td></tr>
+      <tr><td>Default solver</td><td colspan="2">Newton + MuJoCo internal contacts (soft/penalty), implicit-fast, elliptic cone</td></tr>
+      <tr><td>Envs · episode</td><td colspan="2">4096 · 6.66&nbsp;s</td></tr>
+      <tr><td>Held part</td><td>gear (small/medium/large)</td><td>DisplayPort plug (30&nbsp;g), ~0.27&nbsp;mm blade clearance</td></tr>
+    </tbody>
+  </table>
+  <p>The soft-contact model is what forces the tiny time step: stiff penalty contacts need ~2&nbsp;kHz to stay
+  stable and avoid tunnelling. Newton's <code>SolverVBD</code> and <code>SolverKamino</code> instead solve
+  contacts as constraints, so they should tolerate 100–200&nbsp;Hz collision handling — the premise of this
+  investigation.</p>
+
+  <h2 id="finding">Key finding: contact count is the bottleneck</h2>
+  <p>With collisions left unfiltered, the DisplayPort scene generates a <strong>huge number of contacts per
+  body</strong> — the plug against the socket's full SDF cavity, plus robot links. Running VBD surfaces this
+  immediately as per-body contact-buffer overflow; Kamino cannot even build.</p>
+
+  <div id="contact-hist" class="chart"></div>
+  <p class="caption">Per-body rigid contact counts reported during a VBD rollout of the DisplayPort task
+  (n&nbsp;=&nbsp;578 overflow events, 4 envs). Median <strong>681</strong>, max <strong>820</strong> — all far above the
+  256-contact per-body VBD buffer (dashed line). Every overflow silently drops contacts, which is exactly how
+  tunnelling creeps in.</p>
+
+  <table>
+    <thead><tr><th>Solver preset</th><th>Builds?</th><th>Steps?</th><th>Observation</th></tr></thead>
+    <tbody>
+      <tr><td><code>default</code> (MuJoCo)</td><td class="good">yes</td><td class="good">yes</td><td>Baseline; soft contacts absorb the large contact set.</td></tr>
+      <tr><td><code>newton_vbd</code></td><td class="good">yes</td><td class="good">yes</td><td>Runs, but floods <code>contact buffer overflowed 820 &gt; 256</code> → dropped contacts.</td></tr>
+      <tr><td><code>newton_kamino</code></td><td class="bad">no</td><td>—</td><td>Crashes at construction: contact-sizing integer overflow (<code>array shape −101886780</code>).</td></tr>
+    </tbody>
+  </table>
+
+  <p>Both failure modes share one root cause and one fix: <strong>collision filtering</strong>. Restricting
+  collisions to the pairs that matter — <code>plug ↔ socket</code> and <code>fingers ↔ plug</code>, with robot
+  self-collision, robot-link↔socket, and cross-environment contacts switched off — should cut the contact
+  count by an order of magnitude, stop VBD dropping contacts, and let Kamino build. Only then are the dt sweep
+  and tunnelling evaluation meaningful.</p>
+
+  <div id="throughput-chart" class="chart"></div>
+  <p class="caption">Preliminary per-step throughput at 4 environments (higher is better). VBD is slow here
+  <em>because</em> of the contact-buffer overflow, not intrinsically — this is the "before" bar for the
+  collision-filtering work. Absolute numbers are tiny at 4 envs; the real comparison happens at scale after
+  filtering.</p>
+
+  <div class="callout warn">
+    <strong>Reading of the finding.</strong> The user's intuition — use Newton collision filters to remove
+    unnecessary contacts — turns out to be a hard prerequisite for the constraint-based solvers, not just a
+    speed-up. It moves collision filtering to the front of the queue.
+  </div>
+
+  <h2>What's next</h2>
+  <ul>
+    <li><strong>Collision filtering</strong> to <code>plug↔socket + fingers↔plug</code> via a per-task filter
+    config applied in a Newton builder hook (<code>add_shape_collision_filter_pair</code> / collision groups).
+    Re-test VBD (overflow should vanish) and Kamino (should build).</li>
+    <li><strong>Contact gap / offset</strong> exposure for speculative contacts, plus on-disk <strong>SDF
+    caching</strong> to cut startup time.</li>
+    <li><strong>Tunnelling detector</strong> (keypoint depth vs. contact-force history) + a scripted
+    <strong>forced-insertion proxy</strong> that jams the plug/gear in at escalating speed/misalignment — a
+    fast proxy for the worst-case training moment.</li>
+    <li><strong>Solver × dt sweep</strong> (MuJoCo / hydroelastic / VBD / Kamino × 1000→200→100&nbsp;Hz) with a
+    throughput-vs-tunnelling Pareto and a recommended config per task.</li>
+  </ul>
+
+  <h2>Reproduce</h2>
+  <pre>
+# Kit-free env in the combined worktree
+cd IsaacLab-gear-dp
+uv venv --python 3.12.13 .venv &amp;&amp; uv sync
+
+# Run either task headless, pick a solver, override dt from the CLI
+.venv/bin/python -u tmp_smoke.py \
+  --task IsaacContrib-Deploy-DisplayportInsertion-Rizon4s-Grav-Play \
+  --num_envs 4 --headless --visualizer none presets=newton_vbd
+# sweep knobs without editing files:  env.sim.dt=0.005  env.decimation=10  env.sim.physics.num_substeps=1
+  </pre>
+
+</main>
+<script>
+const LIGHT = {
+  paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "#fbfdff",
+  font: { family: "Inter, Segoe UI, Arial, sans-serif", color: "#18212a", size: 13 },
+  margin: { l: 56, r: 20, t: 30, b: 48 }
+};
+const CFG = { responsive: true, displayModeBar: false };
+
+// Per-body contact counts observed during the VBD DisplayPort rollout (overflow events).
+const CONTACTS = [674,682,676,817,712,779,759,795,755,771,738,777,728,752,683,742,820,793,750,797,764,790,677,692,771,701,668,674,747,674,740,718,779,772,709,678,675,689,680,730,758,686,675,693,677,741,791,754,743,773,704,672,696,719,685,685,664,668,678,680,688,670,669,688,719,770,674,678,696,707,715,702,739,699,756,706,687,677,766,693,696,739,708,677,789,666,709,672,683,661,672,685,684,733,678,672,671,657,680,686,682,670,684,672,680,684,664,670,672,688,665,671,696,683,670,681,695,677,726,690,678,676,674,672,670,662,674,680,681,720,678,674,678,666,708,706,712,736,721,679,758,697,693,720,711,683,685,747,669,690,677,680,673,687,687,679,711,707,703,693,691,683,676,677,676,676,700,689,683,677,678,670,669,684,697,680,684,666,674,680,672,668,675,685,667,672,662,664,662,670,677,696,695,692,703,689,709,689,678,708,702,706,697,716,714,720,746,735,747,794,744,792,748,740,770,768,776,774,762,781,761,740,753,776,752,740,745,758,724,769,766,795,745,749,774,770,742,738,788,746,726,744,790,750,788,756,738,768,752,786,758,752,734,762,748,768,738,746,748,764,746,768,740,760,676,685,753,786,781,783,787,780,750,806,776,757,728,750,762,744,740,794,746,740,742,764,732,764,770,754,747,782,797,724,766,774,770,780,751,767,768,774,736,765,776,779,766,782,797,787,767,761,780,760,758,772,782,758,755,768,768,768,766,766,760,734,734,741,742,740,676,695,783,744,734,773,710,658,519,580,484,446,438,352,390,430,456,420,348,358,384,418,402,394,404,450,516,434,544,580,600,660,772,748,734,688,674,696,716,744,727,741,733,712,711,790,714,676,720,704,664,644,548,622,628,624,462,486,464,444,455,482,654,700,728,700,674,697,744,692,538,394,368,326,354,294,314,282,320,336,266,262,276,294,264,300,286,342,338,342,474,445,591,656,779,761,763,695,518,459,410,392,430,352,392,342,302,268,270,260,272,286,268,262,298,344,340,540,658,738,795,733,674,700,735,644,518,466,370,344,350,328,296,296,346,266,282,266,274,292,300,296,292,296,308,342,328,316,340,376,428,452,544,586,729,617,548,406,356,450,346,292,304,274,284,300,346,274,304,330,290,278,296,314,316,306,386,358,344,390,366,384,414,634,624,746,726,624,676,767,577,338,288,278,268,262,274,262,306,282,286,296,362,478,452,755,562,356,326,308,272,298,276,268,262,264,268,272,268,284,276,266,276,304,274,384,314,280,358,490,732,621,562,676,745,428,260,312,625,543,386,302,262,272,350,560,632,452];
+Plotly.newPlot("contact-hist", [{
+  x: CONTACTS, type: "histogram", marker: { color: "#178a64" }, nbinsx: 30, name: "contacts/body"
+}], Object.assign({}, LIGHT, {
+  xaxis: { title: "rigid contacts per body (per step)" },
+  yaxis: { title: "count" },
+  shapes: [{ type: "line", x0: 256, x1: 256, yref: "paper", y0: 0, y1: 1,
+             line: { color: "#b5483a", width: 2, dash: "dash" } }],
+  annotations: [{ x: 256, yref: "paper", y: 1, text: "VBD buffer = 256", showarrow: false,
+                  font: { color: "#b5483a" }, xanchor: "left", yanchor: "top" }]
+}), CFG);
+
+Plotly.newPlot("throughput-chart", [{
+  type: "bar", orientation: "h",
+  y: ["Kamino (crashes)", "VBD (buffer overflow)", "gear · MuJoCo", "DisplayPort · MuJoCo"],
+  x: [0, 2, 24, 23],
+  marker: { color: ["#b5483a", "#d9a441", "#178a64", "#178a64"] },
+  text: ["build failure", "~2", "~24", "~23"], textposition: "outside"
+}], Object.assign({}, LIGHT, {
+  xaxis: { title: "control env-steps / s (4 envs, preliminary)" },
+  yaxis: { automargin: true }
+}), CFG);
+</script>
+</body>
+</html>
