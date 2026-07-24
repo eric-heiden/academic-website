@@ -73,8 +73,9 @@
     <li><span class="done">✓</span> Rebuilt a <strong>Kit-free</strong> environment (Newton needs no Isaac&nbsp;Sim); both tasks build and step; asset resolution works over S3/CloudFront.</li>
     <li><span class="done">✓</span> Verified <strong>video rollouts</strong> render through Newton's <code>ViewerGL.get_frame()</code> into an mp4, fully headless.</li>
     <li><span class="done">✓</span> Wrote the missing <strong>VBD solver manager</strong> and added <code>newton_vbd</code> / <code>newton_kamino</code> presets; dt / substep / solver sweeps run from the CLI with no code edits.</li>
-    <li><span class="todo">◻</span> Collision filtering (plug↔socket + fingers↔plug only) — <em>in progress</em>, on the critical path (see finding below).</li>
-    <li><span class="todo">◻</span> Benchmark harness + tunnelling detector + forced-insertion proxy → solver&nbsp;×&nbsp;dt sweep.</li>
+    <li><span class="done">✓</span> <strong>Collision filtering</strong> (plug↔socket + plug↔finger only) via per-body Newton collision groups — this fixed both constraint solvers (see below).</li>
+    <li><span class="done">✓</span> <strong>Forced-insertion proxy</strong> — a scripted Jacobian push that presses the plug into the socket (worst-case contact moment); doubles as the close-up video driver.</li>
+    <li><span class="todo">◻</span> Tunnelling detector + solver&nbsp;×&nbsp;dt sweep (1000→200→100&nbsp;Hz) → throughput-vs-stability Pareto.</li>
   </ul>
 
   <h2>Baseline rollout</h2>
@@ -126,15 +127,31 @@
   and tunnelling evaluation meaningful.</p>
 
   <div id="throughput-chart" class="chart"></div>
-  <p class="caption">Preliminary per-step throughput at 4 environments (higher is better). VBD is slow here
-  <em>because</em> of the contact-buffer overflow, not intrinsically — this is the "before" bar for the
-  collision-filtering work. Absolute numbers are tiny at 4 envs; the real comparison happens at scale after
-  filtering.</p>
+  <p class="caption">Per-step throughput at 4 environments after collision filtering (higher is better), with
+  the pre-filter number in parentheses. VBD jumps ~10× once it stops dropping contacts; Kamino now runs at all
+  (it previously crashed at construction). Absolute numbers are small at 4 envs — the real comparison happens
+  at scale.</p>
 
-  <div class="callout warn">
-    <strong>Reading of the finding.</strong> The user's intuition — use Newton collision filters to remove
-    unnecessary contacts — turns out to be a hard prerequisite for the constraint-based solvers, not just a
-    speed-up. It moves collision filtering to the front of the queue.
+  <h2 id="fix">Collision filtering: the fix</h2>
+  <p>The fix is a small, general mechanism: a <code>NewtonCollisionFilterCfg</code> that assigns Newton
+  <em>collision groups</em> per body before the model is finalized. Newton's group rule — a body in a negative
+  "hub" group collides with any positive group, but positive groups don't collide with each other — expresses
+  the desired whitelist exactly: the <strong>plug is the hub</strong> (group&nbsp;−1), the <strong>socket</strong>
+  (group&nbsp;+1) and the <strong>gripper fingers</strong> (group&nbsp;+2) each collide with the plug but not with
+  one another, and everything else (robot arm, links, ground) is disabled (group&nbsp;0). It is
+  O(number&nbsp;of&nbsp;shapes) and never pairs shapes across environments.</p>
+  <table>
+    <thead><tr><th>Solver preset</th><th>Before filter</th><th>After filter (plug↔socket + plug↔finger)</th></tr></thead>
+    <tbody>
+      <tr><td><code>newton_vbd</code></td><td class="bad">runs, but 578 buffer-overflow events/rollout (drops contacts); ~2 env-steps/s</td><td class="good">0 overflow, ~21 env-steps/s (~10×)</td></tr>
+      <tr><td><code>newton_kamino</code></td><td class="bad">build crash — contact-sizing integer overflow</td><td class="good">builds &amp; steps (~1 env-step/s; P-ADMM is heavy)</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <strong>Reading of the finding.</strong> Using Newton collision filters to remove unnecessary contacts —
+    the original intuition — turned out to be a hard prerequisite for the constraint-based solvers, not just a
+    speed-up. With the whitelist in place, both VBD and Kamino work, and the dt sweep / tunnelling study can
+    proceed on a scene that no longer silently drops contacts.
   </div>
 
   <h2>What's next</h2>
@@ -188,12 +205,12 @@ Plotly.newPlot("contact-hist", [{
 
 Plotly.newPlot("throughput-chart", [{
   type: "bar", orientation: "h",
-  y: ["Kamino (crashes)", "VBD (buffer overflow)", "gear · MuJoCo", "DisplayPort · MuJoCo"],
-  x: [0, 2, 24, 23],
-  marker: { color: ["#b5483a", "#d9a441", "#178a64", "#178a64"] },
-  text: ["build failure", "~2", "~24", "~23"], textposition: "outside"
+  y: ["Kamino + filter", "VBD + filter", "MuJoCo default"],
+  x: [1, 21, 23],
+  marker: { color: ["#178a64", "#178a64", "#178a64"] },
+  text: ["~1  (before: build crash)", "~21  (before: ~2, overflowing)", "~23"], textposition: "outside"
 }], Object.assign({}, LIGHT, {
-  xaxis: { title: "control env-steps / s (4 envs, preliminary)" },
+  xaxis: { title: "control env-steps / s (4 envs, preliminary)", range: [0, 34] },
   yaxis: { automargin: true }
 }), CFG);
 </script>
