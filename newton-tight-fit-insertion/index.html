@@ -76,7 +76,7 @@
     <li><span class="done">✓</span> <strong>Collision filtering</strong> via per-body Newton collision groups — and then fixed two bugs in it that were silently disabling the contacts it selected.</li>
     <li><span class="done">✓</span> <strong>Forced-insertion proxy</strong> — a scripted Jacobian push that presses the plug into the socket (worst-case contact moment); doubles as the close-up video driver.</li>
     <li><span class="done">✓</span> <strong>Tunnelling detector</strong> and a direct <strong>vertex-vs-SDF overlap</strong> measurement, both calibrated against the task's own geometry.</li>
-    <li><span class="done">✓</span> <strong>Passive-stability check</strong> — the gear scene now settles on its shaft and stays there; it did not before.</li>
+    <li><span class="done">✓</span> <strong>Passive-stability and gear-train checks</strong> — the gear now seats on its shaft to within 0.03 mm and stays; driving one gear shows the teeth do <em>not</em> transmit.</li>
     <li><span class="todo">◻</span> Redo the solver comparison on the corrected scene, then the dt sweep (1000→200→100&nbsp;Hz).</li>
   </ul>
 
@@ -92,10 +92,10 @@
       the socket), so nothing physical should be read from this clip.</p>
     </div>
     <div>
-      <video controls muted loop playsinline preload="metadata" src="assets/gear_settle_0ms.mp4"></video>
-      <p class="caption">Gear assembly — close-up of the corrected scene: the gear threads onto its shaft and
-      settles. (The earlier gear clip here was rendered before the collision fixes and was not physical; it has
-      been removed rather than kept for comparison.)</p>
+      <video controls muted loop playsinline preload="metadata" src="assets/gear_seated.mp4"></video>
+      <p class="caption">Gear assembly — the gear threaded onto its shaft and resting on the plate, 0.03 mm
+      from its designed rest height. Earlier versions of this clip showed the gear sliding past the fixture;
+      they were wrong and have been replaced rather than kept.</p>
     </div>
   </div>
   <video class="example-video" controls muted loop playsinline preload="metadata" src="assets/dp_baseline_rollout.mp4"></video>
@@ -275,88 +275,102 @@
   </div>
 
 
-  <h2 id="stability">Making the scene physical first</h2>
+  <h2 id="stability">Getting the gear scene physically right</h2>
   <div class="callout warn">
-    <strong>Correction.</strong> The forced-insertion clips previously shown here were not physical — the
-    gear flapped about as if hinged. It was right to distrust them. The scene was never settling, and three
-    separate bugs were responsible. Everything below is re-measured on the corrected scene; the earlier
-    solver comparison is retracted (see the note in that section).
+    <strong>Second correction.</strong> The previous clips here were still wrong: the gear slid down past the
+    fixture instead of seating on its shaft, so it could never mesh with its neighbour. Two things caused it,
+    one mine and one the scene's, and both are measured below. Everything in this section is re-run on the
+    corrected setup, and a new functional test now checks the assembly actually works rather than merely
+    coming to rest.
   </div>
 
-  <p>A contact measurement is only worth as much as the scene under it, so the first thing to establish is
-  that the scene is <em>passively</em> stable: with no actions at all, a part dropped onto its shaft must
-  lose speed, stop tilting and stay put. <code>passive_stability.py</code> checks exactly that and reports
-  linear/angular speed and tilt drift over the last quarter of a rollout. It failed immediately, which is
-  how the following were found.</p>
+  <h3>The geometry, measured rather than assumed</h3>
+  <p>Reading the collider meshes directly settles what the scene is supposed to do:</p>
+  <table>
+    <thead><tr><th>Feature</th><th>Measured</th></tr></thead>
+    <tbody>
+      <tr><td>Base plate</td><td>z ∈ [−18.8, −11.0] mm → <strong>7.8 mm thick</strong>, top face at −11.0 mm</td></tr>
+      <tr><td>Shafts</td><td>z ∈ [−11.3, +18.8] mm, radius <strong>7.1 mm</strong> (30 mm tall)</td></tr>
+      <tr><td>Gear bore</td><td>radius <strong>7.9 mm</strong> → 0.8 mm radial clearance on the shaft</td></tr>
+      <tr><td>Gear teeth</td><td>small <strong>20T</strong> · medium <strong>40T</strong> · large <strong>60T</strong>, circular pitch ≈ 4.9–5.2 mm (module ≈ 1.6 mm)</td></tr>
+      <tr><td>Centre distances</td><td>large↔medium 75.7 mm, medium↔small 45.8 mm → ≈ 1 mm backlash</td></tr>
+    </tbody>
+  </table>
+  <p>So a correctly seated gear has its centre at <strong>+7.5 mm</strong> (bottom face resting on the plate),
+  exactly the task's own <code>seated_gear_z_offset</code>, and the three gears are a <em>matched, meshable
+  set</em>. Any failure to mesh is therefore a simulation problem, not a modelling one.</p>
 
-  <h3>What was wrong</h3>
+  <h3>Why the gear went through the floor</h3>
   <ol>
-    <li><strong>Negative collision groups silently drop MuJoCo contacts.</strong> The filter used a negative
-    "hub" group so the held part would collide with the socket and the fingers while those did not collide
-    with each other. Those semantics belong to Newton's own collision pipeline and are not carried through
-    the MuJoCo contact path — the contacts were simply discarded, and the gear fell 57&nbsp;m through its
-    base. Fixed by putting everything that must touch in one <em>positive</em> group.</li>
-    <li><strong>The filter patterns matched only one asset variant.</strong> They used the default assets'
-    mesh names, but the <code>newton_hydroelastic</code> preset loads different Newton USDs whose bodies are
-    named <code>FactoryGear*</code>. Nothing matched, so every gear and the base fell through to the
-    disabled group. This is also why I previously — and wrongly — reported that "the hydroelastic preset
-    generates no contact at all". The filter now matches the asset prim name, and an unmatched pattern
-    raises a warning instead of silently disabling collisions.</li>
-    <li><strong>The <code>default</code> preset cannot represent gear-on-shaft at all.</strong> Newton
-    convexifies mesh colliders by default, and the convex hull of a gear <em>fills its bore</em>. The gear
-    then balances on the shaft tip instead of threading over it — precisely the hinge-like rocking that was
-    visible. Turning convexification off removes contact entirely (MuJoCo has no exact mesh-mesh path), so
-    the gear task must run the <code>newton_hydroelastic</code> preset, whose SDF assets keep the bore.</li>
+    <li><strong>My drop height was above the shaft.</strong> The shaft tips end at +18.8 mm and a seated gear
+    centre sits at +7.5 mm, so "drop it 15 mm above the seat" put the bore <em>above the shaft tip entirely</em>.
+    The gear was never threaded, and simply fell past the fixture. Released at its seated pose, or dropped
+    ≤5 mm, it threads on and stays: <strong>tilt 0.00°, resting 0.03 mm from the seat, 0.05 mm/s</strong>.</li>
+    <li><strong>The plate is penetrable under modest impact.</strong> Dropped 8 mm the gear ends 9.5 mm below
+    its seat; dropped 11 mm, 22.6 mm below — it passes clean through a 7.8 mm plate. Raising the hydroelastic
+    SDF resolution helps only marginally (−22.6 → −21.9 → −17.4 mm for 64 → 128 → 256), and 512 exhausts the
+    GPU. This is a genuine contact-fidelity limit of the current setup, not a placement mistake.</li>
   </ol>
-  <p>A fourth, smaller issue was in the probe rather than the scene: the reset event randomizes the base
-  pose, so placing the part at its authored world position missed the shaft. It is now placed with the
-  task's own seating maths, composed with the base's runtime pose.</p>
 
-  <h3>The corrected scene</h3>
-  <div class="video-pair" style="grid-template-columns:repeat(3,1fr)">
-    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_settle_0ms.mp4"></video>
-      <p class="caption"><strong>Released at rest.</strong> The gear threads onto the shaft and settles:
-      0.05&nbsp;mm/s, 0.07&nbsp;°/s, tilt 0.31°. It stays there.</p></div>
-    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_insert_035ms.mp4"></video>
-      <p class="caption"><strong>Pressed at 0.35&nbsp;m/s.</strong> A real insertion — the shaft emerges
-      through the bore as the gear seats 34&nbsp;mm down.</p></div>
-    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_fail_2ms.mp4"></video>
-      <p class="caption"><strong>Slammed at 2&nbsp;m/s.</strong> The gear is knocked clean off; the shaft is
-      left bare. This is the failure mode, and now it looks like one.</p></div>
+  <div class="video-pair">
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_seated.mp4"></video>
+      <p class="caption"><strong>Correctly seated.</strong> The gear descends over the shaft — the shaft tip is
+      visible in the bore — and rests flat on the plate, where it stays.</p></div>
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_mesh_drive.mp4"></video>
+      <p class="caption"><strong>Gear-train drive test.</strong> The large gear is spun at 3 rad/s while its
+      neighbours are left free. They barely move — see below.</p></div>
+  </div>
+
+  <h3>Does the assembly actually work?</h3>
+  <p>Settling is far too weak a check: a gear lying under the fixture is also at rest. The real question is
+  whether the thing functions as a gear train, so <code>gear_mesh_test.py</code> seats all three gears, spins
+  one, and measures whether the others turn — checking <em>direction</em> and the <em>ratio their radii imply</em>,
+  not merely that something moved. It also fails when the driven gear itself does not turn, so a dead drive
+  cannot quietly pass.</p>
+  <table>
+    <thead><tr><th>Gear</th><th>Measured ω</th><th>Expected ω</th><th>Stayed on its shaft</th></tr></thead>
+    <tbody>
+      <tr><td>large (driven, 60T)</td><td>+2.23 rad/s</td><td>— (input)</td><td>within 1.2 mm</td></tr>
+      <tr><td>medium (40T)</td><td class="bad">−0.002 rad/s</td><td>−3.3 rad/s</td><td>within 1.4 mm</td></tr>
+      <tr><td>small (20T)</td><td class="bad">−0.021 rad/s</td><td>+6.7 rad/s</td><td>within 1.3 mm</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <strong>The gear train does not transmit.</strong> The gears stay seated — all three hold to within
+    1.4 mm — but driving one moves the others by roughly a thousandth of what meshing would produce. With
+    1.6 mm teeth on a 93 mm gear, the contact simply never resolves the flanks: a 64³ SDF over the base's
+    228 mm span is ~3.6 mm per voxel, so a tooth is smaller than one voxel. Raising resolution helps and then
+    stalls (neighbour ω 0.21 → 0.41 → 0.64 rad/s for 64 → 128 → 256, against 3.3 expected), and 512 runs out
+    of memory. Applying a torque instead of a prescribed spin moves nothing at all.
+    <br><br>This matters beyond aesthetics: a policy trained here can seat a gear, but nothing in the physics
+    rewards or penalises whether the teeth actually engage.
   </div>
 
   <h2 id="penetration">Measuring the overlap</h2>
-  <p>With a scene that settles, the overlap measurement becomes meaningful. The moving mesh's vertices are
-  transformed into the static shape's <strong>signed-distance field</strong> and sampled; a negative sample
-  means that vertex is inside the other solid, and the most negative one is the penetration depth. The SDF is
-  built on demand and disk-cached, and one lookup per vertex keeps the query at <strong>~0.04&nbsp;ms per
-  step</strong> — cheap enough to drive a reward penalty or a reset every control step, both of which are
-  exposed as MDP terms.</p>
+  <p>Overlap is measured directly: the moving mesh's vertices are transformed into the static shape's
+  <strong>signed-distance field</strong> and sampled, so the most negative sample is the penetration depth. The
+  SDF is built on demand and disk-cached, and one lookup per vertex keeps the query at <strong>~0.04 ms per
+  step</strong> — cheap enough to drive a reward penalty or a reset, both exposed as MDP terms.</p>
 
   <div id="penetration-chart" class="chart"></div>
-  <p class="caption">Peak gear-in-base overlap against impact speed, on the corrected scene (hydroelastic
-  SDF assets, 4 environments). Bars are hatched where the gear was knocked off the shaft rather than seated.</p>
+  <p class="caption">Peak gear-in-plate overlap against impact speed, on the corrected scene with the gear
+  properly threaded on its shaft. Hatched bars are runs where the gear did not stay seated.</p>
 
   <table>
-    <thead><tr><th>Impact speed</th><th>Outcome</th><th>Final tilt</th><th>Seated depth</th><th>Peak overlap</th></tr></thead>
+    <thead><tr><th>Impact</th><th>Outcome</th><th>Final tilt</th><th>Resting offset from seat</th><th>Peak overlap</th></tr></thead>
     <tbody>
-      <tr><td>0 m/s (released)</td><td class="good">seats, comes to rest</td><td>0.31°</td><td>−24.7 mm</td><td>1.40 mm</td></tr>
-      <tr><td>0.1 m/s</td><td class="good">seats</td><td>0.92°</td><td>−25.3 mm</td><td>1.48 mm</td></tr>
-      <tr><td>0.2 m/s</td><td class="good">seats</td><td>2.37°</td><td>−25.8 mm</td><td>1.48 mm</td></tr>
-      <tr><td>0.35 m/s</td><td class="good">seats deeper</td><td>1.03°</td><td>−34.0 mm</td><td>1.84 mm</td></tr>
-      <tr><td>0.5 m/s</td><td class="bad">knocked off</td><td>145°</td><td>—</td><td>4.14 mm</td></tr>
-      <tr><td>2 m/s</td><td class="bad">knocked off</td><td>89°</td><td>—</td><td>1.42 mm</td></tr>
-      <tr><td>8 m/s</td><td class="bad">knocked off</td><td>59°</td><td>—</td><td>0.00 mm</td></tr>
+      <tr><td>0 m/s (released)</td><td class="good">seats correctly</td><td>0.00°</td><td>−0.03 mm</td><td>1.81 mm</td></tr>
+      <tr><td>0.2 m/s</td><td class="good">seats correctly</td><td>0.01°</td><td>−0.03 mm</td><td>3.32 mm</td></tr>
+      <tr><td>0.5 m/s</td><td class="bad">punches through the plate</td><td>0.54°</td><td>−30.0 mm</td><td>1.10 mm</td></tr>
+      <tr><td>1.0 m/s</td><td class="bad">knocked off entirely</td><td>46°</td><td>fell away</td><td>1.13 mm</td></tr>
     </tbody>
   </table>
-
   <div class="callout">
-    <strong>What the corrected numbers say.</strong> Insertion succeeds up to about <strong>0.35&nbsp;m/s</strong>
-    and fails beyond it, and the parts interpenetrate by <strong>1.4–1.8&nbsp;mm</strong> even when seating
-    cleanly — still coarse against a sub-millimetre fit, and a real target for solver tuning. The 8&nbsp;m/s
-    row is the reminder that <strong>zero overlap can be the worst case</strong>: the gear covers ~264&nbsp;mm
-    per control step and is simply never sampled while inside the geometry, so overlap and outcome have to be
-    read together.
+    <strong>Reading it.</strong> Up to 0.2 m/s the gear seats to within 0.03 mm of its designed rest height,
+    but with <strong>1.8–3.3 mm of interpenetration</strong> — already coarse against a 0.8 mm shaft clearance.
+    At 0.5 m/s it passes straight through a 7.8 mm plate. And the low overlap on the failing rows is the same
+    trap as before: once the part is moving fast it is never sampled while inside, so overlap must always be
+    read together with the outcome.
   </div>
   <h2>What's next</h2>
   <p>The scene is physical now, which resets the order of work: the solver comparison has to be re-run before
@@ -435,11 +449,11 @@ Plotly.newPlot("depth-trace-chart", SOLV.map(([k,label,col,pat]) => ({
 }), CFG);
 
 const PEN = {
-  speeds:["0","0.1","0.2","0.35","0.5","2","8"],
-  mm:[1.402,1.484,1.484,1.843,4.135,1.418,0.0],
-  seated:[true,true,true,true,false,false,false],
-  note:["seats and comes to rest","seats","seats","seats 34 mm down",
-        "knocked off the shaft","knocked off","knocked off — never sampled inside"]
+  speeds:["0","0.2","0.5","1.0"],
+  mm:[1.806,3.316,1.098,1.132],
+  seated:[true,true,false,false],
+  note:["seats to within 0.03 mm","seats, 3.3 mm interpenetration",
+        "punched through the 7.8 mm plate","knocked off the shaft"]
 };
 Plotly.newPlot("penetration-chart", [{
   type:"bar", x:PEN.speeds, y:PEN.mm,
@@ -452,11 +466,11 @@ Plotly.newPlot("penetration-chart", [{
   customdata:PEN.note,
   hovertemplate:"impact %{x} m/s<br>peak overlap %{y:.2f} mm<br>%{customdata}<extra></extra>"
 }], Object.assign({}, LIGHT, {
-  title:{text:"Peak gear-in-base overlap vs impact speed (hatched = knocked off, not seated)",
+  title:{text:"Peak gear-in-plate overlap vs impact (hatched = did not stay seated)",
          font:{size:14, color:"#18212a"}, x:0, xanchor:"left"},
-  bargap:0.4,
+  bargap:0.45,
   xaxis:{title:"impact speed (m/s)", showgrid:false, type:"category"},
-  yaxis:{title:"overlap (mm)", range:[0,5.2], gridcolor:"#e8ecf0", zerolinecolor:"#d8e0e7"},
+  yaxis:{title:"overlap (mm)", range:[0,4.2], gridcolor:"#e8ecf0", zerolinecolor:"#d8e0e7"},
   hovermode:"closest"
 }), CFG);
 </script>
