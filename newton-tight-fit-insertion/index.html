@@ -239,13 +239,17 @@
 
   <div class="callout warn">
     <strong>Two blockers this measurement exposed.</strong>
-    <br><strong>1. VBD does not advance the simulation.</strong> Under <code>newton_vbd</code> the gear, the
-    fingertips and even the robot's joint positions stay at exactly their initial values. Reading Newton's own
-    state shows why: VBD moves <code>body_q</code> (max |Δ| ≈ 18&nbsp;mm) but leaves <code>joint_q</code>
-    untouched, and the manager re-runs forward kinematics from that stale <code>joint_q</code> every step,
-    overwriting VBD's result. VBD is a <em>maximal-coordinate</em> solver, so it needs a body→joint write-back
-    (Kamino exposes <code>use_fk_solver</code> for exactly this class of problem). Not a CUDA-graph or
-    state-buffering issue — both were ruled out. Until this is fixed, VBD numbers are not comparable.
+    <br><strong>1. VBD state handling was wrong — fixed — but VBD still diverges.</strong> Under
+    <code>newton_vbd</code> the whole scene read back frozen at its initial pose. The cause was an
+    architectural mismatch: VBD, XPBD and Kamino are <em>maximal-coordinate</em> solvers — they integrate
+    <code>body_q</code>/<code>body_qd</code> directly and never touch <code>joint_q</code> — yet forward
+    kinematics was re-run from those stale joint coordinates on every state refresh, overwriting the solver's
+    own result. The fix is to treat body state as authoritative: seed it from joint coordinates <em>once</em>,
+    then re-run FK only for articulations whose joints were explicitly rewritten (a reset), and read
+    observations and rewards from body coordinates. (The second state buffer was also left uninitialized for
+    double-buffered solvers; it is seeded now too.) Generalized-coordinate solvers are bit-identical after the
+    change. VBD now integrates — but the articulated scene <strong>diverges</strong> (bodies reach kilometre
+    scale within a few steps), so VBD numbers are still not comparable; solver-parameter work is next.
     <br><strong>2. The hydroelastic preset generates no contact here</strong>, letting the gear free-fall
     through the base at every speed.
   </div>
@@ -259,6 +263,45 @@
     to <code>hand_close_width = -0.1</code>, and the fingers settle at exactly that target with zero deviation —
     nothing between them. So the DisplayPort task cannot currently produce a meaningful insertion, which is why
     the quantitative comparison above runs on the gear.
+  </div>
+
+
+  <h2 id="penetration">Measuring the overlap itself</h2>
+  <p>Seat depth answers "did the part end up past the seat", but it says nothing about how much material
+  actually <em>overlaps</em>. For a sub-millimetre assembly that is the number that matters, so the probe
+  also measures overlap directly: the moving mesh's vertices are transformed into the static shape's
+  <strong>signed-distance field</strong> and sampled. A negative sample means that vertex is inside the other
+  solid, and the most negative one is the penetration depth. The SDF is built on demand and disk-cached, so it
+  works under any solver — including presets that never build SDFs for collision — and one SDF lookup per
+  vertex keeps the whole query at <strong>~0.04&nbsp;ms per step</strong>, cheap enough to drive a reward
+  penalty or a reset every control step (both are exposed as MDP terms).</p>
+
+  <div class="video-pair" style="grid-template-columns:repeat(3,1fr)">
+    <div><video controls muted loop playsinline preload="metadata" src="assets/force_gear_v0.5.mp4"></video>
+      <p class="caption"><strong>0.5&nbsp;m/s</strong> — caught. But 3.6&nbsp;mm of the gear is inside the base.</p></div>
+    <div><video controls muted loop playsinline preload="metadata" src="assets/force_gear_v2.0.mp4"></video>
+      <p class="caption"><strong>2&nbsp;m/s</strong> — 4.0&nbsp;mm overlap, half the environments break through.</p></div>
+    <div><video controls muted loop playsinline preload="metadata" src="assets/force_gear_v8.0.mp4"></video>
+      <p class="caption"><strong>8&nbsp;m/s</strong> — passes clean through; overlap never even registers.</p></div>
+  </div>
+  <p class="caption">Forced-insertion clips (gear fired at its shaft, MuJoCo default, 4 environments), rendered
+  headless through <code>ViewerGL</code>.</p>
+
+  <div id="penetration-chart" class="chart"></div>
+  <p class="caption">Peak vertex-in-SDF overlap during each impact. The measurement is <em>not</em> monotonic in
+  speed, and that is the point — see below.</p>
+
+  <div class="callout warn">
+    <strong>Two things this measurement changes.</strong>
+    <br><strong>1. "No tunnelling" is not the same as "clean contact."</strong> At 0.5&nbsp;m/s the seat-depth
+    test is perfectly happy — nothing passes through — yet the gear is <strong>3.6&nbsp;mm inside the base</strong>.
+    MuJoCo's soft contacts simply let the parts interpenetrate by several millimetres, which is an order of
+    magnitude coarser than the sub-millimetre fits these tasks are supposed to represent.
+    <br><strong>2. Zero overlap can mean the worst case.</strong> At 8&nbsp;m/s the measured overlap is exactly
+    <code>0.00&nbsp;mm</code> — not because contact was clean, but because the gear travels ~264&nbsp;mm per
+    control step and is never sampled while inside the geometry. Overlap and through-passage therefore have to
+    be reported together; either alone is misleading. (Sampling at solver-step rather than control-step rate
+    would narrow the blind spot.)
   </div>
 
   <h2>What's next</h2>
@@ -351,6 +394,22 @@ Plotly.newPlot("depth-trace-chart", SOLV.map(([k,label,col,pat]) => ({
   shapes:[{type:"rect", xref:"paper", x0:0, x1:1, y0:-45, y1:0, fillcolor:"#b5483a", opacity:0.07, line:{width:0}}],
   annotations:[{xref:"paper", x:0.015, y:-38, text:"inside the solid", showarrow:false, font:{color:"#b5483a", size:11}, xanchor:"left"}],
   legend:{orientation:"h", y:-0.22}, hovermode:"x unified"
+}), CFG);
+
+const PEN = {speeds:["0.5 m/s","2 m/s","8 m/s"], mm:[3.632,3.971,0.0],
+             note:["caught, but 3.6 mm inside","4.0 mm inside, 2/4 broke through","passed through — never sampled inside"]};
+Plotly.newPlot("penetration-chart", [{
+  type:"bar", x:PEN.speeds, y:PEN.mm,
+  marker:{color:"#2a78d6", line:{color:"#fcfcfb", width:2}},
+  text:PEN.mm.map(v=>v.toFixed(2)+" mm"), textposition:"outside", textfont:{color:"#52514e", size:12},
+  customdata:PEN.note,
+  hovertemplate:"%{x}<br>peak overlap %{y:.2f} mm<br>%{customdata}<extra></extra>"
+}], Object.assign({}, LIGHT, {
+  title:{text:"Peak gear-in-base overlap (vertex vs SDF)", font:{size:14, color:"#18212a"}, x:0, xanchor:"left"},
+  bargap:0.45,
+  xaxis:{title:"impact speed", showgrid:false},
+  yaxis:{title:"overlap (mm)", range:[0,5.2], gridcolor:"#e8ecf0", zerolinecolor:"#d8e0e7"},
+  hovermode:"closest"
 }), CFG);
 </script>
 </body>
