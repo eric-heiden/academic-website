@@ -55,7 +55,7 @@
     th,td { padding:9px 11px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
     th { color:#475467; background:#f2f5f7; font-weight:680; } tr:last-child td { border-bottom:0; }
     .progress-track { height:9px; border-radius:999px; background:#eeddbd; overflow:hidden; margin:14px 0 6px; }
-    .progress-fill { height:100%; width:8.13%; background:#d97706; }
+    .progress-fill { height:100%; width:0; background:#d97706; }
     .provenance { background:#17202d; color:#f1f5f9; border-radius:14px; padding:20px; margin-top:20px; }
     .provenance p { color:#cbd5e1; font-size:.82rem; }
     .provenance code { display:block; color:#d8f7f2; background:#273344; padding:7px 9px; margin-top:4px; }
@@ -71,12 +71,17 @@
   <p class="lede">A live, evidence-bound snapshot of the humanoid locomotion remediation and
   dexterous-hand training now underway. Stale benchmark claims have been removed; only results
   backed by the current run manifests are shown.</p>
-  <p class="stamp">Snapshot generated 2026-07-21 22:14 UTC &middot; all times UTC &middot; CPU-rendered plots from immutable training logs</p>
+  <p class="stamp">Snapshot generated 2026-07-25 17:30 UTC &middot; all times UTC &middot; CPU-rendered plots from immutable training logs</p>
 
   <div class="notice"><strong>Interim engineering report &mdash; not an accepted benchmark.</strong>
     Humanoid training completed and passed every monitored training window, but its frozen
     out-of-training acceptance gate found a reproducible fall. The policy is therefore rejected;
-    no deployment, final-quality, or benchmark-win claim is made here.</div>
+    no deployment, final-quality, or benchmark-win claim is made here.
+    <br><br>
+    <strong>All training on this machine has been halted since 2026-07-22 04:00 UTC.</strong>
+    The dexterous-hand qualification stopped part-way: seed 43 finished its full budget, seed 44
+    was terminated at 86% and has no final checkpoint. No held-out acceptance evaluation has been
+    run for either seed, so no hand-task quality claim is made either.</div>
 
   <div class="cards">
     <div class="card"><div class="label">Humanoid training transitions</div><div class="metric">184.3M</div>
@@ -85,8 +90,8 @@
       <div class="submetric"><span class="pill pass">passed</span> no failed limits</div></div>
     <div class="card"><div class="label">Out-of-training acceptance</div><div class="metric">rejected</div>
       <div class="submetric"><span class="pill fail">fall detected</span> after 3 completed cases</div></div>
-    <div class="card"><div class="label">Dexterous hand, seed 43</div><div class="metric">8.1%</div>
-      <div class="submetric"><span class="pill progress">in progress</span> 14,991,360 transitions at snapshot</div></div>
+    <div class="card"><div class="label">Dexterous hand qualification</div><div class="metric">halted</div>
+      <div class="submetric"><span class="pill fail">incomplete</span> seed 43 done &middot; seed 44 stopped at 86%</div></div>
   </div>
 
   <section>
@@ -176,19 +181,76 @@
 
   <section>
     <h2>Dexterous hand training</h2>
-    <p class="section-lede">Allegro-hand cube reorientation is now part of the task suite. The first
-    of two sequential qualification seeds is running in the uv-managed project environment. These
-    values are a timestamped progress reading, not an evaluation or quality verdict.</p>
-    <div class="panel progress">
-      <h3><span class="pill progress">seed 43 training</span> 8.13% of planned transitions</h3>
-      <div class="progress-track"><div class="progress-fill"></div></div>
+    <p class="section-lede">Allegro-hand cube reorientation is part of the task suite. Two sequential
+    qualification seeds were planned at 7,500 PPO iterations each. Seed 43 completed its full budget;
+    seed 44 was terminated at 86% when training on this machine stopped, and has no final checkpoint.
+    Everything below is training telemetry from the immutable metrics logs &mdash; it is not an
+    evaluation result and not a quality verdict.</p>
+
+    <div class="evidence-grid">
+      <div class="panel">
+        <h3><span class="pill pass">seed 43 &mdash; training complete</span></h3>
+        <dl>
+          <dt>Iterations</dt><dd>7,500 / 7,500</dd>
+          <dt>Environment transitions</dt><dd>184,320,000</dd>
+          <dt>Wall time</dt><dd>3.29 h</dd>
+          <dt>Checkpoints</dt><dd>151 numbered, <code>model_final.pt</code> present</dd>
+          <dt>Metrics SHA-256</dt><dd><code>78cfd3fc1dd1d184e2a9c788b7806b98c8b41ca8acb8d2dbcac5ca4a5bc4c1c5</code></dd>
+        </dl>
+      </div>
+      <div class="panel danger">
+        <h3><span class="pill fail">seed 44 &mdash; interrupted</span></h3>
+        <div class="progress-track"><div class="progress-fill" style="width:85.65%"></div></div>
+        <dl>
+          <dt>Iterations</dt><dd>6,424 / 7,500 (85.7%)</dd>
+          <dt>Environment transitions</dt><dd>157,876,224 / 184,320,000</dd>
+          <dt>Wall time</dt><dd>2.69 h before termination</dd>
+          <dt>Checkpoints</dt><dd>129 numbered, last at 6,400; <strong>no final checkpoint</strong></dd>
+          <dt>Metrics SHA-256</dt><dd><code>07a506667e6b7b60aafd3a7ea23b896015f38d159b2422467478495865951e11</code></dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="plots">
+      <figure><img src="assets/allegro_training_progress.png" alt="Allegro hand training return, orientation error, termination rate and curriculum stage">
+        <figcaption>Return, cube orientation error, termination rate and curriculum stage for both seeds.
+        The dotted line marks the planned 184.3M-transition budget.</figcaption></figure>
+      <figure><img src="assets/allegro_success_signals.png" alt="Allegro hand immediate success, settled success and near-goal hover rates">
+        <figcaption>Task-success telemetry. Both seeds reach curriculum stage 3 and improve late,
+        but settled success stays far below the level the acceptance gate requires.</figcaption></figure>
+    </div>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Final 50-iteration mean</th><th>Seed 43 (complete)</th><th>Seed 44 (at 6,424)</th></tr></thead>
+      <tbody>
+        <tr><td>Episode return</td><td>2841.5</td><td>1387.7</td></tr>
+        <tr><td>Episode length</td><td>286.7</td><td>292.8</td></tr>
+        <tr><td>Immediate success rate</td><td>0.0299</td><td>0.0205</td></tr>
+        <tr><td>Settled success rate</td><td>0.0023</td><td>0.00003</td></tr>
+        <tr><td>Near-goal hover</td><td>0.0517</td><td>0.1451</td></tr>
+        <tr><td>Orientation error</td><td>1.0017</td><td>0.6961</td></tr>
+        <tr><td>Drop rate</td><td>0.00027</td><td>0.00012</td></tr>
+        <tr><td>Termination rate</td><td>0.0782</td><td>0.0347</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="panel danger">
+      <h3><span class="pill fail">held-out acceptance not run</span></h3>
+      <p>The predeclared hand gate scores 512 held-out episodes and requires a settled-success pulse
+      in at least 256 of them, with a 95% Wilson lower bound of at least 0.20. That evaluation has
+      <strong>not been executed</strong> for either seed, so no pass/fail verdict exists yet.</p>
+      <p>Stating the obvious rather than hiding it: the training-side settled-success signal is very
+      low, and the immediately preceding attempt on this task failed the same gate with 88 of 512
+      episodes and a Wilson lower bound of 0.142. These curves should be read as evidence that the
+      run is <em>unlikely</em> to clear the gate, not as evidence that it will.</p>
+      <p>The one genuine caveat in the other direction: seed 43 had <em>not</em> converged when its
+      budget ran out. Return and settled success were both still rising steeply over the final
+      60M transitions, with no plateau. So the low numbers are consistent with too short a training
+      budget as well as with an inadequate method, and the two cannot be separated from this data
+      alone.</p>
       <dl>
-        <dt>Metrics rows</dt><dd>610 / 7,500</dd>
-        <dt>Environment transitions</dt><dd>14,991,360 / 184,320,000</dd>
-        <dt>Latest episode return</dt><dd>1320.89</dd>
-        <dt>Latest orientation error</dt><dd>0.6322</dd>
-        <dt>Latest drop rate</dt><dd>0.00171</dd>
-        <dt>Qualification state</dt><dd>pending seed 43 completion, seed 44, held-out acceptance, and visual review</dd>
+        <dt>Blocking</dt><dd>seed 44 must be retrained to completion before a two-seed qualification is meaningful</dd>
+        <dt>Next evidence</dt><dd>completed seed 44, then the frozen 512-episode acceptance sweep, bounded-action audit, and visual gate</dd>
       </dl>
     </div>
   </section>
