@@ -76,7 +76,7 @@
     <li><span class="done">✓</span> <strong>Collision filtering</strong> via per-body Newton collision groups — and then fixed two bugs in it that were silently disabling the contacts it selected.</li>
     <li><span class="done">✓</span> <strong>Forced-insertion proxy</strong> — a scripted Jacobian push that presses the plug into the socket (worst-case contact moment); doubles as the close-up video driver.</li>
     <li><span class="done">✓</span> <strong>Tunnelling detector</strong> and a direct <strong>vertex-vs-SDF overlap</strong> measurement, both calibrated against the task's own geometry.</li>
-    <li><span class="done">✓</span> <strong>Passive-stability and gear-train checks</strong> — the gear now seats on its shaft to within 0.03 mm and stays; driving one gear shows the teeth do <em>not</em> transmit.</li>
+    <li><span class="done">✓</span> <strong>Passive-stability and gear-train checks</strong> — the gear seats on its shaft to within 0.03 mm and stays. Driving one gear shows the teeth touch but do <em>not</em> transmit: insertion is simulated, meshing is not.</li>
     <li><span class="todo">◻</span> Redo the solver comparison on the corrected scene, then the dt sweep (1000→200→100&nbsp;Hz).</li>
   </ul>
 
@@ -330,20 +330,52 @@
   <table>
     <thead><tr><th>Gear</th><th>Measured ω</th><th>Expected ω</th><th>Stayed on its shaft</th></tr></thead>
     <tbody>
-      <tr><td>large (driven, 60T)</td><td>+2.23 rad/s</td><td>— (input)</td><td>within 1.2 mm</td></tr>
-      <tr><td>medium (40T)</td><td class="bad">−0.002 rad/s</td><td>−3.3 rad/s</td><td>within 1.4 mm</td></tr>
-      <tr><td>small (20T)</td><td class="bad">−0.021 rad/s</td><td>+6.7 rad/s</td><td>within 1.3 mm</td></tr>
+      <tr><td>large (driven, 60T)</td><td>+2.14 rad/s</td><td>— (input)</td><td>within 1.5 mm</td></tr>
+      <tr><td>medium (40T)</td><td class="bad">+0.13 rad/s</td><td>−3.2 rad/s</td><td>within 1.5 mm</td></tr>
+      <tr><td>small (20T)</td><td class="bad">−0.04 rad/s</td><td>+6.4 rad/s</td><td>within 2.2 mm</td></tr>
     </tbody>
   </table>
+
+  <h3>Where the meshing actually breaks</h3>
+  <p>It would be easy to blame SDF resolution and stop. Measuring each link in the chain separately shows
+  that is not it:</p>
+  <table>
+    <thead><tr><th>Question</th><th>Measurement</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Are the gears a meshable set?</td><td>20/40/60 teeth, circular pitch 4.9–5.2 mm, centre distances give ~1 mm backlash</td><td class="good">yes</td></tr>
+      <tr><td>Does the SDF represent the teeth?</td><td>sampling the built SDF around the rim gives a clean <strong>60 cycles/rev, 0.49 mm amplitude</strong> (1.53 mm peak-to-peak)</td><td class="good">yes</td></tr>
+      <tr><td>Do the teeth actually touch?</td><td>driven-vs-neighbour overlap peaks at <strong>0.97 mm</strong>, in contact <strong>68 of 80 steps</strong></td><td class="good">yes</td></tr>
+      <tr><td>Is tangential load transmitted?</td><td>neighbour reaches <strong>4 %</strong> of the meshing rate, in the wrong direction</td><td class="bad">no</td></tr>
+    </tbody>
+  </table>
+  <p>A caution on that SDF check: sampled at the gear's mid-height it looks featureless, because that height
+  is the <em>hub</em>. The toothed rim sits at z ≈ −17 mm, and sampled there the teeth are unmistakable. An
+  earlier reading of this as "the SDF has no teeth" was simply the probe in the wrong place.</p>
+
+  <p>Every lever on the contact stack was tried:</p>
+  <table>
+    <thead><tr><th>Change</th><th>Neighbour ω (expect −3.2)</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>SDF resolution 64 → 128 → 256</td><td>0.21 → 0.41 → 0.64 rad/s</td><td>improves, then stalls; 512 exhausts the GPU</td></tr>
+      <tr><td><code>normal_matching=False</code></td><td>+0.02</td><td>overlap rises to 2.6 mm, still no drive</td></tr>
+      <tr><td><code>reduce_contacts=False</code></td><td>+0.04</td><td class="bad">gears explode (53 m)</td></tr>
+      <tr><td>Plain SDF contacts (no hydroelastic)</td><td>+0.01</td><td class="bad">unstable; gears leave the fixture</td></tr>
+      <tr><td>Applied torque instead of prescribed spin</td><td>0.00</td><td class="bad">nothing moves at all</td></tr>
+    </tbody>
+  </table>
+
   <div class="callout warn">
-    <strong>The gear train does not transmit.</strong> The gears stay seated — all three hold to within
-    1.4 mm — but driving one moves the others by roughly a thousandth of what meshing would produce. With
-    1.6 mm teeth on a 93 mm gear, the contact simply never resolves the flanks: a 64³ SDF over the base's
-    228 mm span is ~3.6 mm per voxel, so a tooth is smaller than one voxel. Raising resolution helps and then
-    stalls (neighbour ω 0.21 → 0.41 → 0.64 rad/s for 64 → 128 → 256, against 3.3 expected), and 512 runs out
-    of memory. Applying a torque instead of a prescribed spin moves nothing at all.
-    <br><br>This matters beyond aesthetics: a policy trained here can seat a gear, but nothing in the physics
-    rewards or penalises whether the teeth actually engage.
+    <strong>The gear train does not transmit, and it is the contact model rather than the geometry.</strong>
+    The gears are a matched set, the SDF resolves their teeth, and the teeth are in contact for ~85 % of
+    steps with about a millimetre of overlap — yet the neighbour turns at a few percent of the meshing rate.
+    Hydroelastic contact merges a pair's overlap into a pressure patch with an averaged normal, which is
+    exactly the information a tooth flank needs to push its neighbour tangentially. Disabling that averaging
+    removes the stability instead of fixing the drive.
+    <br><br>The practical consequence for training: a policy here can seat a gear on its shaft, and that part
+    is now sound, but nothing in the physics rewards or penalises whether the teeth engage. Insertion is
+    simulated; <em>meshing is not</em>. Newton's threaded nut-and-bolt example is the closest working
+    reference and runs plain SDF contacts under XPBD rather than MuJoCo, which is the next configuration to
+    try — the option to build mesh SDFs without hydroelastic is now in place for it.
   </div>
 
   <h2 id="penetration">Measuring the overlap</h2>
@@ -376,9 +408,13 @@
   <p>The scene is physical now, which resets the order of work: the solver comparison has to be re-run before
   any of it means anything.</p>
   <ul>
+    <li><strong>Make the teeth transmit.</strong> The nearest working reference is Newton's threaded
+    nut-and-bolt example, which runs <em>plain SDF contacts under XPBD</em> rather than MuJoCo; the option to
+    build mesh SDFs without hydroelastic is now in place, so that pairing is the next thing to try. Until the
+    gear train turns, the assembly half of this task is not being simulated.</li>
     <li><strong>Redo the solver comparison</strong> (MuJoCo / hydroelastic / VBD / Kamino) on the corrected
-    scene, using passive settling as the entry gate — no solver enters the comparison until its scene comes
-    to rest on its own.</li>
+    scene, gated on both checks — passive settling <em>and</em> the gear-train test — so no solver enters the
+    comparison on a scene that only looks right.</li>
     <li><strong>Make VBD advance the simulation.</strong> Body state is now authoritative for
     maximal-coordinate solvers, but VBD still diverges on the articulated scene; its joint and contact
     parameters are the next lever.</li>
