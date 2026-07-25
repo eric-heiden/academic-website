@@ -71,17 +71,17 @@
   <p class="lede">A live, evidence-bound snapshot of the humanoid locomotion remediation and
   dexterous-hand training now underway. Stale benchmark claims have been removed; only results
   backed by the current run manifests are shown.</p>
-  <p class="stamp">Snapshot generated 2026-07-25 17:30 UTC &middot; all times UTC &middot; CPU-rendered plots from immutable training logs</p>
+  <p class="stamp">Snapshot generated 2026-07-25 18:45 UTC &middot; all times UTC &middot; CPU-rendered plots from immutable training logs</p>
 
   <div class="notice"><strong>Interim engineering report &mdash; not an accepted benchmark.</strong>
     Humanoid training completed and passed every monitored training window, but its frozen
     out-of-training acceptance gate found a reproducible fall. The policy is therefore rejected;
     no deployment, final-quality, or benchmark-win claim is made here.
     <br><br>
-    <strong>All training on this machine has been halted since 2026-07-22 04:00 UTC.</strong>
-    The dexterous-hand qualification stopped part-way: seed 43 finished its full budget, seed 44
-    was terminated at 86% and has no final checkpoint. No held-out acceptance evaluation has been
-    run for either seed, so no hand-task quality claim is made either.</div>
+    The dexterous-hand task now has one fully trained seed. Its held-out acceptance sweep has been
+    run and it is <strong>also rejected</strong> &mdash; the final checkpoint clears the headline
+    success bar, but the two earlier mandatory checkpoints do not, and tail motion-quality limits
+    fail in every case. Four further seeds are training now. No hand-task quality claim is made.</div>
 
   <div class="cards">
     <div class="card"><div class="label">Humanoid training transitions</div><div class="metric">184.3M</div>
@@ -90,8 +90,8 @@
       <div class="submetric"><span class="pill pass">passed</span> no failed limits</div></div>
     <div class="card"><div class="label">Out-of-training acceptance</div><div class="metric">rejected</div>
       <div class="submetric"><span class="pill fail">fall detected</span> after 3 completed cases</div></div>
-    <div class="card"><div class="label">Dexterous hand qualification</div><div class="metric">halted</div>
-      <div class="submetric"><span class="pill fail">incomplete</span> seed 43 done &middot; seed 44 stopped at 86%</div></div>
+    <div class="card"><div class="label">Hand acceptance, seed 43</div><div class="metric">rejected</div>
+      <div class="submetric"><span class="pill fail">11 cases run</span> final ckpt 288/512 &middot; earlier ckpts fail</div></div>
   </div>
 
   <section>
@@ -234,24 +234,80 @@
       </tbody>
     </table></div>
 
-    <div class="panel danger">
-      <h3><span class="pill fail">held-out acceptance not run</span></h3>
-      <p>The predeclared hand gate scores 512 held-out episodes and requires a settled-success pulse
-      in at least 256 of them, with a 95% Wilson lower bound of at least 0.20. That evaluation has
-      <strong>not been executed</strong> for either seed, so no pass/fail verdict exists yet.</p>
-      <p>Stating the obvious rather than hiding it: the training-side settled-success signal is very
-      low, and the immediately preceding attempt on this task failed the same gate with 88 of 512
-      episodes and a Wilson lower bound of 0.142. These curves should be read as evidence that the
-      run is <em>unlikely</em> to clear the gate, not as evidence that it will.</p>
-      <p>The one genuine caveat in the other direction: seed 43 had <em>not</em> converged when its
-      budget ran out. Return and settled success were both still rising steeply over the final
-      60M transitions, with no plateau. So the low numbers are consistent with too short a training
-      budget as well as with an inadequate method, and the two cannot be separated from this data
-      alone.</p>
-      <dl>
-        <dt>Blocking</dt><dd>seed 44 must be retrained to completion before a two-seed qualification is meaningful</dd>
-        <dt>Next evidence</dt><dd>completed seed 44, then the frozen 512-episode acceptance sweep, bounded-action audit, and visual gate</dd>
-      </dl>
+    <h3>Held-out acceptance sweep &mdash; seed 43</h3>
+    <p class="section-lede">The full 11-case sweep has now been run on seed 43: three mandatory
+    checkpoints &times; held-out evaluation seeds, 512 episodes each, 5,632 episodes total. The
+    policy is <strong>rejected</strong> &mdash; but not for the reason an earlier version of this
+    page predicted, and that prediction is corrected below.</p>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Checkpoint</th><th>Eval seed</th><th>Settled successes / 512</th><th>Wilson 95% LB</th><th>Drops</th><th>Horizon survivors</th></tr></thead>
+      <tbody>
+        <tr><td>model_6000</td><td>42424601</td><td>110</td><td>0.181</td><td>22</td><td>490</td></tr>
+        <tr><td>model_6000</td><td>42424801</td><td>107</td><td>0.176</td><td>23</td><td>489</td></tr>
+        <tr><td>model_6000</td><td>42424802</td><td>102</td><td>0.167</td><td>22</td><td>490</td></tr>
+        <tr><td>model_6750</td><td>42424601</td><td>205</td><td>0.359</td><td>17</td><td>495</td></tr>
+        <tr><td>model_6750</td><td>42424801</td><td>187</td><td>0.325</td><td>22</td><td>490</td></tr>
+        <tr><td>model_6750</td><td>42424802</td><td>189</td><td>0.328</td><td>23</td><td>489</td></tr>
+        <tr><td><strong>model_final</strong></td><td>42424601</td><td><strong>291</strong></td><td>0.525</td><td>26</td><td>486</td></tr>
+        <tr><td><strong>model_final</strong></td><td>42424801</td><td><strong>260</strong></td><td>0.465</td><td>29</td><td>483</td></tr>
+        <tr><td><strong>model_final</strong></td><td>42424802</td><td><strong>287</strong></td><td>0.517</td><td>27</td><td>485</td></tr>
+        <tr><td><strong>model_final</strong></td><td>42424803</td><td>253</td><td>0.451</td><td>29</td><td>483</td></tr>
+        <tr><td><strong>model_final</strong></td><td>42424804</td><td><strong>288</strong></td><td>0.519</td><td>30</td><td>482</td></tr>
+      </tbody>
+    </table></div>
+    <p class="section-lede">Required: at least 256 settled successes, Wilson lower bound at least
+    0.20, at most 51 drops, at least 461 horizon survivors.</p>
+
+    <div class="notice"><strong>Correction.</strong> An earlier version of this page said the run was
+    &ldquo;unlikely to clear the gate,&rdquo; reasoning from the low per-control-step settled-success
+    rate in the training logs. That inference was wrong. A per-step rate near 0.0023 over a 300-step
+    episode implies roughly 0.7 expected settling events per episode, which is entirely consistent
+    with about half of episodes settling at least once &mdash; which is what the evaluation actually
+    shows. The final checkpoint clears the headline success bar on four of five held-out evaluation
+    seeds, with a median of 288 of 512 (56%) and a Wilson lower bound around 0.5, far above the
+    required 0.20.</div>
+
+    <div class="evidence-grid">
+      <div class="panel danger">
+        <h3><span class="pill fail">why it is still rejected</span></h3>
+        <p>Two independent reasons, both robust across every case run:</p>
+        <dl>
+          <dt>Intermediate checkpoints</dt><dd>the protocol requires <code>model_6000</code>,
+            <code>model_6750</code> and <code>model_final</code> to pass independently.
+            6,000 reaches only 102&ndash;110 of 512 and 6,750 only 187&ndash;205, far under 256.</dd>
+          <dt>Motion-quality thresholds</dt><dd>failed in <strong>all 11 cases</strong>, so these are
+            not seed noise.</dd>
+        </dl>
+      </div>
+      <div class="panel danger">
+        <h3><span class="pill fail">failing quality limits</span></h3>
+        <p><code>model_final</code>, median across five evaluation seeds:</p>
+        <dl>
+          <dt>Orientation error q95</dt><dd>1.911 (limit &le; 1.50)</dd>
+          <dt>Near-goal hover q95</dt><dd>0.391 (limit &le; 0.20)</dd>
+          <dt>Action rate mean</dt><dd>1.012 (limit &le; 1.00)</dd>
+          <dt>Action rate q95</dt><dd>2.122 (limit &le; 2.00)</dd>
+          <dt>Settled/immediate frame ratio</dt><dd>0.088 (limit &ge; 0.10)</dd>
+        </dl>
+      </div>
+    </div>
+
+    <p class="section-lede">Read together, these say the policy can reorient the cube about half the
+    time but reaches the goal pose and then fails to hold it &mdash; it hovers near the goal instead of
+    settling, its worst-quartile episodes stay badly mis-oriented, and its actions are slightly too
+    jerky. Mean orientation error, hold error and cube angular speed all pass comfortably; only the
+    tail statistics fail. This is a consistency problem, not a capability problem.</p>
+
+    <p class="section-lede">One measurement caveat: re-running an identical checkpoint and evaluation
+    seed produced 268 and then 260 settled successes, so evaluation is not bit-deterministic on this
+    hardware. Differences of a few counts around the 256 boundary should not be over-read.</p>
+
+    <div class="panel progress">
+      <h3><span class="pill progress">in progress</span> four further training seeds</h3>
+      <p>Seeds 44&ndash;47 are training now to give five completed seeds for this task. Seed 43's
+      final checkpoint had not converged, so whether the tail-quality failures survive a longer or
+      luckier run is still open.</p>
     </div>
   </section>
 
