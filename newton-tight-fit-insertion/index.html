@@ -73,10 +73,11 @@
     <li><span class="done">✓</span> Rebuilt a <strong>Kit-free</strong> environment (Newton needs no Isaac&nbsp;Sim); both tasks build and step; asset resolution works over S3/CloudFront.</li>
     <li><span class="done">✓</span> Verified <strong>video rollouts</strong> render through Newton's <code>ViewerGL.get_frame()</code> into an mp4, fully headless.</li>
     <li><span class="done">✓</span> Wrote the missing <strong>VBD solver manager</strong> and added <code>newton_vbd</code> / <code>newton_kamino</code> presets; dt / substep / solver sweeps run from the CLI with no code edits.</li>
-    <li><span class="done">✓</span> <strong>Collision filtering</strong> (plug↔socket + plug↔finger only) via per-body Newton collision groups — this fixed both constraint solvers (see below).</li>
+    <li><span class="done">✓</span> <strong>Collision filtering</strong> via per-body Newton collision groups — and then fixed two bugs in it that were silently disabling the contacts it selected.</li>
     <li><span class="done">✓</span> <strong>Forced-insertion proxy</strong> — a scripted Jacobian push that presses the plug into the socket (worst-case contact moment); doubles as the close-up video driver.</li>
-    <li><span class="done">✓</span> <strong>Tunnelling detector</strong> (calibrated against the task's own mate geometry) and a forced-insertion solver comparison — which exposed two correctness blockers, see below.</li>
-    <li><span class="todo">◻</span> Solver&nbsp;×&nbsp;dt sweep (1000→200→100&nbsp;Hz) → throughput-vs-stability Pareto, once VBD advances state.</li>
+    <li><span class="done">✓</span> <strong>Tunnelling detector</strong> and a direct <strong>vertex-vs-SDF overlap</strong> measurement, both calibrated against the task's own geometry.</li>
+    <li><span class="done">✓</span> <strong>Passive-stability check</strong> — the gear scene now settles on its shaft and stays there; it did not before.</li>
+    <li><span class="todo">◻</span> Redo the solver comparison on the corrected scene, then the dt sweep (1000→200→100&nbsp;Hz).</li>
   </ul>
 
   <h2>Rollouts</h2>
@@ -190,7 +191,14 @@
   contact fidelity, and still env-count-scalable.</p>
 
 
-  <h2 id="tunnelling">Forced insertion: measuring tunnelling</h2>
+  <h2 id="tunnelling">Forced insertion: measuring tunnelling <span style="color:#b5483a">(retracted)</span></h2>
+  <div class="callout warn"><strong>These results are withdrawn.</strong> They were measured before the
+  collision-filter bugs above were found, so gear-to-base contact was disabled throughout: what the run
+  actually measured was the gear against the gripper, not against its shaft. The method (depth tracking,
+  the travel column, firing the part at a set speed) stands and is reused above, but the solver comparison
+  itself has to be redone on the corrected scene. The charts below are kept only so the correction is
+  auditable.</div>
+
   <p>Tunnelling — the grasped part passing <em>through</em> the socket instead of seating against it — is the
   failure that forces these tasks down to a 1&nbsp;ms time step. To measure it rather than argue about it, the
   probe tracks the <strong>signed insertion depth</strong>: the distance from the seat plane to the part's tip
@@ -266,75 +274,104 @@
   </div>
 
 
-  <h2 id="penetration">Measuring the overlap itself</h2>
-  <p>Seat depth answers "did the part end up past the seat", but it says nothing about how much material
-  actually <em>overlaps</em>. For a sub-millimetre assembly that is the number that matters, so the probe
-  also measures overlap directly: the moving mesh's vertices are transformed into the static shape's
-  <strong>signed-distance field</strong> and sampled. A negative sample means that vertex is inside the other
-  solid, and the most negative one is the penetration depth. The SDF is built on demand and disk-cached, so it
-  works under any solver — including presets that never build SDFs for collision — and one SDF lookup per
-  vertex keeps the whole query at <strong>~0.04&nbsp;ms per step</strong>, cheap enough to drive a reward
-  penalty or a reset every control step (both are exposed as MDP terms).</p>
-
-  <div class="video-pair" style="grid-template-columns:repeat(3,1fr)">
-    <div><video controls muted loop playsinline preload="metadata" src="assets/force_gear_v0.5.mp4"></video>
-      <p class="caption"><strong>0.5&nbsp;m/s</strong> — caught. But 3.6&nbsp;mm of the gear is inside the base.</p></div>
-    <div><video controls muted loop playsinline preload="metadata" src="assets/force_gear_v2.0.mp4"></video>
-      <p class="caption"><strong>2&nbsp;m/s</strong> — 4.0&nbsp;mm overlap, half the environments break through.</p></div>
-    <div><video controls muted loop playsinline preload="metadata" src="assets/force_gear_v8.0.mp4"></video>
-      <p class="caption"><strong>8&nbsp;m/s</strong> — passes clean through; overlap never even registers.</p></div>
+  <h2 id="stability">Making the scene physical first</h2>
+  <div class="callout warn">
+    <strong>Correction.</strong> The forced-insertion clips previously shown here were not physical — the
+    gear flapped about as if hinged. It was right to distrust them. The scene was never settling, and three
+    separate bugs were responsible. Everything below is re-measured on the corrected scene; the earlier
+    solver comparison is retracted (see the note in that section).
   </div>
-  <p class="caption">Forced-insertion clips (gear fired at its shaft, MuJoCo default, 4 environments), rendered
-  headless through <code>ViewerGL</code>.</p>
+
+  <p>A contact measurement is only worth as much as the scene under it, so the first thing to establish is
+  that the scene is <em>passively</em> stable: with no actions at all, a part dropped onto its shaft must
+  lose speed, stop tilting and stay put. <code>passive_stability.py</code> checks exactly that and reports
+  linear/angular speed and tilt drift over the last quarter of a rollout. It failed immediately, which is
+  how the following were found.</p>
+
+  <h3>What was wrong</h3>
+  <ol>
+    <li><strong>Negative collision groups silently drop MuJoCo contacts.</strong> The filter used a negative
+    "hub" group so the held part would collide with the socket and the fingers while those did not collide
+    with each other. Those semantics belong to Newton's own collision pipeline and are not carried through
+    the MuJoCo contact path — the contacts were simply discarded, and the gear fell 57&nbsp;m through its
+    base. Fixed by putting everything that must touch in one <em>positive</em> group.</li>
+    <li><strong>The filter patterns matched only one asset variant.</strong> They used the default assets'
+    mesh names, but the <code>newton_hydroelastic</code> preset loads different Newton USDs whose bodies are
+    named <code>FactoryGear*</code>. Nothing matched, so every gear and the base fell through to the
+    disabled group. This is also why I previously — and wrongly — reported that "the hydroelastic preset
+    generates no contact at all". The filter now matches the asset prim name, and an unmatched pattern
+    raises a warning instead of silently disabling collisions.</li>
+    <li><strong>The <code>default</code> preset cannot represent gear-on-shaft at all.</strong> Newton
+    convexifies mesh colliders by default, and the convex hull of a gear <em>fills its bore</em>. The gear
+    then balances on the shaft tip instead of threading over it — precisely the hinge-like rocking that was
+    visible. Turning convexification off removes contact entirely (MuJoCo has no exact mesh-mesh path), so
+    the gear task must run the <code>newton_hydroelastic</code> preset, whose SDF assets keep the bore.</li>
+  </ol>
+  <p>A fourth, smaller issue was in the probe rather than the scene: the reset event randomizes the base
+  pose, so placing the part at its authored world position missed the shaft. It is now placed with the
+  task's own seating maths, composed with the base's runtime pose.</p>
+
+  <h3>The corrected scene</h3>
+  <div class="video-pair" style="grid-template-columns:repeat(3,1fr)">
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_settle_0ms.mp4"></video>
+      <p class="caption"><strong>Released at rest.</strong> The gear threads onto the shaft and settles:
+      0.05&nbsp;mm/s, 0.07&nbsp;°/s, tilt 0.31°. It stays there.</p></div>
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_insert_035ms.mp4"></video>
+      <p class="caption"><strong>Pressed at 0.35&nbsp;m/s.</strong> A real insertion — the shaft emerges
+      through the bore as the gear seats 34&nbsp;mm down.</p></div>
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_fail_2ms.mp4"></video>
+      <p class="caption"><strong>Slammed at 2&nbsp;m/s.</strong> The gear is knocked clean off; the shaft is
+      left bare. This is the failure mode, and now it looks like one.</p></div>
+  </div>
+
+  <h2 id="penetration">Measuring the overlap</h2>
+  <p>With a scene that settles, the overlap measurement becomes meaningful. The moving mesh's vertices are
+  transformed into the static shape's <strong>signed-distance field</strong> and sampled; a negative sample
+  means that vertex is inside the other solid, and the most negative one is the penetration depth. The SDF is
+  built on demand and disk-cached, and one lookup per vertex keeps the query at <strong>~0.04&nbsp;ms per
+  step</strong> — cheap enough to drive a reward penalty or a reset every control step, both of which are
+  exposed as MDP terms.</p>
 
   <div id="penetration-chart" class="chart"></div>
-  <p class="caption">Peak vertex-in-SDF overlap during each impact. The measurement is <em>not</em> monotonic in
-  speed, and that is the point — see below.</p>
+  <p class="caption">Peak gear-in-base overlap against impact speed, on the corrected scene (hydroelastic
+  SDF assets, 4 environments). Bars are hatched where the gear was knocked off the shaft rather than seated.</p>
 
-  <div class="callout warn">
-    <strong>Two things this measurement changes.</strong>
-    <br><strong>1. "No tunnelling" is not the same as "clean contact."</strong> At 0.5&nbsp;m/s the seat-depth
-    test is perfectly happy — nothing passes through — yet the gear is <strong>3.6&nbsp;mm inside the base</strong>.
-    MuJoCo's soft contacts simply let the parts interpenetrate by several millimetres, which is an order of
-    magnitude coarser than the sub-millimetre fits these tasks are supposed to represent.
-    <br><strong>2. Zero overlap can mean the worst case.</strong> At 8&nbsp;m/s the measured overlap is exactly
-    <code>0.00&nbsp;mm</code> — not because contact was clean, but because the gear travels ~264&nbsp;mm per
-    control step and is never sampled while inside the geometry. Overlap and through-passage therefore have to
-    be reported together; either alone is misleading. (Sampling at solver-step rather than control-step rate
-    would narrow the blind spot.)
+  <table>
+    <thead><tr><th>Impact speed</th><th>Outcome</th><th>Final tilt</th><th>Seated depth</th><th>Peak overlap</th></tr></thead>
+    <tbody>
+      <tr><td>0 m/s (released)</td><td class="good">seats, comes to rest</td><td>0.31°</td><td>−24.7 mm</td><td>1.40 mm</td></tr>
+      <tr><td>0.1 m/s</td><td class="good">seats</td><td>0.92°</td><td>−25.3 mm</td><td>1.48 mm</td></tr>
+      <tr><td>0.2 m/s</td><td class="good">seats</td><td>2.37°</td><td>−25.8 mm</td><td>1.48 mm</td></tr>
+      <tr><td>0.35 m/s</td><td class="good">seats deeper</td><td>1.03°</td><td>−34.0 mm</td><td>1.84 mm</td></tr>
+      <tr><td>0.5 m/s</td><td class="bad">knocked off</td><td>145°</td><td>—</td><td>4.14 mm</td></tr>
+      <tr><td>2 m/s</td><td class="bad">knocked off</td><td>89°</td><td>—</td><td>1.42 mm</td></tr>
+      <tr><td>8 m/s</td><td class="bad">knocked off</td><td>59°</td><td>—</td><td>0.00 mm</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>What the corrected numbers say.</strong> Insertion succeeds up to about <strong>0.35&nbsp;m/s</strong>
+    and fails beyond it, and the parts interpenetrate by <strong>1.4–1.8&nbsp;mm</strong> even when seating
+    cleanly — still coarse against a sub-millimetre fit, and a real target for solver tuning. The 8&nbsp;m/s
+    row is the reminder that <strong>zero overlap can be the worst case</strong>: the gear covers ~264&nbsp;mm
+    per control step and is simply never sampled while inside the geometry, so overlap and outcome have to be
+    read together.
   </div>
-
   <h2>What's next</h2>
-  <p>The measurement is in place, and it reordered the queue: the interesting comparison (can a
-  constraint-based solver run at 100–200&nbsp;Hz without tunnelling?) is currently blocked by two correctness
-  bugs rather than by tuning.</p>
+  <p>The scene is physical now, which resets the order of work: the solver comparison has to be re-run before
+  any of it means anything.</p>
   <ul>
-    <li><strong>Make VBD advance the simulation.</strong> Write <code>body_q</code> back to
-    <code>joint_q</code> after a VBD step (or skip the forward-kinematics refresh for maximal-coordinate
-    solvers). Without this, every VBD number is meaningless — and with it, VBD becomes the most promising
-    candidate for the larger time step.</li>
-    <li><strong>Fix DisplayPort contact.</strong> The plug currently falls through the socket and is never
-    really gripped; both need to work before the DP task can train at all, let alone be tuned.</li>
-    <li><strong>Make Kamino tractable</strong> on contact-dense scenes (it did not finish a 30-step,
-    4-environment gear run within 15 minutes; MuJoCo does it in about a second). Worth retrying with a
-    smaller contact budget and fewer P-ADMM iterations before drawing conclusions.</li>
-    <li><strong>Then</strong> the original sweep: solver × <code>dt</code> (1000→200→100&nbsp;Hz) with the
-    tunnelling rate above as the stability axis, giving a throughput-vs-stability Pareto and a recommended
-    config per task. Contact gap/offset and on-disk SDF caching fold into that sweep.</li>
+    <li><strong>Redo the solver comparison</strong> (MuJoCo / hydroelastic / VBD / Kamino) on the corrected
+    scene, using passive settling as the entry gate — no solver enters the comparison until its scene comes
+    to rest on its own.</li>
+    <li><strong>Make VBD advance the simulation.</strong> Body state is now authoritative for
+    maximal-coordinate solvers, but VBD still diverges on the articulated scene; its joint and contact
+    parameters are the next lever.</li>
+    <li><strong>Fix DisplayPort contact.</strong> The plug still falls through its socket, so that task
+    cannot train at all yet — it needs the same treatment the gear just had.</li>
+    <li><strong>Then the dt sweep</strong> (1000→200→100&nbsp;Hz), with overlap and seating outcome as the
+    stability axes and throughput as the cost axis.</li>
   </ul>
-
-  <h2>Reproduce</h2>
-  <pre>
-# Kit-free env in the combined worktree
-cd IsaacLab-gear-dp
-uv venv --python 3.12.13 .venv &amp;&amp; uv sync
-
-# Run either task headless, pick a solver, override dt from the CLI
-.venv/bin/python -u tmp_smoke.py \
-  --task IsaacContrib-Deploy-DisplayportInsertion-Rizon4s-Grav-Play \
-  --num_envs 4 --headless --visualizer none presets=newton_vbd
-# sweep knobs without editing files:  env.sim.dt=0.005  env.decimation=10  env.sim.physics.num_substeps=1
-  </pre>
 
 </main>
 <script>
@@ -396,18 +433,28 @@ Plotly.newPlot("depth-trace-chart", SOLV.map(([k,label,col,pat]) => ({
   legend:{orientation:"h", y:-0.22}, hovermode:"x unified"
 }), CFG);
 
-const PEN = {speeds:["0.5 m/s","2 m/s","8 m/s"], mm:[3.632,3.971,0.0],
-             note:["caught, but 3.6 mm inside","4.0 mm inside, 2/4 broke through","passed through — never sampled inside"]};
+const PEN = {
+  speeds:["0","0.1","0.2","0.35","0.5","2","8"],
+  mm:[1.402,1.484,1.484,1.843,4.135,1.418,0.0],
+  seated:[true,true,true,true,false,false,false],
+  note:["seats and comes to rest","seats","seats","seats 34 mm down",
+        "knocked off the shaft","knocked off","knocked off — never sampled inside"]
+};
 Plotly.newPlot("penetration-chart", [{
   type:"bar", x:PEN.speeds, y:PEN.mm,
-  marker:{color:"#2a78d6", line:{color:"#fcfcfb", width:2}},
-  text:PEN.mm.map(v=>v.toFixed(2)+" mm"), textposition:"outside", textfont:{color:"#52514e", size:12},
+  marker:{
+    color:PEN.seated.map(v=>v?"#2a78d6":"#eb6834"),
+    pattern:{shape:PEN.seated.map(v=>v?"":"/"), fgcolor:"#fcfcfb", size:6, solidity:0.35},
+    line:{color:"#fcfcfb", width:2}
+  },
+  text:PEN.mm.map(v=>v.toFixed(2)), textposition:"outside", textfont:{color:"#52514e", size:12},
   customdata:PEN.note,
-  hovertemplate:"%{x}<br>peak overlap %{y:.2f} mm<br>%{customdata}<extra></extra>"
+  hovertemplate:"impact %{x} m/s<br>peak overlap %{y:.2f} mm<br>%{customdata}<extra></extra>"
 }], Object.assign({}, LIGHT, {
-  title:{text:"Peak gear-in-base overlap (vertex vs SDF)", font:{size:14, color:"#18212a"}, x:0, xanchor:"left"},
-  bargap:0.45,
-  xaxis:{title:"impact speed", showgrid:false},
+  title:{text:"Peak gear-in-base overlap vs impact speed (hatched = knocked off, not seated)",
+         font:{size:14, color:"#18212a"}, x:0, xanchor:"left"},
+  bargap:0.4,
+  xaxis:{title:"impact speed (m/s)", showgrid:false, type:"category"},
   yaxis:{title:"overlap (mm)", range:[0,5.2], gridcolor:"#e8ecf0", zerolinecolor:"#d8e0e7"},
   hovermode:"closest"
 }), CFG);
