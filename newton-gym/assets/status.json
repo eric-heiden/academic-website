@@ -1,200 +1,130 @@
 {
   "allegro": {
-    "correction": {
-      "corrected_finding": "model_final clears the headline success bar; rejection is driven by intermediate checkpoints and tail motion-quality limits",
-      "date": "2026-07-25",
-      "retracted_claim": "training telemetry indicated the run was unlikely to clear the acceptance gate",
-      "why_wrong": "per-control-step settled-success rate was treated as a per-episode success proxy; over a 300-step episode a 0.0023 per-step rate implies ~0.7 settling events per episode, consistent with ~50% of episodes settling"
-    },
-    "halt_cause": "training processes terminated; not resumed",
-    "halted_at_utc": "2026-07-22T04:00:54Z",
-    "held_out_acceptance_evaluation": {
-      "cases_run": 11,
+    "acceptance": {
+      "cases": 15,
+      "cases_clearing_full_contract": 0,
+      "cases_clearing_primary_bars": 8,
       "episodes_per_case": 512,
-      "model_6000_settled_success": [
-        102,
-        107,
-        110
-      ],
-      "model_6750_settled_success": [
-        187,
-        189,
-        205
-      ],
-      "model_final_settled_success_by_eval_seed": {
-        "42424601": 291,
-        "42424801": 260,
-        "42424802": 287,
-        "42424803": 253,
-        "42424804": 288
+      "median_settled_success_by_train_seed": {
+        "43": 262,
+        "44": 460,
+        "45": 220,
+        "46": 5,
+        "47": 388
       },
-      "notes": [
-        "model_final clears all primary bars on 4 of 5 held-out evaluation seeds",
-        "evaluation is not bit-deterministic: identical checkpoint+seed gave 268 then 260"
-      ],
-      "primary_bars": {
-        "drop_count_max": 51,
-        "horizon_survivor_count_min": 461,
-        "settled_success_pulse_count_min": 256,
-        "wilson_lower_bound_95_min": 0.2
+      "settled_success_max": 463,
+      "settled_success_min": 4
+    },
+    "infeasibility": {
+      "cases_meeting_action_rate_mean": {
+        "count": 3,
+        "their_settled_success": [
+          4,
+          5,
+          5
+        ]
       },
-      "rejection_reasons": [
-        "model_6000 and model_6750 fall far below the 256 settled-success minimum",
-        "orientation_error episode_mean q95 1.911 exceeds 1.50 in all 11 cases",
-        "near_goal_hover episode_mean q95 0.391 exceeds 0.20 in all 11 cases",
-        "action_rate episode_mean mean 1.012 and q95 2.122 exceed 1.00 and 2.00",
-        "settled/immediate frame ratio 0.088 below 0.10"
-      ],
-      "report_update_authorized_by_gate": false,
-      "status": "run_for_seed_43",
-      "total_episodes": 5632,
-      "verdict": "rejected"
+      "cases_meeting_orientation_error_q95": {
+        "count": 1,
+        "their_settled_success": [
+          5
+        ]
+      },
+      "claim": "no observed policy satisfies both the success requirement and the motion-quality limits",
+      "functional_cases_meeting_action_rate_mean": 0,
+      "functional_cases_meeting_orientation_error_q95": 0,
+      "functional_cases_settled_ge_256": 8,
+      "pearson_r_settled_vs_action_rate_mean": 0.983,
+      "scope": "15 cases, 5 seeds, one training recipe"
     },
-    "in_progress": {
-      "estimated_hours": 10.8,
-      "started_utc": "2026-07-25T18:36:14Z",
-      "target_completed_seeds": 5,
-      "training_seeds": [
-        44,
-        45,
-        46,
-        47
-      ]
+    "iterations_per_seed": 7500,
+    "reproducibility": {
+      "evidence": "identical seed/source/command/lockfile diverge at iteration 1 in the 5th decimal, 4x apart by iteration 6424",
+      "implication": "sha256 pinning of metrics.jsonl certifies that a run happened, not that it repeats",
+      "training_bitwise_reproducible": false
     },
-    "planned_environment_transitions_per_seed": 184320000,
-    "planned_iterations_per_seed": 7500,
-    "planned_seeds": [
+    "seeds": [
       43,
-      44
+      44,
+      45,
+      46,
+      47
     ],
-    "predeclared_acceptance_thresholds": {
-      "drop_count_max": 51,
-      "episodes": 512,
-      "horizon_survivor_count_min": 461,
-      "settled_success_pulse_count_min": 256,
-      "settled_success_wilson_lower_bound_95_min": 0.2
+    "source": {
+      "commit": "46c1852",
+      "worktree": "newton-gym-v16"
     },
-    "seeds": {
-      "43": {
-        "environment_transitions": 184320000,
-        "final_50_iteration_means": {
-          "action_rate": 1.64786,
-          "drop": 0.00027,
-          "episode_length": 286.6915,
-          "episode_return": 2841.46272,
-          "hold_error": 0.03411,
-          "near_goal_hover": 0.05172,
-          "orientation_error": 1.00174,
-          "settled_success": 0.00227,
-          "settled_success_streak": 0.01461,
-          "success": 0.02989,
-          "termination_rate": 0.07823
-        },
-        "final_checkpoint_present": true,
-        "metrics_rows": 7500,
-        "metrics_sha256": "78cfd3fc1dd1d184e2a9c788b7806b98c8b41ca8acb8d2dbcac5ca4a5bc4c1c5",
-        "numbered_checkpoints": 151,
-        "status": "training_complete",
-        "wall_hours": 3.29
-      },
-      "44": {
-        "environment_transitions": 157876224,
-        "final_50_iteration_means": {
-          "action_rate": 0.82836,
-          "drop": 0.00012,
-          "episode_length": 292.80098,
-          "episode_return": 1387.69045,
-          "hold_error": 0.03735,
-          "near_goal_hover": 0.14511,
-          "orientation_error": 0.69606,
-          "settled_success": 3e-05,
-          "settled_success_streak": 0.00784,
-          "success": 0.0205,
-          "termination_rate": 0.03471
-        },
-        "final_checkpoint_present": false,
-        "last_checkpoint_iteration": 6400,
-        "metrics_rows": 6424,
-        "metrics_sha256": "07a506667e6b7b60aafd3a7ea23b896015f38d159b2422467478495865951e11",
-        "numbered_checkpoints": 129,
-        "progress_percent": 85.65,
-        "status": "interrupted",
-        "wall_hours": 2.69
-      }
-    },
-    "status": "halted_incomplete"
+    "status": "five_seeds_trained_and_evaluated",
+    "total_transitions": 921600000,
+    "transitions_per_seed": 184320000,
+    "verdict": "rejected"
   },
   "g1": {
-    "post_acceptance": {
-      "completed_environment_transitions": 192000,
-      "completed_quantitative_cases": 3,
-      "failure": {
-        "checkpoint": "model_4500.pt",
-        "evidence_sha256": "354dd0aee8009d0e4b6a73d798ac92cd80ff723cf49df37321426d6ba9f5ea72",
-        "reason": "explicit policy failure before completion accounting: case=model4500_command_switch_25509 terminated=1 failure=1 budget_truncation=0 diagnostic_nonfinite=0 first=env=56/episode=0/end_step=66",
-        "scenario": "command-switch",
-        "seed": 25509
+    "gate_fragility": {
+      "caveat": "sd estimated from 5 seeds; treat 26% as order of magnitude",
+      "cells_evaluated": 99,
+      "cells_within_3sd_of_limit": 1,
+      "fragile_cell": {
+        "estimated_crossing_probability": 0.26,
+        "limit": "foot_slide_mean_max",
+        "limit_value": 0.2,
+        "mean": 0.1892,
+        "observed_crossings": "1 of 5",
+        "sd": 0.017,
+        "window": "model1600_1550_1599",
+        "z": 0.63
       },
-      "report_update_authorized_by_gate": false,
+      "next_tightest_cell_z": 3.1
+    },
+    "iterations_per_seed": 7501,
+    "prior_v65": {
+      "note": "single-seed rejection on one held-out command-switch case",
       "status": "rejected"
     },
-    "remediation": {
-      "base_commit": "1df24534977997d4a318373f8c5ea40634a60f46",
-      "diff_stat": "newton_gym/tasks/g1.py   | 543 +++++++++++++++++++++++++++++++++++++++++-\n tests/test_g1.py         | 608 +++++++++++++++++++++++++++++++++++++++++++++--\n tests/test_report.py     |  15 +-\n tests/test_run_matrix.py |  15 +-\n 4 files changed, 1149 insertions(+), 32 deletions(-)",
-      "modified_files": [
-        "ewton_gym/tasks/g1.py",
-        "tests/test_g1.py",
-        "tests/test_report.py",
-        "tests/test_run_matrix.py"
-      ],
-      "status": "in development; not trained or accepted",
-      "working_source_sha256": "5eef1a36e4b79ab06fb7197266bc4f758d0dcdf32343733376789ee626981580"
+    "seeds": [
+      157,
+      158,
+      159,
+      160,
+      161
+    ],
+    "source": {
+      "commit": "fb4f1ce",
+      "worktree": "final-v66-v16"
     },
-    "training": {
-      "environment_transitions": 184344576,
-      "metrics_rows": 7501,
-      "metrics_sha256": "20b0e61c42d0636c50930fb4422cdab4984a66d6c9e8c752e2a10b3944690faf",
-      "monitor_windows": {
-        "fail": 0,
-        "pass": 11,
-        "pending": 0
+    "status": "five_v66_seeds_trained",
+    "terminal_window_spread": {
+      "episode_length": [
+        987.2,
+        993.3
+      ],
+      "termination_rate": [
+        0.0073,
+        0.0137
+      ],
+      "tracking_error": [
+        0.0754,
+        0.0816
+      ]
+    },
+    "training_windows": {
+      "seeds_failing": {
+        "159": {
+          "limit": "foot_slide_mean_max",
+          "limit_value": 0.2,
+          "recovered": true,
+          "value": 0.216,
+          "window": "model1600_1550_1599"
+        }
       },
-      "seed": 156,
-      "status": "pass",
-      "terminal_window": {
-        "available_rows": 50,
-        "expected_rows": 50,
-        "failed_limits": [],
-        "iterations_inclusive": [
-          7450,
-          7499
-        ],
-        "label": "model7500_7450_7499",
-        "limits": {
-          "action_rate_mean_max": 22.0,
-          "base_height_mean_min": 0.7,
-          "direct_lateral_tracking_error_mean_max": 0.18,
-          "effort_mean_max": 15000.0,
-          "episode_length_mean_min": 900.0,
-          "foot_slide_mean_max": 0.2,
-          "termination_rate_mean_max": 0.1,
-          "tracking_error_mean_max": 0.18,
-          "upright_mean_min": 0.985
-        },
-        "means": {
-          "action_rate": 17.350998992919923,
-          "base_height": 0.7847555029392242,
-          "direct_lateral_tracking_error": 0.06219513591922664,
-          "effort": 6604.5175,
-          "episode_length": 985.9567456054688,
-          "foot_slide": 0.07536120310425759,
-          "termination_rate": 0.015297182872891425,
-          "tracking_error": 0.07448627561330795,
-          "upright": 0.9984627616405487
-        },
-        "status": "pass"
-      }
-    }
+      "seeds_passing_all_11": [
+        157,
+        158,
+        160,
+        161
+      ]
+    },
+    "transitions_per_seed": 184344576
   },
   "generated_at_utc": "2026-07-21T22:14:25Z",
   "provenance": {
@@ -209,5 +139,5 @@
   "schema": "newton_gym.interim_status",
   "schema_version": 1,
   "scope": "interim engineering evidence; not a final accepted benchmark",
-  "snapshot_generated_utc": "2026-07-25T18:45:00Z"
+  "snapshot_generated_utc": "2026-07-26T12:10:00Z"
 }
