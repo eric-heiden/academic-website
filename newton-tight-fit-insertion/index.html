@@ -94,7 +94,7 @@
     <li><span class="done">✓</span> <strong>Passive-stability and gear-train checks</strong> — the gear seats on its shaft to within 0.03 mm and stays.</li>
     <li><span class="done">✓</span> <strong>Fixed maximal-coordinate read-back</strong> — VBD/XPBD/Kamino were never surfacing their state, so a diverging scene scored as perfectly stable.</li>
     <li><span class="done">✓</span> <strong>Isolated gear-train study</strong> — the meshes are fine, the solvers are fine; the collider representation was the problem. XPBD and MuJoCo-with-Newton-contacts both drive the train at the exact ratios, from 1000&nbsp;Hz down to <strong>100&nbsp;Hz</strong>.</li>
-    <li><span class="done">✓</span> <strong>Made VBD finite on this scene</strong> — its rigid path needs <code>rigid_avbd_beta&nbsp;&gt;&nbsp;0</code>; with the default fixed-penalty setting it goes non-finite within 25&nbsp;ms.</li>
+    <li><span class="done">✓</span> <strong>Made VBD finite on this scene</strong> — its rigid path needs <code>rigid_avbd_beta&nbsp;&gt;&nbsp;0</code>; with the default fixed-penalty setting it goes non-finite within 25&nbsp;ms. It is still too dissipative to drive the train.</li>
     <li><span class="todo">◻</span> Move the task off MuJoCo's convex-hull contact path, then re-run the dt sweep (1000→200→100&nbsp;Hz) on the real scene.</li>
   </ul>
 
@@ -592,12 +592,24 @@
   not a contact-buffer overflow (51–91 contacts per body against a 4096 buffer), and it survives none of the
   usual levers: frictionless, hard or soft contacts, 8 substeps, 5× smaller dt, stiffness from 10⁵ to 10⁷,
   density up to 10⁵.</p>
-  <p>The one setting that fixes it is the AVBD <strong>penalty ramp</strong>. With the default
-  <code>rigid_avbd_beta = 0</code> ("fixed-k") the solve goes NaN at step 25; with
-  <code>rigid_avbd_beta = 1000</code> it runs indefinitely and the gears sit within 0.2 mm of their designed
-  seat. Transmission is still poor — 9–27&nbsp;% of the demanded ratio, versus &lt;1&nbsp;% slip for XPBD —
-  so VBD is finite here but not yet correct, and that is now a bounded, reportable question rather than a
-  mystery.</p>
+  <p>The one setting that changes the outcome is the AVBD <strong>penalty ramp</strong>. With the default
+  <code>rigid_avbd_beta = 0</code> ("fixed-k") the solve goes NaN at step 25 in every one of the sixteen
+  configurations swept; with <code>rigid_avbd_beta = 1000</code> it runs indefinitely and the gears settle
+  within 0.2 mm of their designed seat.</p>
+  <p>Finite is not the same as correct. Driven by the same velocity servo that takes XPBD to 5.2&nbsp;rad/s,
+  VBD's input gear reaches only <strong>0.5–0.7&nbsp;rad/s</strong> — its contact is heavily dissipative here
+  — and the followers slip <strong>34–56&nbsp;%</strong>. Raising the drive torque to overcome the damping
+  makes it unstable again (86–180° of tumbling). So VBD is not usable on this scene yet, but the failure is
+  now specific enough to report upstream with a minimal repro: three meshes, one static, no articulation.</p>
+  <table>
+    <thead><tr><th><code>rigid_avbd_beta</code></th><th>Outcome</th><th>Input ω reached</th><th>Follower slip</th></tr></thead>
+    <tbody>
+      <tr><td>0 (default)</td><td class="bad">non-finite at ~25 ms</td><td>—</td><td>—</td></tr>
+      <tr><td>10 – 100</td><td class="bad">finite but tumbles (14–86°)</td><td>4.8–6.0 rad/s</td><td>64–100 %</td></tr>
+      <tr><td>1000</td><td class="good">stable, seated to 0.2 mm</td><td class="bad">0.5–0.7 rad/s</td><td class="bad">34–56 %</td></tr>
+      <tr><td>10000</td><td class="bad">tumbles (162°)</td><td>5.7 rad/s</td><td>~100 %</td></tr>
+    </tbody>
+  </table>
 
   <div class="callout warn">
     <strong>Corrections to earlier sections of this report.</strong>
