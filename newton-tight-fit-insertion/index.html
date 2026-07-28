@@ -29,6 +29,9 @@
     .stamp { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
     .live { display: inline-block; font-size: 12px; font-weight: 650; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 20px; }
     .example-video { display: block; width: 100%; max-width: 720px; border: 1px solid var(--line); border-radius: 8px; background: #0f1720; }
+    .video-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0 8px; }
+    .video-pair video { display: block; width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #0f1720; }
+    @media (max-width: 720px) { .video-pair { grid-template-columns: 1fr; } .grid-cards { grid-template-columns: repeat(2, 1fr); } }
     .caption { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
     .callout { border: 1px solid var(--line); border-left: 5px solid var(--accent); background: var(--panel); padding: 14px 16px; border-radius: 8px; margin: 20px 0; }
     .callout.warn { border-left-color: var(--warn); }
@@ -55,7 +58,7 @@
   step than the current 2&nbsp;kHz soft-contact regime by moving to Newton's constraint-based solvers
   (<code>SolverVBD</code>, <code>SolverKamino</code>), while quantifying throughput and detecting tunnelling
   before committing to a two-day training run.</p>
-  <p class="stamp" id="stamp">Generated 2026-07-24 · Newton <code>1.4.0.dev0</code> (ships <code>SolverVBD</code> +
+  <p class="stamp" id="stamp">Generated 2026-07-28 · Newton <code>1.4.0.dev0</code> (ships <code>SolverVBD</code> +
   <code>SolverKamino</code>) · Isaac&nbsp;Lab worktree <code>newton/gear-dp-combined</code> · NVIDIA RTX&nbsp;PRO&nbsp;6000
   Blackwell (MIG 1g.24&nbsp;GB) · runs are Kit-free (no Isaac&nbsp;Sim).</p>
   <span class="live">● Live — updated as the investigation progresses</span>
@@ -63,8 +66,20 @@
   <div class="grid-cards">
     <div class="card"><div class="label">Tasks combined</div><div class="metric">2</div><div class="label">gear + DisplayPort, one branch</div></div>
     <div class="card"><div class="label">Solvers selectable</div><div class="metric">5</div><div class="label">MuJoCo · hydroelastic · XPBD · VBD · Kamino</div></div>
-    <div class="card"><div class="label">Contacts / body (unfiltered)</div><div class="metric">~680</div><div class="label">median; vs 256 VBD buffer</div></div>
-    <div class="card"><div class="label">Video pipeline</div><div class="metric">✓</div><div class="label">ViewerGL.get_frame → mp4, headless</div></div>
+    <div class="card"><div class="label">Isolated gear train, exact meshes</div><div class="metric" style="color:#178a64">0.1&nbsp;%</div><div class="label">slip vs the tooth-count ratio</div></div>
+    <div class="card"><div class="label">Same train, convex-hull colliders</div><div class="metric" style="color:#b5483a">100&nbsp;%</div><div class="label">slip — what the training preset simulates</div></div>
+  </div>
+
+  <div class="callout warn">
+    <strong>Headline (2026-07-28): the gears were never being simulated as gears.</strong>
+    An isolated three-gear rig — no robot, no task, the task's own meshes — meshes and transmits torque at
+    the exact tooth-count ratios (<strong>0.1&nbsp;% slip, &lt;0.5° wobble</strong>) under XPBD <em>and</em>
+    under MuJoCo when Newton's collision pipeline supplies the contacts. Swap only the collider
+    representation to convex hulls and the same rig goes to <strong>100&nbsp;% slip</strong>. The task's
+    <code>default</code> preset runs <code>use_mujoco_contacts=True</code>, and MuJoCo "compiles every mesh
+    geom through its convex-hull path" — so the teeth, and the shafts, are hulled away before the solver ever
+    runs. This is the wobbling, the non-meshing and the gear sliding off the fixture, and no solver setting
+    could have fixed it. <a href="#isolated">Full study below.</a>
   </div>
 
   <h2>Where things stand</h2>
@@ -76,9 +91,11 @@
     <li><span class="done">✓</span> <strong>Collision filtering</strong> via per-body Newton collision groups — and then fixed two bugs in it that were silently disabling the contacts it selected.</li>
     <li><span class="done">✓</span> <strong>Forced-insertion proxy</strong> — a scripted Jacobian push that presses the plug into the socket (worst-case contact moment); doubles as the close-up video driver.</li>
     <li><span class="done">✓</span> <strong>Tunnelling detector</strong> and a direct <strong>vertex-vs-SDF overlap</strong> measurement, both calibrated against the task's own geometry.</li>
-    <li><span class="done">✓</span> <strong>Passive-stability and gear-train checks</strong> — the gear seats on its shaft to within 0.03 mm and stays. Driving one gear shows the teeth touch but do <em>not</em> transmit: insertion is simulated, meshing is not.</li>
-    <li><span class="done">✓</span> <strong>Fixed maximal-coordinate read-back</strong> — VBD/XPBD/Kamino were never surfacing their state, so a diverging scene scored as perfectly stable. Both now measurable, and both diverge on this scene.</li>
-    <li><span class="todo">◻</span> Stabilise XPBD/VBD on this scene, then the dt sweep (1000→200→100&nbsp;Hz).</li>
+    <li><span class="done">✓</span> <strong>Passive-stability and gear-train checks</strong> — the gear seats on its shaft to within 0.03 mm and stays.</li>
+    <li><span class="done">✓</span> <strong>Fixed maximal-coordinate read-back</strong> — VBD/XPBD/Kamino were never surfacing their state, so a diverging scene scored as perfectly stable.</li>
+    <li><span class="done">✓</span> <strong>Isolated gear-train study</strong> — the meshes are fine, the solvers are fine; the collider representation was the problem. XPBD and MuJoCo-with-Newton-contacts both drive the train at the exact ratios, from 1000&nbsp;Hz down to <strong>100&nbsp;Hz</strong>.</li>
+    <li><span class="done">✓</span> <strong>Made VBD finite on this scene</strong> — its rigid path needs <code>rigid_avbd_beta&nbsp;&gt;&nbsp;0</code>; with the default fixed-penalty setting it goes non-finite within 25&nbsp;ms.</li>
+    <li><span class="todo">◻</span> Move the task off MuJoCo's convex-hull contact path, then re-run the dt sweep (1000→200→100&nbsp;Hz) on the real scene.</li>
   </ul>
 
   <h2>Rollouts</h2>
@@ -451,23 +468,173 @@
     trap as before: once the part is moving fast it is never sampled while inside, so overlap must always be
     read together with the outcome.
   </div>
+  <h2 id="isolated">The isolated gear-train study</h2>
+  <p>Everything above was measured on the full task: an articulated arm, a gripper, resets, an observation
+  stack and three gears sharing one solve. Any of those can cause the wobble, and none of them can be ruled
+  out from inside. So the scene was rebuilt from nothing —
+  <code>scripts/benchmarks/gear_solver_study.py</code> — as plain Newton: a static base carrying the three
+  shafts, the three gears seated on them, and <em>nothing else</em>. Same USD collision meshes the task
+  ships.</p>
+  <p>The 60-tooth gear is driven by a <strong>velocity servo</strong> rather than a bare torque. That matters:
+  the train is friction-limited, so a fixed torque lands anywhere between stuck and 300&nbsp;rad/s depending
+  on stiction, and no two configurations measure the same thing. Holding the input speed fixed makes
+  <em>slip</em> — how far the followers fall short of the ratio their tooth counts demand — directly
+  comparable across every run.</p>
+
+  <h3>The geometry, measured from the meshes</h3>
+  <p>Slicing the collision meshes with a plane (not sampling their vertices — a cylinder tessellated only at
+  its ends has no vertices at mid-height, so a vertex probe cannot tell a toothed profile from a smooth one)
+  gives the numbers every threshold below is built on:</p>
+  <table>
+    <thead><tr><th>Quantity</th><th>Value</th><th>Consequence</th></tr></thead>
+    <tbody>
+      <tr><td>Module / tooth counts</td><td>1.5 mm · 20 / 40 / 60 T</td><td>tip radii 16.50 / 31.50 / 46.50 mm</td></tr>
+      <tr><td>Tooth depth (tip − root)</td><td><strong>3.37 mm</strong>, 60 cycles/rev confirmed by FFT</td><td>the teeth are really there, at every height of the 13.5 mm toothed band</td></tr>
+      <tr><td>Centre distances</td><td>75.75 / 45.75 mm vs 75 / 45 theoretical</td><td>0.75 mm loose → ≈<strong>0.55 mm backlash</strong></td></tr>
+      <tr><td>Bore vs shaft radius</td><td>7.875 mm vs 7.125 mm</td><td><strong>0.75 mm</strong> radial slop; ~3° of tilt is physically real, not numerical</td></tr>
+      <tr><td>Seat</td><td>plate top −11.25 mm, gear bottom face −18.75 mm</td><td>seated gear centre at <strong>+7.5 mm</strong></td></tr>
+    </tbody>
+  </table>
+  <div id="tooth-profile-chart" class="chart"></div>
+  <p class="caption">Outer radius against angle for the 60-tooth gear, taken from a plane slice of its
+  collision mesh at mid-tooth height. Green is the shipped mesh; the dashed line is its convex hull — the
+  representation MuJoCo's own contact path uses.</p>
+
+  <h3>With the real meshes, the train works</h3>
+  <p>XPBD at 1&nbsp;kHz with a single substep, 10 iterations, a 256³ SDF and a 0.5 mm contact gap drives all
+  three gears at the ratios the tooth counts demand:</p>
+  <table>
+    <thead><tr><th>Gear</th><th>Measured ω</th><th>Ratio demanded by tooth counts</th><th>Slip</th><th>Peak-to-peak tilt</th></tr></thead>
+    <tbody>
+      <tr><td>large 60T (driven)</td><td>+5.24 rad/s</td><td>— (input)</td><td>—</td><td>0.19°</td></tr>
+      <tr><td>medium 40T</td><td class="good">−7.85 rad/s</td><td>−7.86 rad/s</td><td class="good">0.1 %</td><td>0.36°</td></tr>
+      <tr><td>small 20T</td><td class="good">+15.71 rad/s</td><td>+15.72 rad/s</td><td class="good">0.1 %</td><td>0.43°</td></tr>
+    </tbody>
+  </table>
+  <p>MuJoCo reaches the same answer when Newton's collision pipeline supplies the contacts
+  (<code>use_mujoco_contacts=False</code>): 0.3&nbsp;% and 1.5&nbsp;% slip, 0.27–1.68° of tilt. The sign
+  alternates correctly along the chain, and every gear stays within 0.6 mm of its shaft.</p>
+  <div class="video-pair">
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_isolated_sdf.mp4"></video>
+      <p class="caption">Exact meshes + SDF contacts, XPBD. The teeth mesh and the train turns.</p></div>
+    <div><video controls muted loop playsinline preload="metadata" src="assets/gear_isolated_hull.mp4"></video>
+      <p class="caption">Identical run, gears convex-hulled. The driven gear spins; its neighbours never move.</p></div>
+  </div>
+
+  <h3>The one change that breaks it</h3>
+  <p>Same rig, same solver, same time step — only the collider representation changes:</p>
+  <div id="collider-ab-chart" class="chart"></div>
+  <table>
+    <thead><tr><th>Colliders</th><th>XPBD</th><th>MuJoCo (Newton contacts)</th></tr></thead>
+    <tbody>
+      <tr><td>Exact meshes + SDF</td><td class="good">0.1 % slip, 0.2–0.5° tilt</td><td class="good">0.3–1.5 % slip, 0.3–1.7° tilt</td></tr>
+      <tr><td>Gears convex-hulled, base exact</td><td class="bad">diverges</td><td class="bad">100 % slip — followers dead still</td></tr>
+      <tr><td>Everything convex-hulled</td><td class="bad">diverges (4529 rad/s)</td><td class="bad">100 % slip, 94–167° tumbling</td></tr>
+    </tbody>
+  </table>
+  <p>A convex hull of a spur gear is a plain disc of the tip radius with the bore filled in. Two such discs
+  seated at the design centre distance overlap permanently by 2.25 mm — because that overlap <em>is</em> the
+  tooth engagement, and with the teeth gone there is nothing to interlock, only two cylinders pressing on
+  each other. The hull of the <em>base</em> is worse: it is a tent stretched over the three shafts, so the
+  gears have no bore to thread and slide down its slope. That is precisely the "right gear slides down to
+  the floor below the fixture" seen earlier.</p>
+  <div class="callout warn">
+    <strong>And this is what the task runs.</strong> The <code>default</code> preset — the one sized for the
+    two-day training run — sets <code>use_mujoco_contacts=True</code>. Newton's MuJoCo exporter says it
+    plainly in <code>solver_mujoco.py</code>: <em>"MuJoCo compiles every mesh geom through its convex-hull
+    path."</em> So under <code>default</code> the gear teeth and the shafts do not exist as far as contact is
+    concerned. The 2&nbsp;kHz time step was paying for a scene that is permanently 2.25 mm interpenetrated.
+  </div>
+
+  <h3>What the task scene actually hands to the solver</h3>
+  <p>Dumping the finalized Newton model per preset (<code>gear_scene_audit.py</code>) turns up three more
+  problems that no amount of solver tuning would have reached:</p>
+  <table>
+    <thead><tr><th>Preset</th><th>Gear collider Newton receives</th><th>Contact gap</th><th>SDF</th></tr></thead>
+    <tbody>
+      <tr><td><code>default</code></td><td class="bad">the gears' <em>visual</em> meshes — the authored <code>collisions/</code> prims are absent from the model entirely</td><td class="bad">100 mm</td><td class="bad">none</td></tr>
+      <tr><td><code>newton_xpbd</code></td><td class="bad">correct meshes, but the <em>medium</em> gear gets two coincident colliders (its visual mesh <em>and</em> its collision mesh)</td><td>10 mm</td><td class="good">yes</td></tr>
+      <tr><td><code>newton_hydroelastic</code></td><td class="good">one collision mesh per gear, hydroelastic flagged</td><td>5 mm</td><td class="good">yes</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li><strong>100 mm contact gap.</strong> Newton's <code>ModelBuilder.rigid_gap</code> defaults to 0.1 m,
+    and any shape that does not go through Isaac Lab's <code>NewtonShapeCfg</code> (which sets 0.01 m) inherits
+    it. Against 0.55 mm of backlash, a 100 mm speculative envelope means every tooth "sees" every other tooth
+    on the fixture. Even 10 mm is 18× the backlash.</li>
+    <li><strong>A duplicated collider</strong> on the medium gear doubles its contact response against both
+    neighbours and against the shaft.</li>
+    <li><strong>Friction is inconsistent</strong>: the same gear set carries µ = 1.0 on some shapes and
+    µ = 3.0 on others.</li>
+  </ul>
+  <p>Encouragingly, the isolated rig is <em>insensitive</em> to the gap on its own — it still transmits with
+  a 20 mm gap — so the gap is a cost and a contact-count problem (it is where the ~680 contacts/body came
+  from) rather than the cause of the wobble. The cause is the hull.</p>
+
+  <h3>How slow can the loop run?</h3>
+  <p>With the real colliders, the original question finally has an answer. Sweeping the outer step from
+  1&nbsp;kHz to 100&nbsp;Hz, 22 of 24 configurations transmit within 5&nbsp;% of the exact ratio:</p>
+  <div id="rate-chart" class="chart"></div>
+  <p class="caption">Worst-case slip against outer step rate. XPBD holds the ratio down to 100&nbsp;Hz with a
+  single substep; MuJoCo needs 4 substeps below 200&nbsp;Hz. Only two configurations miss: both at
+  100&nbsp;Hz with a single substep.</p>
+  <p>The rest of the sweep is almost boring, which is the point — with the geometry represented correctly the
+  problem is not delicate: <strong>9/9</strong> SDF-resolution × gap combinations transmit (128–512³,
+  0.2–2 mm gap), <strong>8/8</strong> iteration counts (5–40), and <strong>9/9</strong> friction ×
+  stiffness combinations (µ 0.05–1.0, k<sub>e</sub> 10⁵–10⁷).</p>
+  <div id="sdf-chart" class="chart"></div>
+  <p class="caption">Wobble is flat across SDF resolution — 128³ is already enough for a 3.37 mm tooth on a
+  93 mm gear. Resolution was never the limiting factor.</p>
+
+  <h3>VBD: one parameter away from finite</h3>
+  <p>VBD failed differently and more interestingly. On this scene it goes non-finite about 25&nbsp;ms after
+  the gears touch — not by exploding, but by producing NaN while every velocity is still under 2 cm/s. It is
+  not a contact-buffer overflow (51–91 contacts per body against a 4096 buffer), and it survives none of the
+  usual levers: frictionless, hard or soft contacts, 8 substeps, 5× smaller dt, stiffness from 10⁵ to 10⁷,
+  density up to 10⁵.</p>
+  <p>The one setting that fixes it is the AVBD <strong>penalty ramp</strong>. With the default
+  <code>rigid_avbd_beta = 0</code> ("fixed-k") the solve goes NaN at step 25; with
+  <code>rigid_avbd_beta = 1000</code> it runs indefinitely and the gears sit within 0.2 mm of their designed
+  seat. Transmission is still poor — 9–27&nbsp;% of the demanded ratio, versus &lt;1&nbsp;% slip for XPBD —
+  so VBD is finite here but not yet correct, and that is now a bounded, reportable question rather than a
+  mystery.</p>
+
+  <div class="callout warn">
+    <strong>Corrections to earlier sections of this report.</strong>
+    <ul>
+      <li><strong>"The gear train does not transmit, and it is the contact model rather than the geometry"</strong>
+      — half right. It is not the geometry, but nor is it hydroelastic averaging: it is the collider
+      representation upstream of any contact model. With exact meshes the same hydroelastic and SDF paths
+      transmit to 0.1&nbsp;%.</li>
+      <li><strong>"Neither XPBD nor VBD is usable on this scene"</strong> — XPBD is not just usable, it is the
+      best configuration measured, and works at 100&nbsp;Hz. The earlier divergence was the task scene's
+      collider set, not XPBD.</li>
+      <li><strong>"SDF resolution improves, then stalls"</strong> — resolution was never the constraint;
+      128³ already resolves the teeth.</li>
+      <li>An intermediate claim made during this study — that the shipped gear meshes are toothless
+      cylinders — was <em>wrong</em>, and is recorded here because it nearly became the headline. It came
+      from reading the mesh's vertex rings instead of slicing its faces. Plane-slicing shows 60 teeth,
+      3.37 mm deep, at every height. The audit script now slices.</li>
+    </ul>
+  </div>
+
   <h2>What's next</h2>
   <p>The scene is physical now, which resets the order of work: the solver comparison has to be re-run before
   any of it means anything.</p>
   <ul>
-    <li><strong>Stabilise XPBD or VBD on this scene.</strong> Both are now measurable and both diverge, so
-    the next step is their configuration rather than their plumbing — mass ratios, contact stiffness/damping
-    and the articulated arm sharing the solve. Newton's threaded nut-and-bolt example is stable in its own
-    harness with the same contact type, so the gap is this scene, not the solver.</li>
-    <li><strong>Make the teeth transmit.</strong> Under MuJoCo the teeth touch (~1 mm overlap, 85 % of steps)
-    but pass on only ~4 % of the meshing rate. Until the gear train turns, the assembly half of this task is
-    not being simulated.</li>
-    <li><strong>Redo the solver comparison</strong> (MuJoCo / hydroelastic / VBD / Kamino) on the corrected
-    scene, gated on both checks — passive settling <em>and</em> the gear-train test — so no solver enters the
-    comparison on a scene that only looks right.</li>
-    <li><strong>Make VBD advance the simulation.</strong> Body state is now authoritative for
-    maximal-coordinate solvers, but VBD still diverges on the articulated scene; its joint and contact
-    parameters are the next lever.</li>
+    <li><strong>Get the task off the convex-hull contact path.</strong> This is the one change that matters.
+    <code>default</code> must stop being the training preset, or must stop using
+    <code>use_mujoco_contacts=True</code>; <code>newton_xpbd</code> is the candidate, since XPBD with exact
+    SDF colliders is the configuration that actually works in isolation.</li>
+    <li><strong>Fix the asset pipeline problems the scene audit found</strong> — the missing gear colliders
+    under <code>default</code>, the duplicated medium-gear collider under <code>newton_xpbd</code>, the
+    100 mm / 10 mm contact gaps against 0.55 mm of backlash, and the mixed µ = 1.0 / 3.0 friction.</li>
+    <li><strong>Re-run the gear-train test on the task scene</strong>, not just in isolation: the isolated rig
+    proves the physics is reachable, it does not prove the task reaches it. The same slip metric applies
+    directly.</li>
+    <li><strong>Take VBD from finite to correct.</strong> <code>rigid_avbd_beta &gt; 0</code> stops the NaN;
+    the remaining 9–27 % transmission is the open question, and it is now small enough to report upstream
+    with a minimal repro.</li>
     <li><strong>Fix DisplayPort contact.</strong> The plug still falls through its socket, so that task
     cannot train at all yet — it needs the same treatment the gear just had.</li>
     <li><strong>Then the dt sweep</strong> (1000→200→100&nbsp;Hz), with overlap and seating outcome as the
@@ -482,6 +649,16 @@ const LIGHT = {
   margin: { l: 56, r: 20, t: 30, b: 48 }
 };
 const CFG = { responsive: true, displayModeBar: false };
+
+// Isolated gear-train study: figures are generated by scripts/benchmarks/gear_study_plots.py, so
+// re-running a sweep refreshes the charts without touching this page.
+fetch("assets/gear_study_charts.json")
+  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(figs => Object.entries(figs).forEach(([id, fig]) => {
+    const el = document.getElementById(id);
+    if (el) Plotly.newPlot(el, fig.data, Object.assign({}, LIGHT, fig.layout), CFG);
+  }))
+  .catch(err => console.warn("gear study charts unavailable:", err));
 
 // Per-body contact counts observed during the VBD DisplayPort rollout (overflow events).
 const CONTACTS = [674,682,676,817,712,779,759,795,755,771,738,777,728,752,683,742,820,793,750,797,764,790,677,692,771,701,668,674,747,674,740,718,779,772,709,678,675,689,680,730,758,686,675,693,677,741,791,754,743,773,704,672,696,719,685,685,664,668,678,680,688,670,669,688,719,770,674,678,696,707,715,702,739,699,756,706,687,677,766,693,696,739,708,677,789,666,709,672,683,661,672,685,684,733,678,672,671,657,680,686,682,670,684,672,680,684,664,670,672,688,665,671,696,683,670,681,695,677,726,690,678,676,674,672,670,662,674,680,681,720,678,674,678,666,708,706,712,736,721,679,758,697,693,720,711,683,685,747,669,690,677,680,673,687,687,679,711,707,703,693,691,683,676,677,676,676,700,689,683,677,678,670,669,684,697,680,684,666,674,680,672,668,675,685,667,672,662,664,662,670,677,696,695,692,703,689,709,689,678,708,702,706,697,716,714,720,746,735,747,794,744,792,748,740,770,768,776,774,762,781,761,740,753,776,752,740,745,758,724,769,766,795,745,749,774,770,742,738,788,746,726,744,790,750,788,756,738,768,752,786,758,752,734,762,748,768,738,746,748,764,746,768,740,760,676,685,753,786,781,783,787,780,750,806,776,757,728,750,762,744,740,794,746,740,742,764,732,764,770,754,747,782,797,724,766,774,770,780,751,767,768,774,736,765,776,779,766,782,797,787,767,761,780,760,758,772,782,758,755,768,768,768,766,766,760,734,734,741,742,740,676,695,783,744,734,773,710,658,519,580,484,446,438,352,390,430,456,420,348,358,384,418,402,394,404,450,516,434,544,580,600,660,772,748,734,688,674,696,716,744,727,741,733,712,711,790,714,676,720,704,664,644,548,622,628,624,462,486,464,444,455,482,654,700,728,700,674,697,744,692,538,394,368,326,354,294,314,282,320,336,266,262,276,294,264,300,286,342,338,342,474,445,591,656,779,761,763,695,518,459,410,392,430,352,392,342,302,268,270,260,272,286,268,262,298,344,340,540,658,738,795,733,674,700,735,644,518,466,370,344,350,328,296,296,346,266,282,266,274,292,300,296,292,296,308,342,328,316,340,376,428,452,544,586,729,617,548,406,356,450,346,292,304,274,284,300,346,274,304,330,290,278,296,314,316,306,386,358,344,390,366,384,414,634,624,746,726,624,676,767,577,338,288,278,268,262,274,262,306,282,286,296,362,478,452,755,562,356,326,308,272,298,276,268,262,264,268,272,268,284,276,266,276,304,274,384,314,280,358,490,732,621,562,676,745,428,260,312,625,543,386,302,262,272,350,560,632,452];
