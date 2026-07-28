@@ -90,16 +90,18 @@
   <div class="hero">
     <video controls muted loop playsinline preload="metadata" src="assets/montage.mp4"></video>
   </div>
-  <p class="caption">Left to right, top to bottom: picnic basket (<code>large_2</code>), bundled socks (<code>medium_4</code>), cabbage (<code>large_4</code>), lock (<code>small_2</code>), headphones (<code>large_1</code>), salt shaker (<code>small_4</code>). Rendered with
+  <p class="caption">Left to right, top to bottom: picnic basket (<code>large_2</code>), bundled socks (<code>medium_4</code>), cabbage (<code>large_4</code>), lock (<code>small_2</code>), headphones (<code>large_1</code>), salt shaker (<code>small_4</code>). Only the visual meshes are drawn; the
+  convex collision hulls sit a few millimetres away from them and are hidden, since drawing both puts two
+  surfaces in the depth buffer that z-fight. Rendered with
   <code>ViewerGL(headless=True)</code> → <code>get_frame()</code> → H.264, then tiled with ffmpeg. Each clip
   reports its own outcome below; borderline grasps do flip between runs, since float32 contact solving on the
   GPU is not bit-reproducible.</p>
 
   <h2>Individual grasps</h2>
-  <div class="clipgrid"><figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_2__picnic_basket.mp4"></video><figcaption><strong>picnic basket</strong> · <code>large_2</code><br><span class="good">lifted and held</span> · lift 240 mm · wrist error 4.4 mm</figcaption></figure>
-<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/medium_4__bundled_socks.mp4"></video><figcaption><strong>bundled socks</strong> · <code>medium_4</code><br><span class="good">lifted and held</span> · lift 208 mm · wrist error 2.6 mm</figcaption></figure>
-<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_4__cabbage.mp4"></video><figcaption><strong>cabbage</strong> · <code>large_4</code><br><span class="good">lifted and held</span> · lift 202 mm · wrist error 5.0 mm</figcaption></figure>
-<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/small_2__lock.mp4"></video><figcaption><strong>lock</strong> · <code>small_2</code><br><span class="good">lifted and held</span> · lift 180 mm · wrist error 1.4 mm</figcaption></figure>
+  <div class="clipgrid"><figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_2__picnic_basket.mp4"></video><figcaption><strong>picnic basket</strong> · <code>large_2</code><br><span class="good">lifted and held</span> · lift 239 mm · wrist error 4.4 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/medium_4__bundled_socks.mp4"></video><figcaption><strong>bundled socks</strong> · <code>medium_4</code><br><span class="good">lifted and held</span> · lift 207 mm · wrist error 2.6 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_4__cabbage.mp4"></video><figcaption><strong>cabbage</strong> · <code>large_4</code><br><span class="good">lifted and held</span> · lift 201 mm · wrist error 5.0 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/small_2__lock.mp4"></video><figcaption><strong>lock</strong> · <code>small_2</code><br><span class="good">lifted and held</span> · lift 180 mm · wrist error 1.3 mm</figcaption></figure>
 <figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_1__headphones.mp4"></video><figcaption><strong>headphones</strong> · <code>large_1</code><br><span class="good">lifted and held</span> · lift 174 mm · wrist error 3.0 mm</figcaption></figure>
 <figure><video controls muted loop playsinline preload="metadata" src="assets/clips/small_4__salt_shaker.mp4"></video><figcaption><strong>salt shaker</strong> · <code>small_4</code><br><span class="bad">did not hold</span> · lift -25 mm · wrist error 2.1 mm</figcaption></figure></div>
 
@@ -127,10 +129,70 @@
     </div>
   </div>
   <table><thead><tr><th>Scene</th><th>Objects</th><th>Window</th><th>Focus</th><th>Resting contacts</th><th>Wrist error</th><th>Stable</th><th>Largest bystander drift</th></tr></thead><tbody>
-<tr><td><code>small_2</code></td><td>5</td><td>20.5–22.5 s</td><td>match box</td><td>9040</td><td>1.79 mm</td><td class='good'>yes</td><td>hacky sack 4 mm</td></tr>
-<tr><td><code>medium_1</code></td><td>5</td><td>26.4–28.8 s</td><td>dustpan</td><td>10495</td><td>1.06 mm</td><td class='good'>yes</td><td>umbrella 10 mm</td></tr>
+<tr><td><code>small_2</code></td><td>5</td><td>20.5–22.5 s</td><td>match box</td><td>9041</td><td>1.79 mm</td><td class='good'>yes</td><td>hacky sack 4 mm</td></tr>
+<tr><td><code>medium_1</code></td><td>5</td><td>26.4–28.8 s</td><td>dustpan</td><td>10496</td><td>1.06 mm</td><td class='good'>yes</td><td>umbrella 10 mm</td></tr>
 <tr><td><code>large_1</code></td><td>5</td><td>18.9–25.4 s</td><td>pineapple</td><td>4891</td><td>1.57 mm</td><td class='good'>yes</td><td>headphones 27 mm</td></tr>
 </tbody></table>
+
+  <h2>Is any of this actually simulated?</h2>
+  <p>A fair question to ask of any replay video: is the hand really picking the object up through contact, or
+  is something in the driver moving it? Three checks, all of which the pipeline runs.</p>
+
+  <h3>Take the contact away and nothing happens</h3>
+  <p>The strongest test is an ablation. Each successful grasp is run twice through the identical protocol; the
+  only difference in the second run is that hand-object collision pairs are filtered out, so the hand sweeps
+  straight through. If the object still rose, something other than contact was lifting it.</p>
+  <table><thead><tr><th>Object</th><th>Mass</th><th>Lift with contact</th><th>Lift with hand-object contact removed</th><th>Hand-object contacts at lift</th></tr></thead><tbody>
+<tr><td>picnic basket <span class='muted'><code>large_2</code></span></td><td>626 g</td><td class='good'>258 mm</td><td class='muted'>-0.1 mm</td><td>1250</td></tr>
+<tr><td>bundled socks <span class='muted'><code>medium_4</code></span></td><td>50 g</td><td class='good'>207 mm</td><td class='muted'>0.0 mm</td><td>748</td></tr>
+<tr><td>thermos <span class='muted'><code>medium_4</code></span></td><td>297 g</td><td class='good'>205 mm</td><td class='muted'>0.0 mm</td><td>441</td></tr>
+<tr><td>hammer <span class='muted'><code>medium_4</code></span></td><td>390 g</td><td class='good'>199 mm</td><td class='muted'>0.0 mm</td><td>843</td></tr>
+<tr><td>cabbage <span class='muted'><code>large_4</code></span></td><td>1027 g</td><td class='good'>203 mm</td><td class='muted'>-0.5 mm</td><td>257</td></tr>
+<tr><td>lock <span class='muted'><code>small_2</code></span></td><td>112 g</td><td class='good'>180 mm</td><td class='muted'>0.0 mm</td><td>636</td></tr>
+<tr><td>bird toy <span class='muted'><code>medium_4</code></span></td><td>11 g</td><td class='good'>178 mm</td><td class='muted'>0.0 mm</td><td>1130</td></tr>
+<tr><td>headphones <span class='muted'><code>large_1</code></span></td><td>194 g</td><td class='good'>174 mm</td><td class='muted'>0.0 mm</td><td>2078</td></tr>
+</tbody></table>
+  <p class="caption">Every one of the 8 objects lifts when the hand can touch it and 8 of them do not move at all when it cannot (largest residual 0.0 mm). Median 795 hand-object contact points are carrying the object at the moment the lift starts.</p>
+  <p>The object is a passive rigid body with a free joint. Nothing writes to its state, no constraint attaches
+  it to the hand, and the hand is never teleported — only <code>Control.joint_target_q</code> for the fingers
+  and <code>Control.joint_f</code> for the wrist are written, both before the solver step. The lift is
+  contact and friction, or it is nothing.</p>
+
+  <h3>What the physics actually touches is not what you see</h3>
+  <p>The apparent penetration in these clips is real, and it is a property of the released assets rather than
+  of the solver. HUG-Bench ships a watertight <code>visual.obj</code> for looks and a separate CoACD convex
+  decomposition for collision, and only the decomposition takes part in contact. Where they disagree, the
+  fingers correctly stop on a surface that is not being drawn.</p>
+  <div class="two">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/explain_visual.mp4"></video>
+      <p class="caption">As rendered: the watertight scan.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/explain_hulls.mp4"></video>
+      <p class="caption">The same rollout with the CoACD hulls drawn — this is the geometry the fingers are
+      actually resting on. Identical physics, identical 2078 contacts at the lift.</p>
+    </div>
+  </div>
+  <p>Measured over all 60 objects, the collision hull's worst-case departure from the visual surface
+  has a median of <strong>2.98 mm</strong>, a 90th percentile of 9.7 mm, and reaches
+  <strong>79.51 mm</strong> on the picnic basket; 17 objects exceed 5 mm. That is the budget
+  within which a finger can look wrong while being right.</p>
+
+  <h3>Where the sudden movements come from</h3>
+  <p>Two clips show an object jolting rather than being smoothly picked up. Frame-to-frame object displacement
+  is 5 mm for a well-behaved lift — exactly the 0.15 m/s of the standardized lift at 30 fps — and stays there
+  for most objects. The picnic basket reaches 94 mm in one frame. It is also the object with the worst
+  hull-versus-visual gap (80 mm) <em>and</em> the lowest density in the release
+  (34.7 kg/m³, about a twentieth of water, for a wicker basket). A hand that appears to be
+  several centimetres clear makes contact with an invisible hull and knocks a body that is far too light. Both
+  halves of that come from the asset, not the simulation.</p>
+  <div class="callout warn">
+    <p style="margin:0">The released densities are worth flagging generally: they run from
+    34.7 to 7435 kg/m³, because the inertia is computed as a solid of uniform density from
+    the watertight visual mesh and then scaled to a hand-authored mass. 5 objects come out under
+    100 kg/m³. Hollow objects — baskets, bins, bowls, sponges — are the ones that misbehave.</p>
+  </div>
 
   <h2>What had to change in Newton</h2>
 
