@@ -147,9 +147,12 @@
   parsed and emitted a 3-DOF <code>JointType.BALL</code>, then tripped over its own DOF bookkeeping:</p>
 <pre>ValueError: JOINT_DOF attribute 'mujoco:dof_passive_damping' has invalid DOF index 3 (joint has 3 DOFs)</pre>
   <div class="callout warn">
-    <p style="margin:0"><strong>The error was the lucky case.</strong> It only fires because the MuJoCo custom
-    attributes happen to be registered. The same code path without them silently produces a hand whose wrist
-    cannot translate — a model quietly missing three degrees of freedom, which is far worse than a crash.</p>
+    <p style="margin:0"><strong>The error was the lucky case.</strong> Nothing in that path checks the joint
+    combination; the exception comes from DOF bookkeeping, and only because Newton registers the MuJoCo per-DOF
+    custom attributes whenever <code>mujoco</code> is importable. Strip those and the same code silently
+    produces a hand whose wrist cannot translate — a model quietly missing three degrees of freedom, which is
+    far worse than a crash. The fix rejects the combination explicitly rather than relying on a downstream
+    index check.</p>
   </div>
   <p>The fix rebuilds that combination as a free joint carrying the authored per-DOF properties, keeps a lone
   ball joint mapping to <code>JointType.BALL</code>, and rejects any other ball combination with an actionable
@@ -405,7 +408,7 @@
       fingers wrap the body, the grip holds through the 18 cm lift and the 0.6 s hold.</p>
     </div>
   </div>
-  <p></p>
+  <p>manosim ships a second hand — <code>mesh_hand</code>, one convex hull per bone instead of a capsule, closely matching the MANO surface — and recommends the capsule version for contact work. Rerunning the whole study with it, everything else identical, gives 60/60 stable and 16/60 lifted: the same headline numbers as the capsule hand. They are not the same grasps, though — only 12 objects succeed under both, 4 succeed with capsules alone and 4 with hulls alone. Which of two very similar collision proxies you pick decides about a third of the outcomes, which is a fair measure of how marginal these grasps are once the hand is rigid.</p>
 
   <h2>What I would tell the next person</h2>
   <ul>
