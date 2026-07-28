@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>manosim in Newton — replaying HUG grasps</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18212a;
+      --muted: #5e6b76;
+      --line: #d8e0e7;
+      --panel: #f7f9fb;
+      --accent: #178a64;
+      --warn: #b5483a;
+    }
+    body { margin: 0; font-family: Inter, "Segoe UI", Arial, sans-serif; color: var(--ink); background: #fff; line-height: 1.55; }
+    main { max-width: 1080px; margin: 0 auto; padding: 42px 32px 72px; }
+    h1 { font-size: 34px; line-height: 1.12; margin: 0 0 10px; }
+    h2 { margin: 44px 0 12px; font-size: 22px; }
+    h3 { margin: 26px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    a { color: var(--accent); }
+    code { background: #eef3f6; padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+    pre { background: #eef3f6; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
+    .lede { color: var(--muted); font-size: 17px; max-width: 900px; }
+    .stamp { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .live { display: inline-block; font-size: 12px; font-weight: 650; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 20px; }
+    .caption { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+    .callout { border: 1px solid var(--line); border-left: 5px solid var(--accent); background: var(--panel); padding: 14px 16px; border-radius: 8px; margin: 20px 0; }
+    .callout.warn { border-left-color: var(--warn); }
+    .grid-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0 28px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fff; }
+    .metric { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .label { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f8; font-weight: 650; }
+    tr.total td { background: #f7f9fb; }
+    td.objlist { font-size: 13px; }
+    ul { padding-left: 22px; } li { margin: 7px 0; }
+    .good { color: var(--accent); font-weight: 650; }
+    .bad { color: var(--warn); font-weight: 650; }
+    .muted { color: var(--muted); }
+    video { display: block; width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #f4f6f8; }
+    .hero video { max-width: 1000px; }
+    .clipgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 18px 0 8px; }
+    .clipgrid figure { margin: 0; }
+    .clipgrid figcaption { color: var(--muted); font-size: 12.5px; margin-top: 6px; line-height: 1.4; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 860px) {
+      .grid-cards { grid-template-columns: repeat(2, 1fr); }
+      .clipgrid { grid-template-columns: repeat(2, 1fr); }
+      .two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>manosim in Newton: replaying human grasps from HUG</h1>
+  <p class="lede">
+    <a href="https://github.com/KevinyWu/manosim">manosim</a> ships MANO hand models as MJCF, built for
+    <a href="https://grasping.io/">Human Universal Grasping</a> (HUG). Its README montage shows those hands
+    grasping objects in MuJoCo. This report brings the same thing up in
+    <a href="https://github.com/newton-physics/newton">Newton</a>: the unmodified manosim MJCF driven by real
+    10&nbsp;Hz MANO trajectories from HUG-Bench recordings, against the metric-scale scanned objects the humans
+    actually grasped, with every clip rendered headless through <code>ViewerGL</code>.
+    Getting there needed three fixes in Newton's MJCF importer and turned up four further ways an MJCF that runs
+    happily in MuJoCo does not yet run in Newton — including one that silently imports a critically damped drive
+    as an undamped one.
+  </p>
+  <p class="stamp">Generated 2026-07-28 · Newton <code>1.5.0.dev0</code> at <code>a586d5c7</code>
+  (branch <code>eric/manosim-mjcf</code>, forked from upstream <code>main</code>) ·
+  manosim <code>75c77c0</code> · data: <code>kevinywu/hug-bench</code> + <code>kevinywu/1m-hugs</code> ·
+  NVIDIA RTX PRO 6000 Blackwell (MIG 1g.24&nbsp;GB) · headless <code>ViewerGL</code> on Xvfb.</p>
+
+  <div class="grid-cards">
+    <div class="card"><div class="label">Scenes replayed</div><div class="metric">12</div><div class="label">HUG-Bench recordings, 60 recorded grasps</div></div>
+    <div class="card"><div class="label">Rollouts stable</div><div class="metric">60/60</div><div class="label">finite, no ejections</div></div>
+    <div class="card"><div class="label">Grasps that held</div><div class="metric">16/60</div><div class="label">27% lifted 18 cm and kept</div></div>
+    <div class="card"><div class="label">Wrist tracking</div><div class="metric">2.16 mm</div><div class="label">median error vs the recording</div></div>
+  </div>
+
+  <h2>The montage</h2>
+  <p>6 independent scenes, each one scanned HUG-Bench object resting on a ground plane while the manosim MANO
+  hand replays a human's recorded approach and closure, then lifts. Nothing here is scripted animation: the hand
+  is a dynamic articulation driven only by joint targets and a wrist wrench, and every object is a passive rigid
+  body that moves only because something touched it.</p>
+  <div class="hero">
+    <video controls muted loop playsinline preload="metadata" src="assets/montage.mp4"></video>
+  </div>
+  <p class="caption">Left to right, top to bottom: picnic basket (<code>large_2</code>), bundled socks (<code>medium_4</code>), cabbage (<code>large_4</code>), lock (<code>small_2</code>), headphones (<code>large_1</code>), salt shaker (<code>small_4</code>). Rendered with
+  <code>ViewerGL(headless=True)</code> → <code>get_frame()</code> → H.264, then tiled with ffmpeg. Each clip
+  reports its own outcome below; borderline grasps do flip between runs, since float32 contact solving on the
+  GPU is not bit-reproducible.</p>
+
+  <h2>Individual grasps</h2>
+  <div class="clipgrid"><figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_2__picnic_basket.mp4"></video><figcaption><strong>picnic basket</strong> · <code>large_2</code><br><span class="good">lifted and held</span> · lift 240 mm · wrist error 4.4 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/medium_4__bundled_socks.mp4"></video><figcaption><strong>bundled socks</strong> · <code>medium_4</code><br><span class="good">lifted and held</span> · lift 208 mm · wrist error 2.6 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_4__cabbage.mp4"></video><figcaption><strong>cabbage</strong> · <code>large_4</code><br><span class="good">lifted and held</span> · lift 202 mm · wrist error 5.0 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/small_2__lock.mp4"></video><figcaption><strong>lock</strong> · <code>small_2</code><br><span class="good">lifted and held</span> · lift 180 mm · wrist error 1.4 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/large_1__headphones.mp4"></video><figcaption><strong>headphones</strong> · <code>large_1</code><br><span class="good">lifted and held</span> · lift 174 mm · wrist error 3.0 mm</figcaption></figure>
+<figure><video controls muted loop playsinline preload="metadata" src="assets/clips/small_4__salt_shaker.mp4"></video><figcaption><strong>salt shaker</strong> · <code>small_4</code><br><span class="bad">did not hold</span> · lift -25 mm · wrist error 2.1 mm</figcaption></figure></div>
+
+  <h2>Whole-scene replay</h2>
+  <p>The montage isolates one object at a time. This variant keeps a scene as it was scanned — all five objects
+  at their recorded positions on the table — and replays the hand through it. It is the more honest picture of
+  the data, and it also exposes the dataset's main limitation: HUG-Bench stores <em>one</em> resting pose per
+  object and no per-frame object tracking, so a replay is only valid up to the moment the human first picks
+  something up. Every window below is therefore taken around the earliest grasp in its recording.</p>
+  <div class="hero">
+    <video controls muted loop playsinline preload="metadata" src="assets/scene_small_2.mp4"></video>
+  </div>
+  <p class="caption">Scene <code>test/small_2</code>: hacky sack, lock, match box, pepper shaker and tape measure
+  at their scanned positions, with the recorded hand reaching in for the match box.</p>
+  <div class="two">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/scene_medium_1.mp4"></video>
+      <p class="caption"><code>test/medium_1</code> — the hand reaching for the dustpan past a card deck,
+      umbrella, tape dispenser and pear.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/scene_large_1.mp4"></video>
+      <p class="caption"><code>test/large_1</code> — a larger scene: headphones, saucepan, wipe dispenser,
+      pineapple and spray bottle.</p>
+    </div>
+  </div>
+  <table><thead><tr><th>Scene</th><th>Objects</th><th>Window</th><th>Focus</th><th>Resting contacts</th><th>Wrist error</th><th>Stable</th><th>Largest bystander drift</th></tr></thead><tbody>
+<tr><td><code>small_2</code></td><td>5</td><td>20.5–22.5 s</td><td>match box</td><td>9040</td><td>1.79 mm</td><td class='good'>yes</td><td>hacky sack 4 mm</td></tr>
+<tr><td><code>medium_1</code></td><td>5</td><td>26.4–28.8 s</td><td>dustpan</td><td>10495</td><td>1.06 mm</td><td class='good'>yes</td><td>umbrella 10 mm</td></tr>
+<tr><td><code>large_1</code></td><td>5</td><td>18.9–25.4 s</td><td>pineapple</td><td>4891</td><td>1.57 mm</td><td class='good'>yes</td><td>headphones 27 mm</td></tr>
+</tbody></table>
+
+  <h2>What had to change in Newton</h2>
+
+  <h3>MJCF slide + ball joints did not import</h3>
+  <p>manosim's wrist is the standard MJCF idiom for an actuated floating base — three <code>slide</code> joints
+  followed by a <code>ball</code>, each carrying its own damping, armature and <code>&lt;position&gt;</code>
+  actuator:</p>
+<pre>&lt;body name="mano_body_0" pos="0 0 0"&gt;
+  &lt;joint name="wrist_tx" type="slide" axis="1 0 0" limited="false" damping="5.0"/&gt;
+  &lt;joint name="wrist_ty" type="slide" axis="0 1 0" limited="false" damping="5.0"/&gt;
+  &lt;joint name="wrist_tz" type="slide" axis="0 0 1" limited="false" damping="5.0"/&gt;
+  &lt;joint name="wrist_rot" type="ball" limited="false" damping="5.0" armature="0.01"/&gt;</pre>
+  <p>Newton's importer treated <code>ball</code> as terminal. It discarded the three slide axes it had already
+  parsed and emitted a 3-DOF <code>JointType.BALL</code>, then tripped over its own DOF bookkeeping:</p>
+<pre>ValueError: JOINT_DOF attribute 'mujoco:dof_passive_damping' has invalid DOF index 3 (joint has 3 DOFs)</pre>
+  <div class="callout warn">
+    <p style="margin:0"><strong>The error was the lucky case.</strong> It only fires because the MuJoCo custom
+    attributes happen to be registered. The same code path without them silently produces a hand whose wrist
+    cannot translate — a model quietly missing three degrees of freedom, which is far worse than a crash.</p>
+  </div>
+  <p>The fix rebuilds that combination as a free joint carrying the authored per-DOF properties, keeps a lone
+  ball joint mapping to <code>JointType.BALL</code>, and rejects any other ball combination with an actionable
+  message instead of a DOF-index error. Two supporting changes came with it: <code>add_joint_free()</code> gained
+  optional per-DOF axis configs so importers can preserve damping and armature, and the merged-joint DOF map now
+  records a span rather than a single index — without which a <code>&lt;position joint="ball" gear="0 1 0"&gt;</code>
+  actuator set gains on only the first of the ball's three DOFs. A third, independent bug surfaced while testing:
+  the lone-ball import path passed <code>armature</code> and <code>friction</code> to
+  <code>add_joint_ball()</code> but not <code>damping</code>, so every MANO finger joint was silently losing its
+  authored <code>damping="0.01"</code>.</p>
+  <p>The unmodified manosim MJCF now imports as 16 bodies, 16 joints (1 free + 15 ball), 51 DOFs and 67
+  coordinates, with the wrist's damping 5.0, armature 0.01 and all six actuator gains intact. Seven regression
+  tests cover it. Six fail with the source fix stashed — five with the original DOF-index
+  <code>ValueError</code>, one because two ball joints in a body used to be silently accepted; the seventh is
+  the guard that a lone ball joint still imports as a ball joint, which by construction passes either way. The
+  full MJCF importer module (268 tests) still passes.</p>
+
+  <h3>Free joints cannot be actuated, and nothing says so</h3>
+  <p>Mapping the wrist to a free joint is kinematically exact but has a consequence:
+  <code>SolverMuJoCo</code> emits <code>mjJNT_FREE</code> for free joints, and MuJoCo does not allow actuators
+  to target those. The six wrist actuators manosim authors are therefore imported, stored, and never produce
+  force. The hand simply sags: commanded to hold station at 30 cm with <code>kp=300</code>, it drooped 213 mm
+  and settled on the ground.</p>
+  <p>The importer now warns when an MJCF actuator targets a joint Newton represents as free. The replay drives
+  the wrist explicitly instead, through <code>Control.joint_f</code>, which <em>is</em> honoured on free joints —
+  verified by cancelling gravity with <code>joint_f[2] = m·g</code> and watching the hand hover to within
+  0.05 mm over a second. That gives a 6-DOF PD wrench with gravity feed-forward, standing in for the arm that
+  carried the hand in the recording, and it tracks the recorded wrist to a median <strong>2.16 mm</strong>.</p>
+
+  <h3>MJCF <code>dampratio</code> is not converted</h3>
+  <p><code>&lt;position kp="300" dampratio="1.0"/&gt;</code> means "critically damp this drive"; MuJoCo compiles it
+  to <code>kv = 2·dampratio·√(kp·dof_M0)</code>. Newton carries <code>kp</code> across as
+  <code>joint_target_ke</code> but leaves <code>joint_target_kd</code> at zero, so an MJCF that is stable in
+  MuJoCo arrives in Newton with an undamped drive. Reconstructing it needs the diagonal of the generalized mass
+  matrix, which <code>newton.eval_mass_matrix</code> provides; for this hand that is 0.4 kg on the wrist
+  translations and ~1e-3 kg·m² per finger joint. A first attempt that used <code>joint_armature</code> as a
+  stand-in for the effective inertia under-damped the wrist by a factor of 60 and blew the hand up.</p>
+
+  <h3>Model edits must precede the solver</h3>
+  <p><code>SolverMuJoCo</code> bakes gains, force ranges and damping into its MuJoCo spec at construction, and
+  <code>notify_model_changed(ModelFlags.JOINT_PROPERTIES)</code> does not rebuild the actuators. A sweep over
+  <code>joint_effort_limit</code> from 0.02 to 0.3 N·m produced bit-identical results — the setting was simply
+  not reaching the solver — which read as "force limiting does not help" when in fact it was the single most
+  important fix in the whole pipeline. Every model edit now happens before the solver is built.</p>
+
+  <h3>Contact buffers overflow silently</h3>
+  <p>A watertight CoACD decomposition (up to 15 convex parts per object) plus a 16-shape hand generates far more
+  contacts than an estimate taken from the initial state allocates: a five-object scene reports
+  <strong>9,104</strong> contacts at rest, and a hand closing on an object several times more again. Both
+  <code>SolverMuJoCo</code>'s <code>nconmax</code> and <code>CollisionPipeline</code>'s contact capacity default
+  to a value derived from the initial state, and neither overflow raises — <code>nconmax</code> drops
+  constraints, the pipeline drops contacts, and the scene explodes several steps later where the cause is no
+  longer visible. Both buffers are now sized from a measured
+  resting contact count with 6× headroom, because a closing hand produces several times the contacts of the same
+  scene at rest.</p>
+
+  <h3>A ball-joint position drive flutters, and the damping that should stop it is dropped</h3>
+  <p>With contacts, gravity and drive all removed, the hand is exactly static —
+  <code>max|q̇| == 0.0</code>, so Newton's articulation dynamics are sound. Switch the imported drive back on,
+  with its target set to the hand's <em>own current pose</em>, and a residual of 7e-6 rad/s appears on the first
+  step and grows to divergence in about 0.23 s. It is pose-dependent (identity is fine), roughly independent of
+  the time step, and unaffected by gains.</p>
+  <p>The mechanism is a property of MuJoCo's ball-joint transmission. Actuator <em>length</em> is the nonlinear
+  map <code>⟨log(q), gear⟩</code>, but the <em>moment</em> is hard-coded to the constant <code>gear</code>
+  vector — the moment is not the gradient of the length. Three <code>gear = eᵢ</code> actuators therefore
+  produce a generalized stiffness</p>
+<pre>K = kp · Jr⁻¹(φ),   φ = log(q_joint)     antisym(K) = (kp/2)·[φ]<sub>×</sub></pre>
+  <p>which is <strong>non-symmetric</strong>. A circulatory stiffness like that is a classical flutter source:
+  its eigenvalues are <code>kp</code> and <code>kp·(h·cot h ± i·h)</code> with <code>h = |φ|/2</code>, so the
+  system has a right-half-plane root unless the total damping <code>d</code> satisfies</p>
+<pre>d² &gt; m·kp·(θ/2)·tan(θ/2)      ⟺      ζ ≳ θ/4</pre>
+  <p>At <code>φ = 0</code>, <code>Jr⁻¹ = I</code> and <code>K</code> is symmetric — which is precisely why the
+  model is bit-exactly static at the identity pose and unstable at every recorded one. Measuring the stiffness
+  by central differences on <code>qfrc_actuator</code> reproduces <code>K = kp·Jr⁻¹(φ)</code> to 1e-10 relative
+  and <code>antisym(K) = (kp/2)[φ]<sub>×</sub></code> exactly; 33–67% of the commanded torque is perpendicular
+  to the actual rotation error.</p>
+  <div class="callout warn">
+    <p style="margin:0 0 8px"><strong>So why is the same MJCF stable in MuJoCo?</strong> Because MuJoCo honours
+    the <code>dampratio="1.0"</code> manosim authors on every <code>&lt;position&gt;</code> actuator, compiling it
+    to <code>kv = 0.3466</code> — comfortably above the threshold. Newton's importer
+    (<code>import_mjcf.py</code>, <code>parse_actuators</code>) reads only the <code>kv</code> attribute, which
+    the file does not set, so <strong><code>joint_target_kd</code> imports as exactly zero</strong> and the
+    drive arrives undamped. Force <code>kv = 0</code> in native float64 MuJoCo and it diverges at the same
+    +52.5/s. This is not a float32 artefact; float32 only supplies the seed.</p>
+  </div>
+  <p>Both terms of the criterion are measurable here. The worst finger joint in the recorded poses reaches
+  θ = 1.24 rad (71°) with effective inertia 1.0e-3 kg·m², predicting a critical damping of 0.115, or 0.137 once
+  corrected for the discrete time step. Sweeping the real 15-joint hand over a 2.7 s recorded window agrees to
+  within 6%:</p>
+  <table>
+    <thead><tr><th>Total finger damping</th><th>Stable?</th><th>Peak |q̇|</th><th>Mean tracking error</th><th>Worst</th></tr></thead>
+    <tbody>
+      <tr><td>0.010 <span class="muted">(as imported — the bug)</span></td><td class="bad">diverges at t = 0.45 s</td><td>1.6e+07</td><td>42.5°</td><td>179.9°</td></tr>
+      <tr><td>0.100</td><td class="bad">below threshold</td><td>2.9e+02</td><td>2.80°</td><td>103.7°</td></tr>
+      <tr><td>0.130</td><td class="good">yes</td><td>4.06</td><td>0.047°</td><td>1.68°</td></tr>
+      <tr><td><strong>0.150</strong> <span class="muted">(used here)</span></td><td class="good">yes</td><td>3.94</td><td><strong>0.044°</strong></td><td>0.67°</td></tr>
+      <tr><td>0.357 <span class="muted">(what dampratio=1.0 should have given)</span></td><td class="good">yes</td><td>3.20</td><td>0.241°</td><td>1.52°</td></tr>
+      <tr><td>armature ×10 … ×1000, kd = 0</td><td class="bad">no</td><td>1.9e3 … 11.9</td><td>81.7° … 13.9°</td><td>~180°</td></tr>
+      <tr><td>dt → 1/4000, kd = 0</td><td class="bad">no</td><td>2.5e3</td><td>106.1°</td><td>~180°</td></tr>
+    </tbody>
+  </table>
+  <p>The criterion is not academic: it decides results. Running the whole study at the marginal value 0.1 rather than 0.15, with everything else identical, costs 3 rollouts to instability (57/60 stable against 60/60) and 2 successful grasps (14 lifted against 16).</p>
+  <p class="caption">Only damping removes the unstable eigenvalue. Armature rescales the growth rate as
+  1/√m, gain reduction as √kp, and a smaller time step not at all — the eigenvalue is continuous-time
+  (+49.4/s in the dt → 0 limit). Passive <code>joint_damping</code> and actuator <code>kv</code> are
+  interchangeable; only their sum matters. A standalone reproduction — one ball joint, fixed base, no gravity,
+  no contacts, target equal to the current pose — is at <code>scripts/repro_ball_drive.py</code>.</p>
+
+  <div class="callout">
+    <p style="margin:0"><strong>The same trap bit my own code.</strong> The helper that reconstructs the missing
+    damping called <code>notify_model_changed(ModelFlags.JOINT_PROPERTIES)</code>. Drive gains live behind
+    <code>ModelFlags.JOINT_DOF_PROPERTIES</code>; <code>JOINT_PROPERTIES</code> covers
+    <code>joint_q</code>/<code>joint_X_p</code>/<code>joint_X_c</code> only. Every gain, damping and
+    force-limit override was therefore silently discarded, which is what made an
+    <code>joint_effort_limit</code> sweep from 0.02 to 0.3 N·m produce bit-identical results. Two different
+    mechanisms — wrong notify flag, and gains baked into the solver spec at construction — both fail the same
+    silent way.</p>
+  </div>
+
+  <h3>Rigid fingers need a force limit</h3>
+  <p>The most consequential finding, and the one that turned "everything explodes" into "everything is stable".
+  A MANO fit is a fit to a <em>soft</em> hand: the recorded joint angles place the fingers up to a centimetre
+  <em>inside</em> the object being held. Replay those angles against a rigid mesh and the position drive sees a
+  joint error it can never close out, and answers with roughly 120 N of grip on a 10 g match box. Saturating each
+  finger drive at <strong>0.4 N·m</strong> — about 4 N at the fingertip, a firm human squeeze — turns
+  that into a bounded force. Every rollout in this report is stable; before the limit, most ejected their object
+  across the room.</p>
+
+  <h3>Still open upstream</h3>
+  <p>Three of the findings above are fixed on the branch; three are reported here but not yet addressed, and
+  they are worth stating precisely because each fails silently:</p>
+  <ul>
+    <li><strong>Convert <code>&lt;position dampratio&gt;</code> into <code>joint_target_kd</code>.</strong>
+    <code>parse_actuators</code> reads only the <code>kv</code> attribute, so a critically damped MJCF drive
+    imports as an undamped one. The value is already stashed in <code>mujoco.actuator_biasprm</code> and is
+    resolved for CTRL_DIRECT actuators, but the <code>JointTargetMode.POSITION</code> path reads
+    <code>joint_target_kd</code> directly and drops it. Even a warning when a
+    <code>&lt;position dampratio=…&gt;</code> imports with <code>joint_target_kd == 0</code> would have saved
+    most of the debugging in this report.</li>
+    <li><strong>Consider a native quaternion drive for ball joints.</strong> Decomposing into three
+    <code>gear = eᵢ</code> MuJoCo actuators inherits MuJoCo's non-gradient moment arm and the flutter it
+    implies. A drive computing <code>τ = kp·log(q_target·q⁻¹) − kd·ω</code> is unconditionally restoring at any
+    joint angle.</li>
+    <li><strong>Make buffer overflow loud.</strong> <code>nconmax</code> and the collision pipeline's contact
+    capacity both print a line and carry on with dropped constraints. An opt-in strict mode that raises would
+    turn a confusing downstream explosion into an immediate, correct diagnosis.</li>
+  </ul>
+
+  <h2>Is the data actually saying what we think?</h2>
+  <p>Two geometric assumptions sit under every number above, and both were checked rather than assumed.</p>
+
+  <h3>MANO pose → Newton joint coordinates</h3>
+  <p>The dataset gives a wrist transform and 15 axis-angle rotations per frame; the hand needs 67 generalized
+  coordinates. Writing them and running forward kinematics should place every joint on its recorded 3D landmark.
+  Across all 14699 recorded frames in 12 scenes it does, to a median of
+  <strong>1.89 mm</strong>.</p>
+  <table><thead><tr><th>Scene</th><th>Frames</th><th>Median</th><th>Mean</th><th>Worst joint</th><th>MANO β spread</th></tr></thead><tbody>
+<tr><td><code>large_1</code></td><td>1632</td><td>1.54 mm</td><td>3.69 mm</td><td>38.0 mm</td><td>0.41</td></tr>
+<tr><td><code>large_2</code></td><td>1684</td><td>0.88 mm</td><td>3.12 mm</td><td>37.6 mm</td><td>0.38</td></tr>
+<tr><td><code>large_3</code></td><td>721</td><td>1.80 mm</td><td>3.98 mm</td><td>39.0 mm</td><td>0.35</td></tr>
+<tr><td><code>large_4</code></td><td>778</td><td>3.31 mm</td><td>5.05 mm</td><td>35.6 mm</td><td>0.31</td></tr>
+<tr><td><code>medium_1</code></td><td>1614</td><td>3.16 mm</td><td>4.91 mm</td><td>35.2 mm</td><td>0.28</td></tr>
+<tr><td><code>medium_2</code></td><td>1480</td><td>2.80 mm</td><td>4.84 mm</td><td>39.6 mm</td><td>0.45</td></tr>
+<tr><td><code>medium_3</code></td><td>1240</td><td>1.49 mm</td><td>3.65 mm</td><td>38.2 mm</td><td>0.46</td></tr>
+<tr><td><code>medium_4</code></td><td>857</td><td>0.81 mm</td><td>3.05 mm</td><td>37.5 mm</td><td>0.38</td></tr>
+<tr><td><code>small_1</code></td><td>1629</td><td>0.65 mm</td><td>3.01 mm</td><td>38.1 mm</td><td>0.39</td></tr>
+<tr><td><code>small_2</code></td><td>1426</td><td>2.27 mm</td><td>4.39 mm</td><td>38.6 mm</td><td>0.35</td></tr>
+<tr><td><code>small_3</code></td><td>813</td><td>1.98 mm</td><td>4.02 mm</td><td>36.9 mm</td><td>0.43</td></tr>
+<tr><td><code>small_4</code></td><td>825</td><td>2.75 mm</td><td>4.61 mm</td><td>36.7 mm</td><td>0.36</td></tr>
+<tr class="total"><td><strong>All 12</strong></td><td><strong>14699</strong></td><td><strong>1.89 mm</strong></td><td></td><td><strong>39.6 mm</strong></td><td></td></tr>
+</tbody></table>
+  <p>The one outlier — up to 40 mm, always at the thumb base — is not a convention error but a real
+  limitation: <code>aria_data.pkl</code> re-optimises the MANO shape parameters every frame (β spread
+  0.28–0.46), while the simulated hand has one fixed geometry. A fixed-shape sim hand cannot follow a
+  hand whose bone lengths change, and the thumb carpometacarpal joint is where that shows most.</p>
+
+  <h3>Where the objects are</h3>
+  <p>HUG-Bench gives each object a watertight <code>visual.obj</code>, a CoACD decomposition and a
+  <code>world_position</code> — but no orientation. Placement is only correct if the mesh is already
+  world-aligned and merely centred. Testing that properly meant back-projecting the masked depth of 900
+  benchmark frames into the world frame and comparing against the mesh placed by pure translation: median
+  one-sided Chamfer <strong>5.15 mm</strong>, median silhouette IoU against the released object masks
+  <strong>0.79</strong>. Sweeping 90°, 180° and random reorientations, and keeping only the
+  <strong>506</strong> (object, rotation) pairs where the rotation is geometrically observable at all,
+  <strong>0</strong> beat the identity placement. ICP recovers a median 6.8° but moves the surface by
+  only 0.87 mm — it is sliding along symmetry axes — and leaves 8.3 mm of residual translation,
+  which is the real accuracy of <code>world_position</code>.</p>
+  <div class="callout">
+    <p style="margin:0"><strong>The cleanest confirmation came from the pipeline itself.</strong> Placing the
+    objects this way and asking where the recorded fingertips land at the grasp frame, the closest fingertip
+    sits a median <strong>1.1 mm</strong> from the scanned surface across all 60 grasps
+    (90th percentile 4.5 mm), and 53 of them have all five fingertips within 2 cm. A wrong
+    orientation could not produce that.</p>
+  </div>
+
+  <h2>Results</h2>
+  <p>Every object with a recorded grasp, taken through the same protocol: settle on the ground, replay the
+  human's first recorded approach and closure at half speed, then a standardized 18 cm vertical lift and a
+  0.6 s hold. Success means the object is still off the ground at the end.</p>
+  <table><thead><tr><th>Scene</th><th>Objects with a recorded grasp</th><th>Stable rollouts</th><th>Lifted &amp; held</th><th>Median wrist error</th><th>Objects</th></tr></thead><tbody>
+<tr><td><code>large_1</code></td><td>5</td><td>5/5</td><td><strong>1/5</strong></td><td>2.68 mm</td><td class='objlist'><span class="good">headphones</span>, <span class="muted">saucepan</span>, <span class="muted">wipe dispenser</span>, <span class="muted">pineapple</span>, <span class="muted">spray bottle</span></td></tr>
+<tr><td><code>large_2</code></td><td>5</td><td>5/5</td><td><strong>3/5</strong></td><td>2.12 mm</td><td class='objlist'><span class="good">picnic basket</span>, <span class="good">wine bottle</span>, <span class="good">storage bin</span>, <span class="muted">football</span>, <span class="muted">easel</span></td></tr>
+<tr><td><code>large_3</code></td><td>5</td><td>5/5</td><td><strong>0/5</strong></td><td>2.33 mm</td><td class='objlist'><span class="muted">dumbbell</span>, <span class="muted">french vanilla</span>, <span class="muted">keyboard</span>, <span class="muted">sneaker</span>, <span class="muted">eggplant</span></td></tr>
+<tr><td><code>large_4</code></td><td>5</td><td>5/5</td><td><strong>2/5</strong></td><td>2.17 mm</td><td class='objlist'><span class="good">cabbage</span>, <span class="good">milk carton</span>, <span class="muted">frying pan</span>, <span class="muted">mixing bowl</span>, <span class="muted">robot hand</span></td></tr>
+<tr><td><code>medium_1</code></td><td>5</td><td>5/5</td><td><strong>1/5</strong></td><td>2.13 mm</td><td class='objlist'><span class="good">tape dispenser</span>, <span class="muted">card deck</span>, <span class="muted">dustpan</span>, <span class="muted">umbrella</span>, <span class="muted">pear</span></td></tr>
+<tr><td><code>medium_2</code></td><td>5</td><td>5/5</td><td><strong>1/5</strong></td><td>2.22 mm</td><td class='objlist'><span class="good">handbell</span>, <span class="muted">sponge</span>, <span class="muted">bowl</span>, <span class="muted">grapes</span>, <span class="muted">softball</span></td></tr>
+<tr><td><code>medium_3</code></td><td>5</td><td>5/5</td><td><strong>0/5</strong></td><td>2.55 mm</td><td class='objlist'><span class="muted">almonds</span>, <span class="muted">chips</span>, <span class="muted">hair brush</span>, <span class="muted">outlets</span>, <span class="muted">apple</span></td></tr>
+<tr><td><code>medium_4</code></td><td>5</td><td>5/5</td><td><strong>4/5</strong></td><td>2.18 mm</td><td class='objlist'><span class="good">bundled socks</span>, <span class="good">thermos</span>, <span class="good">hammer</span>, <span class="good">bird toy</span>, <span class="muted">pocky</span></td></tr>
+<tr><td><code>small_1</code></td><td>5</td><td>5/5</td><td><strong>1/5</strong></td><td>1.69 mm</td><td class='objlist'><span class="good">glue stick</span>, <span class="muted">eraser</span>, <span class="muted">nail clipper</span>, <span class="muted">rubber duck</span>, <span class="muted">strawberry</span></td></tr>
+<tr><td><code>small_2</code></td><td>5</td><td>5/5</td><td><strong>2/5</strong></td><td>2.14 mm</td><td class='objlist'><span class="good">lock</span>, <span class="good">tape measure</span>, <span class="muted">hacky sack</span>, <span class="muted">match box</span>, <span class="muted">pepper shaker</span></td></tr>
+<tr><td><code>small_3</code></td><td>5</td><td>5/5</td><td><strong>0/5</strong></td><td>1.28 mm</td><td class='objlist'><span class="muted">spring clamp</span>, <span class="muted">battery</span>, <span class="muted">wooden cube</span>, <span class="muted">squash ball</span>, <span class="muted">windup toy</span></td></tr>
+<tr><td><code>small_4</code></td><td>5</td><td>5/5</td><td><strong>1/5</strong></td><td>2.17 mm</td><td class='objlist'><span class="good">salt shaker</span>, <span class="muted">broccoli</span>, <span class="muted">glue tube</span>, <span class="muted">wrench</span>, <span class="muted">apricot</span></td></tr>
+<tr class="total"><td><strong>All</strong></td><td><strong>60</strong></td><td><strong>60/60</strong></td><td><strong>16/60</strong></td><td><strong>2.16 mm</strong></td><td></td></tr>
+</tbody></table>
+  <p class="caption">Green = lifted and held. Configuration: capsule hand, 8 substeps at 30 fps
+  (dt = 1/240), finger drive saturated at 0.4 N·m, finger damping 0.15, object contact
+  stiffness 2500, <code>SolverMuJoCo</code> with the Newton solver, implicitfast integrator and an elliptic
+  friction cone. Whole study: 9 minutes.</p>
+
+  <table><thead><tr><th>Object mass</th><th>n</th><th>Lifted</th><th>Rate</th><th>Median collision parts</th></tr></thead><tbody>
+<tr><td>under 50 g</td><td>18</td><td>3</td><td>17%</td><td>2</td></tr>
+<tr><td>50–150 g</td><td>14</td><td>3</td><td>21%</td><td>6</td></tr>
+<tr><td>150–500 g</td><td>22</td><td>7</td><td>32%</td><td>14</td></tr>
+<tr><td>over 500 g</td><td>6</td><td>3</td><td>50%</td><td>10</td></tr>
+</tbody></table>
+
+  <div class="callout warn">
+    <p style="margin:0 0 8px"><strong>Why the misses miss.</strong> The failures are not instabilities — every
+    rollout is finite and bounded. They are geometry. Three things stack up against a rigid replay:</p>
+    <ul style="margin:0">
+      <li>The MANO fit penetrates the object, so the recorded finger angles do not describe a rigid-body grasp
+      at all; they describe a soft hand spread over a surface. Force-limiting makes that safe but does not make
+      it a grip.</li>
+      <li>The surface that touches in the data is not the surface that touches in the simulation. The released
+      CoACD hulls deviate from the visual mesh by up to 19.6 mm and fill concavities — sum-of-part volume reaches
+      5.06× the visual volume, and 43 of 90 objects exceed 1.15×. A grasp that closes on a handle in the scan may
+      close on a filled-in hull in the sim.</li>
+      <li>Objects the human grasped by enveloping them — a beanbag, a flat match box on a table — are exactly the
+      cases a capsule hand reaches only at the fingertips.</li>
+    </ul>
+  </div>
+  <div class="two">
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/failure_hacky_sack.mp4"></video>
+      <p class="caption">A representative miss. All five recorded fingertips are within 0.5 mm of the hacky
+      sack's scanned surface, but the rigid capsule fingers close over the top of it rather than under it, so
+      the lift comes away empty. The rollout is perfectly stable throughout — this is a modelling gap, not a
+      solver failure.</p>
+    </div>
+    <div>
+      <video controls muted loop playsinline preload="metadata" src="assets/success_tape_measure.mp4"></video>
+      <p class="caption">The same protocol on the tape measure from the same scene and the same recording: the
+      fingers wrap the body, the grip holds through the 18 cm lift and the 0.6 s hold.</p>
+    </div>
+  </div>
+  <p></p>
+
+  <h2>What I would tell the next person</h2>
+  <ul>
+    <li><strong>The manosim assets need no MANO registration.</strong> The built MJCFs and bone meshes are
+    committed to the repo; registration is only needed to re-fit a new hand shape. Likewise the HUG-Bench object
+    assets and hand recordings download anonymously.</li>
+    <li><strong>Import the MJCF, do not hand-edit it.</strong> Rewriting the wrist as a <code>&lt;freejoint/&gt;</code>
+    is a tempting workaround for the importer bug and it silently discards the authored wrist damping and
+    armature, which matters for stability.</li>
+    <li><strong>Budget contacts from a measurement, not a guess</strong>, and treat any
+    "exceeded MJWarp limit" line as a hard failure rather than a warning — it is the most common cause of an
+    explosion whose real trigger is 50 steps earlier.</li>
+    <li><strong>Force-limit anything driven from human motion capture.</strong> Kinematic fits are not
+    contact-consistent; a position drive replaying them will always command penetration.</li>
+    <li><strong>Check what the drive does at its own target</strong> before blaming contacts. Setting the target
+    to the current pose and watching |q̇| is a two-minute test that would have saved several hours here.</li>
+    <li><strong>Verify that a model edit actually reached the solver.</strong> Two independent mechanisms
+    discard them silently: gains and force ranges are baked into the MuJoCo spec at construction, and
+    <code>notify_model_changed</code> only pushes what its flag covers. Read the value back off
+    <code>solver.mjw_model</code> rather than trusting the write.</li>
+    <li><strong>A <code>&lt;position&gt;</code> actuator on a ball joint is not a passive PD controller.</strong>
+    Away from identity its stiffness is non-symmetric and it needs a damping ratio above roughly a quarter of
+    the joint angle just to stay bounded. A drive computing <code>τ = kp·log(q_target·q⁻¹) − kd·ω</code> directly
+    would be unconditionally restoring; decomposing into three <code>gear = eᵢ</code> actuators is not.</li>
+    <li><strong>The dataset is a grasp dataset, not a manipulation dataset.</strong> One resting pose per object
+    and no object tracking means only the first grasp in each recording is replayable against the scanned scene.
+    Later grasps in the same recording look identical in the hand data and aim at empty space.</li>
+  </ul>
+
+  <h2>Reproducing</h2>
+<pre># Newton with the MJCF importer fix
+git clone git@github.com:eric-heiden/newton.git && cd newton
+git checkout eric/manosim-mjcf
+
+# manosim assets (prebuilt MJCF, no MANO registration needed)
+git clone https://github.com/KevinyWu/manosim.git
+
+# HUG-Bench object assets (~98 MB) and hand recordings (~30 MB per scene,
+# streamed out of the scene tars rather than downloading all 47 GB)
+hf download kevinywu/1m-hugs --repo-type dataset --include "val/**" --local-dir data/hug_bench
+hf download kevinywu/1m-hugs --repo-type dataset --include "test/**" --local-dir data/hug_bench
+scripts/fetch_scenes.sh data/scenes test/small_2 test/small_1 val/medium_3   # etc.
+
+# validate, then replay
+uv run python scripts/validate_pose_mapping.py --out out/pose_mapping_validation.json
+uv run python scripts/validate_object_frame.py
+uv run python scripts/run_study.py --effort 0.4 --out out/study_capsule.json
+uv run python scripts/render_montage.py --study out/study_capsule.json
+uv run python scripts/render_scene.py --scenes small_2</pre>
+
+  <p class="caption" style="margin-top:26px">
+    Newton branch <code>eric/manosim-mjcf</code> · importer fix + regression tests ·
+    <a href="https://github.com/KevinyWu/manosim">manosim</a> ·
+    <a href="https://grasping.io/">Human Universal Grasping</a> ·
+    <a href="https://arxiv.org/abs/2606.17054">arXiv:2606.17054</a>
+  </p>
+</main>
+</body>
+</html>
