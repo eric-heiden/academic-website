@@ -641,9 +641,13 @@
     <li><strong>Fix the asset pipeline problems the scene audit found</strong> — the missing gear colliders
     under <code>default</code>, the duplicated medium-gear collider under <code>newton_xpbd</code>, the
     100 mm / 10 mm contact gaps against 0.55 mm of backlash, and the mixed µ = 1.0 / 3.0 friction.</li>
-    <li><strong>Re-run the gear-train test on the task scene</strong>, not just in isolation: the isolated rig
-    proves the physics is reachable, it does not prove the task reaches it. The same slip metric applies
-    directly.</li>
+    <li><strong>Find out why the task cannot hold a gear on its shaft.</strong> Running the same gear-train
+    test inside the task still fails under <em>every</em> preset, and a plainer probe shows why: seat all
+    three gears, disable nothing, step with zero actions, and the one gear the task leaves free is
+    <strong>47–96 mm off its seat within a second</strong> (60 mm under <code>default</code>, 82 mm under
+    <code>newton_xpbd</code>, 47 mm under <code>newton_hydroelastic</code>) while the pinned gears do not
+    move at all. The isolated rig proves the physics is reachable; it does not prove the task reaches it,
+    and the next suspect is the reset/grasp path rather than the contact model.</li>
     <li><strong>Take VBD from finite to correct.</strong> <code>rigid_avbd_beta &gt; 0</code> stops the NaN;
     the remaining 9–27 % transmission is the open question, and it is now small enough to report upstream
     with a minimal repro.</li>
