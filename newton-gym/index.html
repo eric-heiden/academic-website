@@ -41,7 +41,7 @@
     .section-lede { color:var(--muted); max-width:850px; }
     .plots { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:21px; }
     figure { margin:0; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel); }
-    figure img { width:100%; display:block; }
+    figure img, figure video { width:100%; display:block; background:#0d1420; }
     figcaption { color:var(--muted); border-top:1px solid var(--line); padding:10px 13px; font-size:.79rem; }
     .evidence-grid { display:grid; grid-template-columns:1.2fr .8fr; gap:16px; margin:20px 0; }
     .panel { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:19px; }
@@ -72,7 +72,7 @@
   identical recipe, then evaluated against their frozen acceptance contracts. The headline result is
   not about either policy: it is that single-run pass/fail verdicts on these tasks carry far less
   information than the surrounding process assumed.</p>
-  <p class="stamp">Snapshot generated 2026-07-26 12:10 UTC &middot; all times UTC &middot; CPU-rendered plots from immutable training logs</p>
+  <p class="stamp">Snapshot generated 2026-07-28 06:15 UTC &middot; all times UTC &middot; CPU-rendered plots from immutable training logs</p>
 
   <div class="notice"><strong>Engineering report &mdash; no accepted benchmark result.</strong>
     Neither task has a policy that passes its acceptance contract, and no deployment or
@@ -144,6 +144,62 @@
     <p class="section-lede">The honest scope of that claim: it holds across everything observed here
     &mdash; 15 cases, 5 seeds, one training recipe. A materially different recipe might reach a
     behaviour that satisfies both. Nothing in this data suggests where that would be.</p>
+  </section>
+
+  <section>
+    <h2>What that looks like</h2>
+    <p class="section-lede">The two clips below are the best trajectory each policy produced, under an
+    identical camera, evaluation seed and 9.9-second horizon. They are the same comparison as the
+    table above, in motion.</p>
+    <div class="plots">
+      <figure>
+        <video controls muted loop playsinline preload="metadata"
+               poster="assets/videos/allegro_seed44_best.jpg"
+               src="assets/videos/allegro_seed44_best.mp4"></video>
+        <figcaption><strong>Seed 44 &mdash; the policy that works.</strong> Cube starts 2.55 rad from
+        the goal. The hand repeatedly reorients and settles it: 5 settling events in 9.9 s.
+        Action rate 0.79 mean, 3.19 q95 &mdash; over the q95 limit of 2.00. Across the full
+        evaluation this seed settles in 54 of 64 environments.</figcaption>
+      </figure>
+      <figure>
+        <video controls muted loop playsinline preload="metadata"
+               poster="assets/videos/allegro_seed46_best.jpg"
+               src="assets/videos/allegro_seed46_best.mp4"></video>
+        <figcaption><strong>Seed 46 &mdash; the policy that complies.</strong> Cube starts 1.31 rad
+        from the goal and stays there. Zero settling events. Action rate 0.08 mean, 0.19 q95 &mdash;
+        far inside every motion-quality limit. This seed settles in 0 of 64 environments.</figcaption>
+      </figure>
+    </div>
+    <p class="section-lede">Seed 46 is the only policy in the study that satisfies the
+    orientation-error and action-rate limits, and the clip shows why: it holds the cube almost
+    still. The contract's motion-quality limits, applied as written, prefer the hand on the right to
+    the hand on the left.</p>
+  </section>
+
+  <section>
+    <h2>Humanoid locomotion, V66</h2>
+    <p class="section-lede">For contrast, the humanoid policy that the earlier V65 revision was
+    rejected over. Both clips are seed 160 &mdash; the best of the five by terminal tracking error
+    &mdash; with no resets, terminations or truncations in either.</p>
+    <div class="plots">
+      <figure>
+        <video controls muted loop playsinline preload="metadata"
+               poster="assets/videos/g1_seed160_forward.jpg"
+               src="assets/videos/g1_seed160_forward.mp4"></video>
+        <figcaption>Forward locomotion, 12 s. Terminal-window tracking error 0.0754 m/s,
+        termination rate 0.0073.</figcaption>
+      </figure>
+      <figure>
+        <video controls muted loop playsinline preload="metadata"
+               poster="assets/videos/g1_seed160_command-switch.jpg"
+               src="assets/videos/g1_seed160_command-switch.mp4"></video>
+        <figcaption>Command-switch scenario at evaluation seed 25509 &mdash; the scenario and seed on
+        which V65 fell. V66 completes it without a reset.</figcaption>
+      </figure>
+    </div>
+    <p class="section-lede">One clip on one seed is not an acceptance result, and it is not offered
+    as one: the whole point of Finding 4 is that single runs on this task are weak evidence. It does
+    show the failure mode that triggered the V65 rejection is not present here.</p>
   </section>
 
   <section>
