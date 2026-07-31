@@ -26,7 +26,7 @@ from 6.36 mm to 0.31 mm over 11.5 s, at unchanged step cost:
    grasp from 23 to 57 contact rows and therefore per-world nconmax/njmax
    pressure in batched runs.
 
-See https://reports.eric-heiden.de/grasp-shake-drift/ for the measurements.
+See https://reports.eric-heiden.com/grasp-shake-drift/ for the measurements.
 """
 
 from __future__ import annotations
