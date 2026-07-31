@@ -9,6 +9,7 @@ Drop them into `src/newtontests/` of the repro checkout and run with `uv run pyt
 | Script | What it does |
 | --- | --- |
 | `franka_cube_shake.py` | The repro under test, unmodified (vendored here for reference). |
+| `franka_cube_shake_fixed.py` | The same file with the two `# FIX` changes applied. Drop-in replacement; measured at 0.31 mm slip vs 6.36 mm, 23 contact rows vs 57, and passes the example's own `test_final()`. |
 | `measure.py` | Headless run that logs the cube's pose in the TCP frame every frame. Produces the baseline slip trace. |
 | `experiments.py` | `Variant` subclass plus the ~30 single-change configurations. `uv run python -m newtontests.experiments <variant> [...]`. |
 | `frames.py` | Decomposes the drift across hand / TCP / finger / cube frames, to prove the articulation is rigid. |
