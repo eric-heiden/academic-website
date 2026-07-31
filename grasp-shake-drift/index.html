@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why grasped objects creep out of a two-finger gripper in Newton + MuJoCo Warp</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6b7d;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8deea;
+      --blue: #2456a6;
+      --teal: #0f766e;
+      --rust: #9a3412;
+      --green: #166534;
+      --amber: #b45309;
+      --shadow: 0 18px 42px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { overflow-x: hidden; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+    header, main { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    header { padding: 44px 0 26px; border-bottom: 1px solid var(--line); }
+    .eyebrow { margin: 0 0 10px; color: var(--teal); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+    h1 { max-width: 1000px; margin: 0; font-size: clamp(2.1rem, 5vw, 3.9rem); line-height: 1.0; }
+    .lead { max-width: 940px; margin: 18px 0 0; color: var(--muted); font-size: 1.08rem; line-height: 1.58; }
+    .meta { margin: 16px 0 0; color: var(--muted); font-size: 0.86rem; }
+    main { padding: 26px 0 70px; }
+    section { padding: 30px 0; border-bottom: 1px solid var(--line); }
+    section:last-child { border-bottom: none; }
+    h2 { margin: 0 0 13px; font-size: clamp(1.4rem, 3vw, 2.0rem); }
+    h3 { margin: 22px 0 9px; font-size: 1.06rem; }
+    p, li { color: var(--muted); line-height: 1.62; font-size: 1rem; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--blue); }
+    strong.ink { color: var(--ink); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    code { font-size: 0.92em; background: #eef2f9; padding: 1px 5px; border-radius: 4px; }
+    pre {
+      overflow-x: auto; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel); font-size: 0.84rem; line-height: 1.5;
+    }
+    pre code { background: none; padding: 0; }
+    .metric-grid { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+    .metric { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); padding: 14px 16px; }
+    .metric span { color: var(--muted); font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric strong { display: block; margin-top: 6px; font-size: 1.6rem; line-height: 1.05; }
+    .metric small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.4; font-size: 0.83rem; }
+    .cards { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; }
+    .card strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 1.0rem; }
+    .card p { margin: 0; font-size: 0.94rem; }
+    table {
+      width: 100%; margin: 14px 0; border-collapse: collapse; background: var(--panel);
+      border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 0.9rem;
+    }
+    th, td { padding: 8px 11px; border-bottom: 1px solid var(--line); text-align: left; color: var(--ink); }
+    th { background: #eef2f9; font-size: 0.76rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
+    tr:last-child td { border-bottom: none; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .ok { color: var(--green); font-weight: 700; }
+    .bad { color: var(--rust); font-weight: 700; }
+    .warn-t { color: var(--amber); font-weight: 700; }
+    figure { margin: 20px 0; }
+    figure img, figure video {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow);
+    }
+    figcaption { margin-top: 8px; color: var(--muted); font-size: 0.87rem; line-height: 1.5; }
+    .video-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .video-card { margin: 0; }
+    .note {
+      margin: 16px 0; padding: 13px 16px; border-left: 4px solid var(--teal);
+      background: var(--panel); border-radius: 0 8px 8px 0; color: var(--muted); font-size: 0.95rem;
+    }
+    .note.warn { border-left-color: var(--rust); }
+    .note.key { border-left-color: var(--blue); }
+    .note strong { color: var(--ink); }
+    @media (max-width: 900px) {
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .cards, .video-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Newton · MuJoCo Warp · contact tuning</p>
+  <h1>Why a grasped cube creeps out of a two-finger gripper</h1>
+  <p class="lead">
+    A shake test on a Franka FR3 loses its grip on a 4&nbsp;cm cube — slowly and perfectly repeatably, about
+    half a millimetre per shake cycle. It is not a friction problem, not a collision-pipeline problem,
+    and not a solver-convergence problem. It is <strong class="ink">contact compliance being rectified by
+    cyclic load</strong>, and the parameter that controls it is one the test never actually sets, because
+    the example hands contact authority to the finger geoms via <code>mujoco:geom_priority</code>.
+    Raising the finger pads' contact stiffness by 100&times; removes 95&nbsp;% of the drift.
+  </p>
+  <p class="meta">
+    Repro: <a href="https://github.com/StoneT2000/newton-tests">StoneT2000/newton-tests</a> ·
+    Newton&nbsp;1.4.0 (latest public release), MuJoCo&nbsp;Warp&nbsp;3.10.0.3, Warp&nbsp;1.15.0, NVIDIA&nbsp;L40 ·
+    all numbers below measured, not estimated.
+  </p>
+</header>
+
+<main>
+
+<section>
+  <h2>Answers first</h2>
+
+  <div class="cards">
+    <div class="card">
+      <strong>1. Should a shake test work in MuJoCo Warp?</strong>
+      <p>Yes — but not at the contact stiffness this example inherits. As shipped, a 3&nbsp;cm / 1&nbsp;Hz
+      shake bleeds <strong class="ink">6.4&nbsp;mm</strong> over 11.5&nbsp;s and a 10&nbsp;cm shake
+      <strong class="bad">drops the cube outright</strong>. With the pads stiffened, the same 3&nbsp;cm shake
+      holds to <strong class="ok">0.31&nbsp;mm</strong> and the 10&nbsp;cm shake holds too.</p>
+    </div>
+    <div class="card">
+      <strong>2. Is it mis-tuning?</strong>
+      <p>Yes, but not where you looked. The <code>ke</code>, <code>kd</code> and <code>mu</code> you set on the
+      cube are <strong class="ink">silently discarded</strong>: the example gives the finger geoms
+      <code>geom_priority&nbsp;=&nbsp;1</code>, and in MuJoCo the higher-priority geom supplies friction and
+      solref/solimp for the pair outright. The grasp actually runs on the fingers' imported defaults —
+      <code>ke&nbsp;=&nbsp;2500&nbsp;N/m</code>.</p>
+    </div>
+    <div class="card">
+      <strong>3. Does the fix cost speed?</strong>
+      <p>No. The fix is a material parameter, not a smaller timestep. Measured:
+      <strong class="ok">6.13 vs 6.20&nbsp;ms/frame</strong> — inside run-to-run noise — at the same
+      <code>sim_dt&nbsp;=&nbsp;1/960</code> and
+      <code>control&nbsp;dt&nbsp;=&nbsp;1/60</code> you already use. Going stiffer than
+      <code>ke&nbsp;=&nbsp;2.5e5</code> buys nothing: by then pad penetration is already down from 1.87&nbsp;mm
+      to 0.06&nbsp;mm, and there is no compliance left to remove.</p>
+    </div>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Baseline drift</span><strong>6.36 mm</strong>
+      <small>cube displacement in the gripper frame after 11.5&nbsp;s of 3&nbsp;cm / 1&nbsp;Hz shaking</small>
+    </div>
+    <div class="metric">
+      <span>Friction cone in use</span><strong>2.1 %</strong>
+      <small>measured from <code>efc_force</code>; the grasp is nowhere near sliding, yet it drifts</small>
+    </div>
+    <div class="metric">
+      <span>Pad penetration</span><strong>1.9 mm</strong>
+      <small>at 22.5&nbsp;N of grip force — the contact is soft enough to rectify</small>
+    </div>
+    <div class="metric">
+      <span>After the fix</span><strong>0.31 mm</strong>
+      <small>20&times; less drift, below the stationary-hold noise floor of 0.56&nbsp;mm</small>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The reproduction</h2>
+  <p>
+    <code>franka_cube_shake.py</code> from the repro follows Newton's
+    <a href="https://github.com/newton-physics/newton/blob/main/newton/examples/contacts/example_brick_stacking.py"><code>example_brick_stacking.py</code></a>
+    closely: a fixed FR3 driven by analytical IK, <code>SolverMuJoCo</code> with
+    <code>solver="newton"</code>, <code>integrator="implicitfast"</code>, elliptic cone,
+    <code>impratio=50</code>, and Newton's own collision pipeline
+    (<code>use_mujoco_contacts=False</code>). It approaches, descends, grasps, lifts, then shakes forever on a
+    three-axis Lissajous path.
+  </p>
+  <p>
+    I ran it headless with an instrumented wrapper that logs the cube's pose <em>in the TCP frame</em> every
+    frame, so arm motion cancels out and only relative slip remains. Versions match the report exactly:
+    Newton 1.4.0, MuJoCo Warp 3.10.0.3.
+  </p>
+
+  <figure>
+    <video src="media/baseline.mp4" controls loop muted playsinline poster="media/baseline.jpg"></video>
+    <figcaption>
+      <strong>As shipped.</strong> 3&nbsp;cm / 1&nbsp;Hz shake. The overlay reads out the cube's displacement
+      in the gripper frame. The cube never visibly &ldquo;slips&rdquo; — it walks, one small step per cycle.
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="media/plot_timeseries.png" alt="Slip accumulates linearly; each shake cycle adds the same increment">
+    <figcaption>
+      Left: displacement grows linearly, dominated by the shake axis. The oscillatory component is only
+      0.09&nbsp;mm — within a cycle the cube is held rigidly. Right: each 1&nbsp;Hz cycle deposits the same
+      increment (alternating 0.64 / 0.37&nbsp;mm, a period-2 pattern locked to the 2&nbsp;s Lissajous period).
+      That is a <strong>ratchet</strong>, not a slide.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Ruling out the usual suspects</h2>
+  <p>
+    Each variant below changes exactly one thing against the same baseline and runs the same 900 frames.
+    The headline is how little most of them do.
+  </p>
+
+  <h3>It is not the collision pipeline</h3>
+  <p>
+    The example calls <code>collision_pipeline.collide()</code> once per 60&nbsp;Hz frame while the solver takes
+    16 substeps at 1/960 — the obvious suspect. It is not the cause. Refreshing contacts every substep
+    (960&nbsp;Hz) changes the drift by 0.02&nbsp;%. Handing contact generation to MuJoCo entirely
+    (<code>use_mujoco_contacts=True</code>) changes it by 0.08&nbsp;%.
+  </p>
+
+  <table>
+    <tr><th>Contact source</th><th class="num">Drift [mm/s]</th><th class="num">Slip after 11.5 s [mm]</th></tr>
+    <tr><td>Newton pipeline @ 60 Hz (baseline)</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>Newton pipeline @ 240 Hz</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>Newton pipeline @ 960 Hz (every substep)</td><td class="num">0.5086</td><td class="num">6.36</td></tr>
+    <tr><td>MuJoCo native contacts</td><td class="num">0.5083</td><td class="num">6.36</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>On "box or convex mesh collisions".</strong> This scene is boxes throughout — the FR3 fingers
+    import as four box colliders each, and the cube is a box. I did not run a convex-mesh variant, so I
+    cannot report a measured number for it. But the drift is identical whether Newton's narrow phase or
+    MuJoCo's own produces the contacts, and it responds only to the contact <em>constraint</em> parameters,
+    which live on the shape's material rather than on its geometry type. A convex-mesh pad would inherit the
+    same <code>ShapeConfig</code> stiffness default, so the same diagnosis and the same fix should apply —
+    treat that as a reasoned expectation, not a measurement.
+  </div>
+
+  <h3>It is not friction</h3>
+  <p>
+    Sweeping the friction coefficient across two orders of magnitude — 0.2 to 20 on the geoms that actually
+    own the contact — leaves the drift unchanged to four significant figures.
+  </p>
+
+  <table>
+    <tr><th>Friction</th><th class="num">Drift [mm/s]</th><th class="num">Slip [mm]</th><th>Note</th></tr>
+    <tr><td>finger mu 0.2</td><td class="num">0.5083</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>finger mu 0.5</td><td class="num">0.5086</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>finger mu 1.0 (baseline)</td><td class="num">0.5087</td><td class="num">6.36</td><td>imported default</td></tr>
+    <tr><td>finger mu 3.0</td><td class="num">0.5086</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>finger mu 10.0</td><td class="num">0.5087</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>cube mu 0.3</td><td class="num">0.5088</td><td class="num">6.36</td><td>no effect — discarded by priority</td></tr>
+    <tr><td>cube mu 20.0</td><td class="num">0.5082</td><td class="num">6.35</td><td>no effect — discarded by priority</td></tr>
+  </table>
+
+  <h3>It is not solver effort</h3>
+  <p>
+    Newton's <a href="https://newton-physics.github.io/newton/latest/concepts/simulation_tuning_mujoco.html">MuJoCo tuning guide</a>
+    suggests an elliptic cone and <code>impratio</code> for stick-slip. Neither helps here, and neither does
+    throwing 13&times; more solver iterations or a solver tolerance of 1e-10 at it.
+  </p>
+
+  <table>
+    <tr><th>Solver setting</th><th class="num">Drift [mm/s]</th><th class="num">Slip [mm]</th></tr>
+    <tr><td>iterations 15 (baseline)</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>iterations 200</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>tolerance / ls_tolerance 1e-10</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>impratio 50 &rarr; 1000</td><td class="num">0.5082</td><td class="num">6.43</td></tr>
+  </table>
+
+  <figure>
+    <img src="media/plot_variants.png" alt="Every variant tested, sorted by group; only contact compliance changes the result">
+    <figcaption>
+      Every variant run for this report. The dashed line is the baseline. Contact source, friction, solver
+      effort, cone hardness and speculative gap are all flat; only the contact-compliance group moves.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Where the motion actually is</h2>
+  <p>
+    Before blaming contacts, I checked that the arm itself is rigid — a soft weld between the hand and the
+    TCP frame would produce the same signature. It is not that. Decomposing the drift frame by frame over the
+    same 11.5&nbsp;s:
+  </p>
+
+  <table>
+    <tr><th>Relative pose</th><th class="num">Total drift [mm]</th><th>Reading</th></tr>
+    <tr><td>cube in TCP frame</td><td class="num">6.3627</td><td class="bad">the observed slip</td></tr>
+    <tr><td>cube in hand frame</td><td class="num">6.3627</td><td>same motion</td></tr>
+    <tr><td>cube in left-finger frame</td><td class="num">6.3626</td><td class="bad">real motion across the pad</td></tr>
+    <tr><td>cube in right-finger frame</td><td class="num">6.3626</td><td>mirrored, same magnitude</td></tr>
+    <tr><td>TCP in hand frame</td><td class="num">0.00002</td><td class="ok">rigid</td></tr>
+    <tr><td>left finger in hand frame</td><td class="num">0.0070</td><td class="ok">rigid (fingers hold position)</td></tr>
+    <tr><td>hand in link7 frame</td><td class="num">0.00005</td><td class="ok">rigid</td></tr>
+  </table>
+
+  <p>
+    The articulation is exact to within 20&nbsp;nm. The cube genuinely traverses the pads by 6.4&nbsp;mm —
+    16&nbsp;% of its own width.
+  </p>
+</section>
+
+<section>
+  <h2>What the contacts are actually doing</h2>
+  <p>
+    Reading MuJoCo's live constraint rows (<code>d.contact</code> and <code>d.efc.force</code>) mid-shake
+    settles it. Three sample frames, all identical:
+  </p>
+
+  <pre><code>frame 300  phase=SHAKE  contact rows for cube&harr;fingers: 28   rows carrying force: 8
+    total normal force      22.52 N
+    total tangential force   0.335 N     (cube weight = 0.31 N)
+    max friction-cone use    0.021       (1.0 = sliding)
+    condim 3, mu 1.0, penetration at loaded contacts -1.9 mm</code></pre>
+
+  <div class="note key">
+    <strong>The decisive number: the grasp uses 2.1&nbsp;% of its friction capacity.</strong>
+    Coulomb friction is not saturating, not even close — which is exactly why <code>mu</code> did nothing.
+    The cube is nevertheless walking out of the gripper.
+  </div>
+
+  <p>
+    The other number that matters is <strong class="ink">1.9&nbsp;mm of penetration</strong> at 2.8&nbsp;N per
+    contact — an effective normal stiffness around 1.5&nbsp;kN/m. That is a very soft pad for a 32&nbsp;g cube.
+  </p>
+</section>
+
+<section>
+  <h2>Root cause: compliance rectified by cyclic load</h2>
+  <p>
+    Two more measurements pin the mechanism down.
+  </p>
+  <p>
+    <strong class="ink">Hold the arm still and the drift disappears.</strong> Running the identical scene with
+    <code>--shake-amplitude 0</code> — same grasp, same duration, same gravity — gives
+    <strong class="ok">0.56&nbsp;mm</strong> of total wander with a drift rate of &minus;0.024&nbsp;mm/s,
+    twenty-one times smaller and not monotonic. There is no static creep. The drift needs the load cycle.
+  </p>
+  <p>
+    <strong class="ink">The friction rows have nothing to hold the cube in place with.</strong> Printing the
+    three constraint rows of a loaded finger&harr;cube contact shows the asymmetry directly:
+  </p>
+
+  <pre><code>row 0 [normal]     efc_pos = -1.868e-03   efc_vel = -4.750e-04   force = +2.80197
+row 1 [friction1]  efc_pos = +0.000e+00   efc_vel = -2.918e-04   force = +0.04482
+row 2 [friction2]  efc_pos = +0.000e+00   efc_vel = +1.554e-04   force = -0.01071</code></pre>
+
+  <p>
+    The normal row carries a position residual — the 1.9&nbsp;mm of penetration — so it pushes back toward
+    where the surfaces should be. Both friction rows carry <strong class="ink"><code>efc_pos</code> = exactly
+    zero</strong>. Friction here is a velocity-level constraint: it opposes tangential <em>velocity</em>, but
+    nothing remembers where the cube was, so nothing pulls it back. Whatever tangential velocity survives the
+    solve is integrated into permanent displacement.
+  </p>
+  <p>
+    And some always survives: the friction rows sit at a residual sliding velocity of roughly
+    <strong class="ink">3&times;10<sup>&minus;4</sup>&nbsp;m/s</strong> while the normal force cycles with the
+    shake. Sustained over the 11.5&nbsp;s run that is about 3.4&nbsp;mm — the same order as the 6.4&nbsp;mm
+    actually measured. The contact is compliant enough (1.9&nbsp;mm deep) that the cyclic load keeps
+    re-establishing that residual instead of cancelling it out.
+  </p>
+
+  <div class="note">
+    <strong>Scope of that claim.</strong> Everything above says this is the soft-constraint contact model
+    behaving as configured rather than anything specific to Newton's plumbing: the same drift appears through
+    MuJoCo's own contact generation, at every contact refresh rate tested, at every solver tolerance tested,
+    and it responds only to contact stiffness. The one check I did <em>not</em> run is a side-by-side against
+    upstream MuJoCo's C implementation on an equivalent model, which would be needed to rule out a
+    MuJoCo&nbsp;Warp-specific discrepancy outright. Given that the fix is a material parameter and the
+    response to it is clean and monotonic, that seems unlikely — but it is stated here as an open thread
+    rather than a settled one.
+  </div>
+</section>
+
+<section>
+  <h2>The fix</h2>
+  <p>
+    Stiffen the geoms that actually own the contact. Because the example sets
+    <code>mujoco:geom_priority&nbsp;=&nbsp;1</code> on the finger shapes, those are the finger geoms — and they
+    are still carrying <code>ShapeConfig</code>'s import default of <code>ke&nbsp;=&nbsp;2.5e3&nbsp;N/m</code>,
+    <code>kd&nbsp;=&nbsp;100</code>.
+  </p>
+
+  <figure>
+    <img src="media/plot_stiffness.png" alt="Slip falls roughly as 1/ke then saturates">
+    <figcaption>
+      Drift falls roughly as 1/<code>ke</code> and then saturates: <code>2.5e6</code> is indistinguishable from
+      <code>2.5e5</code>. <code>ke&nbsp;=&nbsp;2.5e5</code> is the knee — no reason to go stiffer.
+    </figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Finger pad stiffness</th><th class="num">Slip after 11.5 s [mm]</th><th class="num">vs baseline</th></tr>
+    <tr><td><code>ke</code> 2.5e3 (import default)</td><td class="num">6.36</td><td class="num">&mdash;</td></tr>
+    <tr><td><code>ke</code> 2.5e4, <code>kd</code> 3e2</td><td class="num">1.87</td><td class="num ok">3.4&times; better</td></tr>
+    <tr><td><code>ke</code> 2.5e5, <code>kd</code> 1e3</td><td class="num">0.31</td><td class="num ok">20&times; better</td></tr>
+    <tr><td><code>ke</code> 2.5e6, <code>kd</code> 3e3</td><td class="num">0.31</td><td class="num">saturated</td></tr>
+  </table>
+
+  <p>
+    The saturation has a concrete cause, visible in the contact rows. Stiffening the pads collapses the
+    penetration, and once there is no penetration left there is no compliance left to rectify:
+  </p>
+
+  <table>
+    <tr><th>Finger pad <code>ke</code></th><th class="num">Resolved contact solref</th><th class="num">Penetration at load</th><th class="num">Normal force</th><th class="num">Slip [mm]</th></tr>
+    <tr><td>2.5e3 (default)</td><td class="num">(0.02, 1.0)</td><td class="num">1.868 mm</td><td class="num">2.80 N</td><td class="num">6.36</td></tr>
+    <tr><td>2.5e5</td><td class="num">(0.002, 1.0)</td><td class="num ok">0.061 mm</td><td class="num">2.83 N</td><td class="num ok">0.31</td></tr>
+    <tr><td>2.5e6</td><td class="num">(0.00067, 0.95)</td><td class="num">0.059 mm</td><td class="num">2.83 N</td><td class="num">0.31</td></tr>
+  </table>
+
+  <p>
+    A 30&times; reduction in penetration buys a 20&times; reduction in drift; the last 10&times; of stiffness
+    buys nothing, because penetration is already down to 59&nbsp;µm. Note also what the default actually is:
+    a contact <code>timeconst</code> of <strong class="ink">20&nbsp;ms</strong>, against a 1.04&nbsp;ms
+    substep. The contact was being asked to correct its error twenty times more slowly than the solver was
+    stepping.
+  </p>
+
+  <p>In the repro's <code>_build_franka()</code>, alongside the existing <code>solimp</code>/<code>priority</code> block:</p>
+
+  <pre><code># The finger geoms carry geom_priority = 1, so THEY supply friction and
+# solref/solimp for every finger-object pair. Anything set on the object is
+# discarded. Tune the pads, not the cube.
+for shape_index, body_index in enumerate(builder.shape_body):
+    if body_index in (12, 13):            # fr3_leftfinger, fr3_rightfinger
+        builder.shape_material_ke[shape_index] = 2.5e5   # was 2.5e3 (ShapeConfig default)
+        builder.shape_material_kd[shape_index] = 1.0e3   # was 1.0e2</code></pre>
+
+  <p>
+    <code>kd</code> is scaled as <code>&radic;ke</code> across the sweep (100 &rarr; 300 &rarr; 1000 &rarr; 3000)
+    so the contact's damping ratio stays roughly fixed while stiffness changes — otherwise the sweep would be
+    confounding two knobs at once. The guide's warning applies: on Newton's positive conversion, raising
+    <code>kd</code> also moves the mapped <code>dampratio</code>, so they have to be chosen together.
+  </p>
+
+  <div class="note">
+    <strong>Do not reach for <code>solimp</code> here.</strong> I tried: raising <code>dmax</code> from 0.95 to
+    0.99 and 0.9999 made the drift <em>worse</em> (6.71 and 6.81&nbsp;mm). Per the tuning guide, the reference
+    gains are normalised by <code>dmax</code> — <code>k&#8320; &prop; 1/dmax&sup2;</code> — so raising it lowers the
+    effective stiffness even as it hardens the impedance plateau. <code>ke</code> is the right knob.
+  </div>
+
+  <figure>
+    <video src="media/fixed.mp4" controls loop muted playsinline poster="media/fixed.jpg"></video>
+    <figcaption>
+      <strong>Stiffened pads, same 3&nbsp;cm / 1&nbsp;Hz shake, same timestep.</strong> The overlay stays
+      essentially flat for the whole run.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>How bad does it get, and does the fix hold?</h2>
+  <p>
+    Amplitude, not frequency, is what breaks the grasp. Drift grows roughly with the square of the shake
+    amplitude while flattening out above ~2&nbsp;Hz.
+  </p>
+
+  <figure>
+    <img src="media/plot_severity.png" alt="Drift versus shake frequency and amplitude, before and after the fix">
+    <figcaption>
+      Each point is an independent 660-frame run (~8&nbsp;s of shaking). Left: frequency sweep at 3&nbsp;cm.
+      Right: amplitude sweep at 1&nbsp;Hz. The stiffened configuration is flat across both.
+    </figcaption>
+  </figure>
+
+  <table>
+    <tr>
+      <th>Shake</th>
+      <th class="num">As shipped — slip [mm]</th>
+      <th class="num">Final cube height [m]</th>
+      <th class="num">Stiffened pads — slip [mm]</th>
+      <th class="num">Final cube height [m]</th>
+      <th class="num">Improvement</th>
+    </tr>
+    <tr><td>3 cm @ 0.5 Hz</td><td class="num">1.59</td><td class="num">0.217</td><td class="num">0.08</td><td class="num">0.217</td><td class="num ok">19.5&times;</td></tr>
+    <tr><td>3 cm @ 1 Hz</td><td class="num">4.10</td><td class="num">0.218</td><td class="num">0.20</td><td class="num">0.216</td><td class="num ok">20.6&times;</td></tr>
+    <tr><td>3 cm @ 2 Hz</td><td class="num">5.28</td><td class="num">0.222</td><td class="num">0.26</td><td class="num">0.218</td><td class="num ok">20.2&times;</td></tr>
+    <tr><td>3 cm @ 3 Hz</td><td class="num">5.66</td><td class="num">0.227</td><td class="num">0.29</td><td class="num">0.222</td><td class="num ok">19.7&times;</td></tr>
+    <tr><td>1 cm @ 1 Hz</td><td class="num">0.41</td><td class="num">0.217</td><td class="num">0.03</td><td class="num">0.217</td><td class="num ok">15.9&times;</td></tr>
+    <tr><td>6 cm @ 1 Hz</td><td class="num">17.01</td><td class="num">0.221</td><td class="num">0.87</td><td class="num">0.214</td><td class="num ok">19.5&times;</td></tr>
+    <tr><td>10 cm @ 1 Hz</td><td class="num bad">304.57</td><td class="num bad">0.020 &mdash; dropped</td><td class="num">2.50</td><td class="num ok">0.210 &mdash; held</td><td class="num ok">121.9&times;</td></tr>
+  </table>
+
+  <div class="note key">
+    The improvement is a consistent <strong>~20&times;</strong> across the whole envelope — and at 10&nbsp;cm it is
+    the difference between <strong>dropping the cube on the table</strong> (final height 0.020&nbsp;m, i.e. back
+    at its spawn height) and <strong>holding it</strong> with 2.5&nbsp;mm of residual creep.
+  </div>
+
+  <div class="video-grid">
+    <figure class="video-card">
+      <video src="media/drop.mp4" controls loop muted playsinline poster="media/drop.jpg"></video>
+      <figcaption>
+        <strong>10 cm / 1 Hz, as shipped.</strong> The cube walks clear of the pads and falls back to the
+        table — the same ratchet, given enough amplitude to run out of pad. This is the failure the report
+        describes.
+      </figcaption>
+    </figure>
+    <figure class="video-card">
+      <video src="media/drop_fixed.mp4" controls loop muted playsinline poster="media/drop_fixed.jpg"></video>
+      <figcaption>
+        <strong>10 cm / 1 Hz, stiffened pads.</strong> Same trajectory, same timestep, one material parameter
+        changed. The cube stays put, with 3.9&nbsp;mm of residual creep over the full 11.5&nbsp;s — less than
+        the shipped configuration accumulates at a third of this amplitude.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>Two other things worth fixing in the scene</h2>
+
+  <h3>The cube is carrying a 10 cm speculative contact gap</h3>
+  <p>
+    <code>ModelBuilder.rigid_gap</code> defaults to <strong class="ink">0.1&nbsp;m</strong>. The repro sets
+    <code>builder.rigid_gap&nbsp;=&nbsp;0.005</code> on the <em>robot</em> builder (copied from the upstream
+    example) but the cube is added to a second, fresh <code>ModelBuilder</code> that keeps the default. The
+    result, read straight out of the MuJoCo model:
+  </p>
+  <pre><code>geom 13 (finger)  gap = 0.0050
+geom 18 (cube)    gap = 0.1000</code></pre>
+  <p>
+    That is why 28 contact rows exist for the grasp while only 8 carry force — 20 of them sit between 5&nbsp;mm
+    and 22&nbsp;mm away. Setting the cube's gap to 0.005 drops the mean contact count from
+    <strong class="ink">57 to 19</strong>, and it does not change the drift (0.5081 vs 0.5087&nbsp;mm/s) —
+    the speculative rows are inert.
+  </p>
+  <div class="note warn">
+    <strong>It is not, however, free speed — I measured and it is not.</strong> Cutting the contact count by
+    3&times; produced no wall-clock improvement in this scene (see the benchmark below); the differences are
+    inside run-to-run variation. The real argument for fixing it is capacity, not throughput: the
+    <a href="https://newton-physics.github.io/newton/latest/concepts/simulation_tuning_mujoco.html">tuning guide</a>
+    warns that positive gaps inflate <code>nconmax</code>/<code>njmax</code> pressure, and those buffers are
+    allocated <em>per world</em>. In a single-world debugging scene that costs nothing measurable; across a few
+    thousand RL worlds it is memory you are paying for 38 inert rows per grasp.
+  </div>
+
+  <h3>geom_priority silently discards the object's contact parameters</h3>
+  <p>
+    This is the one that cost the most debugging time, so it is worth stating plainly. The scene sets:
+  </p>
+  <pre><code>cube_cfg = newton.ModelBuilder.ShapeConfig(density=500.0, ke=8.0e4, kd=8.0e2, mu=1.2)</code></pre>
+  <p>
+    None of <code>ke</code>, <code>kd</code> or <code>mu</code> reaches the solver for finger&harr;cube contacts.
+    MuJoCo's priority rule means the finger geoms supply friction and solref/solimp for the pair, and the
+    fingers were imported from URDF with defaults. Confirmed two ways. First, straight out of the model: the
+    loaded contacts report <code>mu&nbsp;=&nbsp;1.0</code> (the finger's), never 1.2. Second, the cleanest A/B
+    in the whole investigation — the <em>same</em> 100&times; stiffness swing applied to the two geoms:
+  </p>
+
+  <table>
+    <tr><th>Which geom gets the stiffness</th><th class="num">ke</th><th class="num">Slip [mm]</th><th>Effect</th></tr>
+    <tr><td>cube (what the scene authors)</td><td class="num">8.0e3</td><td class="num">6.37</td><td rowspan="3" class="bad">100&times; swing, no effect whatsoever</td></tr>
+    <tr><td>cube</td><td class="num">8.0e4 <em>(as written)</em></td><td class="num">6.36</td></tr>
+    <tr><td>cube</td><td class="num">8.0e5</td><td class="num">6.36</td></tr>
+    <tr><td>finger pads (what MuJoCo uses)</td><td class="num">2.5e3 <em>(default)</em></td><td class="num">6.36</td><td rowspan="3" class="ok">100&times; swing, 20&times; less drift</td></tr>
+    <tr><td>finger pads</td><td class="num">2.5e4</td><td class="num">1.87</td></tr>
+    <tr><td>finger pads</td><td class="num">2.5e5</td><td class="num">0.31</td></tr>
+  </table>
+  <p>
+    Dropping <code>priority</code> back to 0 lets MuJoCo mix both geoms' parameters and halves the drift on its
+    own (6.36&nbsp;&rarr;&nbsp;3.42&nbsp;mm) — but the upstream example raises priority deliberately, to keep
+    the pads' <code>solimp</code> in charge during brick stacking. Keeping priority and tuning the pads is the
+    better answer; just be aware that with priority set, the object's material is decoration.
+  </p>
+</section>
+
+<section>
+  <h2>What about simulation speed?</h2>
+  <p>
+    The fix does not touch <code>sim_dt</code>, substeps, iterations or the cone, so the step cost should be
+    unchanged — and measuring 600 frames after a 240-frame warm-up confirms it:
+  </p>
+
+  <table>
+    <tr><th>Configuration</th><th class="num">ms / frame</th><th class="num">frames/s</th><th class="num">vs realtime</th></tr>
+    <tr><td>baseline</td><td class="num">6.126</td><td class="num">163.2</td><td class="num">2.72&times;</td></tr>
+    <tr><td>stiffened pads + cube gap fixed ("fixed")</td><td class="num">6.195</td><td class="num">161.4</td><td class="num">2.69&times;</td></tr>
+    <tr><td>stiffened pads only</td><td class="num">6.350</td><td class="num">157.5</td><td class="num">2.62&times;</td></tr>
+    <tr><td>all gaps zeroed</td><td class="num">6.461</td><td class="num">154.8</td><td class="num">2.58&times;</td></tr>
+  </table>
+
+  <p>
+    Everything is within about 5&nbsp;% — one measurement each, so treat the ordering as noise rather than
+    signal. The point is that the recommended change does not cost a meaningful amount of time, and notably
+    that zeroing the gaps does not <em>buy</em> any either.
+  </p>
+
+  <p>The knobs that <em>would</em> have cost real speed all turned out not to help anyway:</p>
+  <ul>
+    <li><strong class="ink">More substeps do not fix it.</strong> 4&nbsp;&rarr;&nbsp;16&nbsp;&rarr;&nbsp;64
+      substeps gives 5.10, 6.36, 6.64&nbsp;mm. The drift converges to a finite value as
+      <code>dt&nbsp;&rarr;&nbsp;0</code>, which is what you would expect from a continuous-time contact-model
+      effect rather than an integration artefact. Paying 4&times; the compute makes it slightly
+      <em>worse</em>.</li>
+    <li><strong class="ink">More iterations do not fix it</strong> (15&nbsp;&rarr;&nbsp;200: no change), and
+      neither does a tighter tolerance.</li>
+    <li><strong class="ink">Fixing the cube's <code>gap</code></strong> cuts contact rows by 3&times; but does
+      not speed anything up here — it is a per-world memory argument for batched training, not a throughput
+      one.</li>
+  </ul>
+  <p>
+    So your current budget — <code>sim_dt&nbsp;=&nbsp;1/960</code>, control at 60&nbsp;Hz, 15 iterations,
+    elliptic cone — is fine. Keep it.
+  </p>
+</section>
+
+<section>
+  <h2>Reproduce it</h2>
+  <pre><code>git clone https://github.com/StoneT2000/newton-tests &amp;&amp; cd newton-tests
+uv sync
+
+# baseline, as reported
+uv run python src/newtontests/franka_cube_shake.py --viewer gl \
+    --shake-amplitude 0.03 --shake-frequency 1.0
+
+# headless, with slip instrumentation (scripts from this report)
+uv run python -m newtontests.measure    --frames 900 --tag baseline
+uv run python -m newtontests.experiments finger_ke_2p5e5 fixed --frames 900
+uv run python -m newtontests.frames     --frames 900          # frame decomposition
+uv run python -m newtontests.contact_dump --frames 760        # live efc forces</code></pre>
+  <p>
+    The measurement, variant, frame-decomposition, contact-dump and plotting scripts used for this report are
+    in <a href="scripts/">scripts/</a>; the raw per-frame data is in <a href="data/">data/</a>.
+  </p>
+</section>
+
+<section>
+  <h2>References and where to raise this</h2>
+  <ul>
+    <li><a href="https://newton-physics.github.io/newton/latest/concepts/simulation_tuning_mujoco.html">MuJoCo-Warp Contact Tuning</a>
+      — the <em>Grasping / Holding</em> template is the right checklist, and its first step ("check commanded
+      and clamped gripping force") passes here: 22.5&nbsp;N against a 0.31&nbsp;N load.</li>
+    <li><a href="https://newton-physics.github.io/newton/latest/concepts/collisions.html">Collisions</a>
+      — contact reduction, <code>gap</code>/<code>margin</code> semantics, and the
+      <code>use_mujoco_contacts=False</code> pipeline.</li>
+    <li><a href="https://newton-physics.github.io/newton/latest/solvers/mujoco.html">MuJoCo Solver</a>
+      — margin/gap forwarding and the margin-zeroing rule for box geoms.</li>
+    <li><a href="https://mujoco.readthedocs.io/en/stable/computation/index.html#constraint-model">MuJoCo constraint model</a>
+      and <a href="https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters">solver parameters</a>
+      — the authoritative treatment of <code>solref</code>/<code>solimp</code> and of the priority rule.</li>
+  </ul>
+  <p>
+    Per Newton's <a href="https://github.com/newton-physics/newton/blob/main/CONTRIBUTING.md">contributing guide</a>,
+    a tuning question like this belongs in
+    <a href="https://github.com/newton-physics/newton/discussions">GitHub Discussions</a> rather than Issues —
+    Issues are reserved for bugs and features that result in a code or documentation change. That said, there
+    are two things here that arguably <em>are</em> documentation changes worth an Issue: the
+    <code>rigid_gap&nbsp;=&nbsp;0.1</code> default silently applying to a second builder, and the absence of a
+    warning when <code>geom_priority</code> causes authored <code>ke</code>/<code>kd</code>/<code>mu</code> to be
+    discarded.
+  </p>
+</section>
+
+</main>
+</body>
+</html>

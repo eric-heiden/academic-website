@@ -80,6 +80,12 @@
     <p>Research notes, experiment summaries, and supporting media.</p>
     <ul class="report-list">
       <li>
+        <a class="report-card" href="grasp-shake-drift/">
+          <strong>Why a grasped cube creeps out of a two-finger gripper</strong>
+          <span>Root-cause investigation of grasp drift in Newton 1.4.0 + MuJoCo Warp 3.10: a Franka shake test loses 6.4 mm per 11.5 s and drops the cube outright at 10 cm amplitude. Friction, contact source, contact refresh rate, solver iterations and tolerance are all ruled out by measurement; the cause is contact compliance rectified by cyclic load, on finger pads still carrying the 2500 N/m import default because <code>geom_priority</code> discards everything authored on the object. Stiffening the pads gives a consistent ~20× reduction at identical simulation cost.</span>
+        </a>
+      </li>
+      <li>
         <a class="report-card" href="manosim/">
           <strong>manosim in Newton: replaying human grasps from HUG</strong>
           <span>The unmodified manosim MANO hand MJCF driven by real 10 Hz HUG-Bench MANO trajectories against metric-scale scanned objects: an MJCF importer fix for slide+ball floating bases, headless ViewerGL montage and whole-scene replays, 60/60 stable rollouts with 2.2 mm wrist tracking, and the root cause of a ball-joint drive instability that MuJoCo hides by honouring dampratio and Newton does not.</span>
