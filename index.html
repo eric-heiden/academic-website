@@ -80,6 +80,12 @@
     <p>Research notes, experiment summaries, and supporting media.</p>
     <ul class="report-list">
       <li>
+        <a class="report-card" href="newton-xpbd-fluids/">
+          <strong>XPBD fluids in Newton vs. the OmniSurg PBF solver</strong>
+          <span>Head-to-head benchmark of Newton's position-based fluids against a faster external PBF implementation, both driven by one harness in one process against the same <code>Model</code>: Newton runs 8&ndash;12&times; slower, and the cause is that its density kernels re-query the hash grid on every solver iteration instead of reading a neighbor list materialized once per substep &mdash; 20&times; the marginal cost per iteration, and 91% of the frame in two kernels. Scaling, ablation and per-kernel breakdowns, a dam-break filmstrip showing the two flows agree, and a ranked list of fixes.</span>
+        </a>
+      </li>
+      <li>
         <a class="report-card" href="grasp-shake-drift/">
           <strong>Why a grasped cube creeps out of a two-finger gripper</strong>
           <span>Root-cause investigation of grasp drift in Newton 1.4.0 + MuJoCo Warp 3.10: a Franka shake test loses 6.4 mm per 11.5 s and drops the cube outright at 10 cm amplitude. Friction, contact source, contact refresh rate, solver iterations and tolerance are all ruled out by measurement; the cause is contact compliance rectified by cyclic load, on finger pads still carrying the 2500 N/m import default because <code>geom_priority</code> discards everything authored on the object. Stiffening the pads gives a consistent ~20× reduction at identical simulation cost.</span>
