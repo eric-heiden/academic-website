@@ -493,7 +493,14 @@ hr.sep { border:none; border-top: 1px solid var(--border); margin: 42px 0 0; }
 </div>
 
 <h2><span class="eyebrow">Section 10</span>Reproducing this</h2>
-<p>The harness is published alongside this page in <a href="scripts/">scripts/</a>: <code>scene.py</code> (the shared scene), <code>runners.py</code> (the two solvers behind one interface), <code>sweep.py</code> (the matrix), <code>bench.py</code> (a single configuration), <code>visual.py</code> + <code>render_visual.py</code> (the filmstrip), and <code>report.py</code> + <code>charts.js</code> (this page). Both packages are installed into a single virtualenv so they share one Warp and one Newton core.</p>
+<p>The harness is published alongside this page:
+<a href="scripts/scene.py"><code>scene.py</code></a> (the shared scene),
+<a href="scripts/runners.py"><code>runners.py</code></a> (the two solvers behind one interface),
+<a href="scripts/sweep.py"><code>sweep.py</code></a> (the matrix),
+<a href="scripts/bench.py"><code>bench.py</code></a> (a single configuration),
+<a href="scripts/visual.py"><code>visual.py</code></a> + <a href="scripts/render_visual.py"><code>render_visual.py</code></a> (the filmstrip), and
+<a href="scripts/report.py"><code>report.py</code></a> + <a href="scripts/charts.js"><code>charts.js</code></a> (this page).
+Both packages are installed into a single virtualenv so they share one Warp and one Newton core.</p>
 <pre><code># one venv, both implementations, same warp
 cd newton-flex-fluid
 uv sync --extra examples --extra dev
