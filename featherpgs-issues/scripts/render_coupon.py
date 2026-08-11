@@ -14,6 +14,12 @@ sys.path.insert(0, "/home/horde/repos/fpgs-study")
 
 import newton  # noqa: E402
 import coupon  # noqa: E402
+import legacy_coupon as legacy  # noqa: E402
+
+LEGACY = {
+    "legacy_static_box": dict(geom="box", frames=600),
+    "legacy_static_mesh": dict(geom="mesh", frames=600),
+}
 
 CASES = {
     "coupon_static_ok": dict(kind="static", geom="box", kw=dict(overlap=5.0e-4),
@@ -26,6 +32,17 @@ CASES = {
 
 
 def record(name, stride):
+    if name in LEGACY:
+        c = LEGACY[name]
+        env = legacy.make(geom=c["geom"])
+        r = legacy.run(env, frames=c["frames"], record_poses=True)
+        Path("data").mkdir(exist_ok=True)
+        np.savez_compressed(f"data/poses_{name}.npz", poses=r["poses"][::stride],
+                            t=r["t"][::stride])
+        print(f"{name}: {len(r['poses'][::stride])} poses, "
+              f"slip={r.get('final_slip_mm', 0):.2f} mm", flush=True)
+        del env
+        return
     c = CASES[name]
     env = coupon.make(c["kind"], c["geom"], **c["kw"])
     r = coupon.run(env, frames=c["frames"], record_poses=True)
@@ -38,14 +55,19 @@ def record(name, stride):
 
 
 def render(name, size, fps):
-    c = CASES[name]
     d = np.load(f"data/poses_{name}.npz")
     poses, times = d["poses"], d["t"]
-    env = coupon.make(c["kind"], c["geom"], **c["kw"])
+    if name in LEGACY:
+        env = {"model": legacy.make(geom=LEGACY[name]["geom"])["model"]}
+    else:
+        c = CASES[name]
+        env = coupon.make(c["kind"], c["geom"], **c["kw"])
     viewer = newton.viewer.ViewerGL(width=size, height=size, vsync=False, headless=True)
     viewer.set_model(env["model"])
     viewer.picking_enabled = False
-    viewer.set_camera(pos=wp.vec3(0.06, -0.28, 0.13), pitch=-6.0, yaw=102.0)
+    cam = (wp.vec3(0.10, -0.26, 0.10), -7.0, 111.0) if name in LEGACY \
+        else (wp.vec3(0.06, -0.28, 0.13), -6.0, 102.0)
+    viewer.set_camera(pos=cam[0], pitch=cam[1], yaw=cam[2])
     st = env["model"].state()
     out = Path(f"video/{name}.mp4")
     out.parent.mkdir(exist_ok=True, parents=True)

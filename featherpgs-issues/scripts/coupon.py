@@ -112,9 +112,13 @@ def build_driven(geom="box", mu=1.0, gap=5.0e-3, squeeze=2.0e-3,
         parent_xform=wp.transform(wp.vec3(0.0, 0.0, Z0), wp.quat_identity()),
         target_ke=palm_ke, target_kd=palm_kd, armature=0.02, label="shake_x")]
 
-    palm = b.add_link(label="palm")
-    b.add_shape_box(palm, xform=wp.transform(wp.vec3(0.0, 0.0, 0.07), wp.quat_identity()),
-                    hx=0.05, hy=PAD_HALF_Y, hz=0.01, cfg=cfg)
+    # The palm is a mount, not a collider: it carries no geometry, so it cannot
+    # touch the object. Its mass matches the 100 x 100 x 20 mm plate it replaces
+    # so the carrier dynamics are unchanged.
+    palm = b.add_link(label="palm", mass=0.2,
+                      inertia=wp.mat33(1.733e-4, 0.0, 0.0,
+                                       0.0, 1.733e-4, 0.0,
+                                       0.0, 0.0, 3.333e-4))
     joints.append(b.add_joint_prismatic(
         carrier, palm, axis=wp.vec3(0.0, 0.0, 1.0),
         target_ke=palm_ke, target_kd=palm_kd, armature=0.02, label="lift_z"))

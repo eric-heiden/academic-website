@@ -542,6 +542,126 @@ def t_coupon_mech(mech):
         TABLES["tbl-coupon-beta"] = brows
 
 
+def f_legacy(leg):
+    grid, iters = leg.get("grid", {}), leg.get("iters", {})
+    # sliding traces straight out of the saved trajectories
+    series = [("box_fpgs", "FeatherPGS, primitive box", C["aqua"], "solid"),
+              ("mesh_fpgs", "FeatherPGS, triangle mesh", C["orange"], "solid"),
+              ("box_mujoco", "SolverMuJoCo, primitive box", C["blue"], "dash"),
+              ("mesh_mujoco", "SolverMuJoCo, triangle mesh", C["violet"], "dash")]
+    data = []
+    for tag, label, col, dash in series:
+        d = load(f"legacy_{tag}")
+        if d is None:
+            continue
+        drop = (0.065 - d["z"]) * 1000.0
+        data.append(dict(type="scatter", mode="lines", name=label,
+                         x=np.round(d["t"], 3).tolist(),
+                         y=np.round(drop, 4).tolist(),
+                         line=dict(color=col, width=2, dash=dash),
+                         hovertemplate="%{y:.3f} mm below start<extra></extra>"))
+    if data:
+        FIGS["fig-legacy-slide"] = dict(
+            data=data,
+            layout=layout("Time (s)", "Distance slid below the start (mm)",
+                          height=400))
+
+    order = [("box_fpgs", "box, defaults"), ("box_anchors", "box, 2 anchors"),
+             ("box_shared", "box, shared anchor"),
+             ("mesh_fpgs", "mesh, defaults"), ("mesh_anchors", "mesh, 2 anchors"),
+             ("mesh_shared", "mesh, shared anchor")]
+    xs, down, up = [], [], []
+    for k, lbl in order:
+        v = grid.get(k)
+        if not v or "worst_downward_mm" not in v:
+            continue
+        xs.append(lbl)
+        down.append(round(max(v["worst_downward_mm"], 0.0), 4))
+        up.append(round(max(v["worst_upward_mm"], 0.0), 4))
+    if xs:
+        FIGS["fig-legacy-anchors"] = dict(
+            data=[dict(type="bar", name="slid down", x=xs, y=down,
+                       marker=dict(color=C["orange"], line=dict(width=0)),
+                       text=["%.2f" % d for d in down], textposition="outside",
+                       textfont=dict(color=INK, size=11),
+                       hovertemplate="%{x}<br>%{y:.3f} mm down<extra></extra>"),
+                  dict(type="bar", name="pushed up", x=xs, y=up,
+                       marker=dict(color=C["violet"], line=dict(width=0)),
+                       text=["%.2f" % u for u in up], textposition="outside",
+                       textfont=dict(color=INK, size=11),
+                       hovertemplate="%{x}<br>%{y:.3f} mm up<extra></extra>")],
+            layout=layout("", "Worst movement out of the start position (mm)",
+                          barmode="group", hovermode="closest",
+                          xaxis=dict(tickangle=-16),
+                          margin=dict(l=68, r=22, t=22, b=92), height=380))
+
+    if iters:
+        idata = []
+        for geom, col in (("box", C["aqua"]), ("mesh", C["orange"])):
+            pts = sorted([v for v in iters.values() if v.get("geom") == geom],
+                         key=lambda v: v["pgs_iterations"])
+            if not pts:
+                continue
+            idata.append(dict(type="scatter", mode="lines+markers",
+                              name=f"{geom} collider",
+                              x=[v["pgs_iterations"] for v in pts],
+                              y=[round(v.get("worst_excursion_mm",
+                                                v["worst_downward_mm"]), 4)
+                                 for v in pts],
+                              line=dict(color=col, width=2),
+                              marker=dict(size=9, color=col),
+                              hovertemplate="%{x} iterations<br>%{y:.3f} mm<extra></extra>"))
+        if idata:
+            FIGS["fig-legacy-iters"] = dict(
+                data=idata,
+                layout=layout("Solver iterations",
+                              "Worst distance from the start position, mm (log)",
+                              yaxis=dict(type="log"), height=340))
+
+    rows = []
+    def cell(k, key="worst_downward_mm", fmt="%.2f mm"):
+        v = grid.get(k)
+        if not v or key not in v:
+            return "&mdash;"
+        return fmt % v[key]
+    if grid:
+        rows.append(["Primitive box, defaults", "0.163 mm", cell("box_fpgs")])
+        rows.append(["Triangle mesh, defaults",
+                     "<span style='color:#ff6b7a'>lost at 7.18 s, fell 44.7 m</span>",
+                     "<span style='color:#ffbd59'>%s, never loses contact</span>"
+                     % cell("mesh_fpgs")])
+        rows.append(["Triangle mesh, two friction anchors", "19.9 mm",
+                     cell("mesh_anchors")])
+        TABLES["tbl-legacy-then-now"] = rows
+
+
+def t_legacy_db(db, rep):
+    """Execution flags versus plain run-to-run repeatability."""
+    rows = []
+    for geom in ("box", "mesh"):
+        base = db.get(f"{geom}_db0_st0", {})
+        if "worst_downward_mm" not in base:
+            continue
+        for k in sorted([x for x in db if x.startswith(f"diff_{geom}_")]):
+            v = db[k]
+            lbl = k.replace(f"diff_{geom}_", "").replace("db0", "double buffer off") \
+                   .replace("db1", "double buffer on").replace("_st0", ", streams off") \
+                   .replace("_st1", ", streams on")
+            rows.append([f"{geom}: {lbl}",
+                         "<span style='color:%s'>%s</span>" % (
+                             ("#61d69b", "identical") if v["identical"]
+                             else ("#ffbd59", "%.2f mm apart" % v["max_z_difference_mm"]))])
+        r = rep.get(geom)
+        if r:
+            worst = max(r["max_deviation_mm"]) if r["max_deviation_mm"] else 0.0
+            rows.append([f"{geom}: <b>same settings, run again</b>",
+                         "<span style='color:%s'>%s</span>" % (
+                             ("#61d69b", "identical") if r["identical"]
+                             else ("#ff6b7a", "%.2f mm apart" % worst))])
+    if rows:
+        TABLES["tbl-legacy-db"] = rows
+
+
 def t_capture(cap):
     rows = []
     for k, v in cap.items():
@@ -652,6 +772,8 @@ if __name__ == "__main__":
     f_inner(s.get("inner", {}), s.get("substeps", {}), s.get("iters", {}))
     f_tuning(s.get("tuning", {}), s.get("mu_sweep", {}))
     f_coupon(s.get("coupon", {}))
+    f_legacy(s.get("legacy", {}))
+    t_legacy_db(s.get("legacy_db", {}), s.get("legacy_repeat", {}))
     t_coupon_mech(s.get("coupon_mech", {}))
     t_capture(s.get("graph_capture", {}))
     t_spec(s.get("speculative", {}))

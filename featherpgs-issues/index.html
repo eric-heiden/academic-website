@@ -54,17 +54,17 @@
 <section id="changed">
 <div class="kicker">Revision</div>
 <h2>What changed since the previous version of this page</h2>
-<p class="lead">Every claim from the earlier dossier was re-run on current code and current hardware. Two no longer reproduce at all, one was misdiagnosed, two survive in narrower form, and two are confirmed. Two new findings matter more than most of the originals, and the minimal reproduction that produced the most alarming number turns out to have been measuring an undefined quantity.</p>
+<p class="lead">Every claim from the earlier dossier was re-run on current code and current hardware, including its minimal reproductions run unchanged. One no longer reproduces at all, one was misdiagnosed, two survive in narrower form, and three are confirmed. Two new findings matter more than most of the originals &mdash; and the coupon that produced the most alarming number turns out to have been measuring a quantity that does not exist under a hard contact model.</p>
 
 <div class="table-wrap"><table>
 <thead><tr><th>Previous claim</th><th>Status</th><th>What the re-run shows</th></tr></thead>
 <tbody>
-<tr><td><b>FPGS&#8209;01</b> &middot; A triangulated cube loses a grasp that an identical primitive box keeps</td><td><span class="tag gone" id="tag-mesh">No longer reproduces</span></td><td id="txt-mesh">Does not reproduce, and the coupon it came from explains why. In the full scene FeatherPGS holds a primitive box to 0.82&nbsp;mm and the identical triangle mesh to 1.30&nbsp;mm; SolverMuJoCo holds both to 0.30&nbsp;mm. The dramatic gap in the original came from a two-pad coupon whose grip force is undefined under a hard contact model &mdash; see below.</td></tr>
+<tr><td><b>FPGS&#8209;01</b> &middot; A triangulated cube loses a grasp that an identical primitive box keeps</td><td><span class="tag moved" id="tag-mesh">Narrowed</span></td><td id="txt-mesh">The grasp loss does not reproduce. Re-running the original coupon unchanged, the meshed cube never reaches a frame with zero contacts &mdash; it creeps 10.9&nbsp;mm over ten seconds against the primitive box's 0.69&nbsp;mm. So a geometry dependence is real, but it is one order of magnitude in creep rate, not five in outcome. In the full arm scene it shrinks to 1.30&nbsp;mm against 0.82&nbsp;mm. The coupon amplifies it because its grip force is undefined &mdash; see below.</td></tr>
 <tr><td><b>FPGS&#8209;02</b> &middot; Long runs fault the CUDA context after ~700 frames</td><td><span class="tag gone" id="tag-long">No longer reproduces</span></td><td id="txt-long">Both the 100&times;-gain configuration and the gravity-corrected one ran 2000 frames &mdash; more than twice the frame count the earlier report faulted at &mdash; with no CUDA error.</td></tr>
 <tr><td><b>FPGS&#8209;03</b> &middot; Default execution settings break CUDA graph capture</td><td><span class="tag moved">Narrowed</span></td><td>Reproduces, but only <code class="inline">double_buffer=True</code> causes it. <code class="inline">use_parallel_streams</code> is innocent &mdash; capture succeeds with streams on and double buffering off. Root cause identified below.</td></tr>
 <tr><td><b>FPGS&#8209;04</b> &middot; The 256-row dense solver exceeds shared memory</td><td><span class="tag kept">Confirmed</span></td><td>Reproduces here too, and the mechanism is now exact: the kernel stages <code class="inline">2M&sup2; + 26M</code> bytes of shared memory, which is 134.5&nbsp;KiB at 256 rows. The limit is device-dependent &mdash; 48&nbsp;KiB on the machine in the earlier report, about 99&nbsp;KiB here &mdash; and nothing checks it before the first step.</td></tr>
 <tr><td><b>FPGS&#8209;05</b> &middot; The articulated controller needs 100&times; gain scaling</td><td><span class="tag moved">Misdiagnosed</span></td><td>The drive is fine. The gap is that FeatherPGS has no gravity compensation. The sag scales exactly as <code class="inline">1/ke</code>, and disappears entirely with gravity switched off at the original gains.</td></tr>
-<tr><td><b>FPGS&#8209;06</b> &middot; Friction anchors reduce loss but bias the pose</td><td><span class="tag moved">Downgraded</span></td><td>With the controller fixed, the shared friction anchor changes peak creep from 0.82&nbsp;mm to 0.80&nbsp;mm. Real but second-order here. The underlying defect &mdash; a torque couple when the two witness points are separated &mdash; is still on by default.</td></tr>
+<tr><td><b>FPGS&#8209;06</b> &middot; Friction anchors reduce loss but bias the pose</td><td><span class="tag kept">Confirmed</span></td><td>Reproduces clearly on the coupon: two anchors take the mesh from 10.9&nbsp;mm of downward creep to 0.07&nbsp;mm and add <b>33&nbsp;mm of upward travel</b> instead; the shared anchor does the same to the box at 1.8&nbsp;mm. In the full arm scene it is second-order (0.82&nbsp;mm to 0.80&nbsp;mm peak creep) only because that grasp barely penetrates.</td></tr>
 <tr><td><b>FPGS&#8209;07</b> &middot; The upstream PR cannot build the test scene</td><td><span class="tag kept">Still true</span></td><td>PR&nbsp;#2608 has not moved since 8&nbsp;July 2026 and is <code class="inline">blocked</code>. The working branch is 111 commits ahead of and 119 behind upstream <code class="inline">main</code>. There is no upstream FeatherPGS that can run this scene.</td></tr>
 <tr><td><span class="tag new">New</span> The constraint-row budget silently drops most of the scene's contacts</td><td><span class="tag kept">Confirmed</span></td><td>The scene needs 201 dense rows. The default is 32, overflow is silent, and at anything below 96 rows <b>the cube is never picked up at all</b> &mdash; the arm runs the whole scripted sequence over an object still sitting on the table.</td></tr>
 <tr><td><span class="tag new">New</span> Extra velocity iterations make the grasp worse, not better</td><td><span class="tag kept">Confirmed</span></td><td>The velocity pass rebuilds contact targets with the speculative term forced to zero, which turns every not-yet-touching contact into a hard "may not approach" constraint.</td></tr>
@@ -226,12 +226,12 @@ def apply(self):
 <div class="kicker">Minimal reproduction</div>
 <h2>Two pads and one object, with the arm removed entirely.</h2>
 
-<p class="lead">Stripping the scene down to two pads and one object is the right way to look at creep and slip: no IK, no gravity compensation, no seven-joint arm. But <i>how</i> the pads are held matters more than it looks, and the coupon the earlier report used was measuring something that has no answer.</p>
+<p class="lead">Stripping the scene down to two pads and one object is the right way to look at creep and slip: no IK, no gravity compensation, no seven-joint arm. The earlier report's coupon is re-run here byte for byte, and it still shows the sliding it was built to show &mdash; but not the catastrophe it reported. Understanding the difference turns out to matter more than the geometry it was comparing.</p>
 
 <div class="grid2">
 <div class="card">
 <h3>Static pads</h3>
-<p>The pads are welded to the world and the object is placed between them with a fixed geometric overlap, then shaken by a body force. This is the shape of the earlier report's minimal reproduction. It has one attractive property &mdash; nothing to tune but the overlap &mdash; and one fatal one, below.</p>
+<p>The pads are welded to the world and the object is placed between them with a fixed geometric overlap, then shaken by a body force. This is the earlier report's shape. It has one attractive property &mdash; nothing to tune but the overlap &mdash; and one fatal one.</p>
 </div>
 <div class="card">
 <h3>Driven pads</h3>
@@ -239,9 +239,39 @@ def apply(self):
 </div>
 </div>
 
+<h3 style="margin-top:30px">The original reproducer, unchanged</h3>
+<p>A 40&nbsp;mm cube pinched between two pads welded to the world with a 0.5&nbsp;mm overlap, gravity pulling down, an oscillating body force shaking it sideways for ten seconds. Same dimensions, same materials, same solver settings, same twelve iterations. The only thing added is that the height is recorded every frame instead of only at the end.</p>
+
+<figure class="plot"><div id="fig-legacy-slide" class="plotbox"></div>
+<figcaption>How far the cube has slid below its starting height, through the whole ten-second shake. This is the sliding the earlier coupon was built to show. Under FeatherPGS the primitive box creeps a fraction of a millimetre and stops; the triangle mesh keeps going.</figcaption></figure>
+
+<div class="table-wrap"><table id="tbl-legacy-then-now">
+<thead><tr><th>Same scene, same settings</th><th>Earlier report</th><th>Re-run here</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:22px">The sliding reproduces. The catastrophe does not: the meshed cube never reaches a frame with zero contacts, and it does not fall. What it does is creep steadily downward through the grasp, ending about sixteen times lower than the primitive box in the identical scene. So there is a real geometry dependence here, and it is worth a hard look &mdash; but it is a creep-rate difference of one order of magnitude, not the five the earlier number implied.</p>
+
+
+
+<h3 style="margin-top:30px">What the friction anchors actually do</h3>
+<p>The earlier report's other coupon finding was that friction anchors stop the mesh from being lost but bias the pose. That reproduces cleanly, and the coupon shows why it matters: the bias has a sign.</p>
+
+<figure class="plot"><div id="fig-legacy-anchors" class="plotbox"></div>
+<figcaption>Worst movement out of the starting position in each direction. Two friction anchors take the mesh's downward creep from 10.9&nbsp;mm to 0.07&nbsp;mm &mdash; and replace it with 33&nbsp;mm of travel in the other direction. The shared anchor does the same thing to the box on a smaller scale: 0.69&nbsp;mm down becomes 0.05&nbsp;mm down and 1.8&nbsp;mm up.</figcaption></figure>
+
+<p>"It no longer falls" is not the same as "it is held". Both anchor options convert a downward slide into an upward push, which is what you would expect from a friction row that carries a positional bias rather than only a velocity target. A grasp that slowly extrudes the object upward out of the fingers will pass a drop test and fail everything else.</p>
+
 <h3 style="margin-top:34px">The static coupon has no grip force to find</h3>
 <p>Under a hard contact model, two immovable pads and a fixed overlap do not define a squeeze. Push the object equally hard from both sides and it does not move, whether you push with one newton or a thousand. Nothing in the object's motion distinguishes them, so nothing in the solve pins the pair of forces down: both contacts only say "do not penetrate", and neither has a compliance that would let a penetration depth stand in for a force. A compliant contact model does not have this problem, which is why SolverMuJoCo is untroubled by the same scene.</p>
 <p>What FeatherPGS produces instead comes from the position-correction term, which asks for the penetration to be removed within one step &mdash; from both sides at once, in a sweep that visits one row and then the other. The result is an object that gains energy in proportion to how hard it is nominally squeezed.</p>
+
+<figure class="plot"><div id="fig-legacy-iters" class="plotbox"></div>
+<figcaption>The same coupon, the same geometry, only the iteration count changed. The box's excursion moves by a factor of seven and never quite settles; the mesh's does not even keep its direction &mdash; at four and thirty-two iterations the cube drifts upward, at twelve it slides down.</figcaption></figure>
+
+<p>That is also the answer to why the collision representation matters so much here and so little once the pads are driven. The box presents eight contact points and the mesh eleven, and since the squeeze force is undetermined the two land on different values of it; the friction capacity that follows differs with them. Nothing about triangles is at fault. The scene simply has no answer for either representation to converge to, so each one converges to an accident.</p>
+
+<p>Sweeping the one thing the coupon lets you set makes the same point from the other side. This is the same two-pad shape with the overlap varied rather than fixed at the original 0.5&nbsp;mm:</p>
 
 <figure class="plot"><div id="fig-coupon-static" class="plotbox"></div>
 <figcaption>How far the object slides down through the grasp, against how hard it is squeezed, in the static coupon. Squeezing harder makes FeatherPGS worse, and past a threshold the object is ejected outright. SolverMuJoCo is unaffected because its contacts are compliant, so an overlap really is a force there. Points at the bottom of the axis are at the 1&nbsp;&micro;m floor, meaning no measurable slip.</figcaption></figure>
@@ -272,7 +302,19 @@ def apply(self):
 
 <p>The usual remedy for this is a compliance term on the contact, which turns the penetration back into a force. FeatherPGS has one &mdash; <code class="inline">dense_contact_compliance</code> &mdash; but it does not reach here. Sweeping it from zero to 1e-4 over the ejecting coupon produces <b>bit-identical results</b>, because the contacts between a free object and world-fixed pads land on the free-body row family, whose diagonal is seeded with <code class="inline">pgs_cfm</code> and nothing else. A gripper's contacts land on a different family that does have the term.</p>
 
-<div class="note bad"><b>This is what the earlier report was measuring.</b> Its minimal reproduction used exactly this geometry with a 0.5&nbsp;mm overlap, and reported the meshed cube "losing contact and falling 44.7&nbsp;m". A 44.7&nbsp;m fall is what free fall looks like after about three seconds &mdash; the number is the drop, not the defect. Whether a given run survives at all depends on which side of the ejection threshold it lands, and the mesh and the box need not land on the same side &mdash; here both survive at 0.5&nbsp;mm and both are ejected at 1&nbsp;mm. Read as a mesh-versus-primitive comparison the original was never measuring geometry.</div>
+<div class="note bad"><b>What the 44.7-metre number was.</b> The earlier report ran the coupon above and recorded the meshed cube losing contact at 7.18&nbsp;s and ending 44.7&nbsp;m below its start. Re-running that scene unchanged, the cube never reaches a frame with zero contacts at all &mdash; so the fall no longer happens, and the 44.7&nbsp;m was the free fall that followed the loss rather than a measure of the contact defect. What survives is the creep, and the creep is real. What the overlap sweep adds is why it is so sensitive to everything: at 1&nbsp;mm of squeeze this coupon does not creep at all, it ejects.</div>
+
+<h3 style="margin-top:30px">It does not even repeat on the same machine</h3>
+<p>One more piece of evidence sits in the comparison table above. The primitive box slid 0.163&nbsp;mm in the earlier report and 0.686&nbsp;mm here &mdash; same commit, same solver settings, same scene, four times the creep, different GPU. The execution options are not responsible, and neither is anything else in the configuration:</p>
+
+<div class="table-wrap"><table id="tbl-legacy-db">
+<thead><tr><th>Comparison</th><th>Trajectory difference</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:20px">The box is bit-identical under every combination of double buffering and parallel streams, and bit-identical when simply run again. The mesh is not: two runs with <b>nothing changed at all</b> agree until frame 573 and then part company, ending 1.9&nbsp;mm apart. That also explains the one flag combination that looked significant &mdash; it was run-to-run noise, not the flag.</p>
+
+<p>Contact rows are claimed with an atomic counter, so the order the Gauss-Seidel sweep visits them in is whatever order the GPU happened to schedule. On a well-posed problem that is a rounding-level difference. Here it decides the answer, which is why the same code gives 0.163&nbsp;mm on one machine and 0.686&nbsp;mm on another, and why the mesh cannot even agree with itself.</p>
 
 <h3 style="margin-top:34px">The driven coupon is well posed, and both geometries hold</h3>
 <p>Replace the welded pads with a real finger drive and the grip force becomes a defined quantity: stiffness times how far past the surface the finger is commanded. Nothing else about the contact model changes.</p>
@@ -308,8 +350,16 @@ def apply(self):
 
 <div class="video-grid">
 <article class="video-card">
+  <video src="media/legacy_static_mesh.mp4" poster="media/legacy_static_mesh.jpg" autoplay loop muted playsinline></video>
+  <div class="video-copy"><h3>The original coupon, triangle mesh</h3><p>The earlier report's scene, unchanged. The cube never loses contact; it slides steadily down through the pads.</p></div>
+</article>
+<article class="video-card">
+  <video src="media/legacy_static_box.mp4" poster="media/legacy_static_box.jpg" autoplay loop muted playsinline></video>
+  <div class="video-copy"><h3>The original coupon, primitive box</h3><p>The same scene with only the collider swapped. It settles within a fraction of a millimetre and stays.</p></div>
+</article>
+<article class="video-card">
   <video src="media/coupon_static_eject.mp4" poster="media/coupon_static_eject.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>Static pads, 2 mm overlap</h3><p>Nothing is moving the pads. The object is thrown out of the gap by the position-correction term alone.</p></div>
+  <div class="video-copy"><h3>Static pads, squeezed 2 mm</h3><p>The same coupon shape at a larger overlap. Nothing is moving the pads; the object is thrown out of the gap by the position-correction term alone.</p></div>
 </article>
 <article class="video-card">
   <video src="media/coupon_driven_box.mp4" poster="media/coupon_driven_box.jpg" autoplay loop muted playsinline></video>
@@ -411,7 +461,7 @@ wp.copy(self._debug_stage3_v_hat, self.v_hat)</code></pre>
 <ul>
 <li><b>The dropped contact contributes nothing at all</b> &mdash; no normal row, no friction, no force. A finger simply stops touching the cube for that step.</li>
 <li><b>There is no warning.</b> The entire 15,760-line solver contains no <code class="inline">warnings.warn</code> and no logging. The only way to find out is to opt into <code class="inline">row_watermark=True</code> and read <code class="inline">constraint_row_watermarks()</code> yourself.</li>
-<li><b>Which contacts survive is decided by an atomic race.</b> Nothing orders them by penetration depth or by pair. The rollback also means a later single-slot contact can succeed after an earlier three-slot contact failed. Repeated runs on this machine were bit-identical, so the race is stable in practice here &mdash; but nothing in the code makes that a guarantee, and no contact keeps a stable row index between steps, which is why the dense path has no identity-matched warm start.</li>
+<li><b>Which contacts survive is decided by an atomic race.</b> Nothing orders them by penetration depth or by pair. The rollback also means a later single-slot contact can succeed after an earlier three-slot contact failed. The same race also fixes the order the solve sweeps the rows in. For the arm scene, and for the primitive-box coupon, repeated runs came out bit-identical &mdash; but the meshed coupon does <b>not</b> repeat: two runs with nothing changed diverge partway through and end 1.9&nbsp;mm apart. No contact keeps a stable row index between steps either, which is why the dense path has no identity-matched warm start.</li>
 </ul>
 
 <h3 style="margin-top:30px">And the row budget is expensive to raise on the default solve path</h3>
@@ -628,7 +678,8 @@ resolved_friction = wp.max(geom_friction[worldid, g1], geom_friction[worldid, g2
 <li><a href="scripts/exp_rows.py">exp_rows.py</a> &mdash; row budget, watermarks, repeatability</li>
 <li><a href="scripts/exp_speculative.py">exp_speculative.py</a> &mdash; the velocity-pass regression</li>
 <li><a href="scripts/exp_defaults.py">exp_defaults.py</a> &mdash; library defaults and row capacity</li>
-<li><a href="scripts/coupon.py">coupon.py</a> &middot; <a href="scripts/exp_coupon.py">exp_coupon.py</a> &middot; <a href="scripts/exp_coupon_mech.py">exp_coupon_mech.py</a> &mdash; the two-pad coupons</li>
+<li><a href="scripts/legacy_coupon.py">legacy_coupon.py</a> &middot; <a href="scripts/exp_legacy.py">exp_legacy.py</a> &middot; <a href="scripts/exp_legacy_db.py">exp_legacy_db.py</a> &mdash; the earlier report's coupon, re-run</li>
+<li><a href="scripts/coupon.py">coupon.py</a> &middot; <a href="scripts/exp_coupon.py">exp_coupon.py</a> &middot; <a href="scripts/exp_coupon_mech.py">exp_coupon_mech.py</a> &mdash; the driven coupon and its mechanism</li>
 <li><a href="scripts/exp_tuning.py">exp_tuning.py</a> &middot; <a href="scripts/exp_mu.py">exp_mu.py</a> &mdash; parameter and friction sensitivity</li>
 <li><a href="scripts/exp_iters.py">exp_iters.py</a> &middot; <a href="scripts/exp_iters_time.py">exp_iters_time.py</a> &middot; <a href="scripts/exp_inner.py">exp_inner.py</a> &mdash; iteration count and frozen inner substeps</li>
 <li><a href="scripts/exp_mesh2.py">exp_mesh2.py</a> &middot; <a href="scripts/exp_grip.py">exp_grip.py</a> &middot; <a href="scripts/exp_misc.py">exp_misc.py</a> &mdash; mesh geometry, contact detail, and the earlier report's remaining claims</li>

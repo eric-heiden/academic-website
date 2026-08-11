@@ -109,6 +109,13 @@ if __name__ == "__main__":
     coup["driven"] = (tail_json("coupon_driven.log") or {}).get("driven", {})
     coup["knobs"] = (tail_json("coupon_knobs.log") or {}).get("knobs", {})
     s["coupon"] = coup
+    leg = tail_json("legacy.log") or {}
+    it2 = (tail_json("legacy_iters.log") or {}).get("iters")
+    if it2:
+        leg["iters"] = it2
+    s["legacy"] = leg
+    s["legacy_db"] = tail_json("legacy_db.log") or {}
+    s["legacy_repeat"] = tail_json("legacy_repeat.log") or {}
     s["compliance"] = tail_json("compliance.log") or {}
     s["coupon_mech"] = tail_json("coupon_mech.log") or {}
     s["mu_sweep"] = tail_json("mu.log") or {}
