@@ -36,7 +36,7 @@
 <div class="summary-grid">
 <div class="callout warn">
 <h3>What goes wrong</h3>
-<p><b>The position drive has no gravity term.</b> An arm tuned against a solver that compensates gravity sags 4.65&deg; here and never reaches its target pose, so the grasp is never attempted. Scaling the gains up to compensate also stiffens the fingers and wrecks the grasp instead.</p>
+<p><b>The position drive has no gravity term.</b> An arm tuned against a solver that compensates gravity sags 4.65&deg; under FeatherPGS and never reaches its target pose, so the grasp is never attempted. Scaling the gains up to compensate also stiffens the fingers and wrecks the grasp instead.</p>
 <p><b>The contact-row budget defaults to 32 rows &mdash; ten contacts.</b> The arm scene needs 201. Overflow is silent, and below 96 rows the cube is never picked up at all.</p>
 <p><b>The default solve mode cannot hold that many rows cheaply.</b> Its shared-memory footprint grows as the square of the budget.</p>
 </div>
@@ -47,7 +47,7 @@
 </div>
 </div>
 
-<div class="note warning"><b>Scope.</b> One machine, one GPU, two scenes, one environment per run. Speed numbers are single-environment and say nothing about FeatherPGS at thousands of parallel worlds, which is what it is built for.</div>
+<div class="note warning"><b>Scope.</b> Two scenes, one simulated environment per run, on a single NVIDIA RTX PRO 6000 Blackwell (compute capability 12.0). Speed figures are therefore single-environment and say nothing about FeatherPGS at thousands of parallel worlds, which is what it is built for. Behaviour that depends on how the GPU schedules a kernel launch is flagged where it appears.</div>
 </section>
 
 <section id="start">
@@ -230,16 +230,16 @@ __shared__ int   s_parent[TILE_M];
 __shared__ float s_mu[TILE_M];</code></pre>
 </div>
 
-<p>That is <code class="inline">2M&sup2; + 26M</code> bytes &mdash; quadratic in the row budget, and matching both machines this has been measured on to within 128 bytes of alignment padding. The per-block limit for a static allocation is device-dependent, so the ceiling moves with the GPU:</p>
+<p>That is <code class="inline">2M&sup2; + 26M</code> bytes &mdash; quadratic in the row budget. CUDA's default per-block limit for a <i>static</i> shared-memory allocation is 48&nbsp;KiB, and the opt-in above that applies only to <i>dynamic</i> shared memory, so on a device holding to the default the budget caps at 150 rows. Some devices allow more: on the RTX PRO 6000 Blackwell used for these measurements, 201 rows loads and 256 does not, putting its limit between 84 and 134&nbsp;KiB.</p>
 
 <div class="table-wrap"><table>
-<thead><tr><th>dense_max_constraints</th><th>Shared memory needed</th><th>Ampere (48 KiB)</th><th>This machine (~99 KiB)</th></tr></thead>
+<thead><tr><th>dense_max_constraints</th><th>Shared memory needed</th><th>Fits CUDA's default 48 KiB?</th><th>Measured on the test GPU</th></tr></thead>
 <tbody>
-<tr><td class="num">32 <span style="color:#9eb0c2">(default)</span></td><td class="num">2.8 KiB</td><td>loads &mdash; but only 10 contacts</td><td>loads &mdash; only 10 contacts</td></tr>
-<tr><td class="num">128</td><td class="num">35.2 KiB</td><td>loads</td><td>loads</td></tr>
-<tr><td class="num">150</td><td class="num">47.8 KiB</td><td>loads &mdash; the ceiling here</td><td>loads</td></tr>
-<tr><td class="num">201 <span style="color:#ffbd59">(what the scene needs)</span></td><td class="num">84.0 KiB</td><td><span style="color:#ff6b7a">will not load</span></td><td>loads, at 0.11&times; realtime</td></tr>
-<tr><td class="num">256</td><td class="num">134.5 KiB</td><td><span style="color:#ff6b7a">will not load</span></td><td><span style="color:#ff6b7a">will not load</span></td></tr>
+<tr><td class="num">32 <span style="color:#9eb0c2">(default)</span></td><td class="num">2.8 KiB</td><td>yes &mdash; but only 10 contacts</td><td>loads</td></tr>
+<tr><td class="num">128</td><td class="num">35.2 KiB</td><td>yes</td><td>loads</td></tr>
+<tr><td class="num">150</td><td class="num">47.8 KiB</td><td>yes &mdash; the largest that does</td><td>loads</td></tr>
+<tr><td class="num">201 <span style="color:#ffbd59">(what the scene needs)</span></td><td class="num">84.0 KiB</td><td><span style="color:#ff6b7a">no</span></td><td>loads, at 0.11&times; realtime</td></tr>
+<tr><td class="num">256</td><td class="num">134.5 KiB</td><td><span style="color:#ff6b7a">no</span></td><td><span style="color:#ff6b7a">will not load</span></td></tr>
 </tbody>
 </table></div>
 
@@ -605,7 +605,7 @@ wp.copy(self._debug_stage3_v_hat, self.v_hat)</code></pre>
 
 <div class="fix"><h3>Keep the speculative term in the velocity pass</h3><p>One hard-coded <code class="inline">contact_speculative_scale=0.0</code> turns every not-yet-touching contact into a wall and makes <code class="inline">pgs_velocity_iterations</code> a net negative on any scene with a normal collision gap.</p></div>
 
-<div class="fix"><h3>Move the tiled solve's staging to dynamic shared memory</h3><p>A quadratic static allocation puts the row budget at the mercy of the GPU: 150 rows on Ampere, about 220 here. Until it moves, validate <code class="inline">dense_max_constraints</code> against the device's actual limit at construction and say so, rather than failing as a module-load error inside the first step. The solver already has an estimator that does exactly this for a different kernel.</p></div>
+<div class="fix"><h3>Move the tiled solve's staging to dynamic shared memory</h3><p>A quadratic static allocation puts the row budget at the mercy of the device: 150 rows under CUDA's default 48&nbsp;KiB static limit, roughly 220 on a device that allows 99&nbsp;KiB. Until it moves, validate <code class="inline">dense_max_constraints</code> against the device's actual limit at construction and say so, rather than failing as a module-load error inside the first step. The solver already has an estimator that does exactly this for a different kernel.</p></div>
 
 <div class="fix"><h3>Guard the double-buffer fork against graph capture</h3><p>Use the existing <code class="inline">device.is_capturing</code> to fall back to an inline memset, or default <code class="inline">double_buffer</code> to off. Add a test that captures <code class="inline">step()</code> &mdash; there is currently none, which is why this has gone unnoticed.</p></div>
 
