@@ -81,8 +81,8 @@
     <ul class="report-list">
       <li>
         <a class="report-card" href="featherpgs-issues/">
-          <strong>FeatherPGS grasp stability: failure modes and required fixes</strong>
-          <span>Technical investigation of FeatherPGS grasping in Newton: a primitive cube remains within 0.163 mm while an equivalent triangulated mesh loses contact, friction anchors trade complete loss for biased residual slip, and the Franka controller requires 100&times; stiffness and 10&times; damping scaling to reach the shake phase. Includes ViewerGL rollouts, collapsible minimal reproducers, and isolated failures in graph capture, dense-kernel shared memory, and long-horizon CUDA execution.</span>
+          <strong>FeatherPGS grasp stability: one missing torque, and what is left after it</strong>
+          <span>A Franka arm grasps and shakes a cube. FeatherPGS has no gravity compensation, so a controller tuned against SolverMuJoCo never reaches its target pose &mdash; the 100&times; gain workaround was masking a missing feature, not a solver defect. Supply the torque and the grasp holds to 0.82&nbsp;mm at the original gains, 0.32&nbsp;mm with more iterations. What remains: a constraint-row default six times too small with silent overflow, a velocity pass that turns speculative contacts into walls, and an execution default that cannot be captured into a CUDA graph. With interactive plots and ViewerGL rollouts.</span>
         </a>
       </li>
       <li>
