@@ -15,7 +15,7 @@ import warp as wp
 sys.path.insert(0, "/home/horde/repos/fpgs-study")
 
 import newton  # noqa: E402
-import legacy_coupon as L  # noqa: E402
+import static_coupon as L  # noqa: E402
 
 if __name__ == "__main__":
     wp.init()

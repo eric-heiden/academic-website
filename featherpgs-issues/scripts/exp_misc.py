@@ -1,4 +1,4 @@
-"""Re-checks of the earlier report's remaining claims on current code."""
+"""Assorted capability checks: row capacity, control layout, friction modes."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def coord_layout_targets():
 
 
 def long_horizon():
-    """Run past the frame count where the earlier report saw a CUDA fault."""
+    """Long-horizon stability: does a 2000-frame run stay healthy?"""
     out = {}
     for tag, gain, gc, frames in (("gain100_2000f", 100.0, False, 2000),
                                   ("gravity_2000f", 1.0, True, 2000)):

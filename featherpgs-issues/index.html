@@ -9,74 +9,95 @@
 <header class="hero">
 <div class="kicker">Newton solver engineering note &middot; 11 August 2026</div>
 <h1>FeatherPGS grasp stability</h1>
-<p class="dek">A Franka arm picks up a 40&nbsp;mm cube and shakes it. The previous version of this page concluded that stable grasping needed fixes across contact construction, friction, articulation and GPU execution. Re-running everything on current code shows that <b>one missing feature explains almost all of it</b>: FeatherPGS never removes gravity from the arm's position drive, so a controller tuned against SolverMuJoCo's gravity compensation can never reach the pose the task waits for. Supply that one torque and the same solver holds the cube to <b>0.82&nbsp;mm</b> at the original gains &mdash; and to <b>0.32&nbsp;mm</b> with more solver iterations, matching SolverMuJoCo. What is left is a shorter and much more specific list &mdash; and the two-pad coupon that produced the original report's most alarming number turns out to have been measuring a quantity that does not exist under a hard contact model.</p>
+<p class="dek">What stops a robot hand from holding an object in FeatherPGS, what to set to make it work, and what still needs fixing in the solver. Every number here comes from two scenes: a Franka arm that grasps a 40&nbsp;mm cube and shakes it, and a two-pad coupon that strips away everything except the contact.</p>
 <div class="badges">
 <span class="badge">FeatherPGS <code class="inline">fpgs-main</code> @ <a href="https://github.com/dylanturpin/newton-collab/commit/d95efe1d1bb07497a4e51bf9563f36bc8821ab73" target="_blank">d95efe1d</a></span>
 <span class="badge">Newton 1.5.0.dev0 &middot; Warp 1.16.0.dev20260716</span>
 <span class="badge">RTX PRO 6000 Blackwell (sm_120)</span>
-<span class="badge ok">Grasp holds at original gains</span>
-<span class="badge alert">On its own defaults, the cube is never lifted</span>
 </div>
 </header>
 
 <nav class="nav">
-<a href="#summary">Summary</a><a href="#changed">What changed</a><a href="#gravity">Gravity</a><a href="#quality">Grasp quality</a><a href="#coupon">Coupon</a><a href="#timestep">Time step &amp; speed</a><a href="#rows">Row budget</a><a href="#velocity">Velocity pass</a><a href="#capture">Graph capture</a><a href="#smaller">Smaller gaps</a><a href="#fixes">Fix list</a><a href="#repro">Reproduce</a>
+<a href="#summary">Summary</a><a href="#start">Start here</a><a href="#gravity">Gravity</a><a href="#rows">Contact rows</a><a href="#squeeze">Squeeze</a><a href="#friction">Friction</a><a href="#velocity">Velocity pass</a><a href="#timestep">Time step</a><a href="#execution">Execution</a><a href="#smaller">Smaller gaps</a><a href="#fixes">Fix list</a><a href="#repro">Reproduce</a>
 </nav>
 
 <section id="summary">
 <div class="kicker">Summary</div>
-<h2>The grasp was never the problem. The arm could not get into position.</h2>
-<p class="lead">The test is the same scene the original bug report used &mdash; <a href="https://github.com/StoneT2000/newton-tests" target="_blank">StoneT2000/newton-tests</a>, <code class="inline">franka_cube_shake.py</code>, unmodified: a fixed FR3 arm, analytic IK, a scripted approach&rarr;descend&rarr;grasp&rarr;lift&rarr;shake sequence, 60&nbsp;Hz control, 16 physics substeps. The task only advances a phase once the end effector is within 5&nbsp;mm and 2&deg; of its target. Its SolverMuJoCo settings come from the earlier <a href="../grasp-shake-drift/">grasp-shake-drift</a> investigation and are left exactly as they are; the only thing changed here is the solver.</p>
+<h2>The contact model is good. Three defaults and one missing feature stop you reaching it.</h2>
+<p class="lead">On a well-posed grasp FeatherPGS holds an object better than SolverMuJoCo, tolerates a far larger time step, and needs no contact tuning at all. Getting there means supplying one torque the solver does not compute, and changing three settings whose defaults cannot express a real contact set.</p>
 
 <div class="metrics">
-<div class="metric rd"><span class="num">4.65&deg;</span><span class="label">Arm sag under FeatherPGS<small>At the scene's tuned gains, holding a fixed target</small></span></div>
-<div class="metric gr"><span class="num">0.82 mm</span><span class="label">Cube creep once gravity is supplied<small>Original gains, full 11.5 s shake</small></span></div>
-<div class="metric cy"><span class="num">0.32 mm</span><span class="label">With 32 solver iterations<small>SolverMuJoCo on the same scene: 0.31 mm</small></span></div>
-<div class="metric am"><span class="num">201</span><span class="label">Constraint rows this scene needs<small>Default is 32; below 96 the cube is never lifted</small></span></div>
+<div class="metric rd"><span class="num">4.65&deg;</span><span class="label">Arm sag with no gravity term<small>Enough to stall a 5 mm pose gate forever</small></span></div>
+<div class="metric am"><span class="num">201</span><span class="label">Constraint rows the arm scene needs<small>Default is 32; below 96 the cube is never lifted</small></span></div>
+<div class="metric gr"><span class="num">0.32 mm</span><span class="label">Cube creep once both are fixed<small>SolverMuJoCo on the same scene: 0.31 mm</small></span></div>
+<div class="metric cy"><span class="num">16.7 ms</span><span class="label">Time step the coupon still holds at<small>SolverMuJoCo loses it beyond 2 ms</small></span></div>
 </div>
 
 <div class="summary-grid">
-<div class="callout">
-<h3>What actually happens</h3>
-<p>The scene gives every arm joint full gravity compensation through two MuJoCo-specific attributes, <code class="inline">mujoco:jnt_actgravcomp</code> and <code class="inline">mujoco:gravcomp</code>. Those attributes are read by exactly one solver. Under FeatherPGS the position drive has to hold the arm's own weight with proportional gain alone, so every joint settles at <code class="inline">tau_gravity / ke</code> below its target &mdash; 4.65&deg; on the shoulder lift joint and 2.16&deg; on the elbow. Under SolverMuJoCo the same joints sit at zero error. The pose gate never opens, the task never leaves its first phase, and the grasp is never even attempted.</p>
-<p>Raising the gains 100&times; shrinks the sag to 0.046&deg; and lets the task run, which is what the earlier report did. But the same multiplier lands on the two finger joints, so the grip becomes 100&times; stiffer than intended. The cube is lifted, works its way out of the pads over the next few seconds, and is <b>dropped 3.65&nbsp;s into the shake</b>. At 30&times; it is dropped within a tenth of a second. The workaround replaced a control problem with a contact problem, and only looked like a fix because the run was short enough to end first.</p>
+<div class="callout warn">
+<h3>What goes wrong</h3>
+<p><b>The position drive has no gravity term.</b> An arm tuned against a solver that compensates gravity sags 4.65&deg; here and never reaches its target pose, so the grasp is never attempted. Scaling the gains up to compensate also stiffens the fingers and wrecks the grasp instead.</p>
+<p><b>The contact-row budget defaults to 32 rows &mdash; ten contacts.</b> The arm scene needs 201. Overflow is silent, and below 96 rows the cube is never picked up at all.</p>
+<p><b>The default solve mode cannot hold that many rows cheaply.</b> Its shared-memory footprint grows as the square of the budget.</p>
 </div>
 <div class="callout good">
-<h3>What fixes it</h3>
-<p>Feed the arm the generalized gravity torque and leave every gain alone. The cube then stays within 0.82&nbsp;mm of where it started for the whole shake, and within 0.32&nbsp;mm if the solver runs 32 iterations instead of 12.</p>
-<p>FeatherPGS already computes this quantity. Its inverse-dynamics pass builds <code class="inline">joint_tau</code> with gravity in it; a per-joint flag that subtracts the gravity contribution is the whole feature. Everything else in the drive is already correct and already implicit.</p>
+<h3>What works once you do</h3>
+<p>The cube stays within <b>0.82&nbsp;mm</b> of where it started through an eleven-second shake at the scene's original gains, and <b>0.32&nbsp;mm</b> with more solver iterations &mdash; matching SolverMuJoCo, which needs carefully tuned contact settings to get there.</p>
+<p>None of that required tuning a contact parameter. Friction, compliance, position correction and regularisation were all left at their defaults, and the result is insensitive to all of them across wide sweeps.</p>
 </div>
 </div>
 
-<div class="note warning"><b>Scope.</b> One machine, one GPU, one scene, one environment per run. The speed numbers in particular are single-environment numbers and say nothing about FeatherPGS at thousands of parallel worlds, which is what it is built for.</div>
+<div class="note warning"><b>Scope.</b> One machine, one GPU, two scenes, one environment per run. Speed numbers are single-environment and say nothing about FeatherPGS at thousands of parallel worlds, which is what it is built for.</div>
 </section>
 
-<section id="changed">
-<div class="kicker">Revision</div>
-<h2>What changed since the previous version of this page</h2>
-<p class="lead">Every claim from the earlier dossier was re-run on current code and current hardware, including its minimal reproductions run unchanged. One no longer reproduces at all, one was misdiagnosed, two survive in narrower form, and three are confirmed. Two new findings matter more than most of the originals &mdash; and the coupon that produced the most alarming number turns out to have been measuring a quantity that does not exist under a hard contact model.</p>
+<section id="start">
+<div class="kicker">Guidance</div>
+<h2>Start here</h2>
+<p class="lead">This configuration produced every measurement on this page. Two of the three settings are structural &mdash; they decide whether the scene's contacts can be represented at all &mdash; and the third is required for CUDA graph capture.</p>
 
-<div class="table-wrap"><table>
-<thead><tr><th>Previous claim</th><th>Status</th><th>What the re-run shows</th></tr></thead>
-<tbody>
-<tr><td><b>FPGS&#8209;01</b> &middot; A triangulated cube loses a grasp that an identical primitive box keeps</td><td><span class="tag moved" id="tag-mesh">Narrowed</span></td><td id="txt-mesh">The grasp loss does not reproduce. Re-running the original coupon unchanged, the meshed cube never reaches a frame with zero contacts &mdash; it creeps 10.9&nbsp;mm over ten seconds against the primitive box's 0.69&nbsp;mm. So a geometry dependence is real, but it is one order of magnitude in creep rate, not five in outcome. In the full arm scene it shrinks to 1.30&nbsp;mm against 0.82&nbsp;mm. The coupon amplifies it because its grip force is undefined &mdash; see below.</td></tr>
-<tr><td><b>FPGS&#8209;02</b> &middot; Long runs fault the CUDA context after ~700 frames</td><td><span class="tag gone" id="tag-long">No longer reproduces</span></td><td id="txt-long">Both the 100&times;-gain configuration and the gravity-corrected one ran 2000 frames &mdash; more than twice the frame count the earlier report faulted at &mdash; with no CUDA error.</td></tr>
-<tr><td><b>FPGS&#8209;03</b> &middot; Default execution settings break CUDA graph capture</td><td><span class="tag moved">Narrowed</span></td><td>Reproduces, but only <code class="inline">double_buffer=True</code> causes it. <code class="inline">use_parallel_streams</code> is innocent &mdash; capture succeeds with streams on and double buffering off. Root cause identified below.</td></tr>
-<tr><td><b>FPGS&#8209;04</b> &middot; The 256-row dense solver exceeds shared memory</td><td><span class="tag kept">Confirmed</span></td><td>Reproduces here too, and the mechanism is now exact: the kernel stages <code class="inline">2M&sup2; + 26M</code> bytes of shared memory, which is 134.5&nbsp;KiB at 256 rows. The limit is device-dependent &mdash; 48&nbsp;KiB on the machine in the earlier report, about 99&nbsp;KiB here &mdash; and nothing checks it before the first step.</td></tr>
-<tr><td><b>FPGS&#8209;05</b> &middot; The articulated controller needs 100&times; gain scaling</td><td><span class="tag moved">Misdiagnosed</span></td><td>The drive is fine. The gap is that FeatherPGS has no gravity compensation. The sag scales exactly as <code class="inline">1/ke</code>, and disappears entirely with gravity switched off at the original gains.</td></tr>
-<tr><td><b>FPGS&#8209;06</b> &middot; Friction anchors reduce loss but bias the pose</td><td><span class="tag kept">Confirmed</span></td><td>Reproduces clearly on the coupon: two anchors take the mesh from 10.9&nbsp;mm of downward creep to 0.07&nbsp;mm and add <b>33&nbsp;mm of upward travel</b> instead; the shared anchor does the same to the box at 1.8&nbsp;mm. In the full arm scene it is second-order (0.82&nbsp;mm to 0.80&nbsp;mm peak creep) only because that grasp barely penetrates.</td></tr>
-<tr><td><b>FPGS&#8209;07</b> &middot; The upstream PR cannot build the test scene</td><td><span class="tag kept">Still true</span></td><td>PR&nbsp;#2608 has not moved since 8&nbsp;July 2026 and is <code class="inline">blocked</code>. The working branch is 111 commits ahead of and 119 behind upstream <code class="inline">main</code>. There is no upstream FeatherPGS that can run this scene.</td></tr>
-<tr><td><span class="tag new">New</span> The constraint-row budget silently drops most of the scene's contacts</td><td><span class="tag kept">Confirmed</span></td><td>The scene needs 201 dense rows. The default is 32, overflow is silent, and at anything below 96 rows <b>the cube is never picked up at all</b> &mdash; the arm runs the whole scripted sequence over an object still sitting on the table.</td></tr>
-<tr><td><span class="tag new">New</span> Extra velocity iterations make the grasp worse, not better</td><td><span class="tag kept">Confirmed</span></td><td>The velocity pass rebuilds contact targets with the speculative term forced to zero, which turns every not-yet-touching contact into a hard "may not approach" constraint.</td></tr>
-</tbody>
-</table></div>
+<div class="codeblock">
+<div class="code-head"><code>solver setup</code><button class="copy" type="button">Copy</button></div>
+<pre><code>solver = newton.solvers.SolverFeatherPGS(
+    model,
+    pgs_mode="matrix_free",       # "split" cannot hold this scene's rows cheaply
+    dense_max_constraints=256,    # scene peak is 201; the default 32 drops most of it
+    mf_max_constraints=4096,
+    pgs_iterations=12,            # 20 halves the creep at proportional cost
+    double_buffer=False,          # required for CUDA graph capture
+    # friction_mode="bisection_desaxce",   # 0.72 mm -> 0.40 mm, matrix-free only
+    # pgs_beta, pgs_cfm, compliance and friction settings left at their defaults
+)</code></pre>
+</div>
+
+<p>Then supply the arm's gravity torque through <code class="inline">control.joint_f</code>, because the solver will not. And check what your scene actually needs:</p>
+
+<div class="codeblock">
+<div class="code-head"><code>find out whether contacts are being dropped</code><button class="copy" type="button">Copy</button></div>
+<pre><code>solver = newton.solvers.SolverFeatherPGS(model, row_watermark=True, ...)
+# ... run the scene ...
+print(solver.constraint_row_watermarks())
+# {'dense_high_water': 201, 'mf_high_water': 12, 'contact_high_water': 71, ...}</code></pre>
+</div>
+
+<h3 style="margin-top:32px">Why these and not others</h3>
+<p>With the arm in position and the rows in place, the solver options can be judged on their own. Only two move the number much.</p>
+
+<figure class="plot"><div id="fig-configs" class="plotbox"></div>
+<figcaption>Peak creep in the arm scene for each option, everything else held at defaults. More iterations and the two bisection friction formulations each roughly halve the creep. The shared friction anchor is neutral here. Velocity iterations make it worse.</figcaption></figure>
+
+<p>The two parameters people usually reach for do nothing useful. The grasp survives every value of the position-correction factor from zero to 0.9 and every value of the regularisation term across four orders of magnitude &mdash; but the residual creep under the position-correction factor bounces between 0.33&nbsp;mm and 4.50&nbsp;mm with no pattern, so there is nothing to tune toward.</p>
+
+<figure class="plot"><div id="fig-tuning" class="plotbox"></div>
+<figcaption>Wide sweeps of the two parameters most often tuned. The regularisation term is flat because it is added to the Gauss-Seidel denominator but not to the residual the sweep drives to zero: it changes how fast the sweep converges, not what it converges to.</figcaption></figure>
+
+<div class="note bad"><b>Things that will waste your time.</b> <code class="inline">pgs_velocity_iterations</code> makes the grasp worse, not better. <code class="inline">pgs_cfm</code> does nothing to contact softness. <code class="inline">friction_smoothing</code> does nothing at all. A grasp built from immovable pads and a fixed overlap has no defined grip force and will give you a different answer on every machine. Each is explained below.</div>
 </section>
 
 <section id="gravity">
-<div class="kicker">The blocker</div>
-<h2>The position drive has no gravity term, so the arm sits below its target forever.</h2>
+<div class="kicker">Issue 1</div>
+<h2>The position drive has no gravity term.</h2>
 
-<p class="lead">FeatherPGS's drive is not a naive spring. It is folded into the mass matrix, which makes it unconditionally stable: you can raise <code class="inline">ke</code> as far as you like without the simulation exploding. That is exactly why the 100&times; workaround appeared to work, and exactly why it hid the real problem.</p>
+<p class="lead">FeatherPGS's drive is folded into the mass matrix, which makes it unconditionally stable &mdash; you can raise the stiffness as far as you like without the simulation exploding. What it does not contain is anything that cancels gravity.</p>
 
 <div class="codeblock">
 <div class="code-head"><code>newton/_src/solvers/feather_pgs/kernels.py:1977</code><button class="copy" type="button">Copy</button></div>
@@ -86,51 +107,33 @@ if ke &lt;= 0.0 and kd &lt;= 0.0:
     continue
 
 K = ke * dt * dt + kd * dt          # added to the H diagonal before Cholesky
-if K &lt;= 0.0:
-    continue
-
-q         = joint_q[coord_index]
-qd_val    = joint_qd[dof_index]
-target_pos = joint_target_pos[dof_index]
-target_vel = joint_target_vel[dof_index]
 u0 = -(ke * (q - target_pos + dt * qd_val) + kd * (qd_val - target_vel))
-row_K[row_index]  = K               # -&gt; apply_augmented_mass_diagonal
+row_K[row_index]  = K
 row_u0[row_index] = u0              # -&gt; joint_tau</code></pre>
 </div>
 
-<p>Solving <code class="inline">(H + diag(armature) + diag(K)) qdd = tau_rigid + u0</code> is the implicit backward-Euler PD. It is correct. What it does not contain is any term that cancels gravity, and nothing else in the solver supplies one: searching the whole package for <code class="inline">gravcomp</code>, <code class="inline">actgravcomp</code>, or any gravity-cancelling bias returns nothing. The only matches in Newton are inside the MuJoCo solver.</p>
+<p>Solving <code class="inline">(H + diag(armature) + diag(K)) qdd = tau_rigid + u0</code> is the implicit backward-Euler PD, and it is correct. But searching the whole package for <code class="inline">gravcomp</code>, <code class="inline">actgravcomp</code>, or any gravity-cancelling bias returns nothing &mdash; the only matches in Newton are inside the MuJoCo solver, which reads two scene attributes FeatherPGS ignores.</p>
 
-<p>So the steady state of every joint is <code class="inline">q = q_target &minus; tau_gravity / ke</code>. Holding the start pose for two seconds and measuring how far each joint sinks makes the relationship exact:</p>
+<p>So every joint settles at <code class="inline">q_target &minus; tau_gravity / ke</code>. Holding a fixed pose for two seconds makes the relationship exact:</p>
 
 <figure class="plot"><div id="fig-droop" class="plotbox"></div>
-<figcaption>Each bar is the worst arm-joint error after the target has been held constant for two seconds. Ten times the gain gives one tenth the sag; a hundred times gives one hundredth. Turning gravity off removes it completely at the original gains, which is the signature of a static load, not a tuning or stability problem.</figcaption></figure>
+<figcaption>Worst arm-joint error after the target has been held constant for two seconds. Ten times the gain gives one tenth the sag; a hundred times gives one hundredth. Turning gravity off removes it entirely at the original gains &mdash; the signature of a static load, not a tuning or stability problem.</figcaption></figure>
 
-<p>4.65&deg; of joint error puts the end effector centimetres from where the IK asked for it. The task's phase gate wants 5&nbsp;mm and 2&deg;, so it never opens. Scaling the gains does eventually get the arm there, but the same multiplier lands on the two finger joints, and the grasp degrades as fast as the tracking improves:</p>
+<p>4.65&deg; on the shoulder and 2.16&deg; on the elbow puts the end effector centimetres from where the IK asked for it. The test's phase gate wants 5&nbsp;mm and 2&deg;, so it never opens. Scaling the gains does eventually get the arm there, but the same multiplier lands on the finger joints, and the grasp degrades as fast as the tracking improves:</p>
 
 <div class="table-wrap"><table id="tbl-phase">
-<thead><tr><th>Gain multiplier</th><th>Furthest phase reached</th><th>Peak creep during the shake</th></tr></thead>
+<thead><tr><th>Gain multiplier</th><th>Furthest phase reached</th><th>Result during the shake</th></tr></thead>
 <tbody></tbody>
 </table></div>
 
-<div class="note bad"><b>The workaround is worse than it looks.</b> The gain multiplier is applied to <code class="inline">joint_target_ke[:9]</code>, which includes both finger joints. The gripper target closes well past the cube surface on purpose, so squeeze force is proportional to the finger gain; a 100&times; gain is roughly 100&times; the intended squeeze. The pads sink 3.86&nbsp;mm into the cube at 100&times; against 0.045&nbsp;mm for the corrected run, and the cube is squeezed out rather than held: the 100&times; run has <b>no finger-to-cube contact at all in 265 of its 488 shake frames</b>.</div>
+<p style="margin-top:20px">At 100&times; the pads sink 3.86&nbsp;mm into the cube against 0.045&nbsp;mm for the corrected run, and the cube is squeezed out rather than held: <b>no finger-to-cube contact at all in 265 of its 488 shake frames</b>.</p>
 
 <h3 style="margin-top:34px">Supplying the missing torque</h3>
-<p>For the measurements on this page the gravity torque is computed outside the solver and written into <code class="inline">control.joint_f</code>, so nothing about the solver or the scene's gains is changed. The gradient is taken numerically only so the result cannot be accused of borrowing the solver's own internals.</p>
+<p>For everything on this page the gravity torque is computed outside the solver and written into <code class="inline">control.joint_f</code>, so no gain and no solver setting changes. The gradient is taken numerically so the result cannot be accused of borrowing the solver's own internals.</p>
 
 <div class="codeblock">
 <div class="code-head"><code>scripts/gravcomp.py</code><button class="copy" type="button">Copy</button></div>
-<pre><code>def _potential(self, q_np):
-    """Gravitational potential energy of the arm links at joint configuration q."""
-    self._q.assign(q_np.astype(np.float32))
-    newton.eval_fk(self.model, self._q, self.qd_zero, self.scratch)
-    bq = self.scratch.body_q.numpy()
-    u = 0.0
-    for b in np.nonzero(self.mask)[0]:
-        world_com = transform_point(bq[b], self.com[b])
-        u -= self.mass[b] * float(np.dot(self.g, world_com))
-    return u
-
-def torque(self):
+<pre><code>def torque(self):
     """tau_g = dU/dq, the generalized force the drive has to cancel."""
     q = self.env.state_0.joint_q.numpy().copy()
     base = self._potential(q)
@@ -147,23 +150,18 @@ def apply(self):
     self.env.control.joint_f.assign(f)</code></pre>
 </div>
 
-<div class="note good"><b>Where this belongs.</b> Stage&nbsp;1 of <code class="inline">step()</code> already runs a recursive Newton&ndash;Euler pass that produces <code class="inline">joint_tau</code> including the gravity bias. A per-DOF opt-in that runs the same pass with <code class="inline">gravity = 0</code> and subtracts the difference is the entire feature, and it is the shape MuJoCo already exposes through <code class="inline">actgravcomp</code>. Doing it inside the solver also makes it free &mdash; the external version above costs eight extra forward-kinematics evaluations and a device sync per frame.</div>
-</section>
+<div class="note good"><b>Where this belongs.</b> Stage&nbsp;1 of <code class="inline">step()</code> already runs a recursive Newton&ndash;Euler pass that produces <code class="inline">joint_tau</code> with the gravity bias in it. A per-DOF opt-in that subtracts the gravity part is the whole feature, and doing it there makes it free &mdash; the external version above costs eight extra forward-kinematics evaluations and a device sync per frame.</div>
 
-<section id="quality">
-<div class="kicker">Grasp quality</div>
-<h2>With the arm in position, FeatherPGS holds the cube about as well as SolverMuJoCo.</h2>
-
-<p class="lead">The measurement is the cube's position expressed in the gripper's own frame, referenced to the moment the shake starts. That removes the arm's commanded motion and leaves only relative movement between cube and hand &mdash; slip, squeeze, and rattle.</p>
-<p>Over the full 900-frame run the cube stays within 0.82&nbsp;mm of where it started. Extending the same configuration to 2000 frames &mdash; just under thirty seconds of continuous shaking &mdash; gives 1.16&nbsp;mm, so the residual creep is not a slow leak that eventually loses the object.</p>
+<h3 style="margin-top:34px">What the grasp then looks like</h3>
+<p>The measurement is the cube's position in the gripper's own frame, referenced to the start of the shake. That removes the arm's commanded motion and leaves only relative movement &mdash; slip, squeeze and rattle.</p>
 
 <figure class="plot"><div id="fig-traces" class="plotbox"></div>
-<figcaption>Total movement of the cube inside the gripper over the 11.5&nbsp;s shake. The gravity-corrected FeatherPGS run tracks the SolverMuJoCo reference closely; the 100&times;-gain workaround climbs steadily until the cube leaves the gripper altogether.</figcaption></figure>
+<figcaption>Total movement of the cube inside the gripper over the 11.5&nbsp;s shake. Extending the corrected run to 2000 frames &mdash; just under thirty seconds of shaking &mdash; gives 1.16&nbsp;mm, so the residual creep is not a slow leak that eventually loses the object.</figcaption></figure>
 
 <div class="video-grid">
 <article class="video-card">
   <video src="media/mujoco.mp4" poster="media/mujoco.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>SolverMuJoCo, scene defaults</h3><p>The reference. Gravity compensation is supplied by the scene's MuJoCo attributes. Peak creep 0.31&nbsp;mm.</p></div>
+  <div class="video-copy"><h3>SolverMuJoCo, tuned</h3><p>The reference. Gravity compensation comes from the scene's MuJoCo attributes. Peak creep 0.31&nbsp;mm.</p></div>
 </article>
 <article class="video-card">
   <video src="media/fpgs_default.mp4" poster="media/fpgs_default.jpg" autoplay loop muted playsinline></video>
@@ -171,275 +169,28 @@ def apply(self):
 </article>
 <article class="video-card">
   <video src="media/fpgs_100x.mp4" poster="media/fpgs_100x.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>FeatherPGS, 100&times; gains</h3><p>The workaround from the earlier report. The task runs, but the cube works its way out of the over-stiff pads and falls 3.65&nbsp;s into the shake.</p></div>
+  <div class="video-copy"><h3>FeatherPGS, 100&times; gains</h3><p>Stiff enough to reach the pose, but the cube works its way out of the over-stiff pads and falls 3.65&nbsp;s into the shake.</p></div>
 </article>
 <article class="video-card">
   <video src="media/fpgs_gravity.mp4" poster="media/fpgs_gravity.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>FeatherPGS + gravity term, original gains</h3><p>Nothing else changed. Peak creep 0.82&nbsp;mm across the full shake.</p></div>
+  <div class="video-copy"><h3>FeatherPGS + gravity term</h3><p>Original gains, nothing else changed. Peak creep 0.82&nbsp;mm across the full shake.</p></div>
 </article>
 </div>
-
-<h3 style="margin-top:34px">Which solver options actually help</h3>
-<p>With the controller no longer the bottleneck, the solver options can be judged on their own. Two of them help substantially &mdash; more iterations, and a better friction formulation &mdash; one is neutral, and one is actively harmful.</p>
-
-<figure class="plot"><div id="fig-configs" class="plotbox"></div>
-<figcaption>Peak creep for each option, all with the gravity term supplied and the original gains. Thirty-two iterations and the two bisection friction formulations each roughly halve the creep. The shared friction anchor is neutral here. Velocity iterations make it worse, for a reason covered further down.</figcaption></figure>
 
 <figure class="plot"><div id="fig-grip" class="plotbox"></div>
-<figcaption>How many contact points exist between the pads and the cube during the shake. The corrected run keeps eighteen to twenty-two throughout. The 100&times;-gain run loses contact repeatedly and then permanently &mdash; it has no finger-to-cube contact at all in 265 of its 488 shake frames.</figcaption></figure>
-
-<h3 style="margin-top:34px">How much of this needs tuning</h3>
-<p>The premise of a hard contact model is that you should not have to tune contact parameters to get a grasp. That holds here: the grasp survives every value of the position-correction factor from zero to 0.9 and every value of the regularisation term across four orders of magnitude, and it survives dropping the cube's friction coefficient to a quarter of its authored value. What the sweeps also show is that there is not much point tuning them either.</p>
-
-<figure class="plot"><div id="fig-tuning" class="plotbox"></div>
-<figcaption>Peak creep across wide sweeps of the position-correction factor and the regularisation term, with everything else fixed.</figcaption></figure>
-
-<p>The regularisation term does almost nothing across four orders of magnitude, which matches what the code does with it: it is added to the Gauss-Seidel denominator but not to the residual the sweep drives to zero, so it changes how fast the sweep converges, not what it converges to. If you were expecting it to soften the contact, it will not.</p>
-
-<p>The position-correction factor is different. The grasp survives every value from zero to 0.9, so it is not something you have to get right to make the task work &mdash; but the residual creep bounces between 0.33&nbsp;mm and 4.50&nbsp;mm with no pattern. Combined with the non-monotone iteration behaviour, that is the honest characterisation: with an under-converged sweep the creep magnitude is not a smooth function of the parameters, so there is nothing useful to tune. The way to a smaller number is to converge harder, not to search.</p>
-
-<figure class="plot"><div id="fig-mu" class="plotbox"></div>
-<figcaption>The same grasp as the cube's friction coefficient is lowered from 1.2. The finger pads stay at 1.0 throughout. A missing point means the cube was not held.</figcaption></figure>
-
-<p>The friction sweep shows the combination rule from the other side. Dropping the cube from 1.2 to 0.2 quadruples FeatherPGS's creep, from 0.72&nbsp;mm to 2.82&nbsp;mm, and leaves SolverMuJoCo completely unmoved at 0.21&nbsp;mm. Part of that is the rule: MuJoCo takes the maximum of the two coefficients, so the 1.0 finger pads dominate and the edit is invisible to it, while FeatherPGS averages and the effective coefficient falls from 1.1 to 0.6. The rest is that FeatherPGS's grasp is friction-limited in this range and MuJoCo's is not. Both hold the cube at every value tested, so this is about margin rather than failure &mdash; but a material change that one solver ignores and the other responds to fourfold is the kind of thing that makes a model feel untrustworthy.</p>
-
-<div class="callout good" style="margin-top:30px">
-<h3>What to use today</h3>
-<p>Nothing on this page required tuning a contact parameter. The only settings that had to be chosen were structural &mdash; a solve mode that can hold the scene's constraint rows, a row budget large enough to hold them, and an execution flag that lets the frame be captured. Friction, compliance, Baumgarte and the regularisation term were all left at their defaults.</p>
-<div class="codeblock" style="margin-top:12px">
-<div class="code-head"><code>the configuration behind every measurement here</code><button class="copy" type="button">Copy</button></div>
-<pre><code>solver = newton.solvers.SolverFeatherPGS(
-    model,
-    pgs_mode="matrix_free",       # "split" cannot build enough rows for this scene
-    dense_max_constraints=256,    # scene peak is 201; the default 32 drops most of it
-    mf_max_constraints=4096,
-    pgs_iterations=12,            # 32 buys 0.82 mm -> 0.32 mm at proportional cost
-    double_buffer=False,          # required for CUDA graph capture
-    # pgs_beta, pgs_cfm, friction and compliance all left at their defaults
-)
-# and supply the arm's gravity torque through control.joint_f</code></pre>
-</div>
-</div>
-</section>
-
-<section id="coupon">
-<div class="kicker">Minimal reproduction</div>
-<h2>Two pads and one object, with the arm removed entirely.</h2>
-
-<p class="lead">Stripping the scene down to two pads and one object is the right way to look at creep and slip: no IK, no gravity compensation, no seven-joint arm. The earlier report's coupon is re-run here byte for byte, and it still shows the sliding it was built to show &mdash; but not the catastrophe it reported. Understanding the difference turns out to matter more than the geometry it was comparing.</p>
-
-<div class="grid2">
-<div class="card">
-<h3>Static pads</h3>
-<p>The pads are welded to the world and the object is placed between them with a fixed geometric overlap, then shaken by a body force. This is the earlier report's shape. It has one attractive property &mdash; nothing to tune but the overlap &mdash; and one fatal one.</p>
-</div>
-<div class="card">
-<h3>Driven pads</h3>
-<p>The pads are the fingers of a four-joint carrier that closes on the object, lifts it off a support, and shakes it, all position driven. Grip force comes from the finger drive rather than from geometry. Four joints, four links, one object, and a fixed support to start from.</p>
-</div>
-</div>
-
-<h3 style="margin-top:30px">The original reproducer, unchanged</h3>
-<p>A 40&nbsp;mm cube pinched between two pads welded to the world with a 0.5&nbsp;mm overlap, gravity pulling down, an oscillating body force shaking it sideways for ten seconds. Same dimensions, same materials, same solver settings, same twelve iterations. The only thing added is that the height is recorded every frame instead of only at the end.</p>
-
-<figure class="plot"><div id="fig-legacy-slide" class="plotbox"></div>
-<figcaption>How far the cube has slid below its starting height, through the whole ten-second shake. This is the sliding the earlier coupon was built to show. Under FeatherPGS the primitive box creeps a fraction of a millimetre and stops; the triangle mesh keeps going.</figcaption></figure>
-
-<div class="table-wrap"><table id="tbl-legacy-then-now">
-<thead><tr><th>Same scene, same settings</th><th>Earlier report</th><th>Re-run here</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:22px">The sliding reproduces. The catastrophe does not: the meshed cube never reaches a frame with zero contacts, and it does not fall. What it does is creep steadily downward through the grasp, ending about sixteen times lower than the primitive box in the identical scene. So there is a real geometry dependence here, and it is worth a hard look &mdash; but it is a creep-rate difference of one order of magnitude, not the five the earlier number implied.</p>
-
-
-
-<h3 style="margin-top:30px">What the friction anchors actually do</h3>
-<p>The earlier report's other coupon finding was that friction anchors stop the mesh from being lost but bias the pose. That reproduces cleanly, and the coupon shows why it matters: the bias has a sign.</p>
-
-<figure class="plot"><div id="fig-legacy-anchors" class="plotbox"></div>
-<figcaption>Worst movement out of the starting position in each direction. Two friction anchors take the mesh's downward creep from 10.9&nbsp;mm to 0.07&nbsp;mm &mdash; and replace it with 33&nbsp;mm of travel in the other direction. The shared anchor does the same thing to the box on a smaller scale: 0.69&nbsp;mm down becomes 0.05&nbsp;mm down and 1.8&nbsp;mm up.</figcaption></figure>
-
-<p>"It no longer falls" is not the same as "it is held". Both anchor options convert a downward slide into an upward push, which is what you would expect from a friction row that carries a positional bias rather than only a velocity target. A grasp that slowly extrudes the object upward out of the fingers will pass a drop test and fail everything else.</p>
-
-<h3 style="margin-top:34px">The static coupon has no grip force to find</h3>
-<p>Under a hard contact model, two immovable pads and a fixed overlap do not define a squeeze. Push the object equally hard from both sides and it does not move, whether you push with one newton or a thousand. Nothing in the object's motion distinguishes them, so nothing in the solve pins the pair of forces down: both contacts only say "do not penetrate", and neither has a compliance that would let a penetration depth stand in for a force. A compliant contact model does not have this problem, which is why SolverMuJoCo is untroubled by the same scene.</p>
-<p>What FeatherPGS produces instead comes from the position-correction term, which asks for the penetration to be removed within one step &mdash; from both sides at once, in a sweep that visits one row and then the other. The result is an object that gains energy in proportion to how hard it is nominally squeezed.</p>
-
-<figure class="plot"><div id="fig-legacy-iters" class="plotbox"></div>
-<figcaption>The same coupon, the same geometry, only the iteration count changed. The box's excursion moves by a factor of seven and never quite settles; the mesh's does not even keep its direction &mdash; at four and thirty-two iterations the cube drifts upward, at twelve it slides down.</figcaption></figure>
-
-<p>That is also the answer to why the collision representation matters so much here and so little once the pads are driven. The box presents eight contact points and the mesh eleven, and since the squeeze force is undetermined the two land on different values of it; the friction capacity that follows differs with them. Nothing about triangles is at fault. The scene simply has no answer for either representation to converge to, so each one converges to an accident.</p>
-
-<p>Sweeping the one thing the coupon lets you set makes the same point from the other side. This is the same two-pad shape with the overlap varied rather than fixed at the original 0.5&nbsp;mm:</p>
-
-<figure class="plot"><div id="fig-coupon-static" class="plotbox"></div>
-<figcaption>How far the object slides down through the grasp, against how hard it is squeezed, in the static coupon. Squeezing harder makes FeatherPGS worse, and past a threshold the object is ejected outright. SolverMuJoCo is unaffected because its contacts are compliant, so an overlap really is a force there. Points at the bottom of the axis are at the 1&nbsp;&micro;m floor, meaning no measurable slip.</figcaption></figure>
-
-<div class="table-wrap"><table id="tbl-coupon-static">
-<thead><tr><th>Overlap per side</th><th>FeatherPGS, box</th><th>FeatherPGS, mesh</th><th>SolverMuJoCo, box</th><th>SolverMuJoCo, mesh</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:22px">The scaling gives the mechanism away. Doubling the overlap from 1&nbsp;mm to 2&nbsp;mm doubles the distance the object is thrown, and doubles the sideways component with it. That is the position-correction term. It targets a separation velocity proportional to <code class="inline">beta &middot; penetration / dt</code>, so it grows with the overlap and, at a one-millisecond step, a millimetre of squeeze asks for a fifth of a metre per second &mdash; applied on both sides, every substep. The next section pins this down directly.</p>
-
-<h3 style="margin-top:30px">Where the energy comes from</h3>
-<p>Take the shake away, take gravity away, and simply place the object between the pads. Nothing in the scene is trying to move it. It moves anyway:</p>
-
-<div class="table-wrap"><table id="tbl-coupon-mech">
-<thead><tr><th>Overlap per side</th><th>Peak speed, FeatherPGS</th><th>Drift, FeatherPGS</th><th>Drift, SolverMuJoCo</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:20px">Turning the position-correction factor down settles it completely. At the same 1&nbsp;mm overlap:</p>
-
-<div class="table-wrap"><table id="tbl-coupon-beta">
-<thead><tr><th>pgs_beta</th><th>Peak speed</th><th>Drift over one second</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:20px">At <code class="inline">pgs_beta = 0</code> the object does not move at all &mdash; the drift is exactly zero, not small. Every millimetre the object travels in this coupon comes from the position-correction term, and it grows far faster than linearly in that term because the push feeds back into the next step's penetration. The two opposed rows would cancel if they were solved together; they are not, because the Gauss-Seidel sweep visits one and then the other.</p>
-
-<p>The usual remedy for this is a compliance term on the contact, which turns the penetration back into a force. FeatherPGS has one &mdash; <code class="inline">dense_contact_compliance</code> &mdash; but it does not reach here. Sweeping it from zero to 1e-4 over the ejecting coupon produces <b>bit-identical results</b>, because the contacts between a free object and world-fixed pads land on the free-body row family, whose diagonal is seeded with <code class="inline">pgs_cfm</code> and nothing else. A gripper's contacts land on a different family that does have the term.</p>
-
-<div class="note bad"><b>What the 44.7-metre number was.</b> The earlier report ran the coupon above and recorded the meshed cube losing contact at 7.18&nbsp;s and ending 44.7&nbsp;m below its start. Re-running that scene unchanged, the cube never reaches a frame with zero contacts at all &mdash; so the fall no longer happens, and the 44.7&nbsp;m was the free fall that followed the loss rather than a measure of the contact defect. What survives is the creep, and the creep is real. What the overlap sweep adds is why it is so sensitive to everything: at 1&nbsp;mm of squeeze this coupon does not creep at all, it ejects.</div>
-
-<h3 style="margin-top:30px">It does not even repeat on the same machine</h3>
-<p>One more piece of evidence sits in the comparison table above. The primitive box slid 0.163&nbsp;mm in the earlier report and 0.686&nbsp;mm here &mdash; same commit, same solver settings, same scene, four times the creep, different GPU. The execution options are not responsible, and neither is anything else in the configuration:</p>
-
-<div class="table-wrap"><table id="tbl-legacy-db">
-<thead><tr><th>Comparison</th><th>Trajectory difference</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:20px">The box is bit-identical under every combination of double buffering and parallel streams, and bit-identical when simply run again. The mesh is not: two runs with <b>nothing changed at all</b> agree until frame 573 and then part company, ending 1.9&nbsp;mm apart. That also explains the one flag combination that looked significant &mdash; it was run-to-run noise, not the flag.</p>
-
-<p>Contact rows are claimed with an atomic counter, so the order the Gauss-Seidel sweep visits them in is whatever order the GPU happened to schedule. On a well-posed problem that is a rounding-level difference. Here it decides the answer, which is why the same code gives 0.163&nbsp;mm on one machine and 0.686&nbsp;mm on another, and why the mesh cannot even agree with itself.</p>
-
-<h3 style="margin-top:34px">The driven coupon is well posed, and both geometries hold</h3>
-<p>Replace the welded pads with a real finger drive and the grip force becomes a defined quantity: stiffness times how far past the surface the finger is commanded. Nothing else about the contact model changes.</p>
-
-<figure class="plot"><div id="fig-coupon-driven" class="plotbox"></div>
-<figcaption>The same object, the same shake, held by position-driven fingers. Squeezing harder now behaves the way it should, and the triangle mesh tracks the primitive box.</figcaption></figure>
-
-<div class="table-wrap"><table id="tbl-coupon-driven">
-<thead><tr><th>Commanded squeeze</th><th>FeatherPGS, box</th><th>FeatherPGS, mesh</th><th>SolverMuJoCo, box</th><th>SolverMuJoCo, mesh</th></tr></thead>
-<tbody></tbody>
-</table></div>
-<p style="margin-top:12px;color:#93a6b8;font-size:13.5px">Each cell is <b>downward slip / sideways lag</b> in millimetres. Downward slip is the object sliding through the grasp; sideways lag is it trailing the shake, which is inertia rather than slipping.</p>
-
-<p style="margin-top:22px">From one millimetre of squeeze upward, FeatherPGS holds the object to 0.23&nbsp;mm of sideways lag and essentially zero downward slip, and it does not care whether the object is a primitive box or a triangle mesh. SolverMuJoCo on the same coupon needs four millimetres of squeeze to get close, and at one millimetre it lets the object slide 21&nbsp;mm. That ordering is the right way round: holding an object firmly with a modest squeeze is exactly what a hard contact model is for, and here it delivers.</p>
-
-<div class="note"><b>One caveat on the comparison.</b> The SolverMuJoCo side of this coupon runs the coupon's own defaults, not the tuned contact settings the full arm scene uses. The full-scene comparison earlier on this page is the fair one. What this shows is how much of MuJoCo's grasp quality comes from that tuning &mdash; and how little FeatherPGS needs.</div>
-
-<div class="grid2">
-<figure class="plot"><div id="fig-coupon-iters" class="plotbox"></div>
-<figcaption>Solver iterations on the driven coupon. Eight is already enough here.</figcaption></figure>
-<figure class="plot"><div id="fig-coupon-mu" class="plotbox"></div>
-<figcaption>Friction coefficient on every surface, driven coupon. FeatherPGS shows no measurable slip anywhere in this range.</figcaption></figure>
-</div>
-
-<p style="margin-top:22px">The coupon converges much faster than the scene it stands in for. Eight iterations already puts downward slip at the noise floor here, while the full arm scene &mdash; sixty to seventy contacts instead of eight &mdash; is still improving out past twenty. That is the one thing to be careful about when reasoning from a minimal reproduction: it will tell you what is wrong, but it will not tell you how much solver budget the real scene needs.</p>
-
-<div class="table-wrap"><table id="tbl-coupon-dt">
-<thead><tr><th>Physics time step</th><th>FeatherPGS</th><th>SolverMuJoCo</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:22px">The time step is where the coupon says something the full scene could not. On this grasp FeatherPGS still holds the object at a <b>16.7&nbsp;ms</b> step &mdash; one physics step per control frame &mdash; with 1.6&nbsp;mm of slip, while SolverMuJoCo loses it beyond about 2&nbsp;ms. That is the hard contact model doing exactly what it is advertised to do. In the full arm scene the two solvers instead failed together at 16.7&nbsp;ms, because there the limit came from the arm and the controller rather than from the grasp. Strip those away and the contact model's own headroom is much larger than the scene suggested.</p>
-
-<div class="video-grid">
-<article class="video-card">
-  <video src="media/legacy_static_mesh.mp4" poster="media/legacy_static_mesh.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>The original coupon, triangle mesh</h3><p>The earlier report's scene, unchanged. The cube never loses contact; it slides steadily down through the pads.</p></div>
-</article>
-<article class="video-card">
-  <video src="media/legacy_static_box.mp4" poster="media/legacy_static_box.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>The original coupon, primitive box</h3><p>The same scene with only the collider swapped. It settles within a fraction of a millimetre and stays.</p></div>
-</article>
-<article class="video-card">
-  <video src="media/coupon_static_eject.mp4" poster="media/coupon_static_eject.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>Static pads, squeezed 2 mm</h3><p>The same coupon shape at a larger overlap. Nothing is moving the pads; the object is thrown out of the gap by the position-correction term alone.</p></div>
-</article>
-<article class="video-card">
-  <video src="media/coupon_driven_box.mp4" poster="media/coupon_driven_box.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>Driven pads, primitive box</h3><p>Close, lift off the support, shake. The same contact model, with a grip force that exists.</p></div>
-</article>
-<article class="video-card">
-  <video src="media/coupon_driven_mesh.mp4" poster="media/coupon_driven_mesh.jpg" autoplay loop muted playsinline></video>
-  <div class="video-copy"><h3>Driven pads, triangle mesh</h3><p>The identical cube as a triangle mesh, in the identical scene.</p></div>
-</article>
-</div>
-
-<div class="note"><b>What the coupon is good for.</b> Built the second way it is a genuinely useful instrument &mdash; it isolates contact and friction from the controller, runs in seconds, and reproduces the behaviour of the full scene. Built the first way it produces dramatic numbers that say nothing about the solver's grasping behaviour. If you want a minimal grasp reproduction, drive the pads.</div>
-</section>
-
-<section id="timestep">
-<div class="kicker">Time step and speed</div>
-<h2>FeatherPGS tolerates large time steps as well as SolverMuJoCo, and costs about three times as much per step.</h2>
-
-<p class="lead">The control loop stays at 60&nbsp;Hz; only the number of physics substeps changes. Accuracy and speed are measured separately, and speed is measured with the physics loop inside a captured CUDA graph so it reflects the solver rather than Python.</p>
-
-<div class="grid2">
-<figure class="plot"><div id="fig-substeps-drift" class="plotbox"></div>
-<figcaption>The two solvers converge as the step grows. At 8.3&nbsp;ms they are within 5% of each other. Both fail at 16.7&nbsp;ms &mdash; FeatherPGS drops the cube, SolverMuJoCo never completes the grasp.</figcaption></figure>
-<figure class="plot"><div id="fig-substeps-speed" class="plotbox"></div>
-<figcaption>Speed for the same runs, one environment. Both are dominated by fixed per-substep cost: roughly 0.91&nbsp;ms for FeatherPGS and 0.32&nbsp;ms for SolverMuJoCo, nearly independent of substep count.</figcaption></figure>
-</div>
-
-<div class="table-wrap"><table id="tbl-substeps">
-<thead><tr><th>Time step</th><th>FeatherPGS creep</th><th>SolverMuJoCo creep</th><th>FeatherPGS per frame</th><th>SolverMuJoCo per frame</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:22px">The per-substep cost being flat across a 16&times; change in substep count is the whole story: at one environment this is a latency-bound workload, not a compute-bound one. A single 9-DOF arm produces tens of kernel launches per substep, almost all with grids of one to thirty-two threads. The Cholesky factorisation of the 9&times;9 mass matrix runs on <b>one thread</b> &mdash; <code class="inline">small_dof_threshold=12</code> selects the serial kernel below thirteen degrees of freedom &mdash; and the whole Gauss-Seidel solve is launched as one tile of thirty-two threads per world, in both the split and matrix-free modes. There is nothing wrong with that at scale; it is simply the wrong shape for one arm.</p>
-
-<p>Three costs are avoidable at any scale:</p>
-<ul>
-<li><b>Three debug copies run on every step in every configuration.</b> They are not behind a flag, and nothing in the repository ever reads the buffers they write.</li>
-<li><b>Twenty-one separate zero-fills</b> alongside twenty-four kernel launches in the contact-row build stage, ten of the fills only mattering in a mode that is off by default.</li>
-<li><b>Thirteen scoped-timer objects per step</b>, plus the generator chain of the parallel-stream dispatch, which short-circuits to nothing when there is only one articulation size but is still constructed at every call site.</li>
-</ul>
-
-<div class="codeblock">
-<div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:5046 &mdash; ungated, every step</code><button class="copy" type="button">Copy</button></div>
-<pre><code>self._stage3_compute_v_hat(state_in, state_aug, dt)
-self._clamp_rigid_velocity_limits(self.v_hat)
-wp.copy(self._debug_stage3_qd_work, self.qd_work)
-wp.copy(self._debug_stage3_joint_qdd, state_aug.joint_qdd)
-wp.copy(self._debug_stage3_v_hat, self.v_hat)</code></pre>
-</div>
-
-<h3 style="margin-top:34px">Where the time is best spent</h3>
-<p>There are three ways to spend more time on the same second of simulation: smaller substeps, more solver iterations per substep, or &mdash; on an unmerged branch &mdash; frozen inner substeps. Put on the same axes, two of them land on the same frontier and the third does not.</p>
-<figure class="plot"><div id="fig-inner" class="plotbox"></div>
-<figcaption>What each knob buys per millisecond. Down and to the left is better. Adding solver iterations at a small time step and adding substeps at a fixed iteration count land on roughly the same frontier; the frozen inner substeps sit above it, and the points marked with a cross produced no usable grasp at all.</figcaption></figure>
-<div class="table-wrap"><table id="tbl-iters">
-<thead><tr><th>Solver iterations</th><th>Grasp</th><th>Per frame</th><th>Speed</th></tr></thead>
-<tbody></tbody>
-</table></div>
-<p style="margin-top:22px">Iterations are the cleanest lever: going from the default twelve to twenty cuts peak creep from 0.72&nbsp;mm to 0.31&nbsp;mm, and past thirty-two there is nothing left to buy. (This sweep uses a shorter run than the headline figures, so its numbers sit slightly below them; the comparison within the table is like for like.) The one wrinkle is that convergence is not monotone &mdash; eight iterations is worse than four and much worse than twelve. Under-converged Gauss-Seidel does not simply give a slightly softer grasp; it gives a different one, and where a particular iteration count lands is not something you can reason about from the outside. That is an argument for running enough iterations to be past the noisy region rather than for tuning the number.</p>
-<h4 style="margin-top:30px">The unmerged lever, and why it does not help here</h4>
-<p>An unmerged FeatherPGS branch adds <code class="inline">pgs_inner_substeps</code>: several small position substeps inside one solver step, reusing the mass-matrix factorisation and the contact Jacobians instead of rebuilding them. That attacks exactly the cost that dominates here, so it looks like the obvious route to a big step that is still accurate. On this scene it is not.</p>
-<div class="table-wrap"><table id="tbl-inner">
-<thead><tr><th>Solver &times; inner substeps</th><th>Effective time step</th><th>Grasp</th><th>Per frame</th><th>Speed</th></tr></thead>
-<tbody></tbody>
-</table></div>
-<p style="margin-top:22px">Two solver substeps with no inner loop gives 3.43&nbsp;mm at 1.95&nbsp;ms. Adding four frozen inner substeps &mdash; a four-times-smaller integration step &mdash; gives 3.51&nbsp;mm at 5.82&nbsp;ms. Refining the integration changed nothing, because the error is not in the integration. It is in the contact basis, which the frozen loop deliberately does not refresh. At the same effective step size, plain substepping gives 1.30&nbsp;mm.</p>
-
-<p>The one place it does earn its keep is rescuing a step that is too large to work at all: at one solver substep the plain solve drops the cube, and four frozen inner substeps turn that into a 7.47&nbsp;mm hold at 5.9&times; realtime. But the behaviour is not monotone &mdash; eight inner substeps loses the grasp entirely and sixteen drops the cube again &mdash; which is what you would expect when positions are advanced far from where the Jacobians were built. As a speed lever for grasping it needs the contact basis refreshed on some cadence, not frozen for the whole step.</p>
+<figcaption>Contact points between the pads and the cube during the shake. The corrected run keeps eighteen to twenty-two throughout; the 100&times; run loses contact repeatedly and then permanently.</figcaption></figure>
 </section>
 
 <section id="rows">
-<div class="kicker">Constraint rows</div>
-<h2>The scene needs 201 constraint rows. The default is 32, and going over is silent.</h2>
+<div class="kicker">Issue 2</div>
+<h2>The contact-row budget is 32. The arm scene needs 201, and going over is silent.</h2>
 
 <p class="lead">Every contact between the arm and anything else becomes one normal row plus two friction rows in a fixed-size per-world buffer. Drive rows and joint-limit rows are allocated from the same buffer first, so contacts are the first thing sacrificed when it fills.</p>
 
-<p>Turning on the solver's own high-water telemetry over a full grasp-and-shake gives the real requirement: <b>201 dense rows</b> at peak, from up to <b>71 simultaneous contacts</b>. The constructor default is <code class="inline">dense_max_constraints=32</code>, which is ten contacts. The gap is not a matter of degree &mdash; below 96 rows the gripper cannot pick the cube up at all.</p>
+<p>The solver's own high-water telemetry gives the real requirement over a full grasp and shake: <b>201 dense rows</b> at peak, from up to <b>71 simultaneous contacts</b>. The constructor default is <code class="inline">dense_max_constraints=32</code>, which is ten contacts. The gap is not a matter of degree &mdash; below 96 rows the gripper cannot pick the cube up at all.</p>
 
 <figure class="plot"><div id="fig-budget" class="plotbox"></div>
-<figcaption>Peak creep against the row budget. At 64 rows and below the grasp does not happen at all &mdash; the gripper closes, the arm lifts and shakes, and the cube stays on the table. At 96 rows and above it is sub-millimetre. Nothing in the output indicates that anything was discarded.</figcaption></figure>
+<figcaption>Peak creep against the row budget. At 64 rows and below the grasp does not happen: the gripper closes, the arm lifts and shakes, and the cube stays on the table. At 96 rows and above it is sub-millimetre. Nothing in the output indicates that anything was discarded.</figcaption></figure>
 
 <h3 style="margin-top:30px">What overflow does</h3>
 <p>Slots are claimed with an atomic counter. A contact that does not fit rolls the counter back and marks itself dead:</p>
@@ -457,15 +208,14 @@ wp.copy(self._debug_stage3_v_hat, self.v_hat)</code></pre>
             return</code></pre>
 </div>
 
-<p>Three consequences follow from those seven lines:</p>
 <ul>
 <li><b>The dropped contact contributes nothing at all</b> &mdash; no normal row, no friction, no force. A finger simply stops touching the cube for that step.</li>
-<li><b>There is no warning.</b> The entire 15,760-line solver contains no <code class="inline">warnings.warn</code> and no logging. The only way to find out is to opt into <code class="inline">row_watermark=True</code> and read <code class="inline">constraint_row_watermarks()</code> yourself.</li>
-<li><b>Which contacts survive is decided by an atomic race.</b> Nothing orders them by penetration depth or by pair. The rollback also means a later single-slot contact can succeed after an earlier three-slot contact failed. The same race also fixes the order the solve sweeps the rows in. For the arm scene, and for the primitive-box coupon, repeated runs came out bit-identical &mdash; but the meshed coupon does <b>not</b> repeat: two runs with nothing changed diverge partway through and end 1.9&nbsp;mm apart. No contact keeps a stable row index between steps either, which is why the dense path has no identity-matched warm start.</li>
+<li><b>There is no warning.</b> The entire 15,760-line solver contains no <code class="inline">warnings.warn</code> and no logging. The only way to find out is to opt into <code class="inline">row_watermark=True</code>.</li>
+<li><b>Which contacts survive is decided by an atomic race</b>, which also fixes the order the solve sweeps the rows in. Nothing orders them by penetration depth or by pair, and no contact keeps a stable row index between steps &mdash; which is why the dense path has no identity-matched warm start.</li>
 </ul>
 
-<h3 style="margin-top:30px">And the row budget is expensive to raise on the default solve path</h3>
-<p>The default <code class="inline">pgs_kernel="tiled_row"</code> stages the whole Delassus matrix in <i>static</i> shared memory:</p>
+<h3 style="margin-top:30px">And the budget is expensive to raise on the default solve mode</h3>
+<p>The default <code class="inline">pgs_kernel="tiled_row"</code> stages the whole constraint matrix in <i>static</i> shared memory:</p>
 
 <div class="codeblock">
 <div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:8650</code><button class="copy" type="button">Copy</button></div>
@@ -480,7 +230,7 @@ __shared__ int   s_parent[TILE_M];
 __shared__ float s_mu[TILE_M];</code></pre>
 </div>
 
-<p>That is <code class="inline">4&middot;M(M+1)/2 + 6&middot;4M = 2M&sup2; + 26M</code> bytes &mdash; quadratic in the row budget. The formula matches both machines this has been measured on to within 128&nbsp;bytes of alignment padding. The per-block limit for a static allocation is device-dependent, so the ceiling moves with the GPU:</p>
+<p>That is <code class="inline">2M&sup2; + 26M</code> bytes &mdash; quadratic in the row budget, and matching both machines this has been measured on to within 128 bytes of alignment padding. The per-block limit for a static allocation is device-dependent, so the ceiling moves with the GPU:</p>
 
 <div class="table-wrap"><table>
 <thead><tr><th>dense_max_constraints</th><th>Shared memory needed</th><th>Ampere (48 KiB)</th><th>This machine (~99 KiB)</th></tr></thead>
@@ -488,101 +238,166 @@ __shared__ float s_mu[TILE_M];</code></pre>
 <tr><td class="num">32 <span style="color:#9eb0c2">(default)</span></td><td class="num">2.8 KiB</td><td>loads &mdash; but only 10 contacts</td><td>loads &mdash; only 10 contacts</td></tr>
 <tr><td class="num">128</td><td class="num">35.2 KiB</td><td>loads</td><td>loads</td></tr>
 <tr><td class="num">150</td><td class="num">47.8 KiB</td><td>loads &mdash; the ceiling here</td><td>loads</td></tr>
-<tr><td class="num">201 <span style="color:#ffbd59">(what this scene needs)</span></td><td class="num">84.0 KiB</td><td><span style="color:#ff6b7a">will not load</span></td><td>loads, at 0.11&times; realtime</td></tr>
+<tr><td class="num">201 <span style="color:#ffbd59">(what the scene needs)</span></td><td class="num">84.0 KiB</td><td><span style="color:#ff6b7a">will not load</span></td><td>loads, at 0.11&times; realtime</td></tr>
 <tr><td class="num">256</td><td class="num">134.5 KiB</td><td><span style="color:#ff6b7a">will not load</span></td><td><span style="color:#ff6b7a">will not load</span></td></tr>
 </tbody>
 </table></div>
 
-<p style="margin-top:18px">Nothing checks any of this at construction. The solver already has a shared-memory estimator with a helpful error message, but it is only wired into a different kernel family; the PGS kernel is built straight from <code class="inline">dense_max_constraints</code> with no device query. The failure arrives as a CUDA module-load error inside the first step. And even where it does fit, a quadratic tile is the wrong shape: at 201 rows the solve is 84&nbsp;KiB of shared memory driven by a single warp, and the whole run drops to about a third of the speed of the matrix-free path.</p>
+<p style="margin-top:18px">Nothing checks any of this at construction. The solver already has a shared-memory estimator with a helpful error message, but it is wired into a different kernel family; the PGS kernel is built straight from <code class="inline">dense_max_constraints</code> with no device query, and the failure arrives as a CUDA module-load error inside the first step.</p>
 
-<div class="note warning"><b>The escape hatch.</b> <code class="inline">pgs_mode="matrix_free"</code> uses a different generated kernel with an O(M) footprint and does build at 256 rows &mdash; which is why every measurement on this page uses it. That makes matrix-free mode effectively mandatory for any articulated scene with a real contact set, even though the constructor default is <code class="inline">"split"</code>. Either the default should change, or the tiled path should move its staging to dynamic shared memory.</div>
+<div class="note warning"><b>The escape hatch.</b> <code class="inline">pgs_mode="matrix_free"</code> uses a generated kernel with an O(M) footprint and does build at 256 rows &mdash; which is why every measurement here uses it. That makes matrix-free mode effectively mandatory for any articulated scene with a real contact set, even though the constructor default is <code class="inline">"split"</code>. Either the default should change, or the tiled path should move its staging to dynamic shared memory.</div>
 
-<h3 style="margin-top:34px">The same scene on the constructor's own defaults</h3>
-<p>Every other measurement here uses the configuration the earlier report settled on. This is what the library gives you if you construct <code class="inline">SolverFeatherPGS(model)</code> and change nothing, with the gravity torque supplied so the task can still run:</p>
-
+<h3 style="margin-top:34px">The arm scene on the constructor's own defaults</h3>
 <div class="table-wrap"><table id="tbl-defaults">
-<thead><tr><th>Configuration</th><th>Mode</th><th>Rows</th><th>Peak creep</th><th>Solve speed</th></tr></thead>
+<thead><tr><th>Configuration</th><th>Mode</th><th>Rows</th><th>Result</th><th>Speed</th></tr></thead>
 <tbody></tbody>
 </table></div>
 
-<p style="margin-top:20px">Two things fall out of this. On its own defaults the solver never picks the cube up, entirely because of the 32-row budget, and it does so quietly &mdash; the arm runs the full scripted sequence over an object that never moves. And raising the split path's budget until it fits the scene costs about three times the wall-clock time, because a 201-row tile is 84&nbsp;KiB of shared memory driven by a single warp. Matrix-free mode is not an optimisation here; it is the only configuration that is both correct and fast.</p>
+<p style="margin-top:20px">On its own defaults the solver never picks the cube up, entirely because of the 32-row budget, and it does so quietly &mdash; the arm runs the full scripted sequence over an object that never moves. Raising the split path's budget until it fits costs about three times the wall-clock time, because a 201-row tile is 84&nbsp;KiB of shared memory driven by a single warp. Matrix-free mode is not an optimisation here; it is the only configuration that is both correct and fast.</p>
 </section>
 
-<section id="velocity">
-<div class="kicker">Velocity pass</div>
-<h2>Extra velocity iterations make the grasp worse, because speculative contacts become hard walls.</h2>
+<section id="squeeze">
+<div class="kicker">Issue 3</div>
+<h2>A hard contact model cannot express a squeeze between two immovable surfaces.</h2>
 
-<p class="lead"><code class="inline">pgs_velocity_iterations</code> is the PhysX-style split: solve positions with a Baumgarte bias, then clean up velocities without one. It should improve a grasp. It does the opposite, and the reason is one hard-coded argument.</p>
-
-<p>A contact whose surfaces are still apart has a positive gap <code class="inline">phi</code>. The correct velocity-level constraint for it is "you may close at up to <code class="inline">phi/dt</code>", which is what the position pass builds. The velocity pass rebuilds every right-hand side with the speculative scale forced to zero:</p>
-
-<div class="codeblock">
-<div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:4779</code><button class="copy" type="button">Copy</button></div>
-<pre><code>self._stage4_compute_rhs_world(
-    dt,
-    bias_scale=0.0,
-    contact_speculative_scale=0.0,          # &lt;-- not a parameter
-    joint_limit_speculative_scale=1.0,
-    output=self.rhs_unbiased,
-)
-if self._has_free_rigid_bodies:
-    self._compute_mf_rhs_bias(dt, bias_scale=0.0, speculative_scale=0.0,
-                              output=self.mf_rhs_unbiased)</code></pre>
-</div>
-
-<p>Dropping the Baumgarte bias is correct and is the point of the pass. Dropping the speculative term is not: the constraint becomes "you may not approach at all", applied to pairs that are millimetres apart. Every one of them turns into an invisible wall for the duration of the velocity iterations.</p>
-
-<p>The scene's collision gap is 5&nbsp;mm per shape, so during the shake there are typically <b>14 touching contacts and 32 speculative ones</b>. Shrinking the gap by 50&times; so that almost no speculative contacts exist removes the regression and lets the velocity pass do what it is supposed to:</p>
-
-<div class="table-wrap"><table id="tbl-spec">
-<thead><tr><th>Configuration</th><th>Speculative contacts live</th><th>Peak creep</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<div class="note bad"><b>The fix is one argument.</b> The velocity pass should keep <code class="inline">contact_speculative_scale=1.0</code>, matching what the position pass already does and what the constraint actually means. As written, the option cannot be used on any scene with a non-trivial collision gap &mdash; which is the default configuration of every Newton scene.</div>
-</section>
-
-<section id="capture">
-<div class="kicker">Execution</div>
-<h2>The default execution settings cannot be captured into a CUDA graph.</h2>
-
-<p class="lead">Every speed number on this page depends on capturing the 16-substep physics loop once and replaying it. With FeatherPGS's constructor defaults, that capture fails.</p>
-
-<div class="table-wrap"><table id="tbl-capture">
-<thead><tr><th>use_parallel_streams</th><th>double_buffer</th><th>Capture of a 16-substep frame</th></tr></thead>
-<tbody></tbody>
-</table></div>
-
-<p style="margin-top:20px">The earlier report blamed both options. Only <code class="inline">double_buffer</code> is responsible, and the reason is structural rather than incidental. The double-buffer memset forks onto a private stream and never joins back within the same step:</p>
-
-<div class="codeblock">
-<div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:5530</code><button class="copy" type="button">Copy</button></div>
-<pre><code>if self._memset_stream is not None:
-    with wp.ScopedTimer("DB_Memset", ...):
-        with wp.ScopedStream(self._memset_stream):        # forks the capture
-            for size in self.size_groups:
-                if self._mass_update_global_flag:
-                    self._H_bufs[self._buf_idx][size].zero_()
-                self._J_bufs[self._buf_idx][size].zero_()
-        self._memset_done_event[self._buf_idx] = self._memset_stream.record_event()
-        self._buf_idx = 1 - self._buf_idx</code></pre>
-</div>
-
-<p><code class="inline">wp.ScopedStream</code> synchronises on entry but not on exit. The only join is the <code class="inline">wait_event</code> at the top of the <i>next</i> step, so the final step of any captured region leaves an unjoined fork and capture fails. On the first captured step the event being waited on was also recorded outside the capture, which is separately illegal.</p>
-
-<p>There is a method that would fix the second half of this, <code class="inline">seed_double_buffer_events()</code>. It has <b>zero callers</b> anywhere in the repository, and its docstring says it must be called inside graph capture, which is the opposite of what would work. No test in the repository captures a FeatherPGS <code class="inline">step()</code>, which is why this survived.</p>
-
-<div class="note"><b>Practical effect.</b> Pass <code class="inline">double_buffer=False</code>. On a 9-DOF arm the buffers it double-buffers are about 1.5&nbsp;KB, so the memset it is hiding costs nothing; the extra stream, the per-step event allocation and the extra dependency edges cost strictly more. A capture guard using the existing <code class="inline">device.is_capturing</code> would let the default stay on for the uncaptured case.</div>
-</section>
-
-<section id="smaller">
-<div class="kicker">Remaining gaps</div>
-<h2>Smaller things that will each cost somebody an afternoon</h2>
+<p class="lead">Strip the scene down to two pads and one object and this becomes visible in isolation. It matters because it is the shape most people reach for when writing a minimal grasp test, and it has no answer.</p>
 
 <div class="grid2">
 <div class="card">
+<h3>Static pads</h3>
+<p>Pads welded to the world, the object placed between them with a fixed geometric overlap, then shaken by a body force. Nothing to set but the overlap. Contacts take the free-body row path.</p>
+</div>
+<div class="card">
+<h3>Driven pads</h3>
+<p>The pads are the fingers of a four-joint carrier that closes on the object, lifts it off a support and shakes it, all position driven. Grip force comes from the finger drive. Contacts take the articulated path, which is what a real gripper uses.</p>
+</div>
+</div>
+
+<h3 style="margin-top:34px">Static pads: the object slides, and the rate is arbitrary</h3>
+<p>A 40&nbsp;mm cube, 0.5&nbsp;mm of overlap per side, gravity down, an oscillating force shaking it sideways for ten seconds. It does not fall &mdash; it never reaches a frame with zero contacts &mdash; but it does not stay put either:</p>
+
+<figure class="plot"><div id="fig-static-slide" class="plotbox"></div>
+<figcaption>How far the cube has slid below its starting height. Under FeatherPGS the primitive box creeps a fraction of a millimetre and settles; the identical cube as a triangle mesh keeps going. SolverMuJoCo holds both flat.</figcaption></figure>
+
+<div class="table-wrap"><table id="tbl-static-results">
+<thead><tr><th>Object collider</th><th>Contacts</th><th>Slid down</th><th>Pushed up</th><th>SolverMuJoCo, slid down</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<h3 style="margin-top:30px">Why there is no answer to find</h3>
+<p>Push the object equally hard from both sides and it does not move, whether you push with one newton or a thousand. Nothing in its motion distinguishes them, so nothing in the solve pins the pair of forces down: both contacts only say "do not penetrate", and neither has a compliance that would let a penetration depth stand in for a force. A compliant contact model does not have this problem, which is why SolverMuJoCo is untroubled by the same scene.</p>
+
+<p>What FeatherPGS produces instead comes from the position-correction term, which asks for the penetration to be removed within one step &mdash; from both sides at once, in a sweep that visits one row and then the other. Three measurements pin that down.</p>
+
+<p><b>First</b>, the answer moves with the iteration count, on fixed geometry:</p>
+
+<figure class="plot"><div id="fig-static-iters" class="plotbox"></div>
+<figcaption>Same coupon, same collider, only the iteration count changed. The box's excursion moves by a factor of seven and never quite settles; the mesh's does not even keep its direction &mdash; at four and thirty-two iterations the cube drifts upward, at twelve it slides down.</figcaption></figure>
+
+<p>This is also why the collision representation matters so much here and so little once the pads are driven. The box presents eight contact points and the mesh eleven, so the two land on different values of an undetermined force, and the friction capacity that follows differs with them. Nothing about triangles is at fault; each representation simply converges to a different accident.</p>
+
+<p><b>Second</b>, squeezing harder makes it worse, and past a threshold the object is ejected:</p>
+
+<figure class="plot"><div id="fig-coupon-static" class="plotbox"></div>
+<figcaption>Downward slip against overlap, with the same two-pad shape swept rather than fixed. Points at the bottom of the axis are at the 1&nbsp;&micro;m floor, meaning no measurable slip.</figcaption></figure>
+
+<div class="table-wrap"><table id="tbl-coupon-static">
+<thead><tr><th>Overlap per side</th><th>FeatherPGS, box</th><th>FeatherPGS, mesh</th><th>SolverMuJoCo, box</th><th>SolverMuJoCo, mesh</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:20px"><b>Third</b>, take the shake away, take gravity away, and simply place the object between the pads. Nothing in the scene is trying to move it. It moves anyway:</p>
+
+<div class="table-wrap"><table id="tbl-coupon-mech">
+<thead><tr><th>Overlap per side</th><th>Peak speed, FeatherPGS</th><th>Drift, FeatherPGS</th><th>Drift, SolverMuJoCo</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:20px">Turning the position-correction factor down settles it completely:</p>
+
+<div class="table-wrap"><table id="tbl-coupon-beta">
+<thead><tr><th>pgs_beta</th><th>Peak speed</th><th>Drift over one second</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:20px">At <code class="inline">pgs_beta = 0</code> the object does not move at all &mdash; the drift is exactly zero, not small. Every millimetre it travels comes from the position-correction term, and it grows far faster than linearly in that term because the push feeds back into the next step's penetration. The two opposed rows would cancel if solved together; they are not, because the sweep visits one and then the other.</p>
+
+<p>The usual remedy is a compliance term, which turns the penetration back into a force. FeatherPGS has one &mdash; <code class="inline">dense_contact_compliance</code> &mdash; but it does not reach here. Sweeping it from zero to 1e-4 over the ejecting coupon produces <b>bit-identical results</b>, because contacts between a free object and world-fixed pads land on the free-body row family, whose diagonal is seeded with <code class="inline">pgs_cfm</code> and nothing else. A gripper's contacts land on a different family that does have the term.</p>
+
+<h3 style="margin-top:30px">It does not repeat, either</h3>
+<div class="table-wrap"><table id="tbl-static-repeat">
+<thead><tr><th>Comparison</th><th>Trajectory difference</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:20px">The box is bit-identical under every combination of double buffering and parallel streams, and bit-identical when simply run again. The mesh is not: two runs with <b>nothing changed at all</b> agree until frame 573 and then part company, ending 1.9&nbsp;mm apart. Contact rows are claimed with an atomic counter, so the sweep order is whatever the GPU happened to schedule. On a well-posed problem that is a rounding-level detail. Here it decides the answer.</p>
+
+<h3 style="margin-top:34px">Driven pads: well posed, and the geometry difference collapses</h3>
+<p>Replace the welded pads with a real finger drive and grip force becomes a defined quantity: stiffness times how far past the surface the finger is commanded. Nothing about the contact model changes.</p>
+
+<figure class="plot"><div id="fig-coupon-driven" class="plotbox"></div>
+<figcaption>The same object, the same shake, held by position-driven fingers.</figcaption></figure>
+
+<div class="table-wrap"><table id="tbl-coupon-driven">
+<thead><tr><th>Commanded squeeze</th><th>FeatherPGS, box</th><th>FeatherPGS, mesh</th><th>SolverMuJoCo, box</th><th>SolverMuJoCo, mesh</th></tr></thead>
+<tbody></tbody>
+</table></div>
+<p style="margin-top:12px;color:#93a6b8;font-size:13.5px">Each cell is <b>downward slip / sideways lag</b> in millimetres. Downward slip is the object sliding through the grasp; sideways lag is it trailing the shake, which is inertia rather than slipping.</p>
+
+<p style="margin-top:22px">From one millimetre of squeeze upward, FeatherPGS holds the object with essentially zero downward slip, and it does not care whether the object is a box or a triangle mesh. SolverMuJoCo on the same coupon needs four millimetres of squeeze to get close, and at one millimetre it lets the object slide 21&nbsp;mm. That ordering is the right way round: holding an object firmly with a modest squeeze is what a hard contact model is for.</p>
+
+<div class="grid2">
+<figure class="plot"><div id="fig-coupon-iters" class="plotbox"></div>
+<figcaption>Solver iterations on the driven coupon. Eight is already enough here, where the arm scene is still improving past twenty &mdash; a minimal test converges faster than the thing it stands in for.</figcaption></figure>
+<figure class="plot"><div id="fig-coupon-mu" class="plotbox"></div>
+<figcaption>Friction coefficient on every surface. FeatherPGS shows no measurable slip anywhere in this range.</figcaption></figure>
+</div>
+
+<div class="table-wrap"><table id="tbl-coupon-dt">
+<thead><tr><th>Physics time step</th><th>FeatherPGS</th><th>SolverMuJoCo</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:22px">On this grasp FeatherPGS still holds the object at a <b>16.7&nbsp;ms</b> step &mdash; one physics step per control frame &mdash; with 1.6&nbsp;mm of slip, while SolverMuJoCo loses it beyond about 2&nbsp;ms.</p>
+
+<div class="note"><b>One caveat.</b> The SolverMuJoCo side of these coupons runs the coupon's own defaults, not tuned contact settings. The arm-scene comparison further up is the fair one. What this shows is how much of MuJoCo's grasp quality comes from that tuning, and how little FeatherPGS needs.</div>
+
+<div class="video-grid">
+<article class="video-card">
+  <video src="media/coupon_static_mesh.mp4" poster="media/coupon_static_mesh.jpg" autoplay loop muted playsinline></video>
+  <div class="video-copy"><h3>Static pads, triangle mesh</h3><p>The cube never loses contact; it slides steadily down through the pads.</p></div>
+</article>
+<article class="video-card">
+  <video src="media/coupon_static_box.mp4" poster="media/coupon_static_box.jpg" autoplay loop muted playsinline></video>
+  <div class="video-copy"><h3>Static pads, primitive box</h3><p>The same scene with only the collider swapped. It settles within a fraction of a millimetre and stays.</p></div>
+</article>
+<article class="video-card">
+  <video src="media/coupon_static_eject.mp4" poster="media/coupon_static_eject.jpg" autoplay loop muted playsinline></video>
+  <div class="video-copy"><h3>Static pads, squeezed 2 mm</h3><p>Nothing is moving the pads. The object is thrown out of the gap by the position-correction term alone.</p></div>
+</article>
+<article class="video-card">
+  <video src="media/coupon_driven_box.mp4" poster="media/coupon_driven_box.jpg" autoplay loop muted playsinline></video>
+  <div class="video-copy"><h3>Driven pads</h3><p>Close, lift off the support, shake. The same contact model, with a grip force that exists.</p></div>
+</article>
+</div>
+</section>
+
+<section id="friction">
+<div class="kicker">Issue 4</div>
+<h2>Friction: a biased anchor, a mismatched combination rule, and a better formulation you have to ask for.</h2>
+
+<h3>Friction anchors trade a downward slide for an upward push</h3>
+<p>The friction anchor options stop the static coupon's mesh from sliding, and replace the slide with travel in the other direction:</p>
+
+<figure class="plot"><div id="fig-static-anchors" class="plotbox"></div>
+<figcaption>Worst movement out of the starting position in each direction. Two anchors take the mesh's downward creep from 10.9&nbsp;mm to 0.07&nbsp;mm and add 33&nbsp;mm of upward travel instead. The shared anchor does the same to the box at a smaller scale: 0.69&nbsp;mm down becomes 0.05&nbsp;mm down and 1.8&nbsp;mm up.</figcaption></figure>
+
+<p>"It no longer falls" is not the same as "it is held". Both options convert a downward slide into an upward push, which is what you would expect from a friction row carrying a positional bias rather than only a velocity target. A grasp that slowly extrudes the object upward out of the fingers will pass a drop test and fail everything else.</p>
+
+<div class="grid2" style="margin-top:26px">
+<div class="card">
 <h3><span class="sev med">Medium</span> &nbsp;Two solvers in Newton combine friction differently</h3>
-<p>FeatherPGS forms the pair coefficient as the arithmetic mean of the two shape values. Newton's own MuJoCo path takes the element-wise <b>maximum</b> of the same two numbers. Same model, same materials, different friction cone. In this scene the finger pads use the default 1.0 and the cube is authored at 1.2, so SolverMuJoCo grips at 1.2 and FeatherPGS grips at 1.1 &mdash; small here, but the gap widens with every material mismatch, and nothing in the model tells you which rule is in force.</p>
+<p>FeatherPGS forms the pair coefficient as the arithmetic mean of the two shape values. Newton's own MuJoCo path takes the element-wise <b>maximum</b>. Same model, same materials, different friction cone.</p>
 <div class="codeblock" style="margin-top:12px"><div class="code-head"><code>feather_pgs/kernels.py:3096 &nbsp;vs&nbsp; mujoco/kernels.py:165</code></div><pre><code># FeatherPGS
 mu = 0.0
 mat_count = 0
@@ -600,28 +415,157 @@ resolved_friction = wp.max(geom_friction[worldid, g1], geom_friction[worldid, g2
 </div>
 
 <div class="card">
-<h3><span class="sev med">Medium</span> &nbsp;Friction rows are applied at two different points by default</h3>
-<p>The two friction impulses of a contact pair are equal and opposite but are applied at each body's own witness point. Those points are separated along the normal by the penetration depth, so the pair leaves a residual torque proportional to grip force times penetration &mdash; exactly the geometry of a pinch grasp. <code class="inline">contact_friction_shared_anchor=True</code> puts both at the midpoint and removes it. It defaults to off. Measured effect here is small (0.82&nbsp;mm to 0.80&nbsp;mm) only because the corrected run barely penetrates.</p>
+<h3><span class="sev med">Medium</span> &nbsp;The best friction formulation is not the default</h3>
+<p>Three alternatives to the default lagged cone exist. Two are clearly better for a grasp: bisection cuts peak creep from 0.72&nbsp;mm to 0.44&nbsp;mm, and bisection with the de&nbsp;Sax&eacute;e correction to 0.40&nbsp;mm &mdash; a 44% improvement for about 1.4&times; the solve time, with no other change. The bracketed Newton variant is worse than the default at 0.96&nbsp;mm. None can be selected unless <code class="inline">pgs_mode="matrix_free"</code>, and all are excluded from the propagation contact path entirely.</p>
+</div>
 </div>
 
+<figure class="plot"><div id="fig-mu" class="plotbox"></div>
+<figcaption>The arm scene with the cube's friction coefficient lowered from 1.2, pads left at 1.0. Dropping it to 0.2 quadruples FeatherPGS's creep and leaves SolverMuJoCo completely unmoved &mdash; it takes the maximum, so the pads dominate and the edit is invisible to it. Both hold the cube at every value tested, so this is about margin, not failure.</figcaption></figure>
+
+<div class="note"><b>Third defect, on by default.</b> The two friction impulses of a contact pair are equal and opposite but applied at each body's own witness point, and those are separated along the normal by the penetration depth. The pair leaves a residual torque proportional to grip force times penetration &mdash; exactly the geometry of a pinch grasp. <code class="inline">contact_friction_shared_anchor=True</code> puts both at the midpoint and removes it. Its measured effect in the arm scene is small (0.82&nbsp;mm to 0.80&nbsp;mm) only because that grasp barely penetrates.</div>
+</section>
+
+<section id="velocity">
+<div class="kicker">Issue 5</div>
+<h2>Extra velocity iterations make the grasp worse, because speculative contacts become hard walls.</h2>
+
+<p class="lead"><code class="inline">pgs_velocity_iterations</code> solves positions with a position-correction bias, then cleans up velocities without one. It should improve a grasp. It does the opposite, and the reason is one hard-coded argument.</p>
+
+<p>A contact whose surfaces are still apart has a positive gap. The correct velocity-level constraint for it is "you may close at up to gap over dt", which is what the position pass builds. The velocity pass rebuilds every right-hand side with the speculative scale forced to zero:</p>
+
+<div class="codeblock">
+<div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:4779</code><button class="copy" type="button">Copy</button></div>
+<pre><code>self._stage4_compute_rhs_world(
+    dt,
+    bias_scale=0.0,
+    contact_speculative_scale=0.0,          # &lt;-- not a parameter
+    joint_limit_speculative_scale=1.0,
+    output=self.rhs_unbiased,
+)
+if self._has_free_rigid_bodies:
+    self._compute_mf_rhs_bias(dt, bias_scale=0.0, speculative_scale=0.0,
+                              output=self.mf_rhs_unbiased)</code></pre>
+</div>
+
+<p>Dropping the position bias is correct and is the point of the pass. Dropping the speculative term is not: the constraint becomes "you may not approach at all", applied to pairs that are millimetres apart. Every one turns into an invisible wall for the duration of the velocity iterations.</p>
+
+<p>The arm scene's collision gap is 5&nbsp;mm per shape, so during the shake there are typically <b>14 touching contacts and 32 speculative ones</b>. Shrinking the gap by 50&times; so almost no speculative contacts exist removes the regression and lets the pass do what it is supposed to:</p>
+
+<div class="table-wrap"><table id="tbl-spec">
+<thead><tr><th>Configuration</th><th>Speculative contacts live</th><th>Peak creep</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<div class="note bad"><b>The fix is one argument.</b> The velocity pass should keep <code class="inline">contact_speculative_scale=1.0</code>, matching what the position pass already does and what the constraint means. As written, the option cannot be used on any scene with a non-trivial collision gap &mdash; which is the default configuration of every Newton scene.</div>
+</section>
+
+<section id="timestep">
+<div class="kicker">Performance</div>
+<h2>Large time steps are fine. Single-environment throughput is not.</h2>
+
+<p class="lead">The control loop stays at 60&nbsp;Hz; only the number of physics substeps changes. Speed is measured with the physics loop inside a captured CUDA graph so it reflects the solver rather than Python.</p>
+
+<div class="grid2">
+<figure class="plot"><div id="fig-substeps-drift" class="plotbox"></div>
+<figcaption>The two solvers converge as the step grows. At 8.3&nbsp;ms they are within 5% of each other. Both fail the arm scene at 16.7&nbsp;ms &mdash; but that limit comes from the arm and the controller, not the grasp: the coupon still holds there.</figcaption></figure>
+<figure class="plot"><div id="fig-substeps-speed" class="plotbox"></div>
+<figcaption>Speed for the same runs, one environment. Both are dominated by fixed per-substep cost: roughly 0.91&nbsp;ms for FeatherPGS and 0.32&nbsp;ms for SolverMuJoCo, nearly independent of substep count.</figcaption></figure>
+</div>
+
+<div class="table-wrap"><table id="tbl-substeps">
+<thead><tr><th>Time step</th><th>FeatherPGS creep</th><th>SolverMuJoCo creep</th><th>FeatherPGS per frame</th><th>SolverMuJoCo per frame</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:22px">A flat per-substep cost across a 16&times; change in substep count is the whole story: at one environment this is latency-bound, not compute-bound. A single 9-DOF arm produces tens of kernel launches per substep, almost all with grids of one to thirty-two threads. The Cholesky factorisation of the 9&times;9 mass matrix runs on <b>one thread</b> &mdash; <code class="inline">small_dof_threshold=12</code> selects the serial kernel below thirteen degrees of freedom &mdash; and the Gauss-Seidel solve is launched as one tile of thirty-two threads per world, in both solve modes. There is nothing wrong with that at scale; it is the wrong shape for one arm.</p>
+
+<p>Three costs are avoidable at any scale:</p>
+<ul>
+<li><b>Three debug copies run on every step in every configuration.</b> They are not behind a flag, and nothing in the repository ever reads the buffers they write.</li>
+<li><b>Twenty-one zero-fills alongside twenty-four kernel launches</b> in the contact-row build stage, ten of the fills only mattering in a mode that is off by default.</li>
+<li><b>Thirteen scoped-timer objects per step</b>, plus the generator chain of the parallel-stream dispatch, which short-circuits to nothing when there is only one articulation size but is still constructed at every call site.</li>
+</ul>
+
+<div class="codeblock">
+<div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:5046 &mdash; ungated, every step</code><button class="copy" type="button">Copy</button></div>
+<pre><code>self._stage3_compute_v_hat(state_in, state_aug, dt)
+self._clamp_rigid_velocity_limits(self.v_hat)
+wp.copy(self._debug_stage3_qd_work, self.qd_work)
+wp.copy(self._debug_stage3_joint_qdd, state_aug.joint_qdd)
+wp.copy(self._debug_stage3_v_hat, self.v_hat)</code></pre>
+</div>
+
+<h3 style="margin-top:34px">Where the time is best spent</h3>
+<p>There are three ways to spend more time on the same second of simulation: smaller substeps, more solver iterations per substep, or &mdash; on an unmerged branch &mdash; frozen inner substeps that reuse the mass-matrix factorisation and the contact Jacobians.</p>
+
+<figure class="plot"><div id="fig-inner" class="plotbox"></div>
+<figcaption>What each knob buys per millisecond. Down and to the left is better. Adding iterations and adding substeps land on roughly the same frontier; the frozen inner substeps sit above it, and the points marked with a cross produced no usable grasp.</figcaption></figure>
+
+<div class="table-wrap"><table id="tbl-iters">
+<thead><tr><th>Solver iterations</th><th>Grasp</th><th>Per frame</th><th>Speed</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:22px">Iterations are the cleanest lever: twelve to twenty cuts peak creep from 0.72&nbsp;mm to 0.31&nbsp;mm, and past thirty-two there is nothing left to buy. The wrinkle is that convergence is not monotone &mdash; eight iterations is worse than four and much worse than twelve. Under-converged Gauss-Seidel does not give a slightly softer grasp; it gives a different one. That is an argument for running enough iterations to be past the noisy region rather than for tuning the number.</p>
+
+<h4 style="margin-top:30px">The frozen inner substeps do not help here</h4>
+<div class="table-wrap"><table id="tbl-inner">
+<thead><tr><th>Solver &times; inner substeps</th><th>Effective time step</th><th>Grasp</th><th>Per frame</th><th>Speed</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:22px">Two solver substeps with no inner loop gives 3.43&nbsp;mm at 1.95&nbsp;ms. Adding four frozen inner substeps &mdash; a four-times-smaller integration step &mdash; gives 3.51&nbsp;mm at 5.82&nbsp;ms. Refining the integration changed nothing, because the error is not in the integration; it is in the contact basis, which the frozen loop deliberately does not refresh. At the same effective step size, plain substepping gives 1.30&nbsp;mm.</p>
+
+<p>It does earn its keep rescuing a step too large to work at all: at one solver substep the plain solve drops the cube, and four frozen inner substeps turn that into a 7.47&nbsp;mm hold at 5.9&times; realtime. But the behaviour is not monotone &mdash; eight loses the grasp and sixteen drops the cube again &mdash; which is what you would expect when positions are advanced far from where the Jacobians were built. As a speed lever for grasping it needs the contact basis refreshed on some cadence, not frozen for the whole step.</p>
+</section>
+
+<section id="execution">
+<div class="kicker">Issue 6</div>
+<h2>The default execution settings cannot be captured into a CUDA graph.</h2>
+
+<p class="lead">Every speed number here depends on capturing the 16-substep physics loop once and replaying it. With the constructor defaults, that capture fails.</p>
+
+<div class="table-wrap"><table id="tbl-capture">
+<thead><tr><th>use_parallel_streams</th><th>double_buffer</th><th>Capture of a 16-substep frame</th></tr></thead>
+<tbody></tbody>
+</table></div>
+
+<p style="margin-top:20px">Only <code class="inline">double_buffer</code> is responsible, and the reason is structural. The double-buffer memset forks onto a private stream and never joins back within the same step:</p>
+
+<div class="codeblock">
+<div class="code-head"><code>newton/_src/solvers/feather_pgs/solver_feather_pgs.py:5530</code><button class="copy" type="button">Copy</button></div>
+<pre><code>if self._memset_stream is not None:
+    with wp.ScopedTimer("DB_Memset", ...):
+        with wp.ScopedStream(self._memset_stream):        # forks the capture
+            for size in self.size_groups:
+                if self._mass_update_global_flag:
+                    self._H_bufs[self._buf_idx][size].zero_()
+                self._J_bufs[self._buf_idx][size].zero_()
+        self._memset_done_event[self._buf_idx] = self._memset_stream.record_event()
+        self._buf_idx = 1 - self._buf_idx</code></pre>
+</div>
+
+<p><code class="inline">wp.ScopedStream</code> synchronises on entry but not on exit. The only join is the <code class="inline">wait_event</code> at the top of the <i>next</i> step, so the final step of any captured region leaves an unjoined fork and capture fails. On the first captured step the event being waited on was also recorded outside the capture, which is separately illegal.</p>
+
+<p>A method exists that would fix the second half of this, <code class="inline">seed_double_buffer_events()</code>. It has <b>zero callers</b> anywhere in the repository, and its docstring says it must be called inside graph capture, which is the opposite of what would work. No test in the repository captures a FeatherPGS <code class="inline">step()</code>, which is why this survived.</p>
+
+<div class="note"><b>Practical effect.</b> Pass <code class="inline">double_buffer=False</code>. On a 9-DOF arm the buffers involved are about 1.5&nbsp;KB, so the memset it hides costs nothing; the extra stream, the per-step event allocation and the extra dependency edges cost strictly more. A capture guard using the existing <code class="inline">device.is_capturing</code> would let the default stay on for the uncaptured case.</div>
+</section>
+
+<section id="smaller">
+<div class="kicker">Remaining gaps</div>
+<h2>Smaller things that will each cost somebody an afternoon</h2>
+
+<div class="grid2">
 <div class="card">
 <h3><span class="sev med">Medium</span> &nbsp;A documented friction parameter does nothing</h3>
-<p><code class="inline">friction_smoothing</code> is accepted by the constructor, documented as the Huber-norm delta for friction velocity normalisation, and stored on the instance. No kernel reads it, and <code class="inline">norm_huber</code> appears nowhere in the package. It is live in the sibling Featherstone and semi-implicit solvers, which is where the parameter was copied from. Setting it is a silent no-op.</p>
+<p><code class="inline">friction_smoothing</code> is accepted by the constructor, documented as the Huber-norm delta for friction velocity normalisation, and stored on the instance. No kernel reads it, and <code class="inline">norm_huber</code> appears nowhere in the package. It is live in the sibling Featherstone and semi-implicit solvers, which is where it was copied from. Setting it is a silent no-op.</p>
 </div>
 
 <div class="card">
-<h3><span class="sev med">Medium</span> &nbsp;The best friction formulation is not the default</h3>
-<p>Three alternatives to the default lagged cone exist. Two of them are clearly better for this grasp: bisection cuts peak creep from 0.72&nbsp;mm to 0.44&nbsp;mm, and bisection with the de&nbsp;Sax&eacute;e correction to 0.40&nbsp;mm &mdash; a 44% improvement for about 1.4&times; the solve time, with no other change. The bracketed Newton variant is worse than the default at 0.96&nbsp;mm. None of them can be selected unless <code class="inline">pgs_mode="matrix_free"</code>, and all are excluded from the propagation contact path entirely.</p>
-</div>
-
-<div class="card">
-<h3><span class="sev low">Low</span> &nbsp;Model data the solver ignores</h3>
-<p>None of <code class="inline">joint_damping</code>, <code class="inline">joint_friction</code>, or <code class="inline">joint_target_mode</code> appears anywhere in the package &mdash; zero matches across all three files. SolverMuJoCo reads all three. So passive joint damping silently vanishes, joint dry friction vanishes, and every DOF with a non-zero gain gets both a position and a velocity term regardless of the drive mode the model declares. A model that behaves one way under SolverMuJoCo behaves differently under FeatherPGS for reasons that are invisible from the scene description. (Restitution is unread by both solvers, so that one is not a FeatherPGS gap.)</p>
-</div>
-
-<div class="card">
-<h3><span class="sev low">Low</span> &nbsp;Depenetration is unbounded on the path a gripper uses</h3>
-<p>The matrix-free and propagation paths clamp the Baumgarte push with <code class="inline">rigid_body_max_depenetration_velocity</code>. The dense path &mdash; which is where articulated contacts land under the default <code class="inline">articulated_contact_response="immediate"</code> &mdash; does not take that array as an argument at all. A bad initial grasp pose gets an unbounded correction.</p>
+<h3><span class="sev med">Medium</span> &nbsp;The regularisation term is not compliance</h3>
+<p><code class="inline">pgs_cfm</code> is added to the Gauss-Seidel denominator but not to the residual the sweep drives to zero, so it changes how fast the sweep converges rather than what it converges to. Sweeping it across four orders of magnitude moves peak creep from 0.720&nbsp;mm to 0.788&nbsp;mm. If you were expecting it to soften the contact, it will not.</p>
 </div>
 
 <div class="card">
@@ -630,8 +574,18 @@ resolved_friction = wp.max(geom_friction[worldid, g1], geom_friction[worldid, g2
 </div>
 
 <div class="card">
+<h3><span class="sev low">Low</span> &nbsp;Model data the solver ignores</h3>
+<p>None of <code class="inline">joint_damping</code>, <code class="inline">joint_friction</code>, or <code class="inline">joint_target_mode</code> appears anywhere in the package &mdash; zero matches across all three files. SolverMuJoCo reads all three. Passive joint damping vanishes, joint dry friction vanishes, and every DOF with a non-zero gain gets both a position and a velocity term regardless of the drive mode the model declares.</p>
+</div>
+
+<div class="card">
+<h3><span class="sev low">Low</span> &nbsp;Depenetration is unbounded on the path a gripper uses</h3>
+<p>The matrix-free and propagation paths clamp the position-correction push with <code class="inline">rigid_body_max_depenetration_velocity</code>. The dense path &mdash; where articulated contacts land under the default <code class="inline">articulated_contact_response="immediate"</code> &mdash; does not take that array as an argument at all. A bad initial grasp pose gets an unbounded correction.</p>
+</div>
+
+<div class="card">
 <h3><span class="sev low">Low</span> &nbsp;Current control targets are not supported</h3>
-<p>FeatherPGS reads the deprecated DOF-layout aliases <code class="inline">control.joint_target_pos</code> and <code class="inline">joint_target_vel</code>. Under Newton's coordinate-layout targets those properties raise, so <code class="inline">step()</code> fails outright; under the older layout they emit a deprecation warning on every step. The scene used here has to disable the newer layout to run at all.</p>
+<p>FeatherPGS reads the deprecated DOF-layout aliases <code class="inline">control.joint_target_pos</code> and <code class="inline">joint_target_vel</code>. Under Newton's coordinate-layout targets those properties raise, so <code class="inline">step()</code> fails outright; under the older layout they emit a deprecation warning on every step. Any scene using the newer layout has to turn it off.</p>
 </div>
 </div>
 </section>
@@ -641,21 +595,29 @@ resolved_friction = wp.max(geom_friction[worldid, g1], geom_friction[worldid, g2
 <h2>In order of how much grasp stability each one buys</h2>
 
 <div class="fixlist">
-<div class="fix"><h3>Add per-joint gravity compensation</h3><p>The inverse-dynamics pass already computes the bias containing gravity. A per-DOF opt-in that subtracts the gravity part &mdash; the shape MuJoCo already exposes &mdash; is the single change that turns this scene from "never starts" into "0.82&nbsp;mm". Nothing else on this list comes close.</p></div>
-<div class="fix"><h3>Raise the default row budget and make overflow loud</h3><p>Thirty-two rows is ten contacts; a two-finger grasp on a table already needs seventy. Size the default from the model's contact capacity, and warn once when a contact is dropped. Silent contact deletion is the failure mode most likely to be mistaken for a friction problem.</p></div>
+<div class="fix"><h3>Add per-joint gravity compensation</h3><p>The inverse-dynamics pass already computes the bias containing gravity. A per-DOF opt-in that subtracts the gravity part is the single change that turns the arm scene from "never starts" into 0.82&nbsp;mm. Nothing else on this list comes close.</p></div>
+
+<div class="fix"><h3>Raise the default row budget and make overflow loud</h3><p>Thirty-two rows is ten contacts; a two-finger grasp over a table already needs seventy. Size the default from the model's contact capacity, and warn once when a contact is dropped. Silent contact deletion is the failure mode most likely to be mistaken for a friction problem.</p></div>
+
+<div class="fix"><h3>Give hard contacts a way to express a squeeze</h3><p>Two opposed contacts on a rigid object have no force balance to converge to, so the position-correction term becomes the only thing setting the answer &mdash; and it throws the object out in proportion to the overlap. <code class="inline">dense_contact_compliance</code> already provides a compliance term for the row family a gripper's contacts land on; the free-body family has none, and its diagonal carries <code class="inline">pgs_cfm</code> and nothing else. Until that is filled in, a hard-contact grasp has to be driven, never wedged.</p></div>
+
 <div class="fix"><h3>Make the better friction formulation reachable, and reconcile the combination rule</h3><p>The de&nbsp;Sax&eacute;e bisection cone halves the creep of the default for about 1.4&times; the solve time, but only exists on one solve mode and not on the propagation path. Separately, FeatherPGS averages the two friction coefficients while Newton's own MuJoCo path takes their maximum &mdash; two solvers in one library disagreeing about what a material means. Default the shared friction anchor on while you are there; the torque couple it removes is specific to pinch grasps.</p></div>
-<div class="fix"><h3>Give hard contacts a way to express a squeeze</h3><p>Two opposed contacts on a rigid object have no force balance to converge to, so the position-correction term becomes the only thing setting the answer &mdash; and it throws the object out in proportion to the overlap. A compliance term is the standard remedy, and <code class="inline">dense_contact_compliance</code> already provides one for the row family a gripper's contacts land on. The free-body row family &mdash; where an object squeezed between world-fixed pads ends up &mdash; has no compliance term at all; its diagonal is seeded with <code class="inline">pgs_cfm</code> and nothing else. Until that is filled in, a hard-contact grasp has to be driven, never wedged.</p></div>
+
 <div class="fix"><h3>Keep the speculative term in the velocity pass</h3><p>One hard-coded <code class="inline">contact_speculative_scale=0.0</code> turns every not-yet-touching contact into a wall and makes <code class="inline">pgs_velocity_iterations</code> a net negative on any scene with a normal collision gap.</p></div>
+
 <div class="fix"><h3>Move the tiled solve's staging to dynamic shared memory</h3><p>A quadratic static allocation puts the row budget at the mercy of the GPU: 150 rows on Ampere, about 220 here. Until it moves, validate <code class="inline">dense_max_constraints</code> against the device's actual limit at construction and say so, rather than failing as a module-load error inside the first step. The solver already has an estimator that does exactly this for a different kernel.</p></div>
+
 <div class="fix"><h3>Guard the double-buffer fork against graph capture</h3><p>Use the existing <code class="inline">device.is_capturing</code> to fall back to an inline memset, or default <code class="inline">double_buffer</code> to off. Add a test that captures <code class="inline">step()</code> &mdash; there is currently none, which is why this has gone unnoticed.</p></div>
+
 <div class="fix"><h3>Remove the ungated per-step debug copies and the dead parameters</h3><p>Three <code class="inline">wp.copy</code> calls run on every step for buffers nothing reads. <code class="inline">friction_smoothing</code> is documented and inert. Both cost trust more than they cost time.</p></div>
+
 <div class="fix"><h3>Port to the current control-target layout</h3><p>Reading the deprecated DOF-layout aliases makes FeatherPGS unusable with Newton's current default and noisy with the old one.</p></div>
 </div>
 </section>
 
 <section id="repro">
 <div class="kicker">Reproduction</div>
-<h2>Pinned versions and the exact harness</h2>
+<h2>Pinned versions and the harness</h2>
 
 <div class="grid2">
 <div class="card">
@@ -663,29 +625,23 @@ resolved_friction = wp.max(geom_friction[worldid, g1], geom_friction[worldid, g2
 <ul>
 <li>Linux, NVIDIA RTX PRO 6000 Blackwell Server Edition, one MIG 1g.24gb slice, compute capability 12.0</li>
 <li>Python 3.12, Newton 1.5.0.dev0, Warp 1.16.0.dev20260716</li>
-<li>FeatherPGS: <code class="inline">dylanturpin/newton-collab</code> branch <code class="inline">fpgs-main</code> at <code class="inline">d95efe1d</code> &mdash; 111 commits ahead of and 119 behind <code class="inline">newton-physics/newton@main</code></li>
-<li>Scene: <code class="inline">StoneT2000/newton-tests</code> at <code class="inline">32c1544b</code>, <code class="inline">franka_cube_shake.py</code>, unmodified</li>
+<li>FeatherPGS: <code class="inline">dylanturpin/newton-collab</code> branch <code class="inline">fpgs-main</code> at <code class="inline">d95efe1d</code> &mdash; 111 commits ahead of and 119 behind <code class="inline">newton-physics/newton@main</code>. PR&nbsp;#2608 has not moved since 8&nbsp;July&nbsp;2026 and is blocked, so there is no upstream FeatherPGS that runs these scenes.</li>
+<li>Arm scene: <code class="inline">StoneT2000/newton-tests</code> at <code class="inline">32c1544b</code>, <code class="inline">franka_cube_shake.py</code>, unmodified. A fixed FR3, analytic IK, a scripted approach&rarr;descend&rarr;grasp&rarr;lift&rarr;shake sequence at 60&nbsp;Hz with 16 substeps. Its SolverMuJoCo settings come from the <a href="../grasp-shake-drift/">grasp-shake-drift</a> investigation and are left as they are; the only thing changed here is the solver.</li>
 </ul>
 </div>
 <div class="card">
 <h3>Harness</h3>
 <ul>
-<li><a href="scripts/harness.py">harness.py</a> &mdash; scene construction, solver swap, per-frame instrumentation</li>
-<li><a href="scripts/gravcomp.py">gravcomp.py</a> &mdash; the missing gravity torque</li>
+<li><a href="scripts/harness.py">harness.py</a> &middot; <a href="scripts/gravcomp.py">gravcomp.py</a> &mdash; the arm scene and the missing gravity torque</li>
+<li><a href="scripts/coupon.py">coupon.py</a> &middot; <a href="scripts/static_coupon.py">static_coupon.py</a> &mdash; the two-pad scenes</li>
 <li><a href="scripts/exp_graph_and_gravity.py">exp_graph_and_gravity.py</a> &mdash; capture matrix, joint sag, phase progression</li>
-<li><a href="scripts/exp_gravcomp.py">exp_gravcomp.py</a> &mdash; solver option sweep</li>
-<li><a href="scripts/exp_substeps.py">exp_substeps.py</a> &mdash; time step and speed</li>
-<li><a href="scripts/exp_rows.py">exp_rows.py</a> &mdash; row budget, watermarks, repeatability</li>
+<li><a href="scripts/exp_gravcomp.py">exp_gravcomp.py</a> &middot; <a href="scripts/exp_iters.py">exp_iters.py</a> &middot; <a href="scripts/exp_tuning.py">exp_tuning.py</a> &middot; <a href="scripts/exp_mu.py">exp_mu.py</a> &mdash; solver options and sensitivity</li>
+<li><a href="scripts/exp_rows.py">exp_rows.py</a> &middot; <a href="scripts/exp_defaults.py">exp_defaults.py</a> &mdash; row budget and defaults</li>
 <li><a href="scripts/exp_speculative.py">exp_speculative.py</a> &mdash; the velocity-pass regression</li>
-<li><a href="scripts/exp_defaults.py">exp_defaults.py</a> &mdash; library defaults and row capacity</li>
-<li><a href="scripts/legacy_coupon.py">legacy_coupon.py</a> &middot; <a href="scripts/exp_legacy.py">exp_legacy.py</a> &middot; <a href="scripts/exp_legacy_db.py">exp_legacy_db.py</a> &mdash; the earlier report's coupon, re-run</li>
-<li><a href="scripts/coupon.py">coupon.py</a> &middot; <a href="scripts/exp_coupon.py">exp_coupon.py</a> &middot; <a href="scripts/exp_coupon_mech.py">exp_coupon_mech.py</a> &mdash; the driven coupon and its mechanism</li>
-<li><a href="scripts/exp_tuning.py">exp_tuning.py</a> &middot; <a href="scripts/exp_mu.py">exp_mu.py</a> &mdash; parameter and friction sensitivity</li>
-<li><a href="scripts/exp_iters.py">exp_iters.py</a> &middot; <a href="scripts/exp_iters_time.py">exp_iters_time.py</a> &middot; <a href="scripts/exp_inner.py">exp_inner.py</a> &mdash; iteration count and frozen inner substeps</li>
-<li><a href="scripts/exp_mesh2.py">exp_mesh2.py</a> &middot; <a href="scripts/exp_grip.py">exp_grip.py</a> &middot; <a href="scripts/exp_misc.py">exp_misc.py</a> &mdash; mesh geometry, contact detail, and the earlier report's remaining claims</li>
-<li><a href="scripts/collect.py">collect.py</a> &middot; <a href="scripts/reanalyze.py">reanalyze.py</a> &middot; <a href="scripts/make_plots.py">make_plots.py</a> &mdash; scoring and figures</li>
-<li>Raw results: <a href="data/results.json">results.json</a> &middot; <a href="data/grasp_outcomes.json">grasp_outcomes.json</a></li>
+<li><a href="scripts/exp_substeps.py">exp_substeps.py</a> &middot; <a href="scripts/exp_inner.py">exp_inner.py</a> &mdash; time step and speed</li>
+<li><a href="scripts/exp_static_coupon.py">exp_static_coupon.py</a> &middot; <a href="scripts/exp_coupon.py">exp_coupon.py</a> &middot; <a href="scripts/exp_coupon_mech.py">exp_coupon_mech.py</a> &middot; <a href="scripts/exp_repeatability.py">exp_repeatability.py</a> &mdash; the coupons</li>
 <li><a href="scripts/render_video.py">render_video.py</a> &middot; <a href="scripts/render_coupon.py">render_coupon.py</a> &mdash; pose capture and ViewerGL replay</li>
+<li>Raw results: <a href="data/results.json">results.json</a> &middot; <a href="data/grasp_outcomes.json">grasp_outcomes.json</a></li>
 </ul>
 </div>
 </div>
@@ -697,15 +653,7 @@ cd newton-collab &amp;&amp; git checkout d95efe1d1bb07497a4e51bf9563f36bc8821ab7
 uv venv .venv --python 3.12 &amp;&amp; uv sync --extra examples
 
 git clone https://github.com/StoneT2000/newton-tests.git
-cd newton-tests &amp;&amp; git checkout 32c1544bac713bb722e9f805c26dc99413f0e359
-
-# every experiment on this page
-.venv/bin/python exp_graph_and_gravity.py all
-.venv/bin/python exp_gravcomp.py all 900
-.venv/bin/python exp_substeps.py
-.venv/bin/python exp_rows.py
-.venv/bin/python exp_speculative.py
-.venv/bin/python exp_defaults.py</code></pre>
+cd newton-tests &amp;&amp; git checkout 32c1544bac713bb722e9f805c26dc99413f0e359</code></pre>
 </div>
 
 <div class="codeblock">
@@ -722,7 +670,7 @@ for frame in range(900):
 </div>
 </section>
 
-<div class="footer">The drive, the contact rows and the friction cone are all sound. What is missing is a gravity term, a row budget that fits a real contact set, and a velocity pass that keeps the constraint it was given.</div>
+<div class="footer">The drive, the contact rows and the friction cone are all sound. What is missing is a gravity term, a row budget that fits a real contact set, a compliance term on the free-body rows, and a velocity pass that keeps the constraint it was given.</div>
 
 </main>
 <script src="figures.js"></script>

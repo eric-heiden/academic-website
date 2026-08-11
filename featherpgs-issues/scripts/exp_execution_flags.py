@@ -1,8 +1,7 @@
 """Does the double-buffer flag change the answer, or only the schedule?
 
 It is documented as an execution option, so the trajectory should not depend on
-it. The earlier report ran with it on (the default); everything measured here
-runs with it off, so the two need to be compared directly.
+it. Everything else here runs with it off, so the two are compared directly.
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ import warp as wp
 sys.path.insert(0, "/home/horde/repos/fpgs-study")
 
 import newton  # noqa: E402
-import legacy_coupon as L  # noqa: E402
+import static_coupon as L  # noqa: E402
 
 if __name__ == "__main__":
     wp.init()

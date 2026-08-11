@@ -542,7 +542,7 @@ def t_coupon_mech(mech):
         TABLES["tbl-coupon-beta"] = brows
 
 
-def f_legacy(leg):
+def f_static_coupon(leg):
     grid, iters = leg.get("grid", {}), leg.get("iters", {})
     # sliding traces straight out of the saved trajectories
     series = [("box_fpgs", "FeatherPGS, primitive box", C["aqua"], "solid"),
@@ -551,7 +551,7 @@ def f_legacy(leg):
               ("mesh_mujoco", "SolverMuJoCo, triangle mesh", C["violet"], "dash")]
     data = []
     for tag, label, col, dash in series:
-        d = load(f"legacy_{tag}")
+        d = load(f"static_{tag}")
         if d is None:
             continue
         drop = (0.065 - d["z"]) * 1000.0
@@ -561,7 +561,7 @@ def f_legacy(leg):
                          line=dict(color=col, width=2, dash=dash),
                          hovertemplate="%{y:.3f} mm below start<extra></extra>"))
     if data:
-        FIGS["fig-legacy-slide"] = dict(
+        FIGS["fig-static-slide"] = dict(
             data=data,
             layout=layout("Time (s)", "Distance slid below the start (mm)",
                           height=400))
@@ -579,7 +579,7 @@ def f_legacy(leg):
         down.append(round(max(v["worst_downward_mm"], 0.0), 4))
         up.append(round(max(v["worst_upward_mm"], 0.0), 4))
     if xs:
-        FIGS["fig-legacy-anchors"] = dict(
+        FIGS["fig-static-anchors"] = dict(
             data=[dict(type="bar", name="slid down", x=xs, y=down,
                        marker=dict(color=C["orange"], line=dict(width=0)),
                        text=["%.2f" % d for d in down], textposition="outside",
@@ -612,30 +612,28 @@ def f_legacy(leg):
                               marker=dict(size=9, color=col),
                               hovertemplate="%{x} iterations<br>%{y:.3f} mm<extra></extra>"))
         if idata:
-            FIGS["fig-legacy-iters"] = dict(
+            FIGS["fig-static-iters"] = dict(
                 data=idata,
                 layout=layout("Solver iterations",
                               "Worst distance from the start position, mm (log)",
                               yaxis=dict(type="log"), height=340))
 
     rows = []
-    def cell(k, key="worst_downward_mm", fmt="%.2f mm"):
+    for k, lbl in [("box_fpgs", "primitive box"), ("mesh_fpgs", "triangle mesh")]:
         v = grid.get(k)
-        if not v or key not in v:
-            return "&mdash;"
-        return fmt % v[key]
-    if grid:
-        rows.append(["Primitive box, defaults", "0.163 mm", cell("box_fpgs")])
-        rows.append(["Triangle mesh, defaults",
-                     "<span style='color:#ff6b7a'>lost at 7.18 s, fell 44.7 m</span>",
-                     "<span style='color:#ffbd59'>%s, never loses contact</span>"
-                     % cell("mesh_fpgs")])
-        rows.append(["Triangle mesh, two friction anchors", "19.9 mm",
-                     cell("mesh_anchors")])
-        TABLES["tbl-legacy-then-now"] = rows
+        if not v or "worst_downward_mm" not in v:
+            continue
+        mj = grid.get(k.replace("_fpgs", "_mujoco"), {})
+        rows.append([lbl,
+                     "%.0f" % v.get("contacts_median", 0),
+                     "%.2f mm" % v["worst_downward_mm"],
+                     "%.2f mm" % v["worst_upward_mm"],
+                     "%.2f mm" % mj.get("worst_downward_mm", float("nan"))])
+    if rows:
+        TABLES["tbl-static-results"] = rows
 
 
-def t_legacy_db(db, rep):
+def t_static_repeat(db, rep):
     """Execution flags versus plain run-to-run repeatability."""
     rows = []
     for geom in ("box", "mesh"):
@@ -659,7 +657,7 @@ def t_legacy_db(db, rep):
                              ("#61d69b", "identical") if r["identical"]
                              else ("#ff6b7a", "%.2f mm apart" % worst))])
     if rows:
-        TABLES["tbl-legacy-db"] = rows
+        TABLES["tbl-static-repeat"] = rows
 
 
 def t_capture(cap):
@@ -772,8 +770,8 @@ if __name__ == "__main__":
     f_inner(s.get("inner", {}), s.get("substeps", {}), s.get("iters", {}))
     f_tuning(s.get("tuning", {}), s.get("mu_sweep", {}))
     f_coupon(s.get("coupon", {}))
-    f_legacy(s.get("legacy", {}))
-    t_legacy_db(s.get("legacy_db", {}), s.get("legacy_repeat", {}))
+    f_static_coupon(s.get("legacy", {}))
+    t_static_repeat(s.get("legacy_db", {}), s.get("legacy_repeat", {}))
     t_coupon_mech(s.get("coupon_mech", {}))
     t_capture(s.get("graph_capture", {}))
     t_spec(s.get("speculative", {}))

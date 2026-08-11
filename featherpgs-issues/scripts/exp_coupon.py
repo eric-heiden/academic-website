@@ -3,8 +3,7 @@
 Two pads and one object, with nothing else in the scene:
 
   static  - pads welded to the world, object squeezed by a fixed geometric
-            overlap. This is the shape the earlier report's minimal
-            reproduction used.
+            overlap. Grip force is set by geometry alone.
   driven  - pads on a position-driven two-axis carrier that closes, lifts the
             object off a support, and shakes it. Grip force is set by the
             finger drive rather than by geometry.

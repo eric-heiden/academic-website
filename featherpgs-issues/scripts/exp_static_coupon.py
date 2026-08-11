@@ -1,4 +1,4 @@
-"""The earlier report's static grasp coupon, re-run across the same options."""
+"""The static two-pad coupon, across geometry, solver and friction options."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import warp as wp
 sys.path.insert(0, "/home/horde/repos/fpgs-study")
 
 import newton  # noqa: E402
-import legacy_coupon as L  # noqa: E402
+import static_coupon as L  # noqa: E402
 
 
 def keep(r):

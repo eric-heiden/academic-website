@@ -6,7 +6,7 @@ Two variants of the same scene:
               oscillating body force. Object/pad contacts take the free-rigid
               path, so this isolates contact and friction from articulation.
 
-  "driven"  - the pads are the fingers of a three-joint articulation: a palm
+  "driven"  - the pads are the fingers of a position-driven carrier: a palm
               that slides along one axis to do the shaking, and two fingers
               that slide toward each other to do the squeezing, all position
               driven. Object/pad contacts take the articulated path, which is

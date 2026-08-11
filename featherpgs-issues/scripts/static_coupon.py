@@ -1,6 +1,6 @@
-"""The earlier report's minimal static grasp, re-run and instrumented.
+"""Two static pads squeeze one object while it is shaken.
 
-The scene is byte-for-byte the one that report used: a cube pinched between two
+A cube pinched between two
 pads that are welded to the world with a 0.5 mm geometric overlap, shaken by an
 oscillating body force along y while gravity pulls along -z. Only the recording
 is added, so the sliding motion can be plotted rather than reduced to a single
