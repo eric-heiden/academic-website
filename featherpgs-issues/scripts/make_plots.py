@@ -394,6 +394,154 @@ def f_tuning(t, mus_src=None):
                           yaxis=dict(type="log"), height=340))
 
 
+def _coupon_series(grid, xkey, label_fmt):
+    """colour = solver, dash = geometry; missing point = object lost."""
+    out = []
+    for solv, sname, col in (("fpgs", "FeatherPGS", C["aqua"]),
+                             ("mujoco", "SolverMuJoCo", C["blue"])):
+        for geom, dash, sym in (("box", "solid", "circle"),
+                                ("mesh", "dash", "diamond")):
+            pts = sorted([v for v in grid.values()
+                          if v.get("solver") == solv and v.get("geom") == geom
+                          and xkey in v], key=lambda v: v[xkey])
+            if not pts:
+                continue
+            xs = [round(p[xkey], 4) for p in pts]
+            # downward slip is the grasp-relevant number; floor at 1 um for the log axis
+            ys = [max(round(p["axial_slip_mm"], 5), 1.0e-3) if p.get("held") else None
+                  for p in pts]
+            out.append(dict(type="scatter", mode="lines+markers",
+                            name=f"{sname}, {geom}", x=xs, y=ys, connectgaps=False,
+                            line=dict(color=col, width=2, dash=dash),
+                            marker=dict(size=9, color=col, symbol=sym),
+                            hovertemplate=label_fmt + "<br>%{y:.3f} mm<extra></extra>"))
+    return out
+
+
+def f_coupon(c):
+    st, dr, kn = c.get("static", {}), c.get("driven", {}), c.get("knobs", {})
+    if st:
+        FIGS["fig-coupon-static"] = dict(
+            data=_coupon_series(st, "overlap_mm", "overlap %{x} mm"),
+            layout=layout("Geometric overlap per side (mm)",
+                          "Downward slip through the grasp, mm (log)",
+                          yaxis=dict(type="log"), height=360))
+        rows = []
+        for ov in sorted({v["overlap_mm"] for v in st.values() if "overlap_mm" in v}):
+            r = [f"{ov:g} mm"]
+            for solv in ("fpgs", "mujoco"):
+                for geom in ("box", "mesh"):
+                    v = next((x for x in st.values()
+                              if x.get("solver") == solv and x.get("geom") == geom
+                              and x.get("overlap_mm") == ov), None)
+                    if not v:
+                        r.append("&mdash;")
+                    elif not v.get("held"):
+                        r.append("<span style='color:#ff6b7a'>ejected</span>")
+                    else:
+                        r.append("%.2f mm" % v["axial_slip_mm"])
+            rows.append(r)
+        TABLES["tbl-coupon-static"] = rows
+    if dr:
+        FIGS["fig-coupon-driven"] = dict(
+            data=_coupon_series(dr, "squeeze_mm", "squeeze %{x} mm"),
+            layout=layout("Commanded squeeze past the surface (mm)",
+                          "Downward slip through the grasp, mm (log)",
+                          yaxis=dict(type="log"), height=360))
+        rows = []
+        for sq in sorted({v["squeeze_mm"] for v in dr.values() if "squeeze_mm" in v}):
+            r = [f"{sq:g} mm"]
+            for solv in ("fpgs", "mujoco"):
+                for geom in ("box", "mesh"):
+                    v = next((x for x in dr.values()
+                              if x.get("solver") == solv and x.get("geom") == geom
+                              and x.get("squeeze_mm") == sq), None)
+                    if not v or not v.get("held"):
+                        r.append("<span style='color:#ff6b7a'>lost</span>")
+                    else:
+                        r.append("%.2f / %.2f" % (v["axial_slip_mm"], v["lateral_mm"]))
+            rows.append(r)
+        TABLES["tbl-coupon-driven"] = rows
+    if kn:
+        its = sorted([v for v in kn.values() if "pgs_iterations" in v],
+                     key=lambda v: v["pgs_iterations"])
+        mus = {}
+        for v in kn.values():
+            if "mu" in v:
+                mus.setdefault(v["solver"], []).append(v)
+        data = []
+        if its:
+            data.append(dict(type="scatter", mode="lines+markers",
+                             name="FeatherPGS", x=[v["pgs_iterations"] for v in its],
+                             y=[max(round(v["axial_slip_mm"], 5), 1.0e-3)
+                                if v.get("held") else None
+                                for v in its], connectgaps=False,
+                             line=dict(color=C["aqua"], width=2),
+                             marker=dict(size=9, color=C["aqua"]),
+                             hovertemplate="%{x} iterations<br>%{y:.3f} mm<extra></extra>"))
+            FIGS["fig-coupon-iters"] = dict(
+                data=data, layout=layout("Solver iterations",
+                                         "Downward slip through the grasp, mm (log)",
+                                         yaxis=dict(type="log"), height=320))
+        if mus:
+            md = []
+            for solv, sname, col in (("fpgs", "FeatherPGS", C["aqua"]),
+                                     ("mujoco", "SolverMuJoCo", C["blue"])):
+                pts = sorted(mus.get(solv, []), key=lambda v: v["mu"])
+                if not pts:
+                    continue
+                md.append(dict(type="scatter", mode="lines+markers", name=sname,
+                               x=[v["mu"] for v in pts],
+                               y=[max(round(v["axial_slip_mm"], 5), 1.0e-3)
+                                  if v.get("held") else None
+                                  for v in pts], connectgaps=False,
+                               line=dict(color=col, width=2),
+                               marker=dict(size=9, color=col),
+                               hovertemplate="mu %{x}<br>%{y:.3f} mm<extra></extra>"))
+            FIGS["fig-coupon-mu"] = dict(
+                data=md, layout=layout("Friction coefficient on every surface",
+                                       "Downward slip through the grasp, mm (log)",
+                                       yaxis=dict(type="log"), height=320))
+        srows = []
+        for ss in (16, 8, 4, 2, 1):
+            r = [f"{1000.0 / 60.0 / ss:.2f} ms"]
+            for solv in ("fpgs", "mujoco"):
+                v = kn.get(f"ss{ss}_{solv}")
+                r.append("&mdash;" if not v else
+                         ("<span style='color:#ff6b7a'>lost</span>"
+                          if not v.get("held") else "%.3f mm" % v["axial_slip_mm"]))
+            srows.append(r)
+        TABLES["tbl-coupon-dt"] = srows
+
+
+def t_coupon_mech(mech):
+    if not mech:
+        return
+    rows = []
+    for k in sorted([x for x in mech if x.startswith("ov")],
+                    key=lambda x: mech[x].get("overlap_mm", 0)):
+        v = mech[k]
+        if v.get("solver") != "fpgs":
+            continue
+        mj = mech.get(k.replace("_fpgs", "_mujoco"), {})
+        rows.append(["%g mm" % v["overlap_mm"],
+                     "%.3f m/s" % v["peak_speed_m_s"],
+                     "%.2f mm" % v["displacement_mm"],
+                     "%.5f mm" % mj.get("displacement_mm", float("nan"))])
+    if rows:
+        TABLES["tbl-coupon-mech"] = rows
+    brows = []
+    for k in sorted([x for x in mech if x.startswith("beta")],
+                    key=lambda x: mech[x].get("beta", 0)):
+        v = mech[k]
+        col = "#61d69b" if v["displacement_mm"] < 0.01 else "#ff6b7a"
+        brows.append(["%g" % v["beta"], "%.3f m/s" % v["peak_speed_m_s"],
+                      "<span style='color:%s'>%.2f mm</span>"
+                      % (col, v["displacement_mm"])])
+    if brows:
+        TABLES["tbl-coupon-beta"] = brows
+
+
 def t_capture(cap):
     rows = []
     for k, v in cap.items():
@@ -503,6 +651,8 @@ if __name__ == "__main__":
     f_grip()
     f_inner(s.get("inner", {}), s.get("substeps", {}), s.get("iters", {}))
     f_tuning(s.get("tuning", {}), s.get("mu_sweep", {}))
+    f_coupon(s.get("coupon", {}))
+    t_coupon_mech(s.get("coupon_mech", {}))
     t_capture(s.get("graph_capture", {}))
     t_spec(s.get("speculative", {}))
     t_phase(s.get("phase", {}))

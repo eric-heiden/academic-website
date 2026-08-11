@@ -104,6 +104,13 @@ if __name__ == "__main__":
     s["budget"] = rows.get("budget", {})
     s["repeat"] = {k: v for k, v in rows.items() if k.startswith("repeat")}
     s["speculative"] = tail_json("spec.log") or line_json("spec.log", ["base_", "velit"])
+    coup = {}
+    coup["static"] = (tail_json("coupon_static.log") or {}).get("static", {})
+    coup["driven"] = (tail_json("coupon_driven.log") or {}).get("driven", {})
+    coup["knobs"] = (tail_json("coupon_knobs.log") or {}).get("knobs", {})
+    s["coupon"] = coup
+    s["compliance"] = tail_json("compliance.log") or {}
+    s["coupon_mech"] = tail_json("coupon_mech.log") or {}
     s["mu_sweep"] = tail_json("mu.log") or {}
     s["tuning"] = tail_json("tuning.log") or {}
     # timings measured with nothing else on the GPU supersede the sweep's own
