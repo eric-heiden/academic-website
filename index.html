@@ -80,6 +80,12 @@
     <p>Research notes, experiment summaries, and supporting media.</p>
     <ul class="report-list">
       <li>
+        <a class="report-card" href="featherpgs-issues/">
+          <strong>FeatherPGS grasp stability: failure modes and required fixes</strong>
+          <span>Technical investigation of FeatherPGS grasping in Newton: a primitive cube remains within 0.163 mm while an equivalent triangulated mesh loses contact, friction anchors trade complete loss for biased residual slip, and the Franka controller requires 100&times; stiffness and 10&times; damping scaling to reach the shake phase. Includes ViewerGL rollouts, collapsible minimal reproducers, and isolated failures in graph capture, dense-kernel shared memory, and long-horizon CUDA execution.</span>
+        </a>
+      </li>
+      <li>
         <a class="report-card" href="newton-xpbd-fluids/">
           <strong>XPBD fluids in Newton vs. the OmniSurg PBF solver</strong>
           <span>Head-to-head benchmark of Newton's position-based fluids against a faster external PBF implementation, both driven by one harness in one process against the same <code>Model</code>: Newton runs 8&ndash;12&times; slower, and the cause is that its density kernels re-query the hash grid on every solver iteration instead of reading a neighbor list materialized once per substep &mdash; 20&times; the marginal cost per iteration, and 91% of the frame in two kernels. Scaling, ablation and per-kernel breakdowns, a dam-break filmstrip showing the two flows agree, and a ranked list of fixes.</span>
