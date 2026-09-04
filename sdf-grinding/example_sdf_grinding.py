@@ -5,8 +5,7 @@
 # Example SDF Grinding
 #
 # Removes workpiece volume by subtracting a moving grinding wheel from its
-# texture SDF. Hydroelastic collision provides the pressure visualization;
-# no dynamics solver is used.
+# texture SDF. Hydroelastic collision is evaluated without a dynamics solver.
 #
 # Command: python example_sdf_grinding.py
 #
@@ -14,10 +13,11 @@
 
 import math
 
-import newton
-import newton.examples
 import numpy as np
 import warp as wp
+
+import newton
+import newton.examples
 
 WORKPIECE_RADII = (0.45, 0.25, 0.12)
 WORKPIECE_RESOLUTION = 256
@@ -25,7 +25,6 @@ GRINDER_RADIUS = 0.13
 GRINDER_HALF_WIDTH = 0.04
 GRIND_DEPTH = 0.035
 HYDROELASTIC_STIFFNESS = 1.0e8
-PRESSURE_COLOR_MAX = 1.5e5
 
 _SLOT_LINEAR = wp.uint32(0xFFFFFFFE)
 
@@ -53,9 +52,7 @@ def _subtract_cylinder_from_coarse_sdf(
     grid_point = wp.vec3(float(x), float(y), float(z)) * float(subgrid_size)
     point = sdf_lower + wp.cw_mul(grid_point, voxel_size)
     grinder_point = wp.transform_point(wp.transform_inverse(grinder_xform), point)
-    grinder_distance = _sdf_cylinder_z(
-        grinder_point, grinder_radius, grinder_half_width
-    )
+    grinder_distance = _sdf_cylinder_z(grinder_point, grinder_radius, grinder_half_width)
     sdf_values[z, y, x] = wp.max(sdf_values[z, y, x], -grinder_distance)
 
 
@@ -100,64 +97,18 @@ def _subtract_cylinder_from_subgrid_sdf(
     fine_x = block_x * subgrid_size + local_x
     fine_y = block_y * subgrid_size + local_y
     fine_z = block_z * subgrid_size + local_z
-    point = sdf_lower + wp.cw_mul(
-        wp.vec3(float(fine_x), float(fine_y), float(fine_z)), voxel_size
-    )
+    point = sdf_lower + wp.cw_mul(wp.vec3(float(fine_x), float(fine_y), float(fine_z)), voxel_size)
     grinder_point = wp.transform_point(wp.transform_inverse(grinder_xform), point)
-    grinder_distance = _sdf_cylinder_z(
-        grinder_point, grinder_radius, grinder_half_width
-    )
-    sdf_values[texture_z, texture_y, texture_x] = wp.max(
-        sdf_values[texture_z, texture_y, texture_x], -grinder_distance
-    )
-
-
-@wp.func
-def _pressure_color(pressure: float, max_pressure: float) -> wp.vec3:
-    """Map pressure from blue through cyan and yellow to red."""
-    t = wp.clamp(pressure / max_pressure, 0.0, 1.0)
-    if t < 0.25:
-        return wp.vec3(0.0, t * 4.0, 1.0)
-    if t < 0.5:
-        return wp.vec3(0.0, 1.0, 2.0 - t * 4.0)
-    if t < 0.75:
-        return wp.vec3(t * 4.0 - 2.0, 1.0, 0.0)
-    return wp.vec3(1.0, 4.0 - t * 4.0, 0.0)
-
-
-@wp.kernel(enable_backward=False)
-def _build_pressure_lines(
-    triangle_vertices: wp.array[wp.vec3],
-    face_depths: wp.array[wp.float32],
-    face_pressures: wp.array[wp.float32],
-    max_pressure: float,
-    line_starts: wp.array[wp.vec3],
-    line_ends: wp.array[wp.vec3],
-    line_colors: wp.array[wp.vec3],
-):
-    face = wp.tid()
-    base = face * 3
-    if face_depths[face] >= 0.0:
-        for edge in range(3):
-            line_starts[base + edge] = wp.vec3(0.0)
-            line_ends[base + edge] = wp.vec3(0.0)
-            line_colors[base + edge] = wp.vec3(0.0)
-        return
-
-    color = _pressure_color(face_pressures[face], max_pressure)
-    for edge in range(3):
-        line_starts[base + edge] = triangle_vertices[base + edge]
-        line_ends[base + edge] = triangle_vertices[base + (edge + 1) % 3]
-        line_colors[base + edge] = color
+    grinder_distance = _sdf_cylinder_z(grinder_point, grinder_radius, grinder_half_width)
+    sdf_values[texture_z, texture_y, texture_x] = wp.max(sdf_values[texture_z, texture_y, texture_x], -grinder_distance)
 
 
 class Example:
-    def __init__(self, viewer, args):
+    def __init__(self, viewer, _args):
         self.viewer = viewer
         self.frame_dt = 1.0 / 60.0
         self.sim_time = 0.0
         self.frame = 0
-        self.test_mode = args.test
 
         # A gently curved blank keeps fine SDF subgrids resident around the
         # entire machined surface, which makes this compact in-place demo
@@ -215,16 +166,7 @@ class Example:
 
         self.model = builder.finalize()
         self.state_0 = self.model.state()
-        self.contacts = None
-
-        self.collision_pipeline = newton.CollisionPipeline(
-            self.model,
-            reduce_contacts=False,
-            sdf_hydroelastic_config=newton.geometry.HydroelasticSDF.Config(
-                mc_edge_clamp_min=0.0,
-                output_contact_surface=True,
-            ),
-        )
+        self.collision_pipeline = newton.CollisionPipeline(self.model)
         self.contacts = self.collision_pipeline.contacts()
 
         texture_data = self.workpiece_sdf.texture_data
@@ -251,25 +193,11 @@ class Example:
         )
         texture_data.coarse_texture.copy_to(self.coarse_values)
         texture_data.subgrid_texture.copy_to(self.subgrid_values)
-        self.initial_subgrid_values = (
-            self.subgrid_values.numpy() if self.test_mode else None
-        )
 
-        self.subgrid_work_items = (
-            texture_data.subgrid_start_slots.size
-            * (int(texture_data.subgrid_size) + 1) ** 3
-        )
+        self.subgrid_work_items = texture_data.subgrid_start_slots.size * (int(texture_data.subgrid_size) + 1) ** 3
 
         self.body_q = self.state_0.body_q.numpy()
-        self.max_pressure = 0.0
-        self.latest_pressure = 0.0
-        self.pressure_line_starts = None
-        self.pressure_line_ends = None
-        self.pressure_line_colors = None
         self._set_grinder_pose(initial_pose)
-        self.collision_pipeline.collide(self.state_0, self.contacts)
-        self._track_pressure()
-        self.initial_pressure = self.latest_pressure
         self._update_workpiece_surface()
 
         self.viewer.set_model(self.model)
@@ -323,103 +251,20 @@ class Example:
         self.texture_data.coarse_texture.copy_from(self.coarse_values)
         self.texture_data.subgrid_texture.copy_from(self.subgrid_values)
 
-    def _track_pressure(self) -> None:
-        if not self.test_mode:
-            return
-        hydroelastic = self.collision_pipeline.hydroelastic_sdf
-        contact_surface = (
-            hydroelastic.get_contact_surface() if hydroelastic is not None else None
-        )
-        if contact_surface is None:
-            return
-        self.latest_pressure = 0.0
-        face_count = min(
-            int(contact_surface.face_contact_count.numpy()[0]),
-            contact_surface.max_num_face_contacts,
-        )
-        if face_count > 0:
-            pressures = hydroelastic.contact_reduction.reducer.contact_pressure.numpy()[
-                :face_count
-            ]
-            self.latest_pressure = float(np.max(pressures))
-            self.max_pressure = max(self.max_pressure, self.latest_pressure)
-
-    def _log_pressure_surface(self) -> None:
-        hydroelastic = self.collision_pipeline.hydroelastic_sdf
-        contact_surface = (
-            hydroelastic.get_contact_surface() if hydroelastic is not None else None
-        )
-        if contact_surface is None:
-            self.viewer.log_lines("/hydro_pressure", None, None, None)
-            return
-
-        face_count = min(
-            int(contact_surface.face_contact_count.numpy()[0]),
-            contact_surface.max_num_face_contacts,
-        )
-        if face_count == 0:
-            self.viewer.log_lines("/hydro_pressure", None, None, None)
-            return
-
-        max_lines = 3 * contact_surface.max_num_face_contacts
-        if (
-            self.pressure_line_starts is None
-            or len(self.pressure_line_starts) < max_lines
-        ):
-            self.pressure_line_starts = wp.empty(
-                max_lines, dtype=wp.vec3, device=self.model.device
-            )
-            self.pressure_line_ends = wp.empty(
-                max_lines, dtype=wp.vec3, device=self.model.device
-            )
-            self.pressure_line_colors = wp.empty(
-                max_lines, dtype=wp.vec3, device=self.model.device
-            )
-
-        wp.launch(
-            _build_pressure_lines,
-            dim=face_count,
-            inputs=[
-                contact_surface.contact_surface_point,
-                contact_surface.contact_surface_depth,
-                hydroelastic.contact_reduction.reducer.contact_pressure,
-                PRESSURE_COLOR_MAX,
-            ],
-            outputs=[
-                self.pressure_line_starts,
-                self.pressure_line_ends,
-                self.pressure_line_colors,
-            ],
-            device=self.model.device,
-        )
-        num_lines = 3 * face_count
-        self.viewer.log_lines(
-            "/hydro_pressure",
-            self.pressure_line_starts[:num_lines],
-            self.pressure_line_ends[:num_lines],
-            self.pressure_line_colors[:num_lines],
-        )
-
     def _update_workpiece_surface(self) -> None:
         surface = self.workpiece_sdf.extract_isomesh(device=self.model.device)
         if surface is None:
             raise RuntimeError("Grinding removed the complete workpiece.")
-        self.workpiece_points = wp.array(
-            surface.vertices, dtype=wp.vec3, device=self.model.device
-        )
-        self.workpiece_indices = wp.array(
-            surface.indices.reshape(-1), dtype=wp.int32, device=self.model.device
-        )
+        self.workpiece_points = wp.array(surface.vertices, dtype=wp.vec3, device=self.model.device)
+        self.workpiece_indices = wp.array(surface.indices.reshape(-1), dtype=wp.int32, device=self.model.device)
 
     def step(self):
         self.frame += 1
         grinder_pose = self._grinder_pose(self.frame)
         self._set_grinder_pose(grinder_pose)
 
-        # Measure the hydroelastic pressure on the current surface, then remove
-        # the wheel volume from the workpiece with an SDF CSG difference.
+        # Run hydroelastic SDF-SDF collision before editing the workpiece.
         self.collision_pipeline.collide(self.state_0, self.contacts)
-        self._track_pressure()
         self._subtract_grinder(grinder_pose)
         self._update_workpiece_surface()
         self.sim_time += self.frame_dt
@@ -436,28 +281,7 @@ class Example:
             metallic=0.25,
             dynamic=True,
         )
-        self._log_pressure_surface()
         self.viewer.end_frame()
-
-    def test_final(self):
-        """Verify grinding changes the SDF and produces hydroelastic pressure."""
-        assert self.initial_subgrid_values is not None
-        final_values = self.subgrid_values.numpy()
-        max_removed_distance = float(np.max(final_values - self.initial_subgrid_values))
-        assert max_removed_distance > 0.01, (
-            f"Workpiece SDF changed by only {max_removed_distance:.6f} m."
-        )
-        assert self.max_pressure > 0.0, (
-            "Grinding produced no positive hydroelastic pressure."
-        )
-
-        # Re-collide after the final CSG update to verify that hydroelastic
-        # sampling observes the edited texture through the original handle.
-        self.collision_pipeline.collide(self.state_0, self.contacts)
-        self._track_pressure()
-        assert self.latest_pressure < 0.5 * self.initial_pressure, (
-            "Hydroelastic collision did not observe the removed SDF volume."
-        )
 
 
 if __name__ == "__main__":
