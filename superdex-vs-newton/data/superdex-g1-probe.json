@@ -1,0 +1,1314 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-04T19:38:32Z",
+  "probe": "SuperDex Unitree G1 URDF import and bounded gravity simulation",
+  "host": {
+    "python": "3.12.13",
+    "platform": "Linux-6.8.0-1055-gke-x86_64-with-glibc2.35"
+  },
+  "source_build": {
+    "superdex_physics_version": "1.0.0",
+    "superdex_robotics_version": "1.0.0",
+    "physics_module": "$SUPERDEX_CHECKOUT/superdex_physics/wheels/superdex-physics/superdex/physics/__init__.py",
+    "physics_direct_url": {
+      "url": "file://$SUPERDEX_CHECKOUT/superdex_physics/wheels/superdex-physics",
+      "dir_info": {
+        "editable": true
+      }
+    },
+    "robotics_direct_url": {
+      "url": "file://$SUPERDEX_CHECKOUT/superdex_robotics/wheels/superdex-robotics",
+      "dir_info": {
+        "editable": true
+      }
+    },
+    "uses_double_precision": false,
+    "source_repository": "$SUPERDEX_CHECKOUT",
+    "source_revision": "777b498122ab4b8581dfecb5f035af134c647eab",
+    "source_revision_date": "2026-09-04T04:54:54-07:00",
+    "source_revision_subject": "Add support to DSL comments & preserve node ordering",
+    "cmake_cache": "$SUPERDEX_CHECKOUT/build-fp32/cp312-cp312-linux_x86_64/CMakeCache.txt",
+    "cmake_values": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "CMAKE_CXX_COMPILER": "/usr/bin/clang++-17",
+      "CMAKE_C_COMPILER": "/usr/bin/clang-17"
+    },
+    "compiler_version": "Ubuntu clang version 17.0.6 (++20231209124227+6009708b4367-1~exp1~20231209124336.77)"
+  },
+  "input": {
+    "urdf": "$NEWTON_ASSET_CACHE/unitree_g1/urdf/g1_29dof.urdf"
+  },
+  "urdf": {
+    "robot_name": "g1_29dof",
+    "sha256": "95fbf660614e9c9b6fbf10ae8c12aaa8b97b9c25b230098597ef66de98718b51",
+    "link_count": 40,
+    "joint_count": 39,
+    "joint_types": {
+      "fixed": 10,
+      "revolute": 29
+    },
+    "geometry_counts": {
+      "visual": {
+        "mesh": 36
+      },
+      "collision": {
+        "cylinder": 4,
+        "mesh": 25,
+        "sphere": 8
+      }
+    },
+    "package_uri_count": 61,
+    "package_uris_unique": [
+      "package://unitree_g1/meshes/head_link.STL",
+      "package://unitree_g1/meshes/left_ankle_pitch_link.STL",
+      "package://unitree_g1/meshes/left_ankle_roll_link.STL",
+      "package://unitree_g1/meshes/left_elbow_link.STL",
+      "package://unitree_g1/meshes/left_hip_pitch_link.STL",
+      "package://unitree_g1/meshes/left_hip_roll_link.STL",
+      "package://unitree_g1/meshes/left_hip_yaw_link.STL",
+      "package://unitree_g1/meshes/left_knee_link.STL",
+      "package://unitree_g1/meshes/left_rubber_hand.STL",
+      "package://unitree_g1/meshes/left_shoulder_pitch_link.STL",
+      "package://unitree_g1/meshes/left_shoulder_roll_link.STL",
+      "package://unitree_g1/meshes/left_shoulder_yaw_link.STL",
+      "package://unitree_g1/meshes/left_wrist_pitch_link.STL",
+      "package://unitree_g1/meshes/left_wrist_roll_link.STL",
+      "package://unitree_g1/meshes/left_wrist_yaw_link.STL",
+      "package://unitree_g1/meshes/logo_link.STL",
+      "package://unitree_g1/meshes/pelvis.STL",
+      "package://unitree_g1/meshes/pelvis_contour_link.STL",
+      "package://unitree_g1/meshes/right_ankle_pitch_link.STL",
+      "package://unitree_g1/meshes/right_ankle_roll_link.STL",
+      "package://unitree_g1/meshes/right_elbow_link.STL",
+      "package://unitree_g1/meshes/right_hip_pitch_link.STL",
+      "package://unitree_g1/meshes/right_hip_roll_link.STL",
+      "package://unitree_g1/meshes/right_hip_yaw_link.STL",
+      "package://unitree_g1/meshes/right_knee_link.STL",
+      "package://unitree_g1/meshes/right_rubber_hand.STL",
+      "package://unitree_g1/meshes/right_shoulder_pitch_link.STL",
+      "package://unitree_g1/meshes/right_shoulder_roll_link.STL",
+      "package://unitree_g1/meshes/right_shoulder_yaw_link.STL",
+      "package://unitree_g1/meshes/right_wrist_pitch_link.STL",
+      "package://unitree_g1/meshes/right_wrist_roll_link.STL",
+      "package://unitree_g1/meshes/right_wrist_yaw_link.STL",
+      "package://unitree_g1/meshes/torso_link.STL",
+      "package://unitree_g1/meshes/waist_roll_link.STL",
+      "package://unitree_g1/meshes/waist_support_link.STL",
+      "package://unitree_g1/meshes/waist_yaw_link.STL"
+    ],
+    "primitive_collision_links": [
+      "left_ankle_roll_link",
+      "left_shoulder_pitch_link",
+      "left_shoulder_roll_link",
+      "right_ankle_roll_link",
+      "right_shoulder_pitch_link",
+      "right_shoulder_roll_link"
+    ],
+    "primitive_only_collision_links": [
+      "left_ankle_roll_link",
+      "left_shoulder_pitch_link",
+      "left_shoulder_roll_link",
+      "right_ankle_roll_link",
+      "right_shoulder_pitch_link",
+      "right_shoulder_roll_link"
+    ],
+    "geometry_by_link": {
+      "pelvis": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/pelvis.STL"
+          }
+        ],
+        "collision": []
+      },
+      "pelvis_contour_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/pelvis_contour_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/pelvis_contour_link.STL"
+          }
+        ]
+      },
+      "left_hip_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_hip_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_hip_pitch_link.STL"
+          }
+        ]
+      },
+      "left_hip_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_hip_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_hip_roll_link.STL"
+          }
+        ]
+      },
+      "left_hip_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_hip_yaw_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_hip_yaw_link.STL"
+          }
+        ]
+      },
+      "left_knee_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_knee_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_knee_link.STL"
+          }
+        ]
+      },
+      "left_ankle_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_ankle_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_ankle_pitch_link.STL"
+          }
+        ]
+      },
+      "left_ankle_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_ankle_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          },
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          },
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          },
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          }
+        ]
+      },
+      "right_hip_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_hip_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_hip_pitch_link.STL"
+          }
+        ]
+      },
+      "right_hip_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_hip_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_hip_roll_link.STL"
+          }
+        ]
+      },
+      "right_hip_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_hip_yaw_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_hip_yaw_link.STL"
+          }
+        ]
+      },
+      "right_knee_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_knee_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_knee_link.STL"
+          }
+        ]
+      },
+      "right_ankle_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_ankle_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_ankle_pitch_link.STL"
+          }
+        ]
+      },
+      "right_ankle_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_ankle_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          },
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          },
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          },
+          {
+            "type": "sphere",
+            "radius": "0.005"
+          }
+        ]
+      },
+      "waist_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/waist_yaw_link.STL"
+          }
+        ],
+        "collision": []
+      },
+      "waist_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/waist_roll_link.STL"
+          }
+        ],
+        "collision": []
+      },
+      "torso_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/torso_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/torso_link.STL"
+          }
+        ]
+      },
+      "logo_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/logo_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/logo_link.STL"
+          }
+        ]
+      },
+      "head_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/head_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/head_link.STL"
+          }
+        ]
+      },
+      "waist_support_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/waist_support_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/waist_support_link.STL"
+          }
+        ]
+      },
+      "imu_in_torso": {
+        "visual": [],
+        "collision": []
+      },
+      "imu_in_pelvis": {
+        "visual": [],
+        "collision": []
+      },
+      "d435_link": {
+        "visual": [],
+        "collision": []
+      },
+      "mid360_link": {
+        "visual": [],
+        "collision": []
+      },
+      "left_shoulder_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_shoulder_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "cylinder",
+            "length": "0.05",
+            "radius": "0.03"
+          }
+        ]
+      },
+      "left_shoulder_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_shoulder_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "cylinder",
+            "length": "0.03",
+            "radius": "0.03"
+          }
+        ]
+      },
+      "left_shoulder_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_shoulder_yaw_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_shoulder_yaw_link.STL"
+          }
+        ]
+      },
+      "left_elbow_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_elbow_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_elbow_link.STL"
+          }
+        ]
+      },
+      "left_wrist_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_wrist_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_wrist_roll_link.STL"
+          }
+        ]
+      },
+      "left_wrist_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_wrist_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_wrist_pitch_link.STL"
+          }
+        ]
+      },
+      "left_wrist_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_wrist_yaw_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_wrist_yaw_link.STL"
+          }
+        ]
+      },
+      "left_rubber_hand": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/left_rubber_hand.STL"
+          }
+        ],
+        "collision": []
+      },
+      "right_shoulder_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_shoulder_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "cylinder",
+            "length": "0.05",
+            "radius": "0.03"
+          }
+        ]
+      },
+      "right_shoulder_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_shoulder_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "cylinder",
+            "length": "0.03",
+            "radius": "0.03"
+          }
+        ]
+      },
+      "right_shoulder_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_shoulder_yaw_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_shoulder_yaw_link.STL"
+          }
+        ]
+      },
+      "right_elbow_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_elbow_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_elbow_link.STL"
+          }
+        ]
+      },
+      "right_wrist_roll_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_wrist_roll_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_wrist_roll_link.STL"
+          }
+        ]
+      },
+      "right_wrist_pitch_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_wrist_pitch_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_wrist_pitch_link.STL"
+          }
+        ]
+      },
+      "right_wrist_yaw_link": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_wrist_yaw_link.STL"
+          }
+        ],
+        "collision": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_wrist_yaw_link.STL"
+          }
+        ]
+      },
+      "right_rubber_hand": {
+        "visual": [
+          {
+            "type": "mesh",
+            "filename": "package://unitree_g1/meshes/right_rubber_hand.STL"
+          }
+        ],
+        "collision": []
+      }
+    }
+  },
+  "imported_prefab": {
+    "name": "g1_29dof",
+    "link_count": 40,
+    "joint_count": 40,
+    "joint_types": {
+      "FREE": 1,
+      "HARD": 10,
+      "REVOLUTE": 29
+    },
+    "root_joint_name": "world_joint",
+    "root_joint_type": "FREE",
+    "default_pose_value_count": 29,
+    "links_with_collision_shape": 25,
+    "links_with_render_model": 36,
+    "all_loaded_shape_paths_absolute": true,
+    "all_loaded_shape_paths_exist": true,
+    "primitive_collision_links_with_loaded_shape": [],
+    "primitive_only_collision_links_without_loaded_shape": [
+      "left_ankle_roll_link",
+      "left_shoulder_pitch_link",
+      "left_shoulder_roll_link",
+      "right_ankle_roll_link",
+      "right_shoulder_pitch_link",
+      "right_shoulder_roll_link"
+    ],
+    "links": [
+      {
+        "index": 0,
+        "name": "pelvis",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/pelvis.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 1,
+        "name": "imu_in_pelvis",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "",
+        "render_model_file_is_absolute": false,
+        "render_model_file_exists": false
+      },
+      {
+        "index": 2,
+        "name": "left_hip_pitch_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_hip_pitch_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_hip_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 3,
+        "name": "left_hip_roll_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_hip_roll_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_hip_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 4,
+        "name": "left_hip_yaw_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_hip_yaw_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_hip_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 5,
+        "name": "left_knee_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_knee_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_knee_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 6,
+        "name": "left_ankle_pitch_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_ankle_pitch_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_ankle_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 7,
+        "name": "left_ankle_roll_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_ankle_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 8,
+        "name": "pelvis_contour_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/pelvis_contour_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/pelvis_contour_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 9,
+        "name": "right_hip_pitch_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_hip_pitch_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_hip_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 10,
+        "name": "right_hip_roll_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_hip_roll_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_hip_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 11,
+        "name": "right_hip_yaw_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_hip_yaw_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_hip_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 12,
+        "name": "right_knee_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_knee_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_knee_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 13,
+        "name": "right_ankle_pitch_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_ankle_pitch_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_ankle_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 14,
+        "name": "right_ankle_roll_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_ankle_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 15,
+        "name": "waist_yaw_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/waist_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 16,
+        "name": "waist_roll_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/waist_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 17,
+        "name": "torso_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/torso_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/torso_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 18,
+        "name": "d435_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "",
+        "render_model_file_is_absolute": false,
+        "render_model_file_exists": false
+      },
+      {
+        "index": 19,
+        "name": "head_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/head_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/head_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 20,
+        "name": "imu_in_torso",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "",
+        "render_model_file_is_absolute": false,
+        "render_model_file_exists": false
+      },
+      {
+        "index": 21,
+        "name": "left_shoulder_pitch_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_shoulder_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 22,
+        "name": "left_shoulder_roll_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_shoulder_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 23,
+        "name": "left_shoulder_yaw_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_shoulder_yaw_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_shoulder_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 24,
+        "name": "left_elbow_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_elbow_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_elbow_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 25,
+        "name": "left_wrist_roll_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_wrist_roll_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_wrist_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 26,
+        "name": "left_wrist_pitch_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_wrist_pitch_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_wrist_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 27,
+        "name": "left_wrist_yaw_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_wrist_yaw_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_wrist_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 28,
+        "name": "left_rubber_hand",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/left_rubber_hand.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 29,
+        "name": "logo_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/logo_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/logo_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 30,
+        "name": "mid360_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "",
+        "render_model_file_is_absolute": false,
+        "render_model_file_exists": false
+      },
+      {
+        "index": 31,
+        "name": "right_shoulder_pitch_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_shoulder_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 32,
+        "name": "right_shoulder_roll_link",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_shoulder_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 33,
+        "name": "right_shoulder_yaw_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_shoulder_yaw_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_shoulder_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 34,
+        "name": "right_elbow_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_elbow_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_elbow_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 35,
+        "name": "right_wrist_roll_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_wrist_roll_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_wrist_roll_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 36,
+        "name": "right_wrist_pitch_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_wrist_pitch_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_wrist_pitch_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 37,
+        "name": "right_wrist_yaw_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_wrist_yaw_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_wrist_yaw_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 38,
+        "name": "right_rubber_hand",
+        "shape_file": "",
+        "shape_file_is_absolute": false,
+        "shape_file_exists": false,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/right_rubber_hand.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      },
+      {
+        "index": 39,
+        "name": "waist_support_link",
+        "shape_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/waist_support_link.STL",
+        "shape_file_is_absolute": true,
+        "shape_file_exists": true,
+        "render_model_file": "$NEWTON_ASSET_CACHE/unitree_g1/meshes/waist_support_link.STL",
+        "render_model_file_is_absolute": true,
+        "render_model_file_exists": true
+      }
+    ]
+  },
+  "simulation": {
+    "requested_steps": 10,
+    "completed_steps": 10,
+    "time_step_s": 0.002,
+    "start_height_m": 0.85,
+    "gravity_m_s2": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "actor_creation_wall_time_s": 232.427221,
+    "runtime_dof_count": 35,
+    "runtime_nested_link_count": 40,
+    "initial_root_translation_m": [
+      0.0,
+      0.0,
+      0.8500000238418579
+    ],
+    "step_records": [
+      {
+        "step": 1,
+        "scene_time_s": 0.002,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000768
+      },
+      {
+        "step": 2,
+        "scene_time_s": 0.004,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000281
+      },
+      {
+        "step": 3,
+        "scene_time_s": 0.006,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000234
+      },
+      {
+        "step": 4,
+        "scene_time_s": 0.008,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000238
+      },
+      {
+        "step": 5,
+        "scene_time_s": 0.01,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000222
+      },
+      {
+        "step": 6,
+        "scene_time_s": 0.012,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000218
+      },
+      {
+        "step": 7,
+        "scene_time_s": 0.014,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000216
+      },
+      {
+        "step": 8,
+        "scene_time_s": 0.016,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000213
+      },
+      {
+        "step": 9,
+        "scene_time_s": 0.018000000000000002,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.00023
+      },
+      {
+        "step": 10,
+        "scene_time_s": 0.020000000000000004,
+        "root_translation_m": [
+          0.0,
+          0.0,
+          0.8500000238418579
+        ],
+        "solver_convergence_status": "STOPPED",
+        "solver_residual_norm": 262.35882568359375,
+        "max_non_linear_iterations": 1,
+        "max_line_search_iterations": 0,
+        "wall_time_s": 0.000215
+      }
+    ],
+    "final_root_translation_m": [
+      0.0,
+      0.0,
+      0.8500000238418579
+    ],
+    "root_displacement_m": 0.0,
+    "root_vertical_displacement_m": 0.0,
+    "articulated_pose_all_finite": true,
+    "convergence_status_counts": {
+      "STOPPED": 10
+    }
+  },
+  "superdex_logs": [
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/right_wrist_yaw_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/right_shoulder_yaw_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/left_shoulder_yaw_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/torso_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/right_ankle_pitch_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/right_hip_pitch_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/left_ankle_pitch_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "WARNING",
+      "message": "Actor 'g1_29dof/left_hip_pitch_link': The collider mesh is not topologically closed (not a closed surface).\n  The SDF sign may be incorrect, causing unreliable collision detection near the open boundaries.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_physics/src/mochi_contact.cpp",
+      "source_line": 3836,
+      "count": 1
+    },
+    {
+      "channel": "ERROR",
+      "message": "Matrix is singular or needs pivoting.",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_core/include/mochi_core/linear_algebra/ldlt.h",
+      "source_line": 351,
+      "count": 20
+    },
+    {
+      "channel": "WARNING",
+      "message": "Linear solver didn't converge after 0 iterations: |r|=0.00000e+00, |r|/|r0|=0.00000e+00",
+      "source_file": "$SUPERDEX_CHECKOUT/superdex_physics/libraries/mochi/mochi_core/src/solvers/newton_solver.cpp",
+      "source_line": 775,
+      "count": 20
+    }
+  ],
+  "total_wall_time_s": 232.463551
+}
