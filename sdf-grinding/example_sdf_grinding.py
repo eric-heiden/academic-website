@@ -103,6 +103,20 @@ def _subtract_cylinder_from_subgrid_sdf(
     sdf_values[texture_z, texture_y, texture_x] = wp.max(sdf_values[texture_z, texture_y, texture_x], -grinder_distance)
 
 
+@wp.kernel(enable_backward=False)
+def _compute_normal_load(
+    contact_count: wp.array[wp.int32],
+    contact_distance: wp.array[wp.float32],
+    contact_stiffness: wp.array[wp.float32],
+    normal_load: wp.array[wp.float32],
+):
+    contact = wp.tid()
+    if contact < contact_count[0]:
+        normal_load[contact] = wp.max(-contact_distance[contact] * contact_stiffness[contact], 0.0)
+    else:
+        normal_load[contact] = 0.0
+
+
 class Example:
     def __init__(self, viewer, _args):
         self.viewer = viewer
@@ -166,8 +180,21 @@ class Example:
 
         self.model = builder.finalize()
         self.state_0 = self.model.state()
-        self.collision_pipeline = newton.CollisionPipeline(self.model)
+        self.collision_pipeline = newton.CollisionPipeline(
+            self.model,
+            sdf_hydroelastic_config=newton.geometry.HydroelasticSDF.Config(
+                output_contact_surface=True,
+            ),
+        )
         self.contacts = self.collision_pipeline.contacts()
+        self.contact_surface = self.collision_pipeline.hydroelastic_sdf.get_contact_surface()
+        self.contact_distance = wp.empty(
+            self.contacts.rigid_contact_max,
+            dtype=wp.float32,
+            device=self.model.device,
+        )
+        self.normal_load = wp.empty_like(self.contact_distance)
+        self.total_normal_load = 0.0
 
         texture_data = self.workpiece_sdf.texture_data
         if texture_data is None:
@@ -201,6 +228,7 @@ class Example:
         self._update_workpiece_surface()
 
         self.viewer.set_model(self.model)
+        self.viewer.show_hydro_contact_surface = True
         self.viewer.set_camera(pos=wp.vec3(0.8, -0.85, 0.5), pitch=-18.0, yaw=132.0)
 
     @staticmethod
@@ -265,6 +293,24 @@ class Example:
 
         # Run hydroelastic SDF-SDF collision before editing the workpiece.
         self.collision_pipeline.collide(self.state_0, self.contacts)
+        newton.eval_rigid_contact_kinematics(
+            self.model,
+            self.state_0,
+            self.contacts,
+            out_distance=self.contact_distance,
+        )
+        wp.launch(
+            _compute_normal_load,
+            dim=self.contacts.rigid_contact_max,
+            inputs=[
+                self.contacts.rigid_contact_count,
+                self.contact_distance,
+                self.contacts.rigid_contact_stiffness,
+                self.normal_load,
+            ],
+            device=self.model.device,
+        )
+        self.total_normal_load = float(wp.utils.array_sum(self.normal_load))
         self._subtract_grinder(grinder_pose)
         self._update_workpiece_surface()
         self.sim_time += self.frame_dt
@@ -281,6 +327,8 @@ class Example:
             metallic=0.25,
             dynamic=True,
         )
+        self.viewer.log_hydro_contact_surface(self.contact_surface)
+        self.viewer.log_scalar("Hydroelastic normal load [N]", self.total_normal_load)
         self.viewer.end_frame()
 
 

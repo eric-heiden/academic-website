@@ -89,6 +89,7 @@
         <li>The workpiece is a static ellipsoid stored as a texture SDF.</li>
         <li>The grinder is a kinematic cylinder. Both shapes have hydroelastic contact enabled.</li>
         <li>Each frame calls the hydroelastic collision pipeline directly.</li>
+        <li>ViewerGL renders the contact surface and plots its integrated pressure.</li>
         <li>The grinder volume is subtracted from the workpiece with an SDF CSG difference.</li>
         <li>The zero isosurface is rebuilt with Marching Cubes and logged as a dynamic ViewerGL mesh.</li>
       </ul>
@@ -97,12 +98,13 @@
       <video controls muted loop playsinline preload="metadata" poster="poster.jpg">
         <source src="sdf_grinding.mp4" type="video/mp4">
       </video>
-      <p class="note">ViewerGL shows the moving tool and the updated workpiece mesh.</p>
+      <p class="note">ViewerGL shows the moving tool, updated workpiece, and hydroelastic contact field.</p>
 
       <h2>Set up SDF-SDF contact</h2>
       <ul>
         <li>Build the workpiece SDF explicitly so its samples can be edited later.</li>
         <li>Set <code>is_hydroelastic=True</code> on both shape configurations.</li>
+        <li>Request the contact surface for ViewerGL.</li>
         <li>No solver is required to call the collision pipeline.</li>
       </ul>
       <pre><code>workpiece_sdf = workpiece_mesh.build_sdf(
@@ -119,9 +121,19 @@ shape_cfg = newton.ModelBuilder.ShapeConfig(
     margin=0.0,
 )
 
-pipeline = newton.CollisionPipeline(model)
+pipeline = newton.CollisionPipeline(
+    model,
+    sdf_hydroelastic_config=newton.geometry.HydroelasticSDF.Config(
+        output_contact_surface=True,
+    ),
+)
 contacts = pipeline.contacts()
-pipeline.collide(state, contacts)</code></pre>
+pipeline.collide(state, contacts)
+
+viewer.show_hydro_contact_surface = True
+viewer.log_hydro_contact_surface(
+    pipeline.hydroelastic_sdf.get_contact_surface()
+)</code></pre>
 
       <h2>Remove material</h2>
       <ul>
@@ -149,8 +161,9 @@ viewer.log_mesh(
       <h2>Notes</h2>
       <ul>
         <li>This is geometric removal only. Contact forces do not drive the grinder.</li>
-        <li>The collision results are not rendered or passed to a solver.</li>
-        <li>A physical wear model could scale removal by contact pressure, slip speed, and time step.</li>
+        <li>The built-in contact-surface color is based on penetration depth. With the same linear stiffness on both shapes, it is proportional to pressure.</li>
+        <li>The plotted value is integrated pressure, or normal load: <code>sum(max(-distance * stiffness, 0))</code>.</li>
+        <li>A physical wear model could scale removal by pressure, slip speed, and time step.</li>
         <li>Higher SDF resolution increases both the number of edited samples and the cost of rebuilding the Marching Cubes mesh.</li>
         <li>The example requires a CUDA-capable device.</li>
       </ul>
