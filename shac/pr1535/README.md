@@ -21,7 +21,7 @@ Blackwell Server Edition MIG 1g.24gb partition with driver 595.58.03.
 
 | Environment | MJWarp | MuJoCo | Warp | NumPy | PyTorch |
 | --- | --- | --- | --- | --- | --- |
-| PR lock | 3.10.0.1 | 3.10.0 | 1.14.0 | 2.3.4 | not needed |
+| PR lock | 3.10.0.1 | 3.10.0.dev932327625 (reports 3.10.0) | 1.14.0 | 2.3.4 | not needed |
 | Newton integration | 3.10.0.1, editable PR checkout | 3.12.0 | 1.17.0 | 2.5.0 | 2.11.0+cu128 |
 
 ## 1. Create the exact checkouts
@@ -214,6 +214,137 @@ To reevaluate a saved policy explicitly:
   --output "$RESULTS/ant_seed17_reevaluation.json"
 ```
 
+## 6. Reproduce the failure diagnosis
+
+The standalone diagnostic keeps the original v1 training artifacts unchanged.
+It measures actor and critic saturation for both saved policy snapshots from
+all six v1 runs, replays frozen final-policy action tapes through direct MJWarp
+and CPU MuJoCo, and checks
+finite differences of the complete closed-loop actor objective—including the
+terminal target critic—at nominal and available pre-fall states.
+
+```bash
+"$PYTHON" "$REPORT_ROOT/shac/pr1535/diagnose_failures.py" \
+  --results-dir "$RESULTS" \
+  --pr-root "$MJW_PR_ROOT" --newton-root "$NEWTON_SHAC_ROOT" \
+  --device cuda:0 \
+  --output "$RESULTS/failure_diagnostics.json"
+```
+
+The command fails closed on a different PR head or import location. Its full
+JSON retains per-step state-error, contact, and alive traces, plus every
+analytic and finite-difference direction; the compact `findings` object
+contains the report-ready aggregates.
+
+## 7. Reproduce the corrected v2 training runs
+
+`train_shac_v2.py` is the corrective follow-up. It preserves the v1 artifacts
+above and writes v2 JSON/checkpoint pairs under `results/fixed/`. These runs
+are still SHAC-style experiments rather than canonical SHAC benchmarks.
+
+```bash
+V2_TRAINER="$REPORT_ROOT/shac/pr1535/train_shac_v2.py"
+FIXED_RESULTS="$RESULTS/fixed"
+mkdir -p "$FIXED_RESULTS"
+```
+
+Corrected Ant configuration: 64 worlds, horizon 8, one raw physics step per
+action, and 200 epochs.
+
+```bash
+for SEED in 17 29 41; do
+  "$PYTHON" "$V2_TRAINER" \
+    --mode train --task ant \
+    --pr-root "$MJW_PR_ROOT" --newton-root "$NEWTON_SHAC_ROOT" \
+    --device cuda:0 --seed "$SEED" \
+    --worlds 64 --horizon 8 --action-repeat 1 --epochs 200 \
+    --actor-lr 0.001 --critic-lr 0.001 \
+    --critic-iterations 8 --critic-batches 4 --target-polyak 0.2 \
+    --stochastic-std 0.1 --reward-profile legacy \
+    --train-noise-profile narrow --eval-noise-profile narrow \
+    --eval-steps 500 --eval-every 20 \
+    --output "$FIXED_RESULTS/ant_seed${SEED}.json"
+done
+```
+
+Corrected Humanoid configuration: 32 worlds, horizon 32, three raw physics
+steps per action, and 150 epochs.
+
+```bash
+for SEED in 17 29 41; do
+  "$PYTHON" "$V2_TRAINER" \
+    --mode train --task humanoid \
+    --pr-root "$MJW_PR_ROOT" --newton-root "$NEWTON_SHAC_ROOT" \
+    --device cuda:0 --seed "$SEED" \
+    --worlds 32 --horizon 32 --action-repeat 3 --epochs 150 \
+    --actor-lr 0.001 --critic-lr 0.0005 \
+    --critic-iterations 8 --critic-batches 4 --target-polyak 0.995 \
+    --stochastic-std 0.1 --reward-profile diffrl \
+    --train-noise-profile canonical --eval-noise-profile canonical \
+    --eval-steps 200 --eval-every 25 \
+    --output "$FIXED_RESULTS/humanoid_seed${SEED}.json"
+done
+```
+
+Each v2 checkpoint saves the initial, periodically selected best, and final
+actors together with their matching observation-normalizer states.
+
+Validate all six runs, their per-task configuration consistency, recorded
+repository heads and source hashes, and their checkpoint files, then create the
+deterministic aggregate used by the report:
+
+```bash
+python "$REPORT_ROOT/shac/pr1535/summarize_fixed_results.py" \
+  --results-dir "$FIXED_RESULTS" \
+  --output "$FIXED_RESULTS/summary.json"
+```
+
+## 8. Generate the ViewerGL videos
+
+Install the pinned encoder helper into the Newton integration environment;
+this does not replace the editable MJWarp checkout.
+
+```bash
+uv pip install \
+  --python "$PYTHON" \
+  imageio-ffmpeg==0.6.0
+
+RENDERER="$REPORT_ROOT/shac/pr1535/render_viewergl.py"
+VIDEOS="$RESULTS/videos"
+mkdir -p "$VIDEOS"
+```
+
+Render any v1 or v2 checkpoint policy at the report defaults of 960x540 and
+50 fps. The command writes a browser-compatible H.264/yuv420p fast-start MP4,
+a JPEG poster, and a JSON manifest with behavior metrics and hashes.
+
+```bash
+PYGLET_HEADLESS=1 "$PYTHON" "$RENDERER" \
+  --checkpoint "$FIXED_RESULTS/ant_seed17.pt" \
+  --policy best \
+  --camera-mode track \
+  --pr-root "$MJW_PR_ROOT" \
+  --newton-root "$NEWTON_SHAC_ROOT" \
+  --overwrite \
+  --output "$VIDEOS/ant_v2_best.mp4"
+
+PYGLET_HEADLESS=1 "$PYTHON" "$RENDERER" \
+  --checkpoint "$FIXED_RESULTS/humanoid_seed17.pt" \
+  --policy best \
+  --camera-mode track \
+  --pr-root "$MJW_PR_ROOT" \
+  --newton-root "$NEWTON_SHAC_ROOT" \
+  --overwrite \
+  --output "$VIDEOS/humanoid_v2_best.mp4"
+```
+
+Use `--policy initial`, `--policy best`, or `--policy final` with the same
+checkpoint and reset to make direct visual comparisons. The renderer advances
+one fixed, non-noisy lane through MJWarp and freezes it at the first terminal
+state. ViewerGL replays that recorded MJWarp state trajectory. Native MuJoCo
+is used only for forward kinematics from each recorded `qpos` to body poses;
+it does **not** resimulate the trajectory.
+
 ## What this does—and does not—test
 
 `mjwarp_torch_bridge.py` is necessary because PR #1535 records its analytic
@@ -224,9 +355,10 @@ provenance and the environment is Newton's, but the physics step is called
 directly through MJWarp. These runs do **not** demonstrate gradients through
 Newton's public solver adapter.
 
-The bridge calls `mujoco_warp.enable_grad()` before `put_model`, replays one
-out-of-place step during PyTorch backward, and seeds the `qpos` and `qvel`
-output adjoints. Its intentionally narrow contract matters:
+The harness calls `mujoco_warp.enable_grad()` before constructing the bridge.
+The bridge calls `put_model`, replays one out-of-place step during PyTorch
+backward, and seeds the `qpos` and `qvel` output adjoints. Its intentionally
+narrow contract matters:
 
 - The standalone one-step gate is a local API test, not the first step of a
   training rollout: it uses 20 solver iterations and settles Humanoid for 10

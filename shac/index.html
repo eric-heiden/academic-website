@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="An exact-head retest of SHAC-style learning with the analytic adjoint in MuJoCo Warp PR #1535.">
-  <title>SHAC retest · MuJoCo Warp PR #1535</title>
+  <meta name="description" content="A diagnosed and corrected SHAC-style learning retest with the analytic adjoint in MuJoCo Warp PR #1535, including ViewerGL rollouts.">
+  <title>SHAC diagnosed and retested · MuJoCo Warp PR #1535</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     :root {
@@ -172,6 +172,7 @@
     section { margin-top: 25px; }
     .grid { display: grid; gap: 14px; }
     .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
     .panel { min-width: 0; padding: 19px; overflow-x: auto; }
@@ -259,6 +260,54 @@
       overflow: hidden;
     }
 
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .media-card {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .media-card video {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-bottom: 1px solid var(--line);
+      background: #121713;
+      object-fit: cover;
+    }
+
+    .media-copy { padding: 16px 18px 18px; }
+    .media-copy h3 { margin-bottom: 5px; }
+    .media-copy p { margin-bottom: 0; font-size: 0.84rem; }
+
+    .cause-number {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--forest);
+      font: 800 0.78rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .evidence {
+      margin-top: 12px;
+      padding: 11px 13px;
+      border-left: 3px solid var(--forest);
+      border-radius: 0 7px 7px 0;
+      background: var(--forest-soft);
+      color: #354940;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .evidence.fail {
+      border-left-color: var(--red);
+      background: var(--red-soft);
+    }
+
     .chart svg { display: block; width: 100%; height: auto; }
 
     .chart-fallback {
@@ -336,7 +385,7 @@
     }
 
     @media (max-width: 920px) {
-      .hero, .section-head, .bottom-line, .two, .four { grid-template-columns: 1fr; }
+      .hero, .section-head, .bottom-line, .two, .three, .four { grid-template-columns: 1fr; }
       .contract { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .contract div::after { display: none; }
     }
@@ -345,6 +394,7 @@
       main { width: min(100% - 22px, 1120px); padding-top: 18px; }
       .topline { align-items: flex-start; flex-direction: column; }
       .hero { padding-top: 20px; }
+      .media-grid { grid-template-columns: 1fr; }
       .contract { grid-template-columns: 1fr; }
       th, td { padding: 8px 6px; }
       footer { flex-direction: column; }
@@ -355,75 +405,289 @@
   <main>
     <nav class="topline" aria-label="Report context">
       <a href="/">reports.eric-heiden.com</a>
-      <span>Exact-head experiment · 4 September 2026 · raw data published</span>
+      <span>Exact-head diagnosis + corrective retest · 4 September 2026 · raw data published</span>
     </nav>
 
     <header class="hero">
       <div>
-        <div class="eyebrow">SHAC × MuJoCo Warp · PR #1535 retest</div>
-        <h1>The local adjoint works. The learner is not solved.</h1>
+        <div class="eyebrow">SHAC × MuJoCo Warp · PR #1535 diagnosed</div>
+        <h1>Ant trains after the harness fix. Humanoid still falls.</h1>
         <p class="lede">
-          At commit <code>02d09b1</code>, the opt-in out-of-place adjoint passes sampled one-step
-          action-to-state checks for Ant and the PR's bundled Humanoid. Multi-step contact gradients
-          are conditional. Cold-start SHAC-style Ant has a small, repeatable early signal, then
-          regresses; the Humanoid feasibility run fails.
+          At the latest PR head, <code>02d09b1</code>, the analytic adjoint passes the local step gates
+          and full closed-loop actor-objective checks we exercised. The first learner was the larger
+          problem: it over-scaled actor gradients, saturated its critic, and gave Humanoid only 20 ms
+          of direct consequence. A bundled corrective three-seed run gives Ant real motion; Humanoid improves
+          materially but does not yet balance for a full episode.
         </p>
         <div class="chips">
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/pull/1535">PR #1535 · draft</a>
           <a class="chip" href="https://github.com/google-deepmind/mujoco_warp/commit/02d09b139fdf091e1e859d7f41c47a8f71d30574">exact commit</a>
           <a class="chip" href="pr1535/README.md">reproduction guide</a>
-          <a class="chip" href="pr1535/results/summary.json">machine-readable summary</a>
+          <a class="chip" href="pr1535/results/fixed/summary.json">corrected-run summary</a>
+          <a class="chip" href="#viewergl">ViewerGL rollouts</a>
         </div>
       </div>
       <aside class="verdict-card" aria-label="Verdict">
         <span class="label">Report verdict</span>
-        <strong>Promising primitive; preliminary learning evidence.</strong>
-        <div class="status-line"><span class="tag pass">Pass</span><span>sampled one-step VJP</span></div>
-        <div class="status-line"><span class="tag mixed">Mixed</span><span>multi-step gradients</span></div>
-        <div class="status-line"><span class="tag mixed">Early</span><span>Ant learning signal</span></div>
-        <div class="status-line"><span class="tag fail">Fail</span><span>Humanoid short run</span></div>
+        <strong>The baseline failure is diagnosed; Ant improves, Humanoid remains unsolved.</strong>
+        <div class="status-line"><span class="tag pass">Pass</span><span>step + objective gradients</span></div>
+        <div class="status-line"><span class="tag pass">Pass</span><span>CPU/MJWarp forward parity</span></div>
+        <div class="status-line"><span class="tag pass">3 / 3</span><span>Ant holdout improvement</span></div>
+        <div class="status-line"><span class="tag mixed">Partial</span><span>Humanoid; 0 / 3 finish</span></div>
       </aside>
     </header>
 
     <section class="grid four" aria-label="Headline results">
       <article class="panel metric">
-        <span class="label">One-step gate</span>
-        <div class="value">1.60×10<sup>−4</sup></div>
-        <p>Worst relative error across both Ant objectives; Humanoid is lower. Both pass the 0.5% gate.</p>
+        <span class="label">Corrected Ant return</span>
+        <div class="value">+23.15%</div>
+        <p>633.26 → 779.89 mean paired holdout return across seeds 17, 29, and 41.</p>
+      </article>
+      <article class="panel metric">
+        <span class="label">Corrected Ant motion</span>
+        <div class="value">19.6×</div>
+        <p>Mean displacement rises from 0.099 m to 1.935 m over five-second holdouts.</p>
       </article>
       <article class="panel metric mixed">
-        <span class="label">Ant holdout</span>
-        <div class="value">+1.37%</div>
-        <p>Mean selected-checkpoint return across three independent holdouts; displacement gains 0.107 m.</p>
+        <span class="label">Corrected Humanoid</span>
+        <div class="value">+28.8%</div>
+        <p>Mean alive time improves from ≈0.669 s to ≈0.862 s; every three-second rollout still falls.</p>
       </article>
-      <article class="panel metric fail">
-        <span class="label">Ant horizon sweep</span>
-        <div class="value">H16, H32 fail</div>
-        <p>Both show sign errors and perturbed contact-count changes in the sampled schedule.</p>
-      </article>
-      <article class="panel metric fail">
-        <span class="label">Humanoid training</span>
-        <div class="value">0 / 3 learned</div>
-        <p>The return selector keeps the untrained epoch-0 actor in every 100-update run.</p>
+      <article class="panel metric">
+        <span class="label">Forward replay parity</span>
+        <div class="value">≤6.96×10<sup>−6</sup></div>
+        <p>Maximum qpos error versus CPU MuJoCo on frozen policy tapes; terminal/contact counts agree.</p>
       </article>
     </section>
 
     <section class="panel bottom-line">
       <div>
         <span class="label">Bottom line</span>
-        <h2>Useful, not conclusive</h2>
+        <h2>The learner failed first</h2>
       </div>
       <p>
-        This is credible integration evidence for PR #1535's analytic step adjoint—not evidence that
-        “SHAC works” in general. Ant's selected policies move only about 0.043 m/s, final policies are
-        worse than initialization, and Humanoid collapses. The run is also <strong>SHAC-style</strong>,
-        not a canonical benchmark reproduction and not a gradient test through Newton's public solver adapter.
+        MJWarp and CPU MuJoCo closely replay the same failing actions, and analytic gradients of the
+        complete configured objective agree with finite differences on nominal and pre-fall states.
+        The reproduced collapse instead coincides with a nearly constant saturated critic plus a myopic,
+        over-scaled actor update. A corrective bundle addressing these and other harness choices produces
+        Ant locomotion and substantially delays Humanoid's fall. The experiment does not ablate each change,
+        does not solve Humanoid, and does not erase the PR's topology-sensitive contact-gradient limitation.
       </p>
     </section>
 
-    <div class="section-head">
+    <div class="section-head" id="viewergl">
       <div>
-        <div class="kicker">01 · Gradient evidence</div>
+        <div class="kicker">01 · ViewerGL rollouts</div>
+        <h2>Watch the failure—and the corrected policies</h2>
+      </div>
+      <p>These are real checkpoint rollouts from the exact MJWarp PR, rendered headlessly at 960×540 and 50 fps by Newton's ViewerGL.</p>
+    </div>
+
+    <section class="media-grid" aria-label="ViewerGL checkpoint rollouts">
+      <figure class="panel media-card">
+        <video controls muted playsinline preload="metadata" poster="pr1535/results/videos/ant_v2_initial.jpg">
+          <source src="pr1535/results/videos/ant_v2_initial.mp4" type="video/mp4">
+          <a href="pr1535/results/videos/ant_v2_initial.mp4">Download the Ant initial-policy video.</a>
+        </video>
+        <figcaption class="media-copy">
+          <span class="tag mixed">Ant · initial</span>
+          <h3>0.137 m in 5.0 s</h3>
+          <p>Corrected-harness seed 17 at epoch 0; the deterministic nominal rollout remains alive. <a href="pr1535/results/videos/ant_v2_initial.json">Manifest</a></p>
+        </figcaption>
+      </figure>
+      <figure class="panel media-card">
+        <video controls muted playsinline preload="metadata" poster="pr1535/results/videos/ant_v2_best.jpg">
+          <source src="pr1535/results/videos/ant_v2_best.mp4" type="video/mp4">
+          <a href="pr1535/results/videos/ant_v2_best.mp4">Download the trained Ant video.</a>
+        </video>
+        <figcaption class="media-copy">
+          <span class="tag pass">Ant · selected</span>
+          <h3>2.714 m in 5.0 s</h3>
+          <p>Seed 17 at epoch 200; this nominal lane remains alive and earns 886.54. <a href="pr1535/results/videos/ant_v2_best.json">Manifest</a></p>
+        </figcaption>
+      </figure>
+      <figure class="panel media-card">
+        <video controls muted playsinline preload="metadata" poster="pr1535/results/videos/humanoid_v1_final.jpg">
+          <source src="pr1535/results/videos/humanoid_v1_final.mp4" type="video/mp4">
+          <a href="pr1535/results/videos/humanoid_v1_final.mp4">Download the failed Humanoid video.</a>
+        </video>
+        <figcaption class="media-copy">
+          <span class="tag fail">Humanoid · old final</span>
+          <h3>Terminal at 0.205 s</h3>
+          <p>The original seed-17 actor learns the diagnosed forward dive; the renderer freezes the first terminal state. <a href="pr1535/results/videos/humanoid_v1_final.json">Manifest</a></p>
+        </figcaption>
+      </figure>
+      <figure class="panel media-card">
+        <video controls muted playsinline preload="metadata" poster="pr1535/results/videos/humanoid_v2_best.jpg">
+          <source src="pr1535/results/videos/humanoid_v2_best.mp4" type="video/mp4">
+          <a href="pr1535/results/videos/humanoid_v2_best.mp4">Download the corrected Humanoid video.</a>
+        </video>
+        <figcaption class="media-copy">
+          <span class="tag mixed">Humanoid · corrected</span>
+          <h3>Terminal at 1.065 s</h3>
+          <p>Corrected seed 17 at epoch 125 travels 0.712 m, but it still falls. This is progress, not a solved gait. <a href="pr1535/results/videos/humanoid_v2_best.json">Manifest</a></p>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="panel" style="margin-top: 14px">
+      <h3>What ViewerGL is showing</h3>
+      <p style="margin-bottom: 0">
+        The renderer advances one fixed, noise-free lane through
+        <code>MJWarpTorchBridge._forward_raw</code>, records every <code>qpos</code>, and freezes after
+        the first terminal transition. Native MuJoCo performs forward kinematics only to convert
+        those recorded joint states into body poses; it never advances dynamics. ViewerGL then draws
+        the corresponding Newton model on CPU with CUDA interop disabled. Each linked manifest hashes
+        the checkpoint, policy state, trajectory, renderer, poster, and H.264/yuv420p MP4.
+      </p>
+    </section>
+
+    <div class="section-head" id="diagnosis">
+      <div>
+        <div class="kicker">02 · Failure diagnosis</div>
+        <h2>Three diagnosed learner-side contributors</h2>
+      </div>
+      <p>The diagnosis uses the unchanged v1 checkpoints. It separates a simulator/adjoint problem from an optimization-system problem before changing the trainer.</p>
+    </div>
+
+    <section class="grid three">
+      <article class="panel">
+        <span class="cause-number">01 / SCALE</span>
+        <h3>The actor loss omitted ÷ horizon</h3>
+        <p>The original harness averaged worlds but not time. Against the released SHAC update, gradients were H-times larger before clipping: 8× for Ant and 4× for Humanoid.</p>
+        <div class="evidence">Ant clipped in 39–58 of 100 updates by seed (maximum pre-clip norm 48.26); Humanoid clipped in 91–94.</div>
+      </article>
+      <article class="panel">
+        <span class="cause-number">02 / CRITIC</span>
+        <h3>The tanh critic became nearly constant</h3>
+        <p>The terminal value supplied most of the numerical actor objective, but the second tanh layer saturated, removing the state derivative needed to see beyond the short rollout.</p>
+        <div class="evidence fail">99.976–100% of final-policy second-layer activations have |h|&gt;.99. Humanoid's final target <code>‖dV/dobs‖₂</code> is exactly zero in all three seeds.</div>
+      </article>
+      <article class="panel">
+        <span class="cause-number">03 / MYOPIA</span>
+        <h3>Twenty milliseconds rewards a dive</h3>
+        <p>Humanoid's H4 window ends at 0.020 s; its final-policy fall occurs at 0.215 s. At the nominal pose, alive, upright, height, and zero-control terms have no useful first-order stability signal, leaving forward acceleration.</p>
+        <div class="evidence fail">The terminal critic contributes about 85% of the final-policy objective while its gradient is flat. Final action RMS reaches .557–.565, versus .00328–.00361 for the selected epoch-0 policies.</div>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel">
+        <h2>The backend was not the divergence</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Frozen final-policy tape</th><th class="num">Compared span</th><th class="num">Max |Δqpos|</th><th>Terminal / contacts</th></tr></thead>
+            <tbody>
+              <tr><td>Ant · MJWarp vs CPU MuJoCo</td><td class="num">500 steps · 5.0 s</td><td class="num">6.96×10<sup>−6</sup></td><td>Neither terminates; 0 count mismatches</td></tr>
+              <tr><td>Humanoid · MJWarp vs CPU MuJoCo</td><td class="num">43 steps · 0.215 s</td><td class="num">2.44×10<sup>−6</sup></td><td>Both terminate at step 43; 0 count mismatches</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Reported error is the worse of normal CPU state carry and a replay that resets warm-start state every step to match the bridge's deliberately narrow qpos/qvel contract; the terminal/contact conclusion is unchanged.</p>
+      </article>
+      <article class="panel">
+        <h2>The configured actor gradient checks out</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Complete v1 objective</th><th class="num">Max relative error</th><th>Topology / sign</th></tr></thead>
+            <tbody>
+              <tr><td>Ant · nominal · H8</td><td class="num">0.148%</td><td>3 / 3 signs; no count or alive changes</td></tr>
+              <tr><td>Humanoid · nominal · H4</td><td class="num">0.691%</td><td>3 / 3 signs; no count or alive changes</td></tr>
+              <tr><td>Humanoid · last pre-fall state · H4</td><td class="num">1.469%</td><td>3 / 3 signs; no count or alive changes</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">These finite differences perturb actor parameters and include the frozen target critic—not merely a fixed action tape. See the <a href="pr1535/results/failure_diagnostics.json">full 623 kB diagnostic artifact</a>.</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>What changed in the corrective harness</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Failure surface</th><th>Original v1</th><th>Corrected v2</th></tr></thead>
+          <tbody>
+            <tr><td>Actor scale</td><td>Mean over worlds only</td><td>Mean over worlds and horizon, matching the released SHAC loss</td></tr>
+            <tr><td>Critic conditioning</td><td>Two tanh layers; fixed observation scaling</td><td>ELU + LayerNorm; running observation mean/variance; minibatched updates</td></tr>
+            <tr><td>Optimization</td><td>Constant learning rate; deterministic actor</td><td>Linear LR decay; reparameterized Gaussian training actions; deterministic evaluation</td></tr>
+            <tr><td>Rollout state</td><td>One indefinitely advancing stream</td><td>Health and episode-boundary resets; matched normalizer saved per policy</td></tr>
+            <tr><td>Humanoid horizon</td><td>H4 × .005 = .020 s</td><td>H32 × 3 × .005 = .480 s</td></tr>
+            <tr><td>Humanoid target / task</td><td>Retention .4; sparse local stability signal</td><td>Retention .995; DiffRL-like dense height/heading/control reward and broader reset noise</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        These choices are informed by the immutable
+        <a href="https://github.com/NVlabs/DiffRL/blob/a4c0dd1696d3c3b885ce85a3cb64370b580cb913/algorithms/shac.py#L245-L300">released SHAC update</a>,
+        <a href="https://github.com/NVlabs/DiffRL/blob/a4c0dd1696d3c3b885ce85a3cb64370b580cb913/examples/cfg/shac/ant.yaml">Ant config</a>, and
+        <a href="https://github.com/NVlabs/DiffRL/blob/a4c0dd1696d3c3b885ce85a3cb64370b580cb913/examples/cfg/shac/humanoid.yaml">Humanoid config</a>.
+        The v2 harness is still intentionally smaller and remains “SHAC-style,” not a canonical reproduction.
+      </p>
+    </section>
+
+    <div class="section-head" id="corrected">
+      <div>
+        <div class="kicker">03 · Corrected learning</div>
+        <h2>Ant locomotes; Humanoid makes partial progress</h2>
+      </div>
+      <p>All comparisons pair the initial and selected policy on an independent holdout reset batch. Selection and holdout seeds are separate; evaluation is deterministic.</p>
+    </div>
+
+    <section class="grid two">
+      <article class="panel">
+        <span class="tag pass">3 / 3 improve</span>
+        <h2 style="margin-top: 10px">Ant · N64 · H8 · 200 updates</h2>
+        <p>The legacy Ant reward and five-second narrow-noise evaluation are retained, so this comparison is directly interpretable against initialization and the original run.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Seed</th><th class="num">Epoch</th><th class="num">Return</th><th class="num">Displacement</th><th class="num">Alive mean</th></tr></thead>
+            <tbody>
+              <tr><td>17</td><td class="num">200</td><td class="num">635.15 → 840.51</td><td class="num">0.115 → 2.880 m</td><td class="num">.955</td></tr>
+              <tr><td>29</td><td class="num">200</td><td class="num">628.11 → 829.63</td><td class="num">0.046 → 2.437 m</td><td class="num">.972</td></tr>
+              <tr><td>41</td><td class="num">160</td><td class="num">636.52 → 669.54</td><td class="num">0.135 → 0.487 m</td><td class="num">1.000</td></tr>
+              <tr class="mean"><td>Mean</td><td class="num">—</td><td class="num">633.26 → 779.89</td><td class="num">0.099 → 1.935 m</td><td class="num">.976</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="readout">Paired holdout return gains 146.63 points (+23.15%); displacement gains 1.836 m. All three seeds improve, although seed 41 is much weaker and 9.9% of lanes are down at the endpoint on average.</div>
+      </article>
+      <article class="panel">
+        <h2>Ant evaluation during correction</h2>
+        <p>Return change on the checkpoint-selection batch. Filled marks identify each selected best-return epoch.</p>
+        <div id="fixed-ant-chart" class="chart" aria-live="polite"><div class="chart-fallback">Loading corrected Ant histories…</div></div>
+        <p class="note">Faint lines are individual seeds; the dark line is their mean. The independent holdout numbers at left are the reported result.</p>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article class="panel">
+        <span class="tag mixed">Improved, unsolved</span>
+        <h2 style="margin-top: 10px">Humanoid · N32 · H32×3 · 150 updates</h2>
+        <p>The v2 task uses canonical reset noise and a DiffRL-like reward. Raw returns therefore compare only within this corrected run, not to the legacy-reward v1 run.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Seed</th><th class="num">Epoch</th><th class="num">Return</th><th class="num">Displacement</th><th class="num">Alive time</th></tr></thead>
+            <tbody>
+              <tr><td>17</td><td class="num">125</td><td class="num">74.61 → 158.53</td><td class="num">0.068 → 0.823 m</td><td class="num">.614 → .833 s</td></tr>
+              <tr><td>29</td><td class="num">150</td><td class="num">77.46 → 151.02</td><td class="num">−0.016 → 0.701 m</td><td class="num">.666 → .838 s</td></tr>
+              <tr><td>41</td><td class="num">100</td><td class="num">84.74 → 129.64</td><td class="num">0.035 → 0.200 m</td><td class="num">.727 → .914 s</td></tr>
+              <tr class="mean"><td>Mean</td><td class="num">—</td><td class="num">78.94 → 146.39</td><td class="num">0.029 → 0.574 m</td><td class="num">.669 → .862 s</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="readout fail">On average, alive time rises 28.8% and return rises 85.5%; both improve in every paired holdout. But all 96 lanes are below the health threshold by 3.0 s. The corrective bundle delays the immediate collapse; it does not establish stable Humanoid locomotion.</div>
+      </article>
+      <article class="panel">
+        <h2>Humanoid survival during correction</h2>
+        <p>Change in mean alive time on the checkpoint-selection batch, in simulated seconds.</p>
+        <div id="fixed-humanoid-chart" class="chart" aria-live="polite"><div class="chart-fallback">Loading corrected Humanoid histories…</div></div>
+        <p class="note">The three independent holdouts improve by +0.219 s, +0.172 s, and +0.188 s. No selected policy reaches the three-second endpoint.</p>
+      </article>
+    </section>
+
+    <div class="section-head" id="gradients">
+      <div>
+        <div class="kicker">04 · Gradient evidence</div>
         <h2>A strong local check, then a conditional trajectory check</h2>
       </div>
       <p>Central differences use ε=0.01. Every number below comes from the exact PR checkout, not the earlier PR #1423 report.</p>
@@ -484,21 +748,21 @@
             </tbody>
           </table>
         </div>
-        <p class="note">† includes a sign disagreement. “Count mismatch” means that many directions changed the batched active-contact count under ±ε. Equal counts do not prove equal contact identity or closest feature.</p>
+        <p class="note">† includes a sign disagreement. “Count mismatch” means that many directions changed the batched active-contact count under ±ε. Equal counts do not prove equal contact identity or closest feature. PR #1535 deliberately freezes discrete contact set/slot/witness choices while differentiating smooth geometry; its own discussion warns that this approximation can be poor near topology changes.</p>
       </article>
     </section>
 
-    <div class="section-head">
+    <div class="section-head" id="original">
       <div>
-        <div class="kicker">02 · Cold-start learning</div>
-        <h2>Ant finds an early signal; Humanoid does not</h2>
+        <div class="kicker">05 · Original learner</div>
+        <h2>The baseline symptoms that prompted the diagnosis</h2>
       </div>
-      <p>Three deterministic-policy seeds, independently initialized actors and critics, no PPO checkpoint. Best epoch is chosen by return on one fixed evaluation batch, then compared on a separate initial-state batch.</p>
+      <p>These unchanged v1 results remain published for auditability: three deterministic-policy seeds, independently initialized actors and critics, and no pretrained checkpoint.</p>
     </div>
 
     <section class="grid two">
       <article class="panel">
-        <span class="tag mixed">Early signal</span>
+        <span class="tag mixed">Weak early signal</span>
         <h2 style="margin-top: 10px">Ant · H=8 (0.08 s) · 64 worlds · 100 updates</h2>
         <p>All three selected checkpoints improve on holdout, but selection happens early and the absolute motion is small.</p>
         <div class="table-wrap">
@@ -529,7 +793,7 @@
         <p>The return selector retains epoch 0 for every seed. Any tiny holdout difference is GPU contact nondeterminism, not learning.</p>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Seed</th><th class="num">Selected</th><th class="num">Train return</th><th class="num">Mean alive fraction</th></tr></thead>
+            <thead><tr><th>Seed</th><th class="num">Selected</th><th class="num">Selection return</th><th class="num">Mean alive fraction</th></tr></thead>
             <tbody>
               <tr><td>17</td><td class="num">epoch 0</td><td class="num">892.78 → 275.02</td><td class="num">0.370 → 0.101</td></tr>
               <tr><td>29</td><td class="num">epoch 0</td><td class="num">958.29 → 272.60</td><td class="num">0.398 → 0.100</td></tr>
@@ -548,9 +812,9 @@
       </article>
     </section>
 
-    <div class="section-head">
+    <div class="section-head" id="method">
       <div>
-        <div class="kicker">03 · API and method contract</div>
+        <div class="kicker">06 · API and method contract</div>
         <h2>Direct MJWarp bridge, inside Newton's environment</h2>
       </div>
       <p>This distinction is important: the experiment uses Newton's current package stack for integration, but does not claim gradients through <code>SolverMuJoCo</code>.</p>
@@ -574,23 +838,23 @@
 
     <section class="grid two">
       <article class="panel">
-        <h2>Retained SHAC ingredients</h2>
+        <h2>Corrected SHAC ingredients</h2>
         <ul class="mini-list">
-          <li>Deterministic actor and short differentiable rollout.</li>
+          <li>Reparameterized stochastic training actor and deterministic evaluation.</li>
           <li>Differentiable terminal value from a frozen target critic.</li>
           <li>Online critic fit to TD(λ), λ=0.95 targets.</li>
-          <li>Polyak target update; actor/critic Adam β=(0.7, 0.95).</li>
-          <li>Physical state continues across windows; graph history stops at each boundary.</li>
+          <li>Polyak target update, actor/critic Adam β=(0.7, 0.95), and linear LR decay.</li>
+          <li>Physical state continues across windows until a health or episode reset; graph history stops at each boundary.</li>
         </ul>
       </article>
       <article class="panel">
         <h2>Why the label is “SHAC-style”</h2>
         <ul class="mini-list">
           <li>The bridge carries only qpos/qvel; qacc warm-start is fixed and detached each step.</li>
-          <li>Critic fitting is a compact full-batch variant, not the full released training system.</li>
+          <li>The compact trainer and qpos/qvel observation are not the full released training system.</li>
           <li>Masks and resets are nondifferentiable boundaries; models require stateless actuators.</li>
           <li>Tasks, rewards, time steps, and evaluation differ from the original DFlex benchmarks.</li>
-          <li>H=8 Ant and H=4 Humanoid are feasibility settings, not canonical H=32 results.</li>
+          <li>Ant uses H8 and the legacy report reward; Humanoid uses a smaller training budget and reduced observation.</li>
         </ul>
       </article>
     </section>
@@ -603,17 +867,21 @@
           <tbody>
             <tr><td>One-step gate</td><td>Ant + settled Humanoid</td><td>2 objectives × 5 directions · ε=.01</td><td>Local API/VJP check in two package stacks</td></tr>
             <tr><td>Horizon gate</td><td>Nominal qpos0</td><td>H=1,2,4,8,16,32 · 2 worlds · 5 directions</td><td>Fixed-action reward-gradient check</td></tr>
-            <tr><td>Ant learning</td><td>Gymnasium 1.3.0 Ant XML</td><td>3 seeds · 64 worlds · H=8 (0.08 s) · 100 updates</td><td>Cold-start early feasibility</td></tr>
-            <tr><td>Humanoid learning</td><td>PR-bundled 21-actuator model</td><td>3 seeds · 32 worlds · H=4 (0.02 s) · 100 updates</td><td>More complex-system stress test</td></tr>
+            <tr><td>Failure diagnosis</td><td>v1 final-policy states/tapes</td><td>6 checkpoints · CPU parity · full-objective FD</td><td>Locate simulator, adjoint, critic, and horizon failures</td></tr>
+            <tr><td>Original Ant</td><td>Gymnasium 1.3.0 Ant XML</td><td>3 seeds · N64 · H8 · 100 updates</td><td>Reproduce weak early signal and regression</td></tr>
+            <tr><td>Corrected Ant</td><td>Same Ant model + reward</td><td>3 seeds · N64 · H8 · 200 updates</td><td>Paired corrective test with direct metric comparability</td></tr>
+            <tr><td>Original Humanoid</td><td>PR-bundled 21-actuator model</td><td>3 seeds · N32 · H4 · 100 updates</td><td>Reproduce the forward-dive failure</td></tr>
+            <tr><td>Corrected Humanoid</td><td>Same physical model; canonical-like task</td><td>3 seeds · N32 · H32×3 · 150 updates</td><td>Complex-system corrective stress test</td></tr>
+            <tr><td>ViewerGL replay</td><td>Selected + failure checkpoints</td><td>1 fixed lane · 50 fps · H.264</td><td>Inspect actual recorded MJWarp trajectories</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="note">A “step” here is one bare MJWarp physics step, not a Gymnasium frame-skipped environment transition.</p>
+      <p class="note">H denotes control decisions in v2; <code>×3</code> is the Humanoid action repeat. In the original v1 and gradient sweep, every step is one bare MJWarp physics step.</p>
     </section>
 
-    <div class="section-head">
+    <div class="section-head" id="artifacts">
       <div>
-        <div class="kicker">04 · Limits and artifacts</div>
+        <div class="kicker">07 · Limits and artifacts</div>
         <h2>Everything needed to inspect or rerun it</h2>
       </div>
       <p>The result JSONs include full CLI configuration, timestamps, package and device versions, model/source hashes, every training update, and evaluation histories.</p>
@@ -623,12 +891,14 @@
       <article class="panel">
         <h2>Interpretation limits</h2>
         <ul class="mini-list">
-          <li>n=3 seeds and 100 updates are an early feasibility budget, not convergence.</li>
+          <li>n=3 seeds and 200 Ant / 150 Humanoid updates are a corrective test, not convergence.</li>
           <li>No PPO or model-free baseline is used; scores should not be compared with the SHAC paper.</li>
           <li>Central differences are sampled directional tests, not a proof of the full Jacobian.</li>
           <li>Contact topology and closest-feature selection are nonsmooth; equal counts are insufficient.</li>
-          <li>PR #1535 is still a draft, currently conflicts with its base branch, and awaits review.</li>
-          <li>Unsupported model features include connect/weld constraints, tendons, flex, fluid forces, and several actuator types.</li>
+          <li>The full-objective parameter check covers the v1 H8/H4 failures, not every state in the corrected H32×3 Humanoid run.</li>
+          <li>Humanoid v1 and v2 raw returns are not comparable because the corrective run changes reward and reset distribution.</li>
+          <li>PR #1535 is still a draft and may change after the exact head captured here.</li>
+          <li>The tested bridge supports only stateless motor actuators; this report does not exercise equality constraints, tendons, flex, fluid forces, or other actuator types.</li>
         </ul>
       </article>
       <article class="panel">
@@ -637,8 +907,12 @@
           <li><a href="pr1535/README.md">Exact reproduction guide</a></li>
           <li><a href="pr1535/gradient_probe.py">Standalone one-step finite-difference probe</a></li>
           <li><a href="pr1535/mjwarp_torch_bridge.py">Reusable MJWarp ↔ PyTorch step bridge</a></li>
-          <li><a href="pr1535/train_shac.py">SHAC-style trainer and horizon probe</a></li>
-          <li><a href="pr1535/summarize_results.py">Fail-closed aggregation script</a></li>
+          <li><a href="pr1535/train_shac.py">Original SHAC-style trainer and horizon probe</a></li>
+          <li><a href="pr1535/diagnose_failures.py">Forward, critic, action, and full-objective diagnostic</a></li>
+          <li><a href="pr1535/train_shac_v2.py">Corrected SHAC-style trainer</a></li>
+          <li><a href="pr1535/render_viewergl.py">Reproducible ViewerGL renderer</a></li>
+          <li><a href="pr1535/summarize_results.py">Original fail-closed aggregation script</a></li>
+          <li><a href="pr1535/summarize_fixed_results.py">Corrected-run fail-closed aggregation script</a></li>
           <li><a href="https://openreview.net/forum?id=ZSKRQMvttc">SHAC paper · Xu et al., ICLR 2022</a></li>
           <li><a href="https://github.com/NVlabs/DiffRL/tree/a4c0dd1696d3c3b885ce85a3cb64370b580cb913">Official DiffRL source at an immutable commit</a></li>
         </ul>
@@ -656,8 +930,36 @@
           <li><a href="pr1535/results/humanoid_multistep_gradient.json">Humanoid horizons 1–32</a></li>
         </ul>
       </details>
+      <details open>
+        <summary>Diagnosis and corrected summary</summary>
+        <ul class="artifact-list">
+          <li><a href="pr1535/results/failure_diagnostics.json">Full failure diagnostic · critic/action statistics, CPU replay parity, objective finite differences</a></li>
+          <li><a href="pr1535/results/fixed/summary.json">Validated deterministic summary of all six corrected runs</a></li>
+        </ul>
+      </details>
+      <details open>
+        <summary>Corrected training artifacts</summary>
+        <ul class="artifact-list">
+          <li>Ant seed 17: <a href="pr1535/results/fixed/ant_seed17.json">JSON</a> · <a href="pr1535/results/fixed/ant_seed17.pt">checkpoint</a></li>
+          <li>Ant seed 29: <a href="pr1535/results/fixed/ant_seed29.json">JSON</a> · <a href="pr1535/results/fixed/ant_seed29.pt">checkpoint</a></li>
+          <li>Ant seed 41: <a href="pr1535/results/fixed/ant_seed41.json">JSON</a> · <a href="pr1535/results/fixed/ant_seed41.pt">checkpoint</a></li>
+          <li>Humanoid seed 17: <a href="pr1535/results/fixed/humanoid_seed17.json">JSON</a> · <a href="pr1535/results/fixed/humanoid_seed17.pt">checkpoint</a></li>
+          <li>Humanoid seed 29: <a href="pr1535/results/fixed/humanoid_seed29.json">JSON</a> · <a href="pr1535/results/fixed/humanoid_seed29.pt">checkpoint</a></li>
+          <li>Humanoid seed 41: <a href="pr1535/results/fixed/humanoid_seed41.json">JSON</a> · <a href="pr1535/results/fixed/humanoid_seed41.pt">checkpoint</a></li>
+        </ul>
+      </details>
       <details>
-        <summary>Ant training artifacts</summary>
+        <summary>ViewerGL videos, posters, and manifests</summary>
+        <ul class="artifact-list">
+          <li>Ant initial: <a href="pr1535/results/videos/ant_v2_initial.mp4">MP4</a> · <a href="pr1535/results/videos/ant_v2_initial.jpg">poster</a> · <a href="pr1535/results/videos/ant_v2_initial.json">manifest</a></li>
+          <li>Ant selected: <a href="pr1535/results/videos/ant_v2_best.mp4">MP4</a> · <a href="pr1535/results/videos/ant_v2_best.jpg">poster</a> · <a href="pr1535/results/videos/ant_v2_best.json">manifest</a></li>
+          <li>Humanoid old final: <a href="pr1535/results/videos/humanoid_v1_final.mp4">MP4</a> · <a href="pr1535/results/videos/humanoid_v1_final.jpg">poster</a> · <a href="pr1535/results/videos/humanoid_v1_final.json">manifest</a></li>
+          <li>Humanoid corrected initial: <a href="pr1535/results/videos/humanoid_v2_initial.mp4">MP4</a> · <a href="pr1535/results/videos/humanoid_v2_initial.jpg">poster</a> · <a href="pr1535/results/videos/humanoid_v2_initial.json">manifest</a></li>
+          <li>Humanoid corrected selected: <a href="pr1535/results/videos/humanoid_v2_best.mp4">MP4</a> · <a href="pr1535/results/videos/humanoid_v2_best.jpg">poster</a> · <a href="pr1535/results/videos/humanoid_v2_best.json">manifest</a></li>
+        </ul>
+      </details>
+      <details>
+        <summary>Original Ant training artifacts</summary>
         <ul class="artifact-list">
           <li>Seed 17: <a href="pr1535/results/ant_seed17.json">JSON</a> · <a href="pr1535/results/ant_seed17.pt">checkpoint</a></li>
           <li>Seed 29: <a href="pr1535/results/ant_seed29.json">JSON</a> · <a href="pr1535/results/ant_seed29.pt">checkpoint</a></li>
@@ -665,7 +967,7 @@
         </ul>
       </details>
       <details>
-        <summary>Humanoid training artifacts</summary>
+        <summary>Original Humanoid training artifacts</summary>
         <ul class="artifact-list">
           <li>Seed 17: <a href="pr1535/results/humanoid_seed17.json">JSON</a> · <a href="pr1535/results/humanoid_seed17.pt">checkpoint</a></li>
           <li>Seed 29: <a href="pr1535/results/humanoid_seed29.json">JSON</a> · <a href="pr1535/results/humanoid_seed29.pt">checkpoint</a></li>
@@ -763,54 +1065,59 @@
       target.replaceChildren(svg);
     }
 
-    function renderLearningChart(targetId, runs, taskName, color) {
+    function renderLearningChart(targetId, runs, taskName, color, options = {}) {
       const target = document.getElementById(targetId);
       const width = 720;
       const height = 330;
       const margin = { top: 35, right: 25, bottom: 48, left: 62 };
       const innerWidth = width - margin.left - margin.right;
       const innerHeight = height - margin.top - margin.bottom;
+      const metricValue = options.metricValue || ((metrics) => metrics.mean_return);
+      const metricLabel = options.metricLabel || "Δ return";
+      const tickDigits = options.tickDigits ?? 0;
+      const maxEpoch = Math.max(...runs.flatMap((run) => run.run.evaluations.map((entry) => entry.epoch)));
       const all = runs.flatMap((run) => {
-        const baseline = run.run.evaluations[0].metrics.mean_return;
-        return run.run.evaluations.map((entry) => entry.metrics.mean_return - baseline);
+        const baseline = metricValue(run.run.evaluations[0].metrics);
+        return run.run.evaluations.map((entry) => metricValue(entry.metrics) - baseline);
       });
       let minValue = Math.min(0, ...all);
       let maxValue = Math.max(0, ...all);
-      const pad = Math.max((maxValue - minValue) * 0.1, 1);
+      const pad = Math.max((maxValue - minValue) * 0.1, options.minPad ?? 1);
       minValue -= pad;
       maxValue += pad;
-      const x = (epoch) => margin.left + epoch / 100 * innerWidth;
+      const x = (epoch) => margin.left + epoch / maxEpoch * innerWidth;
       const y = (value) => margin.top + (maxValue - value) / (maxValue - minValue) * innerHeight;
-      const svg = makeSvg(`${taskName} evaluation return change over 100 training updates for three seeds and their mean`, width, height);
+      const svg = makeSvg(`${taskName} ${metricLabel} over ${maxEpoch} training updates for three seeds and their mean`, width, height);
 
       for (let index = 0; index <= 5; index += 1) {
         const value = minValue + (maxValue - minValue) * index / 5;
         const py = y(value);
         svg.append(svgElement("line", { x1: margin.left, x2: width - margin.right, y1: py, y2: py, stroke: palette.grid, "stroke-width": 1 }));
-        svg.append(svgElement("text", { x: margin.left - 8, y: py + 4, fill: palette.muted, "font-size": 11, "text-anchor": "end" }, value.toFixed(0)));
+        const displayValue = Math.abs(value) < 0.5 * 10 ** -tickDigits ? 0 : value;
+        svg.append(svgElement("text", { x: margin.left - 8, y: py + 4, fill: palette.muted, "font-size": 11, "text-anchor": "end" }, displayValue.toFixed(tickDigits)));
       }
-      [0, 20, 40, 60, 80, 100].forEach((epoch) => {
+      Array.from({ length: 6 }, (_, index) => Math.round(maxEpoch * index / 5)).forEach((epoch) => {
         const px = x(epoch);
         svg.append(svgElement("text", { x: px, y: height - 20, fill: palette.muted, "font-size": 11, "text-anchor": "middle" }, String(epoch)));
       });
       svg.append(svgElement("line", { x1: margin.left, x2: width - margin.right, y1: y(0), y2: y(0), stroke: "#9faca5", "stroke-width": 1.3 }));
       svg.append(svgElement("text", { x: margin.left + innerWidth / 2, y: height - 3, fill: palette.muted, "font-size": 11, "text-anchor": "middle" }, "training update"));
-      svg.append(svgElement("text", { x: 12, y: margin.top - 12, fill: palette.muted, "font-size": 11 }, "Δ return"));
+      svg.append(svgElement("text", { x: 12, y: margin.top - 12, fill: palette.muted, "font-size": 11 }, metricLabel));
 
       for (const run of runs) {
-        const baseline = run.run.evaluations[0].metrics.mean_return;
-        const points = run.run.evaluations.map((entry) => [x(entry.epoch), y(entry.metrics.mean_return - baseline)]);
+        const baseline = metricValue(run.run.evaluations[0].metrics);
+        const points = run.run.evaluations.map((entry) => [x(entry.epoch), y(metricValue(entry.metrics) - baseline)]);
         svg.append(svgElement("path", { d: linePath(points), fill: "none", stroke: color, "stroke-opacity": 0.42, "stroke-width": 1.6 }));
         const selectedEpoch = run.run.holdout.selected_epoch;
         const selected = run.run.evaluations.find((entry) => entry.epoch === selectedEpoch);
-        if (selected) svg.append(svgElement("circle", { cx: x(selectedEpoch), cy: y(selected.metrics.mean_return - baseline), r: 4.4, fill: color, stroke: "#fff", "stroke-width": 1.2 }));
+        if (selected) svg.append(svgElement("circle", { cx: x(selectedEpoch), cy: y(metricValue(selected.metrics) - baseline), r: 4.4, fill: color, stroke: "#fff", "stroke-width": 1.2 }));
       }
 
       const epochs = runs[0].run.evaluations.map((entry) => entry.epoch);
       const meanPoints = epochs.map((epoch, index) => {
         const mean = runs.reduce((sum, run) => {
-          const baseline = run.run.evaluations[0].metrics.mean_return;
-          return sum + run.run.evaluations[index].metrics.mean_return - baseline;
+          const baseline = metricValue(run.run.evaluations[0].metrics);
+          return sum + metricValue(run.run.evaluations[index].metrics) - baseline;
         }, 0) / runs.length;
         return [x(epoch), y(mean)];
       });
@@ -827,15 +1134,24 @@
         loadJson("pr1535/results/ant_multistep_gradient.json"),
         loadJson("pr1535/results/humanoid_multistep_gradient.json"),
         ...[17, 29, 41].map((seed) => loadJson(`pr1535/results/ant_seed${seed}.json`)),
-        ...[17, 29, 41].map((seed) => loadJson(`pr1535/results/humanoid_seed${seed}.json`))
+        ...[17, 29, 41].map((seed) => loadJson(`pr1535/results/humanoid_seed${seed}.json`)),
+        ...[17, 29, 41].map((seed) => loadJson(`pr1535/results/fixed/ant_seed${seed}.json`)),
+        ...[17, 29, 41].map((seed) => loadJson(`pr1535/results/fixed/humanoid_seed${seed}.json`))
       ]);
       renderGradientChart(antGradient, humanoidGradient);
       renderLearningChart("ant-learning-chart", training.slice(0, 3), "Ant", palette.ant);
-      renderLearningChart("humanoid-learning-chart", training.slice(3), "Humanoid", palette.humanoid);
+      renderLearningChart("humanoid-learning-chart", training.slice(3, 6), "Humanoid", palette.humanoid);
+      renderLearningChart("fixed-ant-chart", training.slice(6, 9), "corrected Ant", palette.ant);
+      renderLearningChart("fixed-humanoid-chart", training.slice(9, 12), "corrected Humanoid", palette.humanoid, {
+        metricValue: (metrics) => metrics.mean_alive_fraction * metrics.simulated_seconds,
+        metricLabel: "Δ alive s",
+        tickDigits: 2,
+        minPad: 0.02
+      });
     }
 
     renderCharts().catch((error) => {
-      for (const id of ["gradient-chart", "ant-learning-chart", "humanoid-learning-chart"]) {
+      for (const id of ["gradient-chart", "ant-learning-chart", "humanoid-learning-chart", "fixed-ant-chart", "fixed-humanoid-chart"]) {
         document.getElementById(id).innerHTML = `<div class="chart-fallback">Chart unavailable: ${error.message}. The tables and linked JSON remain complete.</div>`;
       }
     });
