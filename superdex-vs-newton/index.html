@@ -1,637 +1,582 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
-  <meta name="description" content="A task-oriented comparison of Newton and Project SuperDex for humanoid locomotion, robot manipulation, cloth, and user-facing API design.">
-  <meta name="theme-color" content="#f7f6f1">
-  <title>Newton × SuperDex — robot workload comparison</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="figures.js" defer></script>
+<html lang="en"><head><meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>SuperDex vs Newton</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
-<body>
-  <div class="page-shell">
-    <header class="report-header">
-      <div class="hero-grid">
-        <div>
-          <div class="eyebrow">Robot simulation field report · 4 September 2026</div>
-          <h1>Newton ×<br>SuperDex</h1>
-          <p class="dek">A user-oriented comparison built around three jobs that matter in robotics: making a G1 walk, completing a parallel-gripper manipulation sequence, and putting cloth in contact with a moving robot.</p>
-          <div class="hero-tags" aria-label="Report scope">
-            <span class="pill">Current main branches</span>
-            <span class="pill">Real robot assets</span>
-            <span class="pill">Runnable evidence</span>
-            <span class="pill">API ergonomics</span>
-          </div>
-        </div>
-        <aside class="snapshot" aria-label="Compared revisions">
-          <h2>Compared snapshot</h2>
-          <dl>
-            <div>
-              <dt>Newton</dt>
-              <dd><a href="https://github.com/newton-physics/newton/commit/d37f4d3d341ccce1e06a1dff21e9a054759b4855">d37f4d3d341c</a> · 1.6.0.dev0<br><time datetime="2026-09-04T12:02:51Z">4 Sep, 12:02 UTC</time></dd>
-            </div>
-            <div>
-              <dt>Project SuperDex</dt>
-              <dd><a href="https://github.com/facebookresearch/project_superdex/commit/777b498122ab4b8581dfecb5f035af134c647eab">777b498122ab</a> · main<br><time datetime="2026-09-04T11:54:54Z">4 Sep, 11:54 UTC</time></dd>
-            </div>
-            <div>
-              <dt>Newton execution</dt>
-              <dd>Warp 1.17.0 · CUDA<br>RTX PRO 6000 Blackwell, MIG 1g.24gb</dd>
-            </div>
-            <div>
-              <dt>Report refreshed</dt>
-              <dd><time datetime="2026-09-04T19:55:35Z">4 Sep 2026, 19:55 UTC</time></dd>
-            </div>
-          </dl>
-        </aside>
-      </div>
-    </header>
+<body><main class="wrap">
 
-    <div class="toc-wrap">
-      <nav class="toc" aria-label="Report sections">
-        <a href="#orientation">Orientation</a>
-        <a href="#coverage">Task coverage</a>
-        <a href="#g1">G1 locomotion</a>
-        <a href="#manipulation">Manipulation</a>
-        <a href="#cloth">Cloth</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#api">API ergonomics</a>
-        <a href="#gaps">Gaps</a>
-        <a href="#reproduce">Reproduce</a>
-      </nav>
-    </div>
+<header class="hero">
+<div class="kicker">Engine comparison &middot; 25 August 2026</div>
+<h1>SuperDex vs Newton</h1>
+<p class="dek">Meta released <a href="https://github.com/facebookresearch/project_superdex" target="_blank">Project SuperDex</a> on 24 August 2026 &mdash; a &ldquo;contact-first physics engine purpose-built for tactile manipulation.&rdquo; It ships no paper, no benchmark numbers and no comparison to any other engine. This report reads its source, installs its wheels, and measures it against Newton on the same scenes. The headline: SuperDex is a <b>CPU</b> engine that spends a full implicit Newton solve on <b>one</b> high-fidelity scene, where Newton spends cheap substeps on <b>thousands</b>. On a pile of rigid boxes the crossover is at <b>48 bodies</b>. Also compared against MuJoCo, VBD/AVBD and Kamino, which turn out to occupy four corners of the same design space.</p>
+<div class="badges">
+<span class="badge">SuperDex 1.0.0 &middot; <code class="inline">superdex-physics</code> wheels, Python 3.12</span>
+<span class="badge">Newton 1.5.0.dev0 &middot; Warp 1.15.0.dev20260626 &middot; MuJoCo Warp 3.10.0.2</span>
+<span class="badge">RTX PRO 6000 Blackwell <b>MIG 1g.24gb</b> (46 SMs) &middot; AMD EPYC 9B45, 192 cores</span>
+<span class="badge alert">All numbers measured here, not quoted</span>
+</div>
+</header>
 
-    <main>
-      <section class="section" id="orientation">
-        <div class="section-head">
-          <div>
-            <span class="section-number">01 · Orientation</span>
-            <h2>Start with the task, not the solver label.</h2>
-          </div>
-          <p class="section-lead">The projects overlap, but their user journeys are different. Newton presents a broad simulation toolkit with explicit data flow and a menu of solvers. SuperDex presents a live scene, packaged robot assets, and one integrated physics system. A useful comparison asks how much work remains between installation and a representative robot outcome.</p>
-        </div>
+<nav class="nav">
+<a href="#summary">Summary</a><a href="#what">What it is</a><a href="#solver">Solver stack</a><a href="#four">Four corners</a><a href="#contact">Contact model</a><a href="#crossover">Crossover</a><a href="#batch">Batch scale</a><a href="#accuracy">Accuracy</a><a href="#threads">Threads</a><a href="#cpu">The CPU finding</a><a href="#deform">Deformables</a><a href="#diff">Gradients</a><a href="#api">API</a><a href="#verdict">Verdict</a><a href="#repro">Reproduce</a>
+</nav>
 
-        <div class="orientation-grid">
-          <article class="card">
-            <div class="card-kicker">How to read the evidence</div>
-            <h3>Three levels of support</h3>
-            <p><strong>Ready example</strong> means a task, robot, controller, contacts, and visible outcome run together at the pinned revision. <strong>Building block</strong> means relevant assets or APIs ship, but the end-to-end task does not. <strong>Gap</strong> means the attempted path needs re-authoring or additional implementation.</p>
-          </article>
-          <article class="card soft-blue">
-            <div class="card-kicker">Newton in one sentence</div>
-            <h3>Explicit, array-oriented, and broad</h3>
-            <p>Users choose how models, state, contacts, controls, solvers, worlds, and viewers fit together. The setup is longer, but the same concepts extend to GPU batches and mixed workloads.</p>
-          </article>
-          <article class="card soft-teal">
-            <div class="card-kicker">SuperDex in one sentence</div>
-            <h3>Scene-oriented and compact</h3>
-            <p>Users create actors or packaged bots inside a mutable scene and advance it with one step call. Studio and native prefabs provide a cohesive authoring path for a single detailed scene.</p>
-          </article>
-        </div>
+<section id="summary">
+<div class="kicker">Summary</div>
+<h2>Two engines that disagree about what a time step is for.</h2>
+<p class="lead">Newton's bet is that a manipulation policy needs <i>billions</i> of cheap samples, so the unit of work is a substep across thousands of GPU worlds. SuperDex's bet is that a manipulation policy needs samples that are <i>right</i>, so the unit of work is a converged implicit solve of one scene at a 16.7&nbsp;ms step. Both bets are defensible. They are not the same product, and the benchmark that flatters one buries the other.</p>
 
-        <div class="research-route" aria-label="A reader's route through the comparison">
-          <div class="route-intro">
-            <span class="card-kicker">A reader’s route</span>
-            <h3>Move from promise to task to evidence.</h3>
-            <p>The most useful comparison follows the path a new user would take. It begins with what each project makes easy to discover, continues through a representative robot task, and only then uses architecture to explain the outcome.</p>
-          </div>
-          <ol>
-            <li><span>01</span><div><strong>Set the boundary</strong><p>Pin the revisions and distinguish complete examples, reusable building blocks, and project demonstrations.</p></div></li>
-            <li><span>02</span><div><strong>Follow the user journey</strong><p>Ask whether the robot, control, contacts, and a checkable outcome arrive as one usable path.</p></div></li>
-            <li><span>03</span><div><strong>Interpret the gap</strong><p>Treat missing task scaffolding as integration work at this snapshot—not as a limit on what the engine could support.</p></div></li>
-          </ol>
-        </div>
+<div class="metrics">
+<div class="metric cy"><span class="num">48</span><span class="label">Rigid bodies at which Newton overtakes SuperDex<small>Below that, SuperDex on one CPU core is faster than Newton on a GPU &mdash; 31&times; faster at a single body</small></span></div>
+<div class="metric bl"><span class="num">679 k</span><span class="label">Newton env-steps/s at 1024 worlds<small>SuperDex has no batch axis at all: 20 k scene-steps/s on one core</small></span></div>
+<div class="metric gr"><span class="num">0.308 mm</span><span class="label">SuperDex resting penetration, <b>invariant</b> from 1 ms to 200 ms steps<small>A 200&times; time-step range moves it by 0.1%</small></span></div>
+<div class="metric rd"><span class="num">CPU only</span><span class="label">The shipped wheels cannot use a GPU<small><code class="inline">LinearSolverType.CUDA_CG</code> exists and throws at runtime</small></span></div>
+</div>
 
-        <div class="headline-callout">
-          <div class="big">The short answer</div>
-          <p>For the three workloads in this report, Newton currently provides the more complete path from repository to runnable robot task. SuperDex is especially attractive when a user begins with its native bot assets, Studio workflow, integrated contact model, and scene-level API—but matching these exact tasks still requires more task authoring.</p>
-        </div>
+<div class="summary-grid">
+<div class="callout good">
+<h3>What SuperDex genuinely does better</h3>
+<p><b>One unified implicit solver for five body types.</b> Rigid, articulated, FEM soft, Kirchhoff rods and thin shells all contribute residual + Jacobian blocks to the <i>same</i> Newton&ndash;Raphson system, so a soft fingertip pressing a cloth over a rod is one monolithic solve. Newton reaches comparable coverage only by coupling separate solvers through a lagged proxy or ADMM layer.</p>
+<p><b>Time-step robustness that is real and measurable.</b> Resting penetration is identical to four significant figures from 1&nbsp;ms to 200&nbsp;ms. Nothing in Newton's rigid stack behaves like this &mdash; contact stiffness, substep count and iteration count all move the answer.</p>
+<p><b>Analytic adjoints through contact.</b> <code class="inline">get_step_jacobian</code> and <code class="inline">GetContactForceWorldBackward</code> differentiate an implicit contact solve. Newton's differentiable path is <code class="inline">SolverSemiImplicit</code> with a frozen contact normal.</p>
+<p><b>Tendons as first-class physics</b>, at three fidelities (elastic rod → spatial tendon → linear transmission), including a McKibben pneumatic-muscle model. Newton has no first-class tendons at all.</p>
+</div>
+<div class="callout warn">
+<h3>What will stop you using it for RL</h3>
+<p><b>No GPU, and no batch dimension anywhere in the engine.</b> There is no <code class="inline">nenv</code> axis, no batched state tensor. SuperDex Lab gets parallel environments by forking Python processes. Against 679 k env-steps/s on a <i>seventh</i> of one Blackwell, that is not a gap you close with cores.</p>
+<p><b>Threading stops helping at 4 workers and then hurts.</b> On a 192-core machine, 4 worker threads give 1.7&times;; 16 threads are <b>2.7&times; slower than single-threaded</b>. The parallelism is task-graph over islands, not data-parallel over the state vector.</p>
+<p><b>Everything is compliant &mdash; there is no hard-constraint path.</b> Joint limits, loop closures, rigid &ldquo;joints,&rdquo; pose controllers and contact are all penalty springs. Resting penetration is a designed-in function of load ÷ stiffness, and a stiff contact makes the body <i>float</i> 0.68&nbsp;mm on the 1&nbsp;mm detection threshold.</p>
+<p><b>v1.0.0, four days old, no paper, no published numbers, 33 stars.</b> MPC and system-ID are advertised in the README and absent from the code.</p>
+</div>
+</div>
 
-        <div class="note neutral"><strong>Comparison boundary.</strong> The task traces and ViewerGL footage below are direct runs of Newton at the pinned revision. SuperDex gallery clips are first-party demonstrations of its broader manipulation and cloth capabilities; they are shown as capability context, not as matched benchmark results. No throughput ranking is inferred from unlike scenes.</div>
-      </section>
+<div class="note warning"><b>Scope and honesty about the hardware.</b> Every GPU number here is from a <b>MIG 1g.24gb slice</b> &mdash; 46 SMs, roughly one seventh of an RTX PRO 6000 Blackwell. Newton's absolute throughput on a whole GPU is several times higher than what is plotted; the <i>shape</i> of the scaling curve and the crossover point are what this report claims. SuperDex numbers are single-process on an idle 192-core EPYC. One benchmark process ran at a time; an early pass that had three running concurrently was discarded and re-run.</div>
+</section>
 
-      <section class="section" id="coverage">
-        <div class="section-head">
-          <div>
-            <span class="section-number">02 · Task readiness</span>
-            <h2>What can a user run today?</h2>
-          </div>
-          <p class="section-lead">This matrix scores the complete user path, not whether a low-level body type exists. A task earns “ready” only when the repository supplies the robot, scene, behavior, and a result that can be checked.</p>
-        </div>
 
-        <div class="table-wrap" tabindex="0" aria-label="Task readiness comparison table">
-          <table>
-            <thead>
-              <tr><th>Workload</th><th>Newton main</th><th>SuperDex main</th><th>Practical reading</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span class="task-name">G1 locomotion</span><span class="task-note">Floating-base humanoid, non-zero velocity command, policy-controlled walking</span></td>
-                <td><span class="status ready">Ready example</span><span class="task-note">G1 preset, trained ONNX policy, MuJoCo Warp dynamics, interactive commands</span></td>
-                <td><span class="status gap">Integration required</span><span class="task-note">Ant and HalfCheetah locomotion ship, but no G1 task; runtime URDF import does not retain primitive collision geometry</span></td>
-                <td>Newton runs the target workload directly. SuperDex can read the articulation structure, but the unmodified robot is not yet a usable locomotion scene.</td>
-              </tr>
-              <tr>
-                <td><span class="task-name">Parallel-gripper pick and place</span><span class="task-note">Arm, two-finger gripper, grasp, transport, release, checked outcome</span></td>
-                <td><span class="status ready">Ready example</span><span class="task-note">Franka hand, IK trajectory, hydroelastic contact, pen and cube variants</span></td>
-                <td><span class="status building">Building blocks</span><span class="task-note">FR3 + Robotiq 2F-85 asset, joint and operational-space controllers</span></td>
-                <td>SuperDex has a strong native hardware asset, but the current examples do not package a parallel-gripper contact task with an end-state check.</td>
-              </tr>
-              <tr>
-                <td><span class="task-name">Robot–cloth interaction</span><span class="task-note">Garment or cloth responding to articulated robot motion</span></td>
-                <td><span class="status ready">Ready examples</span><span class="task-note">H1 wearing a jacket; Franka manipulating a shirt</span></td>
-                <td><span class="status building">Standalone example</span><span class="task-note">Experimental T-shirt shell example completes a two-second current-source smoke run; gallery scenes show broader cloth interaction</span></td>
-                <td>Both expose cloth. Newton currently ships direct robot–cloth examples; SuperDex ships a runnable standalone cloth case, while an equivalent articulated-robot task remains to be authored.</td>
-              </tr>
-              <tr>
-                <td><span class="task-name">Many-world robot learning</span><span class="task-note">Multiple simulation worlds in one process</span></td>
-                <td><span class="status ready">Native worlds</span><span class="task-note">Model replication, device arrays, selective reset paths</span></td>
-                <td><span class="status building">Process vectorization</span><span class="task-note">Gymnasium layer with synchronous environments and asynchronous workers</span></td>
-                <td>Newton owns the stronger simulator-side batching primitive. SuperDex offers the more direct Gymnasium abstraction, currently scaled across processes.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+<section id="what">
+<div class="kicker">Orientation</div>
+<h2>SuperDex is four products; only one of them is a physics engine.</h2>
 
-      <section class="section" id="g1">
-        <div class="section-head">
-          <div>
-            <span class="section-number">03 · Locomotion</span>
-            <h2>Unitree G1: policy-controlled locomotion.</h2>
-          </div>
-          <p class="section-lead">The Newton sequence uses the repository’s G1 29-DoF locomotion preset and its shipped policy. The robot receives forward and turning commands, covers ground, and remains upright through the eight-second task.</p>
-        </div>
+<div class="grid2">
+<div class="card">
+<h3>The stack</h3>
+<p><b>SuperDex Physics</b> &mdash; the engine. A C++ library whose internal codename is <code class="inline">mochi</code>; <code class="inline">superdex_physics.h</code> is a six-line alias shim over <code class="inline">mochi_physics.h</code>. Full source ships under Apache-2.0; there are no prebuilt blobs in the tree.</p>
+<p><b>SuperDex Robotics</b> &mdash; bot definitions (<code class="inline">.superdex_bot</code> JSON), OSC and joint-space PD controllers, a camera sensor, URDF import.</p>
+<p><b>SuperDex Studio</b> &mdash; a Filament-based desktop GUI for authoring meshes, prefabs and scenes, plus a SolidWorks/NX CAD exporter.</p>
+<p><b>SuperDex Lab</b> &mdash; &ldquo;early preview&rdquo; Gymnasium RL harness on Ray RLlib.</p>
+<p><b>Q4 2026: SuperDex Teleop</b> &mdash; on-device Quest 3 VR teleoperation in pure C++. This is clearly the point of the whole project; every gallery video was recorded through it.</p>
+</div>
+<div class="card">
+<h3>Newton, for contrast</h3>
+<p>A Linux Foundation project from Disney Research, Google DeepMind and NVIDIA, built on NVIDIA Warp. GPU-first, OpenUSD-native, and deliberately <i>plural</i>: nine first-party solvers behind one <code class="inline">Model</code>/<code class="inline">State</code>/<code class="inline">Control</code> API, so you pick the physics that fits the scene.</p>
+<p>Where SuperDex answers &ldquo;which solver?&rdquo; with <i>one, for everything</i>, Newton answers with <i>MuJoCo for articulated robots, VBD for deformables, Kamino for kinematic loops and hard contact, MPM for granular, XPBD for cheap and fast</i> &mdash; and an experimental coupling layer to run them together.</p>
+<p>That plurality is Newton's real architectural claim, and it is the axis on which the two projects are least comparable.</p>
+</div>
+</div>
 
-        <article class="workload">
-          <div class="workload-title">
-            <div class="workload-index">G1</div>
-            <div>
-              <h3>Commanded humanoid locomotion</h3>
-              <p class="workload-sub">Unitree G1 · policy inference on Warp · articulated contact dynamics</p>
-            </div>
-            <div class="result-chip">Runnable in Newton</div>
-          </div>
+<div class="note"><b>Naming.</b> Meta's marketing never names an algorithm. The site says only &ldquo;robust simulation without the restrictive time-step stability limits of explicit or semi-implicit methods.&rdquo; Everything in the next section comes from reading <code class="inline">mochi</code>'s headers and from introspecting the installed wheel &mdash; not from documentation.</div>
+</section>
 
-          <figure class="media-frame">
-            <video data-autoplay muted loop playsinline controls preload="none" poster="media/newton-g1-locomotion.jpg">
-              <source src="media/newton-g1-locomotion.mp4" type="video/mp4">
-            </video>
-            <figcaption class="media-caption"><span>Newton ViewerGL · full eight-second command sequence</span><span>Current main · G1 locomotion policy</span></figcaption>
-          </figure>
 
-          <div class="metric-row">
-            <div class="metric"><span class="metric-value" data-stat="g1-distance">—</span><span class="metric-label">Horizontal displacement</span></div>
-            <div class="metric"><span class="metric-value" data-stat="g1-speed">—</span><span class="metric-label">Peak horizontal speed</span></div>
-            <div class="metric"><span class="metric-value" data-stat="g1-height">—</span><span class="metric-label">Minimum root height</span></div>
-          </div>
+<section id="solver">
+<div class="kicker">Architecture</div>
+<h2>It is a variational implicit integrator solved by Newton&ndash;Raphson. Not LCP, not PGS, not XPBD, not TGS.</h2>
 
-          <div class="evidence-grid">
-            <div class="chart-card">
-              <div class="chart-head"><h4>Top-down root path</h4><span>Measured from simulation state</span></div>
-              <div class="chart" id="chart-g1-path"><div class="chart-loading">Loading trace…</div></div>
-            </div>
-            <div>
-              <div class="finding newton">
-                <h4>Newton path</h4>
-                <p>The example bundles the robot asset, control policy, command interface, dynamics configuration, and a basic completion check. The asset also contains articulated hands; the locomotion preset name refers to the body configuration.</p>
-              </div>
-              <div class="finding superdex">
-                <h4>SuperDex path</h4>
-                <p>SuperDex ships Ant and HalfCheetah locomotion environments, and the current HalfCheetah sample completed a 1,000-step episode with video. No G1 or humanoid locomotion task ships on this revision. The G1 compatibility probe retained 40 links, 40 joints, and 35 runtime DoFs, while the mesh-only import path omitted eight spherical foot contacts and four cylindrical shoulder colliders. All ten bounded simulation steps returned, but each reported <code class="inline">STOPPED</code> rather than convergence to the requested tolerance, and the measured root pose did not change. This generic-import result does not represent a Studio-authored native bot; it shows that the unmodified URDF needs collider and task re-authoring before a locomotion comparison is meaningful.</p>
-              </div>
-            </div>
-          </div>
+<p class="lead">Every physical term &mdash; inertia, gravity, stress, contact, constraints, tendons &mdash; contributes an <i>objective, residual and d-residual</i> triple to a per-island system of nonlinear equations. One Newton solve per stage advances the step. Introspecting the shipped wheel prints the whole design in one screen:</p>
 
-          <div class="chart-card" style="margin-top:18px">
-            <div class="chart-head"><h4>Command response</h4><span>Forward, turn, then settle</span></div>
-            <div class="chart" id="chart-g1-speed"><div class="chart-loading">Loading trace…</div></div>
-          </div>
-        </article>
-      </section>
+<div class="codeblock">
+<div class="code-head"><code>the solver taxonomy, read out of the installed package</code><button class="copy" type="button">Copy</button></div>
+<pre><code>&gt;&gt;&gt; from superdex import physics as sp
 
-      <section class="section" id="manipulation">
-        <div class="section-head">
-          <div>
-            <span class="section-number">04 · Manipulation</span>
-            <h2>Parallel gripper: grasp, carry, place.</h2>
-          </div>
-          <p class="section-lead">This sequence evaluates a complete contact outcome. A Franka parallel gripper approaches a pen, closes, lifts it from the table, moves above a cup, lowers, and releases. The final test checks both the lift and placement.</p>
-        </div>
+IntegrationMethod:   BACKWARD_EULER (default), BDF2, BDF3,
+                     DIRK22, DIRK23, DIRK33, SYMPLECTIC_DIRK12, SYMPLECTIC_DIRK22
+NonLinearSolverType: NEWTON (default), BFGS, SR1
+LineSearchType:      RESIDUAL_NORM (default), ARMIJO, WOLFE_WEAK, WOLFE_STRONG, ...
+PsdProjectionMode:   ALWAYS (default), NEVER, IF_FAIL_RETRY, IF_FAIL_ALWAYS
+LinearSolverType:    AUTO (default), CG, GMRES, MINRES, LDLT, LU, AUGMENTED_CG,
+                     PARALLEL_CG, ASYNC_CG, CUDA_CG, CUDA_GMRES, ...
+PreconditionerType:  PER_ACTOR (default), AMG, IC0, ILU0, SSOR, BLOCK_JACOBI, ...
+LinearToleranceStrategy: EISENSTAT_WALKER2 (default)   # inexact-Newton forcing terms
+ActorType:           RIGID, ARTICULATED, SOFT, SHELL, ROD
+SoftMaterialType:    NEO_HOOKEAN, ST_VENANT_KIRCHHOFF, ARAP, LINEAR_ELASTIC,
+                     ACTIVE_NEO_HOOKEAN, ACTIVE_SHAPE_TARGETING_ARAP
+CoulombFrictionModel: C1_REGULARIZED (default), CINF_REGULARIZED</code></pre>
+</div>
 
-        <article class="workload">
-          <div class="workload-title">
-            <div class="workload-index">02</div>
-            <div>
-              <h3>Franka pen pick-and-place</h3>
-              <p class="workload-sub">Parallel jaws · inverse kinematics · SDF hydroelastic contacts</p>
-            </div>
-            <div class="result-chip" data-stat="panda-result">Runnable in Newton</div>
-          </div>
+<p>Three things in that listing are unusual for a robotics engine and worth dwelling on.</p>
 
-          <div class="paired-media">
-            <figure class="media-frame">
-              <video data-autoplay muted loop playsinline controls preload="none" poster="media/newton-panda-pick-place.jpg">
-                <source src="media/newton-panda-pick-place.mp4" type="video/mp4">
-              </video>
-              <figcaption class="media-caption"><span>Newton ViewerGL · complete pen transfer</span><span>Measured task run</span></figcaption>
-            </figure>
-            <figure class="media-frame">
-              <video data-autoplay muted loop playsinline controls preload="none" poster="media/superdex-robot-library.jpg">
-                <source src="media/superdex-robot-library.mp4" type="video/mp4">
-              </video>
-              <figcaption class="media-caption"><span>SuperDex robot library · includes FR3 + 2F-85</span><span><a href="https://projectsuperdex.com/img/layers/robotics/robotics_bot_library.mp4">Project footage</a></span></figcaption>
-            </figure>
-          </div>
+<div class="grid3">
+<div class="card">
+<h4>Stiff ODE integrators</h4>
+<p>BDF2/BDF3 and three diagonally-implicit Runge&ndash;Kutta schemes, annotated in the headers with their stability class (&ldquo;L-stable&rdquo;, &ldquo;A-stable&rdquo;). Two are <i>symplectic</i>. No robotics engine ships this menu; this is the vocabulary of stiff FEM, not of game physics.</p>
+</div>
+<div class="card">
+<h4>PSD projection, always on</h4>
+<p><code class="inline">psd_proj_mode = ALWAYS</code> eigen-clamps the assembled Hessian every iteration. That is the standard trick for making implicit FEM robust to element inversion &mdash; and it tells you the contact and constraint terms are <i>energies</i>, not complementarity conditions.</p>
+</div>
+<div class="card">
+<h4>Inexact Newton</h4>
+<p>Eisenstat&ndash;Walker forcing terms adapt the inner Krylov tolerance to the outer residual, so early Newton iterations solve the linear system loosely. Combined with <code class="inline">AUGMENTED_CG</code> Krylov recycling and a preconditioner-recycling manager, this is a serious numerical-linear-algebra stack.</p>
+</div>
+</div>
 
-          <div class="metric-row">
-            <div class="metric"><span class="metric-value" data-stat="panda-lift">—</span><span class="metric-label">Measured pen lift</span></div>
-            <div class="metric"><span class="metric-value" data-stat="panda-peak">—</span><span class="metric-label">Peak pen height</span></div>
-            <div class="metric"><span class="metric-value">2</span><span class="metric-label">Scene variants: pen + cube</span></div>
-          </div>
+<h3 style="margin-top:32px">The defaults that decide the character of the engine</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Parameter</th><th class="num">Default</th><th>Consequence</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">non_linear_solver.max_iter</code></td><td class="num">4</td><td>Four Newton iterations per stage. This is the real-time budget; convergence is a hope, not a guarantee.</td></tr>
+<tr><td><code class="inline">line_search_max_iter</code></td><td class="num">4</td><td>Residual-norm line search, cheap.</td></tr>
+<tr><td><code class="inline">linear_solver</code></td><td class="num">AUTO</td><td>Direct <b>LDLT</b> below 50 DoFs, <b>CG</b> above. The header admits the threshold &ldquo;has not been tuned yet.&rdquo;</td></tr>
+<tr><td><code class="inline">contact.penalty_coefficient</code></td><td class="num">1e9 Pa/m</td><td>Contact is a smoothed penalty spring. Sets resting penetration &mdash; see below.</td></tr>
+<tr><td><code class="inline">penalty_threshold_default</code></td><td class="num">0.001 m</td><td>Contact activates 1&nbsp;mm before touching. Stiff contacts therefore <i>levitate</i>.</td></tr>
+<tr><td><code class="inline">penalty_smoothing_half_distance</code></td><td class="num">0.005 m</td><td>C²-continuous &ldquo;PolyReLU&rdquo; instead of a kink at zero gap.</td></tr>
+<tr><td><code class="inline">coulomb_friction_coefficient</code></td><td class="num">0.5</td><td>Isotropic cone, IPC-style C¹ mollifier, <code class="inline">friction_falloff_vel = 0.01 m/s</code>.</td></tr>
+<tr><td><code class="inline">precision</code></td><td class="num">fp32</td><td>fp64 is a <i>separate wheel</i> (<code class="inline">superdex-physics-fp64</code>) selected by <code class="inline">SUPERDEX_PRECISION=double</code>.</td></tr>
+<tr><td>gravity</td><td class="num">&minus;Y</td><td>Physics is <b>Y-up</b>; Robotics and Studio are <b>Z-up</b>. Flagged in comments in both example families.</td></tr>
+</tbody></table></div>
 
-          <div class="evidence-grid">
-            <div class="chart-card">
-              <div class="chart-head"><h4>Gripper and object height</h4><span>Approach → grasp → transfer → release</span></div>
-              <div class="chart" id="chart-panda-height"><div class="chart-loading">Loading trace…</div></div>
-            </div>
-            <div>
-              <div class="finding newton">
-                <h4>Newton path</h4>
-                <p>A complete task is available in one example, with pen and cube choices. Nearby examples extend the same robot family to cube stacking, soft-body grasping, cable pick-and-place, and cloth manipulation.</p>
-              </div>
-              <div class="finding superdex">
-                <h4>SuperDex path</h4>
-                <p>The native FR3 + Robotiq 2F-85 assembly loaded with 20 links, 20 joints, two closed-loop cycles, and 13 runtime DoFs. Robotics provides joint-space, operational-space, and articulated-pose control. What is missing for this comparison is a packaged parallel-gripper object task with a checked contact outcome.</p>
-              </div>
-            </div>
-          </div>
+<div class="note bad"><b>There is no hard-constraint path anywhere in the engine.</b> Joint limits carry a <code class="inline">limitStiffness</code>. Closed kinematic loops are <code class="inline">ArticulatedCycleJointParams</code> with <code class="inline">stiffness = 50000</code>. Rigid &ldquo;joints&rdquo; between bodies are constraints with <code class="inline">stiffness = 1e6</code>. Pose controllers are implicit PD terms baked into the Newton system. Everything is a spring, everything has a saturation, and nothing is exactly enforced. This is a coherent design &mdash; a single differentiable energy that a Newton solver can descend &mdash; but it is the opposite of Kamino's premise.</div>
+</section>
 
-          <div class="gallery-strip">
-            <figure class="media-frame square">
-              <video data-autoplay muted loop playsinline controls preload="none" poster="media/superdex-bimanual-manipulation.jpg">
-                <source src="media/superdex-bimanual-manipulation.mp4" type="video/mp4">
-              </video>
-              <figcaption class="media-caption"><span>SuperDex bimanual puzzle-cube manipulation</span><span><a href="https://projectsuperdex.com/img/layers/robotics/bimanual_cube_manipulation.mp4">Project footage</a></span></figcaption>
-            </figure>
-            <div class="card soft-teal">
-              <div class="card-kicker">Important context</div>
-              <h3>SuperDex’s manipulation story is broader than the matched task.</h3>
-              <p>The first-party gallery shows high-contact dexterous scenes that go beyond a two-finger grasp. That is a real strength. The distinction here is between a demonstrated project capability and a downloadable example that a user can run, modify, and test immediately.</p>
-              <p>The fairest next comparison would use one shared robot/object asset and one shared success condition, while letting each engine use its native contact and control stack.</p>
-            </div>
-          </div>
-        </article>
-      </section>
 
-      <section class="section" id="cloth">
-        <div class="section-head">
-          <div>
-            <span class="section-number">05 · Cloth</span>
-            <h2>A garment has to follow the robot.</h2>
-          </div>
-          <p class="section-lead">The lead Newton cloth case is an H1 humanoid wearing a simulated jacket while its arms raise, wave, and lower. It makes robot–cloth coupling visible at a glance. A separate Franka example manipulates a shirt on a table.</p>
-        </div>
+<section id="four">
+<div class="kicker">Positioning</div>
+<h2>SuperDex, MuJoCo, VBD/AVBD and Kamino are four different answers to &ldquo;what is a contact?&rdquo;</h2>
 
-        <article class="workload">
-          <div class="workload-title">
-            <div class="workload-index">H1</div>
-            <div>
-              <h3>Humanoid jacket interaction</h3>
-              <p class="workload-sub">Unitree H1 · Style3D cloth · IK-driven articulated motion</p>
-            </div>
-            <div class="result-chip">Runnable in Newton</div>
-          </div>
+<p class="lead">These are not four points on a quality axis. They are four different mathematical objects, and each one buys a property the others cannot express.</p>
 
-          <div class="paired-media">
-            <figure class="media-frame">
-              <video data-autoplay muted loop playsinline controls preload="none" poster="media/newton-h1-jacket.jpg">
-                <source src="media/newton-h1-jacket.mp4" type="video/mp4">
-              </video>
-              <figcaption class="media-caption"><span>Newton ViewerGL · jacket responding to H1 arm motion</span><span>Measured task run</span></figcaption>
-            </figure>
-            <figure class="media-frame">
-              <video data-autoplay muted loop playsinline controls preload="none" poster="media/superdex-fruit-bag.jpg">
-                <source src="media/superdex-fruit-bag.mp4" type="video/mp4">
-              </video>
-              <figcaption class="media-caption"><span>SuperDex shell interaction · fruit bag</span><span><a href="https://projectsuperdex.com/img/gallery/fruitbag_low.mp4">Project footage</a></span></figcaption>
-            </figure>
-          </div>
+<div class="table-wrap"><table>
+<thead><tr><th>Engine</th><th>Contact is&hellip;</th><th>Solved by</th><th>Coordinates</th><th>Buys you</th><th>Costs you</th></tr></thead>
+<tbody>
+<tr>
+<td><b>SuperDex Physics</b></td>
+<td>a smoothed <b>penalty energy</b> + IPC-mollified Coulomb friction</td>
+<td>Newton&ndash;Raphson on a variational implicit step (BDF/DIRK), PSD-projected</td>
+<td>maximal for rigid, <b>reduced</b> for articulated, nodal for deformables &mdash; in one system</td>
+<td>huge stable steps; one solve couples rigid+soft+shell+rod; differentiable by construction</td>
+<td>CPU only; penetration is designed in; no exact constraints; no batching</td>
+</tr>
+<tr>
+<td><b>MuJoCo / MJWarp</b></td>
+<td>a <b>soft convex constraint</b> (regularised, Gauss principle)</td>
+<td>Newton or CG on the dual QP over constraint impulses, warm-started</td>
+<td>generalized (CRB + RNE)</td>
+<td>fastest articulated dynamics on GPU; islands + sleeping; enormous ecosystem</td>
+<td>convex-hulled meshes; slip is inherent to the soft model; penetration set by <code class="inline">solref</code></td>
+</tr>
+<tr>
+<td><b>VBD / AVBD</b></td>
+<td>a <b>penalty potential</b>, promoted to augmented-Lagrangian for hard slots</td>
+<td>vertex-block Gauss&ndash;Seidel coordinate descent, graph-coloured, on GPU</td>
+<td>vertex positions; 6-DoF blocks for rigid</td>
+<td>unconditional stability, monotone energy decrease, arbitrary iteration budget; superb at deformables and huge body counts</td>
+<td>information propagates only as fast as iterations × connectivity; not differentiable in Newton</td>
+</tr>
+<tr>
+<td><b>Kamino</b></td>
+<td>a <b>nonlinear complementarity problem</b> &mdash; Signorini&ndash;Coulomb, unconvexified</td>
+<td>Proximal-ADMM with Nesterov acceleration, block-Cholesky or matrix-free CR</td>
+<td>maximal (independent SE(3) per body)</td>
+<td>genuinely hard contact, restitutive impacts, native kinematic loops, heterogeneous worlds</td>
+<td>expensive; rigid-only; not differentiable; explicitly beta and &ldquo;discouraged&rdquo;</td>
+</tr>
+</tbody></table></div>
 
-          <div class="metric-row">
-            <div class="metric"><span class="metric-value" data-stat="cloth-particles">—</span><span class="metric-label">Jacket particles</span></div>
-            <div class="metric"><span class="metric-value" data-stat="cloth-span">—</span><span class="metric-label">Maximum vertical envelope</span></div>
-            <div class="metric"><span class="metric-value" data-stat="cloth-hand">—</span><span class="metric-label">Peak left-hand height</span></div>
-          </div>
+<div class="grid2" style="margin-top:22px">
+<div class="callout">
+<h3>SuperDex and Kamino are exact opposites</h3>
+<p>Both landed in 2026, both call themselves contact-focused, and they disagree about the fundamental object. Kamino refuses to convexify or soften: contact is a complementarity condition and the solver's job is to satisfy it. SuperDex refuses to leave the smooth world: contact is a C²-continuous energy and the solver's job is to minimise it.</p>
+<p>The consequences are visible in the API. Kamino exposes <code class="inline">restitution</code>; SuperDex has no restitution parameter at all and instead ships a <i>fitted rational calibration</i> converting a desired coefficient of restitution into a normal viscous damping coefficient, valid at one impact velocity.</p>
+</div>
+<div class="callout">
+<h3>SuperDex and VBD are close cousins</h3>
+<p>Both minimise the same variational implicit-Euler objective. Both use stable Neo-Hookean energies from Smith et&nbsp;al.&nbsp;2018 and IPC-smoothed friction. They differ only in <i>how</i> they descend it: VBD does block coordinate descent one vertex at a time (embarrassingly parallel after graph colouring, ideal for a GPU), SuperDex assembles the global Hessian and does a real Newton step with a Krylov solve (better convergence per iteration, needs sparse linear algebra, natural on a CPU).</p>
+<p>That single choice &mdash; local Gauss&ndash;Seidel vs global Newton &mdash; is what puts one on a GPU and the other on a CPU.</p>
+</div>
+</div>
 
-          <div class="evidence-grid">
-            <div class="chart-card">
-              <div class="chart-head"><h4>Jacket envelope and hand motion</h4><span>Shaded area: cloth min–max height</span></div>
-              <div class="chart" id="chart-cloth"><div class="chart-loading">Loading trace…</div></div>
-            </div>
-            <div>
-              <div class="finding newton">
-                <h4>Newton path</h4>
-                <p>The H1 garment example is complete and visually readable. Newton also ships VBD cloth on a Franka arm, a solver comparison for hanging cloth, self-contact twisting, and a Style3D garment case.</p>
-              </div>
-              <div class="finding superdex">
-                <h4>SuperDex path</h4>
-                <p>Shells participate in the same scene as rigid and articulated actors, and the project gallery shows interactive fabric objects. The experimental T-shirt-on-plane example completed a two-second current-source smoke run. It is a substantive standalone cloth case, but not yet a robot–cloth task; its final solver status also remained <code class="inline">STOPPED</code>.</p>
-              </div>
-            </div>
-          </div>
-        </article>
-      </section>
+<div class="note"><b>Kamino is a Newton solver, not a separate simulator.</b> Worth stating plainly because secondary sources get it wrong: <code class="inline">newton.solvers.SolverKamino</code>, authored by Disney Research (Tsounis et&nbsp;al., <a href="https://arxiv.org/abs/2603.16536" target="_blank">arXiv:2603.16536</a>), Proximal-ADMM over an NCP. It is <i>not</i> a VBD variant. Its published result is a walking policy on DR&nbsp;Legs &mdash; a biped with six nested kinematic loops &mdash; at ~3 600 env-steps/s across 4 096 environments.</div>
+</section>
 
-      <section class="section" id="architecture">
-        <div class="section-head">
-          <div>
-            <span class="section-number">06 · Background</span>
-            <h2>Two coherent simulation shapes.</h2>
-          </div>
-          <p class="section-lead">The differences above follow directly from the public architecture. Newton separates model data, collision, state, control, and solver choice. SuperDex assembles rigid, articulated, soft, shell, and rod actors inside one scene and advances that scene through an implicit solve.</p>
-        </div>
 
-        <div class="architecture-grid">
-          <article class="card architecture-card newton soft-blue">
-            <div class="card-kicker">Newton</div>
-            <h3>A simulator toolkit with interchangeable physics paths</h3>
-            <ul>
-              <li>Eight first-party solver families cover articulated bodies, deformables, cloth, MPM, and hard-contact experiments.</li>
-              <li>Topology is finalized; state, control, contacts, and many model arrays remain directly accessible.</li>
-              <li>World replication and device arrays make many environments a core modeling primitive.</li>
-              <li>URDF, MJCF, and USD can enter through public Python APIs.</li>
-              <li>ViewerGL, RTX, Rerun, Viser, USD, file playback, and null execution share one viewer interface.</li>
-            </ul>
-          </article>
-          <article class="card architecture-card superdex soft-teal">
-            <div class="card-kicker">Project SuperDex</div>
-            <h3>A live scene with integrated implicit physics</h3>
-            <ul>
-              <li>Rigid, articulated, FEM soft, shell, and rod actors contribute to one scene-level solve.</li>
-              <li>Actors, bots, controllers, sensors, and scene snapshots use object-oriented handles.</li>
-              <li>Native bot and task prefabs pair with a dedicated Studio authoring and validation workflow.</li>
-              <li>Rods, tendons, soft actors, and shell contact are visible first-class concepts.</li>
-              <li>Current public wheels execute physics on CPU; Lab scales environments with local and worker processes.</li>
-            </ul>
-          </article>
-        </div>
+<section id="contact">
+<div class="kicker">Contact</div>
+<h2>No GJK, no EPA, no convex decomposition. Surface quadrature points against a signed distance field.</h2>
 
-        <div class="note"><strong>Main-branch context.</strong> The SuperDex snapshot includes development after its 1.0 tag: direct per-pair contact overrides, prefab additions, package-path cleanup, linear-solver changes, and shell-storage work. Newton’s snapshot includes the 1.6 development API, MuJoCo Warp 3.12, the explicit collision pipeline, new controller surfaces, and recent hydroelastic-contact work.</div>
-      </section>
+<p class="lead">SuperDex's narrow phase is not feature-pair generation. The colliding actor emits <i>sample points</i> &mdash; three per boundary triangle by default, configurable up to sixteen &mdash; and the collider answers each with an SDF value and gradient. Grepping the whole tree for <code class="inline">gjk</code> or <code class="inline">epa</code> returns nothing.</p>
 
-      <section class="section" id="api">
-        <div class="section-head">
-          <div>
-            <span class="section-number">07 · API ergonomics</span>
-            <h2>Which API feels easier from the user’s seat?</h2>
-          </div>
-          <p class="section-lead">SuperDex is usually shorter for one already-authored scene. Newton asks for more decisions at setup time, but those objects become useful when users need a different solver, direct arrays, explicit contacts, or hundreds of worlds.</p>
-        </div>
+<div class="grid2">
+<div class="card">
+<h4>Why that matters for dexterous manipulation</h4>
+<p>MuJoCo convex-hulls every mesh, which is exactly why the gear teeth in <a href="../newton-tight-fit-insertion/">the tight-fit insertion study</a> disappeared and the train slipped 100%. SuperDex never needs a convex hull: <code class="inline">ColliderType.AUTO</code> maps a mesh on a volumetric actor to <b>SDF</b>, and a shell or rod to <b>POINT_CLOUD</b>. Non-convex contact is the default path, not an escape hatch.</p>
+<p>It also means contact count is not a fixed budget. There is no <code class="inline">nconmax</code> to overflow, no <code class="inline">rigid_contact_max</code> to silently truncate. The contact set is however many quadrature samples are inside the threshold.</p>
+</div>
+<div class="card">
+<h4>What it costs</h4>
+<p>Grid SDFs must be baked per shape at init &mdash; the code warns that it is &ldquo;expensive&rdquo; and complains about non-watertight meshes. Contact resolution is tied to mesh tessellation, so a coarse mesh gives coarse contact whether or not the geometry is right.</p>
+<p><code class="inline">ColliderType.MESH</code> is marked <i>[Experimental], &ldquo;Performance is slow&rdquo;</i>. Self-contact on point clouds is off by default, described in the source as &ldquo;still highly experimental, not optimized yet, and may severely degrade performance.&rdquo;</p>
+</div>
+</div>
 
-        <div class="api-intro">
-          <article class="api-verdict">
-            <div class="card-kicker">SuperDex ergonomic advantage</div>
-            <h3>One scene, compact lifecycle</h3>
-            <p>The ordinary mental model is direct: initialize, create a scene, add actors or bots, and call <code>scene.step(dt)</code>. Whole-scene capture and restore is similarly cohesive.</p>
-          </article>
-          <article class="api-verdict">
-            <div class="card-kicker">Newton ergonomic advantage</div>
-            <h3>Explicit data that scales with the experiment</h3>
-            <p>Model, solver, collision, state, and control are separate on purpose. The API is more verbose, while making device placement, batching, solver swaps, and custom loops legible.</p>
-          </article>
-        </div>
+<h3 style="margin-top:30px">The friction model is IPC's, verbatim</h3>
+<p><code class="inline">C1_REGULARIZED</code> is the <i>Incremental Potential Contact</i> mollifier &mdash; the header cites Li et&nbsp;al. 2020 and reproduces the C¹ interpolant of the unit step. Friction is an isotropic cone, not a pyramid, and it enters the Newton system as an energy with a saturating Hessian. Newton's VBD solver uses the same mollifier, with one difference the Newton source is explicit about:</p>
+<div class="codeblock">
+<div class="code-head"><code>newton/_src/solvers/vbd/particle_vbd_kernels.py</code></div>
+<pre><code># Different from IPC, we treat the contact normal as constant
+#  this significantly improves the stability</code></pre>
+</div>
+<p>SuperDex makes the same simplification through <code class="inline">explicitNormals</code>, and in fact <i>requires</i> it for differentiable scenes.</p>
+</section>
 
-        <div class="table-wrap api-table" tabindex="0" aria-label="API ergonomics comparison table">
-          <table>
-            <thead><tr><th>Area</th><th>Newton</th><th>SuperDex</th><th>User perspective</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>Scene setup</td>
-                <td><code class="inline">ModelBuilder</code> → finalized <code class="inline">Model</code> → explicit solver, state, control, and contacts</td>
-                <td>Live <code class="inline">Scene</code> owns actors; Robotics adds <code class="inline">BotPrefab</code>, <code class="inline">Bot</code>, and context</td>
-                <td>SuperDex has fewer visible pieces for a basic scene. Newton makes ownership and solver choice explicit.</td>
-              </tr>
-              <tr>
-                <td>Assets</td>
-                <td>Direct URDF, MJCF, and USD ingestion plus procedural construction</td>
-                <td>Native bot/scene prefabs and processed geometry, with Studio; runtime URDF for mesh-based prototypes</td>
-                <td>Newton is immediately interoperable with more common formats. SuperDex offers the more integrated native authoring workflow.</td>
-              </tr>
-              <tr>
-                <td>Control</td>
-                <td>Bulk <code class="inline">State</code>/<code class="inline">Control</code> arrays, IK objectives, joint impedance, operational-space, and differential-IK controllers</td>
-                <td>Typed controller records around joint-space, operational-space, and articulated-pose controllers; custom components can be registered</td>
-                <td>SuperDex’s observation–target–output pattern is compact. Newton exposes more vectorized controller variants and buffers.</td>
-              </tr>
-              <tr>
-                <td>Reset</td>
-                <td>Granular state assignment and applicable per-world reset masks</td>
-                <td>Scene-level <code class="inline">capture_state()</code> and <code class="inline">restore_state()</code></td>
-                <td>SuperDex offers the cleaner whole-scene rollback. Newton offers finer control for selective batched reset.</td>
-              </tr>
-              <tr>
-                <td>RL scaling</td>
-                <td>Native replicated worlds in one model; full environment layer delegated to integrations such as Isaac Lab</td>
-                <td>Direct Gymnasium environment base and RLlib examples; current vectorization uses synchronous scenes plus workers</td>
-                <td>SuperDex starts closer to a familiar Gym environment. Newton starts closer to a batched simulator substrate.</td>
-              </tr>
-              <tr>
-                <td>Visualization</td>
-                <td>Common viewer API across GL, RTX, Rerun, Viser, USD, file, and null targets</td>
-                <td>Physics Debugger, Studio, Rerun logger, and a Polyscope-based Lab viewer</td>
-                <td>Newton unifies more output targets. SuperDex separates authoring, low-level inspection, and RL rendering into focused tools.</td>
-              </tr>
-              <tr>
-                <td>Typing</td>
-                <td>Typed Python package with inspectable public annotations and shape validation</td>
-                <td>Typed parameter/result objects and generated native stubs in the source tree</td>
-                <td>Both are designed for IDE discovery; both still expose experimental higher-level surfaces.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
 
-        <div class="code-pair">
-          <article class="code-card">
-            <div class="code-head"><span>Newton · shape of a single-robot loop</span><button class="copy" type="button" aria-label="Copy Newton example">Copy</button></div>
-            <pre><code>builder = newton.ModelBuilder()
-builder.add_urdf("robot.urdf", floating=False)
-builder.add_ground_plane()
-model = builder.finalize()
+<section id="crossover">
+<div class="kicker">Measurement 1</div>
+<h2>On one scene, SuperDex beats a GPU until the scene reaches 48 bodies.</h2>
+
+<p class="lead">The same experiment in both engines: N unit-density 10&nbsp;cm boxes stacked in a cube lattice, dropped onto a ground plane, stepped at 16.7&nbsp;ms, timed after settling. SuperDex single-threaded on one EPYC core; Newton on the GPU slice with the whole step in a captured CUDA graph.</p>
+
+<figure class="plot"><div id="fig-crossover" class="plotbox"></div>
+<figcaption>Wall-clock cost of one 16.7&nbsp;ms step. SuperDex is <b>31&times; faster than XPBD at a single body</b> (6.5&nbsp;µs vs 201&nbsp;µs) and <b>8.4&times; slower at 216</b>. XPBD is almost perfectly flat &mdash; 0.20&nbsp;ms to 0.29&nbsp;ms across a 216&times; range &mdash; because the GPU is latency-bound, not work-bound, at these sizes. That flatness is the whole argument for GPU physics, and it is also why the comparison inverts so sharply.</figcaption></figure>
+
+<div class="table-wrap"><table>
+<thead><tr><th>bodies</th><th class="num">SuperDex (CPU, 1 core)</th><th class="num">Newton XPBD</th><th class="num">Newton MuJoCo</th><th class="num">Newton Kamino</th><th class="num">SuperDex ÷ XPBD</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="num">0.0065 ms</td><td class="num">0.201 ms</td><td class="num">0.250 ms</td><td class="num">0.255 ms</td><td class="num">0.03&times;</td></tr>
+<tr><td>8</td><td class="num">0.0498 ms</td><td class="num">0.231 ms</td><td class="num">0.520 ms</td><td class="num">2.327 ms</td><td class="num">0.22&times;</td></tr>
+<tr><td>27</td><td class="num">0.124 ms</td><td class="num">0.280 ms</td><td class="num">1.026 ms</td><td class="num"><span class="tag moved">stalled</span></td><td class="num">0.44&times;</td></tr>
+<tr><td>64</td><td class="num">0.402 ms</td><td class="num">0.280 ms</td><td class="num">12.13 ms</td><td class="num">&mdash;</td><td class="num">1.44&times;</td></tr>
+<tr><td>125</td><td class="num">1.054 ms</td><td class="num">0.283 ms</td><td class="num"><span class="tag kept">IndexError</span></td><td class="num">&mdash;</td><td class="num">3.73&times;</td></tr>
+<tr><td>216</td><td class="num">2.392 ms</td><td class="num">0.286 ms</td><td class="num"><span class="tag kept">IndexError</span></td><td class="num">&mdash;</td><td class="num">8.35&times;</td></tr>
+</tbody></table></div>
+
+<p>SuperDex's cost grows as roughly <b>N<sup>1.6</sup></b> &mdash; superlinear, as you would expect from a sparse factorisation and a broad phase that both scale with contact count, and as the <code class="inline">AUTO</code> heuristic flips from dense LDLT to CG past 50 DoFs.</p>
+
+<div class="note bad"><b>Two Newton results in that table are defects, not physics.</b> <code class="inline">SolverMuJoCo</code> costs 12&nbsp;ms at 64 free bodies &mdash; 12&times; the cost at 27 &mdash; and then fails outright at 125 with <code class="inline">IndexError: index 19 is out of bounds for axis 0 with size 19</code> during model conversion. <code class="inline">SolverKamino</code> emitted a per-step host-side warning (<code class="inline">rigid_contact_max (1000) exceeds model_max_contacts_host (672); contacts will be truncated</code>) that dominated wall-clock and stalled the sweep past 8 bodies. Both are worth filing; neither is a statement about the underlying algorithms.</div>
+</section>
+
+
+<section id="batch">
+<div class="kicker">Measurement 2</div>
+<h2>And then the batch axis appears, and the comparison stops being close.</h2>
+
+<p class="lead">The previous plot is the only regime where SuperDex competes on speed. Newton's design point is not one scene &mdash; it is thousands of identical worlds in one kernel launch, which is what an RL rollout actually needs.</p>
+
+<figure class="plot"><div id="fig-batch" class="plotbox"></div>
+<figcaption>Environment-steps per second for 8-body worlds. Newton XPBD climbs from 4.2&nbsp;k to <b>679&nbsp;k env-steps/s</b> at 1 024 worlds &mdash; a <b>161&times;</b> gain for 1 024&times; the work &mdash; then falls to 298&nbsp;k at 4 096, where 32 768 bodies exceed what 46 SMs and 24&nbsp;GiB can keep resident. On a whole GPU that peak moves right and up. SuperDex has no batch axis to plot: the flat cyan line is one scene on one core (20.1&nbsp;k scene-steps/s), and the dotted line is the unreachable upper bound of perfect scaling across all 192 cores.</figcaption></figure>
+
+<p>The dotted line deserves scepticism, and it is drawn only to be argued with. It assumes 192 independent SuperDex processes scale linearly, which ignores memory bandwidth, and it credits SuperDex with hardware that costs far more than the GPU slice it is being compared against. Even granting all of it, one seventh of a Blackwell running Newton lands within a factor of ~6 of an entire 192-core EPYC running SuperDex &mdash; and the GPU number is throttled by a partition, not by the algorithm.</p>
+
+<p>The MuJoCo line is included because it is a useful reminder that <i>solver choice dominates engine choice</i>. On this scene &mdash; eight free-floating boxes with no articulation, which is the worst possible shape for a generalized-coordinate engine &mdash; <code class="inline">SolverMuJoCo</code> manages 863 env-steps/s at 16 worlds, <b>66&times; slower than XPBD</b>, before failing outright at 64. Quoting &ldquo;Newton&rdquo; a single throughput number is meaningless; quoting SuperDex one is at least well-defined, because it only has one solver.</p>
+
+<div class="note warning"><b>SuperDex Lab's parallelism is <code class="inline">fork()</code>.</b> <code class="inline">HybridVectorEnv</code> is documented as &ldquo;multiple async workers using <code class="inline">AsyncVectorEnv</code>, where each worker runs a <code class="inline">SyncVectorEnv</code> containing multiple environments&rdquo; &mdash; N processes × M sequential envs, with a refcounted <code class="inline">SceneManager</code> to share scene memory. There is no vectorisation over worlds inside the engine, and given the thread-scaling result below, there may not be an easy path to one.</div>
+</section>
+
+
+<section id="accuracy">
+<div class="kicker">Measurement 3</div>
+<h2>The time-step claim is true. The contact-softness claim is the price.</h2>
+
+<p class="lead">SuperDex's examples repeat one claim verbatim: <i>&ldquo;fully-implicit integration, enabling substantially larger stable time steps than explicit or semi-implicit methods &hellip; 10&ndash;25&nbsp;ms steps remain robust.&rdquo;</i> A single box dropped from 1&nbsp;m and left to settle for 3&nbsp;s tests it directly.</p>
+
+<figure class="plot"><div id="fig-dt" class="plotbox"></div>
+<figcaption>Resting penetration against time step. From 1&nbsp;ms to 200&nbsp;ms &mdash; a 200&times; range, an order of magnitude past the claim &mdash; the answer moves by <b>0.1%</b>. The steady state is set by force balance against the penalty spring, and the implicit integrator reaches it identically regardless of how coarsely time is sliced. Newton iteration count is equally irrelevant: 1, 2, 4, 8 and 16 iterations all give 0.3078&ndash;0.3083&nbsp;mm.</figcaption></figure>
+
+<p>That is a genuinely strong result and it is the engine's best feature. But the flip side is the number itself: <b>the box rests 0.308&nbsp;mm inside the floor</b>, and where it rests is a pure function of load ÷ stiffness.</p>
+
+<figure class="plot"><div id="fig-penetration" class="plotbox"></div>
+<figcaption>Two independent sweeps that land on one curve. Sweeping contact stiffness at fixed density (line) and sweeping density at fixed stiffness (crosses) produce <i>identical</i> penetrations once replotted against stiffness ÷ load &mdash; &minus;0.4894&nbsp;mm at ρ=10 is the same number as &minus;0.4894&nbsp;mm at k=1e11. The contact is a linear spring and behaves exactly like one. Below 1e9 the model softens toward multi-millimetre interpenetration; above 1e10 the body <b>floats</b>, because contact activates at the 1&nbsp;mm <code class="inline">penalty_threshold</code> and a stiff spring never lets it through. At k=1e6 the Newton solver reports <code class="inline">Solution explosion detected</code>.</figcaption></figure>
+
+<div class="note warning"><b>This is the failure mode already documented in Newton.</b> The <a href="../grasp-shake-drift/">grasp-shake-drift study</a> traced cube creep in a two-finger gripper to exactly this: compliant contact rectified by cyclic load, on pads carrying an import-default stiffness. SuperDex has the same physics with a different parameter name. Its advantage is that <code class="inline">penalty_coefficient</code> is a single scalar in Pa/m with an obvious meaning, rather than MuJoCo's <code class="inline">solref</code>/<code class="inline">solimp</code> five-tuple &mdash; and that <code class="inline">geom_priority</code> cannot silently discard what you authored. Its disadvantage is that there is no hard-contact escape hatch at all.</div>
+
+<div class="grid3" style="margin-top:22px">
+<div class="card"><h4>Determinism</h4><p>Five identical runs produced <b>bit-identical</b> final positions (<code class="inline">0.04969199374318123</code>). Single-threaded and single-scene, so this is the easy case &mdash; but it is a clean pass.</p></div>
+<div class="card"><h4>Iteration insensitivity</h4><p>1 → 16 Newton iterations changes resting penetration by 0.5&nbsp;µm. The solve converges well inside the default budget of 4 for this scene; <code class="inline">get_solver_stats()</code> reported 0 iterations at rest.</p></div>
+<div class="card"><h4>Where it breaks</h4><p>At a 500&nbsp;ms step the box never moved at all. At <code class="inline">penalty_coefficient = 1e6</code> the solver logged an explosion. Both are far outside the advertised envelope, and both fail loudly rather than silently.</p></div>
+</div>
+</section>
+
+
+<section id="threads">
+<div class="kicker">Measurement 4</div>
+<h2>Threading helps to four workers, then actively hurts.</h2>
+
+<p class="lead">SuperDex's only scaling lever is <code class="inline">initialize(num_worker_threads=N)</code>. The docstring promises that &ldquo;for scenes with a large number of DoFs &hellip; running with multiple threads will improve performance.&rdquo; On a 192-core EPYC, with 1 899-tet FEM ducks &mdash; precisely the high-DoF case the docs point at &mdash; it does not hold up.</p>
+
+<figure class="plot"><div id="fig-threads" class="plotbox"></div>
+<figcaption>Speed-up over single-threaded. The peak is <b>4 workers</b> at 1.21&ndash;1.75&times;. At 8 workers the single-duck scene is already <i>slower than single-threaded</i>, and at 16 workers every configuration is worse &mdash; the single duck by <b>2.7&times;</b>. This is not a NUMA artefact at these sizes; it is what a fibre-based task scheduler does when the tasks are smaller than the scheduling overhead.</figcaption></figure>
+
+<p>The mechanism is visible in the source. Parallelism is <i>task-graph</i> over simulation islands, not data-parallel over the state vector: islands are scheduled as concurrent tasks on a Google&nbsp;<a href="https://github.com/google/marl" target="_blank">marl</a> fibre scheduler, collision detection overlaps with articulated-Jacobian updates, and small islands explicitly opt out via <code class="inline">island::ShouldRunSingleThreaded</code>. A scene with one duck has one island, so there is nothing to overlap &mdash; only threads to synchronise.</p>
+
+<div class="note"><b>Consistent with the shipped examples.</b> Every SuperDex example except the t-shirt uses <code class="inline">num_worker_threads=0</code>. The t-shirt &mdash; a self-colliding shell with thousands of point-cloud samples, i.e. genuinely wide work &mdash; is the one that asks for <code class="inline">-1</code>. The engine authors appear to know exactly where threading pays.</div>
+</section>
+
+
+<section id="cpu">
+<div class="kicker">Finding</div>
+<h2>The CUDA solvers are in the API and cannot run.</h2>
+
+<p class="lead"><code class="inline">LinearSolverType</code> advertises <code class="inline">CUDA_CG</code>, <code class="inline">CUDA_GMRES</code> and three experimental cuSPARSE factorisations. Eight <code class="inline">.cu</code> files ship in the tree. It is reasonable to read all that as a GPU engine. It is not one.</p>
+
+<div class="codeblock">
+<div class="code-head"><code>selecting each linear solver on a 1 899-tet soft-body scene</code><button class="copy" type="button">Copy</button></div>
+<pre><code>CUDA_CG                            FAIL  Error: mochi_scene.cpp(423):
+                                         CUDA solvers require building with CUDA.
+CUDA_GMRES                         FAIL  (same)
+EXPERIMENTAL_CUDA_SPARSE_CHOLESKY  FAIL  (same)
+EXPERIMENTAL_CUDA_SPARSE_LDLT      FAIL  (same)
+PARALLEL_CG                        OK    ConvergenceStatus.CONVERGED
+CG                                 OK    ConvergenceStatus.CONVERGED</code></pre>
+</div>
+
+<p>And it cannot be fixed by rebuilding from the public source: <code class="inline">MOCHI_USE_CUDA</code> defaults to 0, and grepping every <code class="inline">CMakeLists.txt</code> and <code class="inline">.cmake</code> in the repo for it returns nothing. There is no CMake option, no <code class="inline">find_package(CUDAToolkit)</code>, no <code class="inline">enable_language(CUDA)</code>. The CMake preamble sets <code class="inline">MOCHI_INTERNAL OFF &hellip; FORCE</code> with the comment &ldquo;Only external builds are supported with CMake&rdquo; &mdash; CUDA is wired up in Meta's internal Buck build, which was not released.</p>
+
+<div class="note bad"><b>Even if it were enabled, the scope is the linear solve only.</b> The CUDA path is <code class="inline">CudaCG</code>, <code class="inline">CudaGMRES</code> and sparse factorisations &mdash; the inner Krylov step of each Newton iteration. Assembly, collision detection, SDF queries and the outer Newton loop are CPU. That is an accelerated linear-algebra backend, not a GPU simulation architecture, and it would not create a batch dimension. A macOS-ARM target and an AVX2/NEON SIMD layer with hand-written width-specialised kernels confirm where the engineering effort went.</div>
+
+<p>One detail cuts the other way and is worth flagging as a hint about intent. The SIMD emulator header says:</p>
+<div class="codeblock">
+<div class="code-head"><code>mochi_config.h</code></div>
+<pre><code>// Emulate 32 16-byte SIMD registers. A common use case for SIMD emulation is NVIDIA GPUs, where
+// each thread has access to 255 32-bit registers.</code></pre>
+</div>
+<p>Somebody has thought about running these kernels on a GPU. It has not shipped.</p>
+</section>
+
+
+<section id="deform">
+<div class="kicker">Capability</div>
+<h2>Where SuperDex is ahead: one solver for five body types, and tendons that are actually modelled.</h2>
+
+<figure class="plot"><div id="fig-coverage" class="plotbox"></div>
+<figcaption>Feature coverage. Newton wins on breadth of <i>solver</i> (granular MPM, hard NCP contact, batched worlds) &mdash; but it wins by having nine solvers, and combining them means the experimental <code class="inline">SolverCoupled</code>/<code class="inline">SolverCoupledADMM</code>/<code class="inline">SolverCoupledProxy</code> layer with a one-step lag. SuperDex's five actor types are monolithically coupled by construction.</figcaption></figure>
+
+<div class="grid2">
+<div class="card">
+<h4>Continuum coverage in one Newton system</h4>
+<p><b>Soft</b> — tetrahedral FEM with six constitutive models, including stable Neo-Hookean (Smith et&nbsp;al. 2018) and two <i>active</i> materials for muscle (Klár et&nbsp;al. 2020 shape targeting).</p>
+<p><b>Shell</b> — discrete triangle shell, 6-node bending stencil, thickness-integrated from 3D isotropic properties. The t-shirt.</p>
+<p><b>Rod</b> — Kirchhoff rods with axial, bending and torsional energy, citing the Columbia discrete-elastic-rods and discrete-viscous-threads formulations. The rope braid.</p>
+<p><b>Soft-skinned</b> — a tet mesh bound to an articulated link, coupled through explicit off-diagonal Hessian blocks. This is how the soft fingertips work, and it is the single most manipulation-relevant capability in the engine.</p>
+</div>
+<div class="card">
+<h4>Reduced-order models — nobody else ships this</h4>
+<p><code class="inline">mochi_hyper_reduction.cpp</code>, polynomial and <b>neural CROM</b> latent bases, contact-force-informed basis adaptivity (modes selected online by <code class="inline">Φᵀ·f_node</code>), and automatic ROM↔FOM switching based on the number of active collision points.</p>
+<p>That is a research-grade answer to &ldquo;how do you afford a deformable fingertip at 1&nbsp;kHz&rdquo; and it has no counterpart in Newton, MuJoCo or Isaac. The neural path is gated behind <code class="inline">MOCHI_USE_TORCH</code>, which is off by default.</p>
+<h4 style="margin-top:14px">Tendons at three fidelities</h4>
+<p>A <code class="inline">Transmission</code> abstraction maps joint DoFs to a scalar displacement: <code class="inline">LinearTransmission</code> (constant moment arm, MuJoCo-style fixed tendon), <code class="inline">SpatialTendon</code> (waypoint routing, geometry-derived moment arms), or a full elastic rod. Actuators include a <b>McKibben pneumatic muscle</b> model from Chou &amp; Hannaford. <code class="inline">example_tendon_comparison.py</code> runs all three side by side with matched stiffness.</p>
+</div>
+</div>
+
+<figure class="plot"><div id="fig-soft" class="plotbox"></div>
+<figcaption>FEM soft-body cost, single-threaded. A 1 899-tet duck runs at <b>2.2&times; real time</b> (7.7&nbsp;ms per 16.7&nbsp;ms step); four ducks fall below real time; eight run at 0.24&times;. Cost is close to linear in element count over this range, which is what a good sparse solver should do. For a VR teleoperation product that needs one deformable object at interactive rates on a laptop, this is exactly the right operating point &mdash; and it is a completely different product requirement from an RL rollout.</figcaption></figure>
+
+<div class="note"><b>Newton's answer is VBD, and it is a good one.</b> <code class="inline">SolverVBD</code> covers cloth, FEM soft bodies, cables and rigid bodies (via AVBD) on the GPU, with stable Neo-Hookean membranes and IPC friction. The published AVBD numbers are startling &mdash; 510 000 rigid bodies in 10.3&nbsp;ms of solver time on an RTX 4090, 51&times; faster than XPBD on the same scene. What Newton lacks is not deformable capability but <i>monolithic coupling</i>: a soft fingertip on a MuJoCo-driven hand goes through <code class="inline">SolverCoupledProxy</code> with a lagged impulse, not through one linear system.</div>
+</section>
+
+
+<section id="diff">
+<div class="kicker">Gradients</div>
+<h2>SuperDex differentiates through contact analytically. This is the least expected thing in the release.</h2>
+
+<p class="lead">There is a <code class="inline">superdex.physics.diffsim</code> module, and it is not a stub. It implements adjoint differentiation of the implicit step via the implicit function theorem, with an inner adjoint solve and a full set of vector-Jacobian products.</p>
+
+<div class="codeblock">
+<div class="code-head"><code>superdex.physics.diffsim</code></div>
+<pre><code>make_scene_differentiable(scene)
+prepare_back_propagate(scene, state_new, state_old)
+back_propagate(scene)
+get_step_jacobian(scene, state_new, state_curr, state_old) -> (jac_curr, jac_old)
+
+# vector-Jacobian products, including through contact:
+get_contact_force_world_backward(...)
+get_contact_force_from_actor_world_backward(...)
+get_articulated_pose_backward(...)
+set_articulated_target_pose_backward(...)
+set_external_forces_on_dofs_backward(...)
+# plus Lie <-> quaternion <-> rotation-vector gradient converters</code></pre>
+</div>
+
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>SuperDex</th><th>Newton</th></tr></thead>
+<tbody>
+<tr><td>Mechanism</td><td>Hand-derived analytic Jacobians + adjoint solve (implicit function theorem)</td><td>Warp <code class="inline">wp.Tape()</code> reverse-mode autodiff over the kernel graph</td></tr>
+<tr><td>Which solver</td><td>The only solver &mdash; rigid, articulated and contact terms</td><td><code class="inline">SolverSemiImplicit</code> and <code class="inline">SolverFeatherstone</code> only, both marked &ldquo;basic&rdquo;. MuJoCo, VBD, XPBD, Kamino: <b>not differentiable</b></td></tr>
+<tr><td>Through contact?</td><td>Yes, with <code class="inline">explicitNormals = true</code> required</td><td>First-order tangent-plane post-process; narrow phase frozen, <b>normal treated as constant</b></td></tr>
+<tr><td>Hessian-vector products</td><td>Finite differences, with optional per-Hvp validation</td><td>Exact through the tape</td></tr>
+<tr><td>Framework integration</td><td>None &mdash; raw VJP callbacks you wire up yourself</td><td>Native PyTorch/JAX interop through Warp</td></tr>
+<tr><td>Not differentiable</td><td>Skinning, blending and ROM Jacobians</td><td>Particle-particle contacts corrupt gradients in <code class="inline">SolverSemiImplicit</code></td></tr>
+</tbody></table></div>
+
+<p>The comparison is genuinely close, and it is the one axis where SuperDex's architecture pays an unambiguous dividend: differentiating an implicit solve is a <i>linear solve you already did</i>, whereas differentiating an explicit substep chain is a tape that grows with substep count. If SHAC-style short-horizon actor-critic on contact-rich manipulation is the goal, SuperDex's formulation is the more principled starting point &mdash; on a CPU, for one environment, with finite-difference Hvps.</p>
+</section>
+
+
+<section id="api">
+<div class="kicker">API</div>
+<h2>Imperative scene graph with handles, versus a builder that finalises to device arrays.</h2>
+
+<div class="grid2">
+<div class="card">
+<h4>SuperDex — mutable scene, live actors</h4>
+<div class="codeblock" style="margin-top:6px">
+<div class="code-head"><code>superdex</code><button class="copy" type="button">Copy</button></div>
+<pre><code>physics.initialize(num_worker_threads=0)
+scene = physics.create_scene("Rigid Bodies Scene")
+scene.set_gravity([0, -9.8, 0])          # Y-up!
+
+plane  = physics.create_plane_shape(normal=[0,1,0], distance=-1.0)
+sphere = physics.load_shape_from_file(
+    file_path=str(resolve_asset("sphere/icosphere_3subdiv.1.mochi.json")),
+    bake_scale=[0.2, 0.2, 0.2])
+
+a = scene.create_rigid_actor(
+    name="sphere", shape=sphere, density=1000.0,
+    world_from_local=physics.TransformRT(translation=[-0.5, 0.2, 0]),
+    collider_type=physics.ColliderType.SPHERE)
+scene.create_rigid_actor(name="ground", shape=plane, is_static=True)
+
+physics.prefab.add_to_scene(prefab_path=..., root_path=..., scene=scene,
+    params=physics.prefab.PrefabParams(name="tablePrefab"))
+
+while True:
+    scene.step(1/60)
+    T = a.get_root_transform()
+    f = a.get_contact_force_world()</code></pre>
+</div>
+<p>Actors are live objects with ~140 methods. State snapshot/restore is first-class (<code class="inline">capture_state</code>, <code class="inline">restore_state</code>, <code class="inline">capture_state_to_bytes</code>, <code class="inline">is_equal_state</code>) and is what RL resets are built on. Bindings are generated from a C++ reflection system, with 19k lines of <code class="inline">.pyi</code> stubs and units in the attribute metadata.</p>
+</div>
+<div class="card">
+<h4>Newton — build once, then it is arrays</h4>
+<div class="codeblock" style="margin-top:6px">
+<div class="code-head"><code>newton</code><button class="copy" type="button">Copy</button></div>
+<pre><code>quadruped = newton.ModelBuilder()
+quadruped.default_joint_cfg.armature = 0.01
+quadruped.add_urdf(path, xform=..., floating=True)
+
+scene = newton.ModelBuilder()
+scene.replicate(quadruped, world_count=100)      # &lt;-- the batch axis
+scene.add_ground_plane()
+model = scene.finalize()                          # -&gt; device arrays
 
 solver = newton.solvers.SolverXPBD(model)
-state_a, state_b = model.state(), model.state()
-control = model.control()
-pipeline = newton.CollisionPipeline(model)
-contacts = pipeline.contacts()
+state_0, state_1 = model.state(), model.state()
+control, contacts = model.control(), model.contacts()
 
-newton.eval_fk(model, model.joint_q, model.joint_qd, state_a)
+with wp.ScopedCapture() as cap:                   # whole step in one graph
+    for _ in range(sim_substeps):
+        state_0.clear_forces()
+        model.collide(state_0, contacts)
+        solver.step(state_0, state_1, control, contacts, sim_dt)
+        state_0, state_1 = state_1, state_0
+graph = cap.graph
 
-for _ in range(200):
-    state_a.clear_forces()
-    pipeline.collide(state_a, contacts)
-    solver.step(state_a, state_b, control, contacts, 1 / 200)
-    state_a, state_b = state_b, state_a</code></pre>
-          </article>
-          <article class="code-card">
-            <div class="code-head"><span>SuperDex · shape of a single-robot loop</span><button class="copy" type="button" aria-label="Copy SuperDex example">Copy</button></div>
-            <pre><code>sdp.initialize(num_worker_threads=0)
-try:
-    scene = sdp.create_scene("robot")
-    scene.set_gravity([0, 0, -9.81])
+for frame in range(N):
+    wp.capture_launch(graph)</code></pre>
+</div>
+<p>The <code class="inline">replicate()</code> call and the graph capture are the two lines that do not exist in SuperDex and cannot easily be added. In exchange, Newton's model is immutable after <code class="inline">finalize()</code>, which is a real ergonomic cost for authoring and interactive editing.</p>
+</div>
+</div>
 
-    prefab = sdr.load_bot_prefab_from_file("robot.superdex_bot")
-    context = sdr.create_context()
-    bot = sdr.create_bot(scene, prefab, context)
+<h3 style="margin-top:30px">Assets</h3>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>SuperDex</th><th>Newton</th></tr></thead>
+<tbody>
+<tr><td>Native format</td><td>Custom JSON + HDF5: <code class="inline">.superdex_bot</code>, <code class="inline">.mochi_prefab</code>, <code class="inline">.mochi_scene</code>, <code class="inline">.mochi.h5</code></td><td><b>OpenUSD</b>, first-class, with applied physics schemas and a live-stage importer</td></tr>
+<tr><td>Import</td><td>URDF only (runtime + Studio). Exactly one <code class="inline">.urdf</code> and one <code class="inline">.xml</code> in the whole asset tree, both under <code class="inline">test/</code></td><td>URDF, MJCF, USD &mdash; all three on <code class="inline">ModelBuilder</code>, accepting paths, URLs or raw strings</td></tr>
+<tr><td>Robot library</td><td>35 bots: FR3, OpenArm, Robotiq 2F-85, Allegro v5, Dexterity DG5F (±Seed tactile), Wuji Hand 2, Oculus XR hand</td><td>Whatever you import; examples ship G1, H1, ANYmal, Franka, Allegro, UR10</td></tr>
+<tr><td>Authoring</td><td><b>SuperDex Studio</b> GUI + CAD exporter for SolidWorks/NX &mdash; a genuine advantage</td><td>Python, or any USD tool</td></tr>
+<tr><td>Viewers</td><td>Remote debugger (examples <i>block until it attaches</i>), Polyscope, UnrealCV bridge</td><td>ViewerGL, ViewerRTX, ViewerUSD, ViewerRerun, ViewerViser, ViewerNull</td></tr>
+</tbody></table></div>
 
-    for _ in range(200):
-        scene.step(1 / 200)
+<div class="note warning"><b>An ergonomic trap worth knowing before you run anything.</b> Every shipped SuperDex physics example is structured as <code class="inline">if physics.debugger.attach(): while physics.debugger.is_attached(): scene.step(dt)</code>. Headless, <code class="inline">attach()</code> returns false and the example exits having simulated nothing. Every benchmark in this report drives <code class="inline">scene.step()</code> directly instead. Assets also need <code class="inline">SUPERDEX_ASSETS_PATH</code> set when running from a wheel rather than the source tree.</div>
+</section>
 
-    sdr.destroy_bot(scene, bot)
-finally:
-    sdp.shutdown()</code></pre>
-          </article>
-        </div>
-        <div class="note neutral"><strong>Ergonomic conclusion.</strong> SuperDex is more concise for a native, single-scene application and provides a particularly nice whole-scene snapshot concept. Newton is easier to extend when the experiment itself revolves around solver selection, GPU arrays, batched worlds, or multiple visualization backends. Neither is simply “better”; the shorter API serves a narrower default path.</div>
-      </section>
 
-      <section class="section" id="gaps">
-        <div class="section-head">
-          <div>
-            <span class="section-number">08 · Gap map</span>
-            <h2>Where each project is more complete.</h2>
-          </div>
-          <p class="section-lead">These are observable gaps at the pinned commits, not a proposed roadmap. They identify where a user can proceed with existing artifacts and where custom integration begins.</p>
-        </div>
+<section id="verdict">
+<div class="kicker">Verdict</div>
+<h2>They are not competitors. Pick by whether your bottleneck is samples or fidelity.</h2>
 
-        <div class="gap-columns">
-          <article class="gap-card newton">
-            <div class="card-kicker">More complete in Newton</div>
-            <h3>Robot tasks and experiment scale</h3>
-            <ul>
-              <li>Shipped G1 policy locomotion</li>
-              <li>Checked parallel-gripper pick-and-place</li>
-              <li>Robot–cloth examples on H1 and Franka</li>
-              <li>Native many-world model replication</li>
-              <li>Broader direct import and viewer choices</li>
-            </ul>
-          </article>
-          <article class="gap-card superdex">
-            <div class="card-kicker">More complete in SuperDex</div>
-            <h3>Native scene and authoring cohesion</h3>
-            <ul>
-              <li>Compact mutable-scene lifecycle</li>
-              <li>Studio-backed bot and prefab authoring</li>
-              <li>First-class rod, tendon, and muscle concepts</li>
-              <li>Whole-scene capture and restore</li>
-              <li>Direct Gymnasium environment surface</li>
-            </ul>
-          </article>
-          <article class="gap-card shared">
-            <div class="card-kicker">Open comparison work</div>
-            <h3>Evidence both ecosystems would benefit from</h3>
-            <ul>
-              <li>Shared robot and object assets</li>
-              <li>Common task-success definitions</li>
-              <li>Matched contact and control assumptions</li>
-              <li>Repeatable robot-task performance suites</li>
-              <li>Versioned expected outcomes for examples</li>
-            </ul>
-          </article>
-        </div>
+<div class="fixlist">
+<div class="fix">
+<h3>If you are training a policy, this changes nothing</h3>
+<p>SuperDex has no GPU, no batch dimension, and thread scaling that peaks at four workers. Newton at 1 024 worlds on a seventh of a GPU already outruns an optimistic upper bound for SuperDex on 192 CPU cores, and the published MJWarp numbers on a full GPU are two orders of magnitude beyond that. SuperDex Lab is honestly labelled &ldquo;early preview,&rdquo; ships three MuJoCo-Gym ports as its benchmark suite, and the MPC and system-ID capabilities in its README do not exist in the code.</p>
+</div>
+<div class="fix">
+<h3>If you are simulating one deformable-rich manipulation scene, take it seriously</h3>
+<p>Soft fingertips monolithically coupled to an articulated hand, non-convex SDF contact with no convex-hulling, spatial tendons with geometry-derived moment arms, Kirchhoff rods, self-colliding shells, and per-node contact forces as a first-class query. That combination does not exist anywhere else in one solver. For tactile-sensor modelling, VR teleoperation and haptics &mdash; which is transparently what it was built for &mdash; it is well ahead of Newton.</p>
+</div>
+<div class="fix">
+<h3>Steal the contact model's ergonomics</h3>
+<p>One scalar in Pa/m, one detection threshold in metres, one smoothing half-distance in metres, and a documented geometric-mean pair combination rule. Compare with <code class="inline">solref</code>/<code class="inline">solimp</code>, or with Newton's <code class="inline">ke</code>/<code class="inline">kd</code>/<code class="inline">kf</code>/<code class="inline">ka</code>/<code class="inline">kh</code> spread across solvers that variously honour or ignore each field. The physics is the same compliant contact; the parameterisation is much easier to reason about, and it is why two independent sweeps here collapsed onto one curve.</p>
+</div>
+<div class="fix">
+<h3>The 10&ndash;25 ms claim is real and under-sold</h3>
+<p>Measured invariance holds to 200&nbsp;ms. If Newton wants that property in a rigid solver it is an argument for the variational-implicit family &mdash; which is to say, for pushing AVBD further into the rigid path rather than for another projection scheme.</p>
+</div>
+<div class="fix">
+<h3>Watch the contact-first framing, not the benchmark</h3>
+<p>Meta published no numbers, no paper and no comparison, and shipped a v1.0.0 whose gallery is entirely VR teleoperation. Reading it as a competitor to Isaac Lab or Newton misreads the product. Reading it as the physics tier under a Quest-native dexterous-teleop data-collection pipeline &mdash; arriving Q4 2026 &mdash; explains every engineering choice in this report, including the CPU one.</p>
+</div>
+</div>
 
-        <div class="headline-callout">
-          <div class="big">Decision guide</div>
-          <p>Choose Newton when today’s work centers on GPU world replication, existing humanoid or manipulation examples, solver choice, or direct simulation arrays. Choose SuperDex when the application fits its native asset pipeline and values a compact scene API, Studio workflow, monolithic multi-material contact, and Gymnasium-facing environment layer. Prototype the exact contact task before committing either way.</p>
-        </div>
-      </section>
+<div class="grid2" style="margin-top:26px">
+<div class="callout good">
+<h3>Newton's remaining edge, restated fairly</h3>
+<p>Nine solvers behind one API; batched worlds and CUDA graph capture as native concepts; OpenUSD; MJCF/URDF/USD import; a hard-contact NCP option (Kamino) and a granular option (MPM) that SuperDex has no answer for; tiled camera, contact, IMU and transform sensors; opt-in determinism across five solvers; and a monthly release cadence with a deprecation policy.</p>
+</div>
+<div class="callout warn">
+<h3>Newton's gaps that SuperDex highlights</h3>
+<p>No first-class tendons or working muscles. Deformable↔rigid coupling is lagged rather than monolithic. Differentiability is confined to two solvers and freezes the contact normal. No reduced-order deformables. And two crashes surfaced by a 200-line benchmark in this report &mdash; MuJoCo conversion failing at 125 free bodies, and Kamino's per-step host-side contact warning dominating wall-clock.</p>
+</div>
+</div>
+</section>
 
-      <section class="section" id="reproduce">
-        <div class="section-head">
-          <div>
-            <span class="section-number">09 · Reproduction</span>
-            <h2>Download the evidence.</h2>
-          </div>
-          <p class="section-lead">The bundle pins both repository revisions, provides one command for the Newton workloads, includes the bounded SuperDex G1 compatibility probe, and exposes every plotted trace as JSON.</p>
-        </div>
 
-        <div class="downloads">
-          <a class="download" href="scripts/render_newton_robot_workloads.py" download>
-            <span class="download-type">Python · 13 KB</span>
-            <strong>Newton robot workloads</strong>
-            <span>G1 locomotion, Panda pick-and-place, and H1 jacket runs</span>
-          </a>
-          <a class="download" href="scripts/probe_superdex_g1.py" download>
-            <span class="download-type">Python</span>
-            <strong>SuperDex G1 probe</strong>
-            <span>Imports a supplied G1 URDF and checks a bounded dynamics sequence</span>
-          </a>
-          <a class="download" href="REPRODUCE.md" download>
-            <span class="download-type">Guide</span>
-            <strong>Exact environment recipe</strong>
-            <span>Revisions, dependencies, commands, expected artifacts, and checks</span>
-          </a>
-          <a class="download" href="data/g1-locomotion.json" download>
-            <span class="download-type">JSON trace</span>
-            <strong>G1 state trace</strong>
-            <span>Root trajectory, height, speed, and command schedule</span>
-          </a>
-          <a class="download" href="data/panda-pick-place.json" download>
-            <span class="download-type">JSON trace</span>
-            <strong>Panda task trace</strong>
-            <span>Object and end-effector trajectories with task phase</span>
-          </a>
-          <a class="download" href="data/h1-jacket.json" download>
-            <span class="download-type">JSON trace</span>
-            <strong>Cloth task trace</strong>
-            <span>Particle height envelope and humanoid hand motion</span>
-          </a>
-          <a class="download" href="data/superdex-g1-probe.json" download>
-            <span class="download-type">JSON result</span>
-            <strong>SuperDex compatibility result</strong>
-            <span>Revision, parsed structure, warnings, and bounded step outcome</span>
-          </a>
-          <a class="download" href="data/manifest.json" download>
-            <span class="download-type">Manifest</span>
-            <strong>Evidence inventory</strong>
-            <span>Checksums, capture times, revisions, and media provenance</span>
-          </a>
-          <a class="download" href="media/newton-panda-pick-place.mp4" download>
-            <span class="download-type">MP4 video</span>
-            <strong>ViewerGL media set</strong>
-            <span>Direct link to the manipulation video; adjacent media paths are listed in the manifest</span>
-          </a>
-        </div>
+<section id="repro">
+<div class="kicker">Reproduce</div>
+<h2>Everything here runs from four scripts.</h2>
 
-        <h3 style="margin-top:34px">Project links used for the comparison</h3>
-        <ul class="source-list">
-          <li><a href="https://github.com/newton-physics/newton/tree/d37f4d3d341ccce1e06a1dff21e9a054759b4855">Newton source at the compared revision</a></li>
-          <li><a href="https://github.com/newton-physics/newton/blob/d37f4d3d341ccce1e06a1dff21e9a054759b4855/newton/examples/robot/example_robot_policy.py">Newton G1 policy example</a></li>
-          <li><a href="https://github.com/newton-physics/newton/blob/d37f4d3d341ccce1e06a1dff21e9a054759b4855/newton/examples/robot/example_robot_panda_hydro.py">Newton Panda hydroelastic example</a></li>
-          <li><a href="https://github.com/newton-physics/newton/blob/d37f4d3d341ccce1e06a1dff21e9a054759b4855/newton/examples/cloth/example_cloth_h1.py">Newton H1 jacket example</a></li>
-          <li><a href="https://github.com/newton-physics/newton/blob/d37f4d3d341ccce1e06a1dff21e9a054759b4855/docs/concepts/worlds.rst">Newton worlds and replication guide</a></li>
-          <li><a href="https://github.com/newton-physics/newton/blob/d37f4d3d341ccce1e06a1dff21e9a054759b4855/docs/guide/visualization.rst">Newton visualization guide</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/tree/777b498122ab4b8581dfecb5f035af134c647eab">Project SuperDex source at the compared revision</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/superdex_robotics/examples/basic/example_scene_loading.py">SuperDex native bot and task-prefab example</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/assets/bots/arm_hand_combos/fr3_v2_2f_85/fr3_v2_2f_85.superdex_bot">SuperDex FR3 + Robotiq 2F-85 bot asset</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/superdex_robotics/examples/basic/example_urdf_loading.py">SuperDex runtime URDF example and limitations</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/superdex_robotics/examples/control/example_osc_jsc_control.py">SuperDex OSC/JSC control example</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/superdex_physics/examples/example_tshirt_on_plane.py">SuperDex T-shirt shell example</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/superdex_lab/superdex/lab/gym/envs/benchmarks/halfcheetah_env.py">SuperDex HalfCheetah locomotion environment</a></li>
-          <li><a href="https://github.com/facebookresearch/project_superdex/blob/777b498122ab4b8581dfecb5f035af134c647eab/superdex_lab/apps/envs/run_with_gymnasium_vectorization.py">SuperDex Gymnasium vectorization example</a></li>
-        </ul>
+<div class="codeblock">
+<div class="code-head"><code>setup</code><button class="copy" type="button">Copy</button></div>
+<pre><code># SuperDex — wheels only, no build needed
+git clone --branch stable https://github.com/facebookresearch/project_superdex
+cd project_superdex && uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python superdex
+export SUPERDEX_ASSETS_PATH=$PWD/superdex_physics/assets
 
-        <div class="note neutral"><strong>Media credit.</strong> Embedded SuperDex gallery footage is © Meta Platforms, Inc. and attributed to Project SuperDex under the project’s stated CC BY 4.0 documentation and asset terms. Newton videos and plots are report runs of the linked first-party examples. Robot and object assets retain the licenses distributed with their source projects.</div>
-      </section>
-    </main>
+# Newton
+cd newton && uv sync</code></pre>
+</div>
 
-    <footer class="report-footer">
-      <p>Newton × SuperDex · task-oriented comparison · 4 September 2026</p>
-      <p>Compared revisions and evidence are pinned in <a href="data/manifest.json">the manifest</a>.</p>
-    </footer>
-  </div>
-</body>
-</html>
+<div class="codeblock">
+<div class="code-head"><code>the four measurements</code><button class="copy" type="button">Copy</button></div>
+<pre><code># 1. single-scene crossover
+.venv/bin/python scripts/sdx_bench.py    rigid 0     # SuperDex, N = 1..216 bodies
+.venv/bin/python scripts/newton_bench.py single      # Newton, all solvers, same scene
+
+# 2. batch scaling
+.venv/bin/python scripts/newton_bench.py scale       # 1..4096 worlds
+
+# 3. accuracy: penetration, time step, determinism
+for m in dt penalty mass iters determinism; do
+    .venv/bin/python scripts/sdx_accuracy.py $m | grep '^{'
+done
+
+# 4. thread scaling
+for t in 0 2 4 8 16; do .venv/bin/python scripts/sdx_threads.py $t; done</code></pre>
+</div>
+
+<p>Scripts are in <code class="inline">scripts/</code>, raw JSONL in <code class="inline">data/</code>. Two cautions if you re-run: <b>run one benchmark process at a time</b> &mdash; an early pass with three concurrent processes on the same MIG slice reported XPBD at 4.15&nbsp;ms where the clean number is 0.237&nbsp;ms, a 17&times; error &mdash; and <b>filter stdout with <code class="inline">grep '^{'</code></b>, because <code class="inline">mochi</code>'s solver warnings and Warp's module-load messages both go to stdout and will corrupt a JSONL parse.</p>
+
+<div class="note"><b>Not measured, and worth doing next.</b> A matched <i>dexterous</i> scene &mdash; the Allegro hand plus an object &mdash; on both engines, which is the workload both actually target and where SuperDex's SDF contact should look best against MuJoCo's convex hulls. Also: SuperDex fp64 vs fp32 divergence; the shell self-contact path under load; and whether <code class="inline">get_step_jacobian</code> gradients agree with finite differences on a grasp.</div>
+</section>
+
+<div class="footer">
+<p>Sources: <a href="https://github.com/facebookresearch/project_superdex" target="_blank">facebookresearch/project_superdex</a> @ v1.0.0 (released 24 Aug 2026) &middot; <a href="https://projectsuperdex.com/" target="_blank">projectsuperdex.com</a> &middot; <a href="https://github.com/newton-physics/newton" target="_blank">newton-physics/newton</a> @ <code>e6ea232a</code> &middot; VBD: <a href="https://doi.org/10.1145/3658179" target="_blank">Chen et&nbsp;al., SIGGRAPH 2024</a> &middot; AVBD: <a href="https://doi.org/10.1145/3731195" target="_blank">Giles, Diaz &amp; Yuksel, SIGGRAPH 2025</a> &middot; Kamino: <a href="https://arxiv.org/abs/2603.16536" target="_blank">arXiv:2603.16536</a>, <a href="https://arxiv.org/abs/2504.19771" target="_blank">arXiv:2504.19771</a> &middot; <a href="https://mujoco.readthedocs.io/en/stable/computation/index.html" target="_blank">MuJoCo computation docs</a>.</p>
+<p>All performance figures measured 25 August 2026 on one machine: NVIDIA RTX PRO 6000 Blackwell Server Edition <b>MIG 1g.24gb</b> partition (46 SMs, 24 GiB) and AMD EPYC 9B45 (192 logical cores). GPU numbers are from one seventh of a GPU and are not full-device numbers.</p>
+</div>
+
+</main>
+<script src="figures.js"></script>
+</body></html>
