@@ -1,0 +1,2657 @@
+{
+  "config": {
+    "actor_lr": 0.0003,
+    "adam_beta1": 0.7,
+    "adam_beta2": 0.95,
+    "allow_other_mjw": false,
+    "checkpoint": null,
+    "checkpoint_policy": "best",
+    "critic_iterations": 16,
+    "critic_lr": 0.001,
+    "device": "cuda:0",
+    "epochs": 100,
+    "eval_every": 10,
+    "eval_steps": 300,
+    "gamma": 0.99,
+    "gradcheck_directions": 5,
+    "gradcheck_eps": 0.01,
+    "gradcheck_horizons": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32
+    ],
+    "gradcheck_max_relative": 0.05,
+    "hidden": 128,
+    "horizon": 8,
+    "max_grad_norm": 10.0,
+    "mode": "gradcheck",
+    "nconmax": 64,
+    "newton_root": "/home/horde/repos/newton-shac-pr1535",
+    "njmax": 256,
+    "output": "shac/pr1535/results/humanoid_multistep_gradient.json",
+    "pr_root": "/home/horde/repos/mujoco_warp-pr1535",
+    "reset_interval": 32,
+    "seed": 2301,
+    "target_polyak": 0.995,
+    "task": "humanoid",
+    "td_lambda": 0.95,
+    "worlds": 2,
+    "xml": null
+  },
+  "mode": "gradcheck",
+  "provenance": {
+    "bridge": "/home/horde/repos/academic-website-reports/shac/pr1535/mjwarp_torch_bridge.py",
+    "bridge_sha256": "8be0f873a4aa4a5e46c9e6cf2eeb1eb46b99bd3b2b84ab6e33822bbf7c985da1",
+    "device": {
+      "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+      "nvidia_driver": "595.58.03",
+      "torch": "cuda:0",
+      "warp": "cuda:0"
+    },
+    "method_notes": [
+      "Cold start: no pretrained actor or critic is loaded in train mode.",
+      "Actor objective is a discounted short differentiable rollout plus a differentiable terminal target-critic value.",
+      "Critic targets use backward-view TD(lambda) recursion with target-critic bootstraps.",
+      "Only qpos and qvel are carried through Torch; qacc_warmstart is detached at each physics step.",
+      "Unhealthy-world resets and alive masks are non-differentiable boundaries between short rollouts.",
+      "The policy is deterministic; seeds are fixed, but GPU contact atomics are not claimed bitwise deterministic."
+    ],
+    "model": {
+      "cone": "mjCONE_ELLIPTIC",
+      "eulerdamp_disabled": true,
+      "geom_solimp_modified_by_harness": false,
+      "geom_solimp_sha256": "f5d10b7d0ddba68045c36535b54605b97469188e81ab243b600c05a48e2ef381",
+      "initial_contacts": 8,
+      "integrator": "mjINT_EULER",
+      "na": 0,
+      "nq": 28,
+      "nu": 21,
+      "nv": 27,
+      "solver": "mjSOL_NEWTON",
+      "task": "humanoid",
+      "timestep": 0.005,
+      "xml": "/home/horde/repos/mujoco_warp-pr1535/benchmarks/humanoid/humanoid.xml",
+      "xml_sha256": "9b29ea10152748e66a0a77f7651efbbb8282fef9621e7cb8d220ca157c41e61a"
+    },
+    "newton_head": "d37f4d3d341ccce1e06a1dff21e9a054759b4855",
+    "pr": {
+      "exact_worktree_import": true,
+      "expected_worktree": "/home/horde/repos/mujoco_warp-pr1535",
+      "head": "02d09b139fdf091e1e859d7f41c47a8f71d30574",
+      "import_path": "/home/horde/repos/mujoco_warp-pr1535/mujoco_warp/__init__.py",
+      "url": "https://github.com/google-deepmind/mujoco_warp/pull/1535"
+    },
+    "script": "/home/horde/repos/academic-website-reports/shac/pr1535/train_shac.py",
+    "script_sha256": "4db62e472575317958d3e4fea3caa9d4766984c3c56ed79e46be3e218a80c010",
+    "timestamp_utc": "2026-09-04T20:08:20.622193+00:00",
+    "versions": {
+      "mujoco": "3.12.0",
+      "mujoco_warp": "3.10.0.1",
+      "numpy": "2.5.0",
+      "python": "3.12.13",
+      "torch": "2.11.0+cu128",
+      "warp": "1.17.0"
+    }
+  },
+  "run": {
+    "algorithm": "MJWarp action-schedule derivative check",
+    "checks": [
+      {
+        "all_same_sign": true,
+        "base_contact_count_trace": [
+          [
+            16
+          ]
+        ],
+        "comparisons": [
+          {
+            "absolute_error": 8.922070264816284e-07,
+            "analytic": -0.011693539097905159,
+            "contact_count_mismatch_steps": 0,
+            "direction": 0,
+            "finite_difference": -0.01169443130493164,
+            "minus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "relative_error": 7.629332313965342e-05,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 1.424737274646759e-05,
+            "analytic": 0.015046538785099983,
+            "contact_count_mismatch_steps": 0,
+            "direction": 1,
+            "finite_difference": 0.015032291412353516,
+            "minus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.0009468870515640595,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 8.177012205123901e-07,
+            "analytic": 0.008643491193652153,
+            "contact_count_mismatch_steps": 0,
+            "direction": 2,
+            "finite_difference": 0.00864267349243164,
+            "minus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "relative_error": 9.460311836875778e-05,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 9.94652509689331e-07,
+            "analytic": -0.01628299430012703,
+            "contact_count_mismatch_steps": 0,
+            "direction": 3,
+            "finite_difference": -0.01628398895263672,
+            "minus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "relative_error": 6.108162518301611e-05,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 1.8795952200889587e-05,
+            "analytic": 0.02920123003423214,
+            "contact_count_mismatch_steps": 0,
+            "direction": 4,
+            "finite_difference": 0.02918243408203125,
+            "minus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.0006436698789350787,
+            "same_sign": true
+          }
+        ],
+        "epsilon": 0.01,
+        "gradient_l2_norm": 0.21477852761745453,
+        "horizon": 1,
+        "max_relative_error": 0.0009468870515640595,
+        "objective": 0.03965473175048828,
+        "pass": true
+      },
+      {
+        "all_same_sign": true,
+        "base_contact_count_trace": [
+          [
+            16
+          ],
+          [
+            13
+          ]
+        ],
+        "comparisons": [
+          {
+            "absolute_error": 1.1183787137269974e-05,
+            "analytic": -0.004509937483817339,
+            "contact_count_mismatch_steps": 0,
+            "direction": 0,
+            "finite_difference": -0.004498753696680069,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "relative_error": 0.00247980979279644,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.004647243767976761,
+            "analytic": -0.053206123411655426,
+            "contact_count_mismatch_steps": 1,
+            "direction": 1,
+            "finite_difference": -0.048558879643678665,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ]
+            ],
+            "relative_error": 0.08734415270252009,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.004650350660085678,
+            "analytic": 0.04042626917362213,
+            "contact_count_mismatch_steps": 1,
+            "direction": 2,
+            "finite_difference": 0.03577591851353645,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "relative_error": 0.11503289210571033,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 1.6354024410247803e-06,
+            "analytic": -0.022597093135118484,
+            "contact_count_mismatch_steps": 0,
+            "direction": 3,
+            "finite_difference": -0.02259872853755951,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "relative_error": 7.23670111929842e-05,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 2.7976930141448975e-06,
+            "analytic": -0.05498211458325386,
+            "contact_count_mismatch_steps": 0,
+            "direction": 4,
+            "finite_difference": -0.054984912276268005,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ]
+            ],
+            "relative_error": 5.088110353051172e-05,
+            "same_sign": true
+          }
+        ],
+        "epsilon": 0.01,
+        "gradient_l2_norm": 0.3866236209869385,
+        "horizon": 2,
+        "max_relative_error": 0.11503289210571033,
+        "objective": 0.01508442685008049,
+        "pass": false
+      },
+      {
+        "all_same_sign": true,
+        "base_contact_count_trace": [
+          [
+            16
+          ],
+          [
+            14
+          ],
+          [
+            13
+          ],
+          [
+            15
+          ]
+        ],
+        "comparisons": [
+          {
+            "absolute_error": 0.00010967999696731567,
+            "analytic": -0.030962254852056503,
+            "contact_count_mismatch_steps": 0,
+            "direction": 0,
+            "finite_difference": -0.030852574855089188,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.003542377565567734,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 5.2716583013534546e-05,
+            "analytic": -0.03301733732223511,
+            "contact_count_mismatch_steps": 0,
+            "direction": 1,
+            "finite_difference": -0.03307005390524864,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.0015940882093684083,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 3.272294998168945e-05,
+            "analytic": 0.02210639789700508,
+            "contact_count_mismatch_steps": 0,
+            "direction": 2,
+            "finite_difference": 0.02213912084698677,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.0014780600461893765,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 5.254335701465607e-05,
+            "analytic": 0.010606290772557259,
+            "contact_count_mismatch_steps": 0,
+            "direction": 3,
+            "finite_difference": 0.010553747415542603,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.00495398043872292,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 4.884600639343262e-05,
+            "analytic": -0.020656965672969818,
+            "contact_count_mismatch_steps": 0,
+            "direction": 4,
+            "finite_difference": -0.020608119666576385,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.002364626400931135,
+            "same_sign": true
+          }
+        ],
+        "epsilon": 0.01,
+        "gradient_l2_norm": 0.7212329506874084,
+        "horizon": 4,
+        "max_relative_error": 0.00495398043872292,
+        "objective": -0.02208171971142292,
+        "pass": true
+      },
+      {
+        "all_same_sign": true,
+        "base_contact_count_trace": [
+          [
+            16
+          ],
+          [
+            10
+          ],
+          [
+            14
+          ],
+          [
+            15
+          ],
+          [
+            14
+          ],
+          [
+            13
+          ],
+          [
+            14
+          ],
+          [
+            14
+          ]
+        ],
+        "comparisons": [
+          {
+            "absolute_error": 2.2705644369125366e-05,
+            "analytic": -0.02576226368546486,
+            "contact_count_mismatch_steps": 0,
+            "direction": 0,
+            "finite_difference": -0.025784969329833984,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "relative_error": 0.0008805767452612112,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 7.599592208862305e-07,
+            "analytic": -0.15224741399288177,
+            "contact_count_mismatch_steps": 0,
+            "direction": 1,
+            "finite_difference": -0.1522466540336609,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "relative_error": 4.9916067600449475e-06,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.00011252611875534058,
+            "analytic": -0.04947374016046524,
+            "contact_count_mismatch_steps": 0,
+            "direction": 2,
+            "finite_difference": -0.0493612140417099,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "relative_error": 0.0022744615303061494,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 7.069483399391174e-05,
+            "analytic": -0.05378267541527748,
+            "contact_count_mismatch_steps": 0,
+            "direction": 3,
+            "finite_difference": -0.05371198058128357,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "relative_error": 0.0013144536497682337,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 4.533305764198303e-05,
+            "analytic": -0.0012616850435733795,
+            "contact_count_mismatch_steps": 0,
+            "direction": 4,
+            "finite_difference": -0.0013070181012153625,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                10
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ]
+            ],
+            "relative_error": 0.034684338036197804,
+            "same_sign": true
+          }
+        ],
+        "epsilon": 0.01,
+        "gradient_l2_norm": 1.4567111730575562,
+        "horizon": 8,
+        "max_relative_error": 0.034684338036197804,
+        "objective": 0.03518625348806381,
+        "pass": true
+      },
+      {
+        "all_same_sign": true,
+        "base_contact_count_trace": [
+          [
+            16
+          ],
+          [
+            15
+          ],
+          [
+            12
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            13
+          ],
+          [
+            14
+          ],
+          [
+            14
+          ],
+          [
+            14
+          ],
+          [
+            16
+          ]
+        ],
+        "comparisons": [
+          {
+            "absolute_error": 0.0002986788749694824,
+            "analytic": -0.2623251676559448,
+            "contact_count_mismatch_steps": 0,
+            "direction": 0,
+            "finite_difference": -0.26202648878097534,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.001138582613473129,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.0002067089080810547,
+            "analytic": 0.3213886618614197,
+            "contact_count_mismatch_steps": 0,
+            "direction": 1,
+            "finite_difference": 0.32159537076950073,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.000642760831993476,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 6.470084190368652e-05,
+            "analytic": 0.18958386778831482,
+            "contact_count_mismatch_steps": 0,
+            "direction": 2,
+            "finite_difference": 0.1896485686302185,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.0003411617729097752,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 7.84117728471756e-05,
+            "analytic": 0.0012299101799726486,
+            "contact_count_mismatch_steps": 0,
+            "direction": 3,
+            "finite_difference": 0.0013083219528198242,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.05993308656036447,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.0003254301846027374,
+            "analytic": 0.03034083917737007,
+            "contact_count_mismatch_steps": 0,
+            "direction": 4,
+            "finite_difference": 0.030015408992767334,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                12
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                14
+              ],
+              [
+                16
+              ]
+            ],
+            "relative_error": 0.01072581357095297,
+            "same_sign": true
+          }
+        ],
+        "epsilon": 0.01,
+        "gradient_l2_norm": 3.3167269229888916,
+        "horizon": 16,
+        "max_relative_error": 0.05993308656036447,
+        "objective": 0.3132333755493164,
+        "pass": false
+      },
+      {
+        "all_same_sign": true,
+        "base_contact_count_trace": [
+          [
+            16
+          ],
+          [
+            13
+          ],
+          [
+            12
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            14
+          ],
+          [
+            13
+          ],
+          [
+            14
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            16
+          ],
+          [
+            16
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ],
+          [
+            15
+          ]
+        ],
+        "comparisons": [
+          {
+            "absolute_error": 0.0003006458282470703,
+            "analytic": -0.19078516960144043,
+            "contact_count_mismatch_steps": 0,
+            "direction": 0,
+            "finite_difference": -0.19048452377319336,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.001575834373683941,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.0023869872093200684,
+            "analytic": -0.19140559434890747,
+            "contact_count_mismatch_steps": 0,
+            "direction": 1,
+            "finite_difference": -0.19379258155822754,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.012317226955371697,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 6.586313247680664e-05,
+            "analytic": -0.4408720135688782,
+            "contact_count_mismatch_steps": 1,
+            "direction": 2,
+            "finite_difference": -0.44080615043640137,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.00014939286334744115,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.0003650188446044922,
+            "analytic": -0.41002774238586426,
+            "contact_count_mismatch_steps": 0,
+            "direction": 3,
+            "finite_difference": -0.40966272354125977,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.0008902296280747374,
+            "same_sign": true
+          },
+          {
+            "absolute_error": 0.0013646632432937622,
+            "analytic": -0.04727272689342499,
+            "contact_count_mismatch_steps": 1,
+            "direction": 4,
+            "finite_difference": -0.04863739013671875,
+            "minus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                13
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "plus_contact_count_trace": [
+              [
+                16
+              ],
+              [
+                13
+              ],
+              [
+                12
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                14
+              ],
+              [
+                13
+              ],
+              [
+                14
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                16
+              ],
+              [
+                16
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ],
+              [
+                15
+              ]
+            ],
+            "relative_error": 0.028057904411764707,
+            "same_sign": true
+          }
+        ],
+        "epsilon": 0.01,
+        "gradient_l2_norm": 9.199007987976074,
+        "horizon": 32,
+        "max_relative_error": 0.028057904411764707,
+        "objective": 1.9011752605438232,
+        "pass": true
+      }
+    ],
+    "status": "fail",
+    "timing_seconds": {
+      "total": 3.3440782990073785
+    }
+  },
+  "schema": "mjwarp-pr1535-shac-style-v1",
+  "setup_seconds": 0.043174513964913785
+}
