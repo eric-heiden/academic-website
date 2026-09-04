@@ -24,6 +24,7 @@ WORKPIECE_RESOLUTION = 256
 GRINDER_RADIUS = 0.13
 GRINDER_HALF_WIDTH = 0.04
 GRIND_DEPTH = 0.035
+GRIND_FRAMES = 270
 HYDROELASTIC_STIFFNESS = 1.0e8
 
 _SLOT_LINEAR = wp.uint32(0xFFFFFFFE)
@@ -225,6 +226,9 @@ class Example:
 
         self.body_q = self.state_0.body_q.numpy()
         self._set_grinder_pose(initial_pose)
+        # Start with the wheel seated in its own imprint. This avoids treating
+        # the initial placement as a one-frame pressure impulse.
+        self._subtract_grinder(initial_pose)
         self._update_workpiece_surface()
 
         self.viewer.set_model(self.model)
@@ -235,7 +239,7 @@ class Example:
     def _grinder_pose(frame: int) -> wp.transform:
         x_start = -0.36
         x_end = 0.36
-        x = min(x_start + frame * 0.004, x_end)
+        x = x_start + min(frame / GRIND_FRAMES, 1.0) * (x_end - x_start)
         radial_fraction = min((x / WORKPIECE_RADII[0]) ** 2, 1.0)
         surface_z = WORKPIECE_RADII[2] * math.sqrt(1.0 - radial_fraction)
         z = surface_z + GRINDER_RADIUS - GRIND_DEPTH
