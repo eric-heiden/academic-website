@@ -1,0 +1,321 @@
+{
+  "all_final_gates_pass": true,
+  "generated_at_utc": "2026-09-05T09:12:38.478236+00:00",
+  "method_notes": [
+    "Noisy audits contain three independent 1024-lane, uninterrupted full-horizon rollouts.",
+    "Terminal lanes freeze; displacement-derived speed always uses the complete requested horizon.",
+    "Nominal full-horizon evaluation is a mandatory gate in SHAC selection and final audit.",
+    "ViewerGL records a fresh single-lane MJWarp rollout and uses Newton only to render recorded qpos states."
+  ],
+  "mjwarp_pr_head": "02d09b139fdf091e1e859d7f41c47a8f71d30574",
+  "newton_head": "d37f4d3d341ccce1e06a1dff21e9a054759b4855",
+  "schema": "mjwarp-pr1535-final-gaits-v3-summary",
+  "status": "completed",
+  "tasks": {
+    "ant": {
+      "audit": {
+        "all_noisy_gates_pass": true,
+        "control_steps": 400,
+        "gate_thresholds": {
+          "final_alive_fraction": 0.98,
+          "maximum_mean_abs_lateral_displacement": 1.5,
+          "maximum_mean_action_rate_rms": 0.35,
+          "maximum_mean_flight_fraction": 0.6,
+          "maximum_mean_support_foot_slip_rms": 1.1,
+          "mean_forward_speed_over_horizon": 0.75,
+          "mean_heading_while_alive": 0.75,
+          "mean_survival_fraction": 0.98,
+          "mean_up_while_alive": 0.9,
+          "minimum_alternating_diagonal_support_switches_per_second": 0.6,
+          "minimum_mean_diagonal_support_fraction": 0.05,
+          "minimum_mean_two_or_more_support_fraction": 0.05
+        },
+        "noisy_metric_ranges": {
+          "final_alive_fraction": {
+            "maximum": 0.9912109375,
+            "mean": 0.9886067708333334,
+            "minimum": 0.984375
+          },
+          "mean_abs_lateral_displacement": {
+            "maximum": 1.1949987411499023,
+            "mean": 1.1833598216374714,
+            "minimum": 1.1725647449493408
+          },
+          "mean_action_rate_rms": {
+            "maximum": 0.1408509761095047,
+            "mean": 0.14075031379858652,
+            "minimum": 0.1405920386314392
+          },
+          "mean_alternating_diagonal_support_switches_per_second": {
+            "maximum": 1.034521460533142,
+            "mean": 1.029003898302714,
+            "minimum": 1.0181152820587158
+          },
+          "mean_diagonal_support_fraction": {
+            "maximum": 0.09020019322633743,
+            "mean": 0.08971679707368214,
+            "minimum": 0.08907715231180191
+          },
+          "mean_flight_fraction": {
+            "maximum": 0.5905464887619019,
+            "mean": 0.5893100698788961,
+            "minimum": 0.5876996517181396
+          },
+          "mean_forward_speed_over_horizon": {
+            "maximum": 1.015339970588684,
+            "mean": 1.0130469004313152,
+            "minimum": 1.0100187063217163
+          },
+          "mean_heading_while_alive": {
+            "maximum": 0.9907568097114563,
+            "mean": 0.9902876019477844,
+            "minimum": 0.9894200563430786
+          },
+          "mean_support_foot_slip_rms": {
+            "maximum": 0.7745876908302307,
+            "mean": 0.76826939980189,
+            "minimum": 0.7635805606842041
+          },
+          "mean_survival_fraction": {
+            "maximum": 0.9916309118270874,
+            "mean": 0.9890454411506653,
+            "minimum": 0.9848974943161011
+          },
+          "mean_two_or_more_support_fraction": {
+            "maximum": 0.09520749747753143,
+            "mean": 0.09499575197696686,
+            "minimum": 0.09458091855049133
+          },
+          "mean_up_while_alive": {
+            "maximum": 0.9963403344154358,
+            "mean": 0.9960421323776245,
+            "minimum": 0.9957311153411865
+          }
+        },
+        "nominal_gate_pass": true,
+        "nominal_metrics": {
+          "final_alive_fraction": 1.0,
+          "mean_abs_lateral_displacement": 0.7747135758399963,
+          "mean_action_rate_rms": 0.14106450974941254,
+          "mean_alternating_diagonal_support_switches_per_second": 1.08349609375,
+          "mean_diagonal_support_fraction": 0.09772705286741257,
+          "mean_flight_fraction": 0.5759595036506653,
+          "mean_forward_speed_over_horizon": 1.0341724157333374,
+          "mean_heading_while_alive": 0.9955065846443176,
+          "mean_support_foot_slip_rms": 0.7301921248435974,
+          "mean_survival_fraction": 1.0,
+          "mean_two_or_more_support_fraction": 0.10305420309305191,
+          "mean_up_while_alive": 0.99931800365448
+        },
+        "seeds": [
+          9851,
+          9863,
+          9877
+        ],
+        "simulated_seconds": 20.0,
+        "support_definition": {
+          "basis": "0.08 m capsule radius + 0.02 m combined geom contact margin",
+          "point": "outer endpoint of each distal capsule: 2 * geom_xpos - body_xpos",
+          "support_height_m": 0.1
+        },
+        "total_noisy_worlds": 3072,
+        "worlds_per_seed": 1024
+      },
+      "checkpoint": "ant_checkpoint.pt",
+      "checkpoint_sha256": "ad060c573a34027ad9560f7a03fbd1761f97d24c80fd210e547ba3262a2d736e",
+      "shac": {
+        "accepted_updates": 1,
+        "all_direction_signs_match": true,
+        "best_update": 1,
+        "direction_checks": [
+          {
+            "analytic_slope": 11.010424610509347,
+            "epsilon": 0.0001,
+            "finite_difference_slope": 11.0626220703125,
+            "relative_error": 0.004718362380219944,
+            "same_sign": true
+          }
+        ],
+        "holdout_all_gates_pass": true,
+        "holdout_count": 3,
+        "maximum_direction_relative_error": 0.004718362380219944,
+        "nominal_holdout_gate_pass": true,
+        "source_checkpoint": "ant_shac_source_checkpoint.pt",
+        "source_checkpoint_sha256": "73167703a4dc22d367f4e1b97e901827b6a6efcfb0a064aab02a914f71115ab7"
+      },
+      "viewergl": {
+        "displacement_x": 21.019622802734375,
+        "displacement_y": 1.3464360237121582,
+        "final_alive": true,
+        "forward_speed_over_horizon": 1.0509811639785767,
+        "independent_nominal_gate_pass": true,
+        "poster": "ant_viewergl.jpg",
+        "recorded_gait_gate_pass": true,
+        "recorded_gait_metrics": {
+          "final_alive_fraction": 1.0,
+          "mean_abs_lateral_displacement": 1.3464360237121582,
+          "mean_action_rate_rms": 0.14117689430713654,
+          "mean_alternating_diagonal_support_switches_per_second": 1.3,
+          "mean_diagonal_support_fraction": 0.09749999642372131,
+          "mean_flight_fraction": 0.5600000023841858,
+          "mean_forward_speed_over_horizon": 1.0509811639785767,
+          "mean_heading_while_alive": 0.9902421832084656,
+          "mean_support_foot_slip_rms": 0.7106859087944031,
+          "mean_survival_fraction": 1.0,
+          "mean_two_or_more_support_fraction": 0.10249999910593033,
+          "mean_up_while_alive": 0.9994598627090454
+        },
+        "simulated_seconds": 20.0,
+        "video": "ant_viewergl.mp4"
+      }
+    },
+    "humanoid": {
+      "audit": {
+        "all_noisy_gates_pass": true,
+        "control_steps": 600,
+        "gate_thresholds": {
+          "final_alive_fraction": 0.95,
+          "maximum_mean_abs_lateral_displacement": 1.0,
+          "maximum_mean_action_rate_rms": 0.35,
+          "maximum_mean_flight_fraction": 0.25,
+          "maximum_mean_support_foot_slip_rms": 0.3,
+          "mean_forward_speed_over_horizon": 1.0,
+          "mean_heading_while_alive": 0.75,
+          "mean_survival_fraction": 0.98,
+          "mean_up_while_alive": 0.85,
+          "minimum_alternating_support_switches_per_second": 0.8,
+          "minimum_mean_single_support_fraction": 0.1
+        },
+        "noisy_metric_ranges": {
+          "final_alive_fraction": {
+            "maximum": 1.0,
+            "mean": 0.9977213541666666,
+            "minimum": 0.99609375
+          },
+          "mean_abs_lateral_displacement": {
+            "maximum": 0.983315646648407,
+            "mean": 0.9712491234143575,
+            "minimum": 0.9567757844924927
+          },
+          "mean_action_rate_rms": {
+            "maximum": 0.307166188955307,
+            "mean": 0.3071606953938802,
+            "minimum": 0.3071576654911041
+          },
+          "mean_alternating_support_switches_per_second": {
+            "maximum": 3.633594036102295,
+            "mean": 3.6233291625976562,
+            "minimum": 3.6167969703674316
+          },
+          "mean_flight_fraction": {
+            "maximum": 0.07269760966300964,
+            "mean": 0.07213277121384938,
+            "minimum": 0.07173014432191849
+          },
+          "mean_forward_speed_over_horizon": {
+            "maximum": 1.1990525722503662,
+            "mean": 1.1962067286173503,
+            "minimum": 1.1947046518325806
+          },
+          "mean_heading_while_alive": {
+            "maximum": 0.9796720743179321,
+            "mean": 0.9794008930524191,
+            "minimum": 0.9791833758354187
+          },
+          "mean_single_support_fraction": {
+            "maximum": 0.8326892852783203,
+            "mean": 0.832360029220581,
+            "minimum": 0.8317736387252808
+          },
+          "mean_support_foot_slip_rms": {
+            "maximum": 0.2978925406932831,
+            "mean": 0.2970110277334849,
+            "minimum": 0.2958274483680725
+          },
+          "mean_survival_fraction": {
+            "maximum": 1.0,
+            "mean": 0.9979551633199056,
+            "minimum": 0.9964778423309326
+          },
+          "mean_up_while_alive": {
+            "maximum": 0.9916495084762573,
+            "mean": 0.9916038513183594,
+            "minimum": 0.9915724992752075
+          }
+        },
+        "nominal_gate_pass": true,
+        "nominal_metrics": {
+          "final_alive_fraction": 1.0,
+          "mean_abs_lateral_displacement": 0.956866443157196,
+          "mean_action_rate_rms": 0.30604422092437744,
+          "mean_alternating_support_switches_per_second": 3.661067485809326,
+          "mean_flight_fraction": 0.06610514223575592,
+          "mean_forward_speed_over_horizon": 1.2018208503723145,
+          "mean_heading_while_alive": 0.9801962971687317,
+          "mean_single_support_fraction": 0.8397461175918579,
+          "mean_support_foot_slip_rms": 0.29078179597854614,
+          "mean_survival_fraction": 1.0,
+          "mean_up_while_alive": 0.9916455745697021
+        },
+        "seeds": [
+          9801,
+          9811,
+          9829
+        ],
+        "simulated_seconds": 15.0,
+        "support_definition": {
+          "point": "left/right foot body origin",
+          "support_height_m": 0.06
+        },
+        "total_noisy_worlds": 3072,
+        "worlds_per_seed": 1024
+      },
+      "checkpoint": "humanoid_checkpoint.pt",
+      "checkpoint_sha256": "fa9f0fdad3c577c6ec70c14853f75e7a0f12970d99b4f0764cf254286da76d12",
+      "shac": {
+        "accepted_updates": 0,
+        "all_direction_signs_match": true,
+        "best_update": 0,
+        "direction_checks": [
+          {
+            "analytic_slope": 121.18857987643152,
+            "epsilon": 0.0001,
+            "finite_difference_slope": 121.15478515625,
+            "relative_error": 0.00027886060069337126,
+            "same_sign": true
+          }
+        ],
+        "holdout_all_gates_pass": true,
+        "holdout_count": 3,
+        "maximum_direction_relative_error": 0.00027886060069337126,
+        "nominal_holdout_gate_pass": true,
+        "source_checkpoint": "humanoid_shac_source_checkpoint.pt",
+        "source_checkpoint_sha256": "e8c7ad9393b70d0618875686db790c78539e0a69af9cd365ee354234e7008120"
+      },
+      "viewergl": {
+        "displacement_x": 17.937458038330078,
+        "displacement_y": -0.7601410150527954,
+        "final_alive": true,
+        "forward_speed_over_horizon": 1.1958305835723877,
+        "independent_nominal_gate_pass": true,
+        "poster": "humanoid_viewergl.jpg",
+        "recorded_gait_gate_pass": true,
+        "recorded_gait_metrics": {
+          "final_alive_fraction": 1.0,
+          "mean_abs_lateral_displacement": 0.7601410150527954,
+          "mean_action_rate_rms": 0.30758556723594666,
+          "mean_alternating_support_switches_per_second": 3.6666666666666665,
+          "mean_flight_fraction": 0.06666667014360428,
+          "mean_forward_speed_over_horizon": 1.1958305835723877,
+          "mean_heading_while_alive": 0.9808921217918396,
+          "mean_single_support_fraction": 0.8333333134651184,
+          "mean_support_foot_slip_rms": 0.2932995557785034,
+          "mean_survival_fraction": 1.0,
+          "mean_up_while_alive": 0.9919155836105347
+        },
+        "simulated_seconds": 15.0,
+        "video": "humanoid_viewergl.mp4"
+      }
+    }
+  }
+}

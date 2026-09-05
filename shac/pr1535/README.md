@@ -345,6 +345,96 @@ state. ViewerGL replays that recorded MJWarp state trajectory. Native MuJoCo
 is used only for forward kinematics from each recorded `qpos` to body poses;
 it does **not** resimulate the trajectory.
 
+## 9. Reproduce the final v3 gait checks
+
+The 5 September full-gait update is in `results/gaits_v3/`. It promotes a
+hybrid Ant dynamic-trot controller and a filtered/calibrated Humanoid PPO
+policy, then subjects both to guarded SHAC, three independent 1024-lane
+full-horizon audits, a nominal audit, and an exact-recorded-trajectory
+ViewerGL gate. The final measured ranges are:
+
+| Task | Noisy audit | Horizon | Speed | Final alive | Contact signature |
+| --- | --- | ---: | ---: | ---: | --- |
+| Ant | 3 seeds × 1024 lanes | 20 s | 1.010–1.015 m/s | 98.44–99.12% | 8.91–9.02% diagonal support; 58.77–59.05% flight |
+| Humanoid | 3 seeds × 1024 lanes | 15 s | 1.195–1.199 m/s | 99.61–100% | 83.18–83.27% single support; 7.17–7.27% flight |
+
+The Ant is an aerial dynamic trot, not a grounded walk. The complete gates,
+unrounded metrics, source-checkpoint hashes, and video hashes are in
+[`results/gaits_v3/summary.json`](results/gaits_v3/summary.json).
+
+Validate the published bundle first. This fails if either task gate is false,
+the PR/Newton revisions differ, a SHAC source or output checkpoint hash does
+not match, or a video/poster hash differs from its manifest.
+
+```bash
+V3="$RESULTS/gaits_v3"
+"$PYTHON" "$REPORT_ROOT/shac/pr1535/summarize_gaits_v3.py" \
+  --results-dir "$V3"
+```
+
+Re-run the definitive audits without overwriting the published JSON:
+
+```bash
+"$PYTHON" "$REPORT_ROOT/shac/pr1535/audit_gaits_v3.py" \
+  --checkpoint "$V3/ant_checkpoint.pt" --checkpoint-policy best \
+  --worlds 1024 --steps 400 --seeds 9851 9863 9877 \
+  --output /tmp/ant_final_audit20s.json
+
+"$PYTHON" "$REPORT_ROOT/shac/pr1535/audit_gaits_v3.py" \
+  --checkpoint "$V3/humanoid_checkpoint.pt" --checkpoint-policy best \
+  --worlds 1024 --steps 600 --seeds 9801 9811 9829 \
+  --output /tmp/humanoid_final_audit15s.json
+```
+
+The final guarded-SHAC calls are exactly reproducible from the published
+source checkpoints. Each signed candidate receives a randomized and a
+nominal uninterrupted full-horizon evaluation; both gates must pass, and the
+weaker selection score must improve.
+
+```bash
+"$PYTHON" "$REPORT_ROOT/shac/pr1535/fine_tune_gaits_shac_v3.py" \
+  --checkpoint "$V3/ant_shac_source_checkpoint.pt" \
+  --checkpoint-policy best --output /tmp/ant_final_shac.json \
+  --seed 997 --worlds 8 --selection-worlds 256 --horizon 1 --epochs 1 \
+  --warmup-steps 32 --selection-steps 400 --holdout-steps 400 \
+  --holdout-repeats 3 --direction-check-epsilon 0.0001 \
+  --line-search-steps 0 0.00001 -0.00001 0.00003 -0.00003 0.0001 -0.0001
+
+"$PYTHON" "$REPORT_ROOT/shac/pr1535/fine_tune_gaits_shac_v3.py" \
+  --checkpoint "$V3/humanoid_shac_source_checkpoint.pt" \
+  --checkpoint-policy best --output /tmp/humanoid_final_shac.json \
+  --seed 993 --worlds 8 --selection-worlds 256 --horizon 1 --epochs 1 \
+  --warmup-steps 32 --selection-steps 600 --holdout-steps 600 \
+  --holdout-repeats 3 --direction-check-epsilon 0.0001 \
+  --line-search-steps 0 0.00001 -0.00001 0.00003 -0.00003 0.0001 -0.0001
+```
+
+Render the promoted checkpoints. `render_gaits_v3.py` keeps the exact
+control-rate qpos/qvel/action trace sent to ViewerGL, recomputes the complete
+gait gate on that trace, and refuses to write a manifest if it fails. It also
+runs a separate nominal sibling evaluation to expose long-horizon contact
+sensitivity.
+
+```bash
+PYOPENGL_PLATFORM=egl PYGLET_HEADLESS=1 "$PYTHON" \
+  "$REPORT_ROOT/shac/pr1535/render_gaits_v3.py" \
+  --checkpoint "$V3/ant_checkpoint.pt" --policy best --steps 400 \
+  --width 960 --height 540 --fps 50 --camera-mode track \
+  --camera-offset -1.8 -2.7 1.2 --camera-target-height .42 --camera-fov 36 \
+  --output /tmp/ant_viewergl.mp4 --overwrite
+
+PYOPENGL_PLATFORM=egl PYGLET_HEADLESS=1 "$PYTHON" \
+  "$REPORT_ROOT/shac/pr1535/render_gaits_v3.py" \
+  --checkpoint "$V3/humanoid_checkpoint.pt" --policy best --steps 600 \
+  --width 960 --height 540 --fps 50 --camera-mode track \
+  --camera-offset -1.8 -2.8 1.3 --camera-target-height .9 --camera-fov 35 \
+  --output /tmp/humanoid_viewergl.mp4 --overwrite
+```
+
+GPU contact execution is not claimed to be bitwise deterministic, so a
+re-run need not reproduce trajectory hashes. The large ensemble and exact
+recorded-trace gates, rather than a single bit pattern, define success.
+
 ## What this does—and does not—test
 
 `mjwarp_torch_bridge.py` is necessary because PR #1535 records its analytic
