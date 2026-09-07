@@ -1,331 +1,277 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-template="prism">
+<html lang="en" data-theme="light" data-template="aperture">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Integration, validation, and performance report for Newton's experimental SPH fluid solver and ViewerGL fluid renderer.">
-  <title>Newton SPH Fluid Support — Integration and Performance Report</title>
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="shared.css">
-  <script src="report.js" defer></script>
+  <meta name="description" content="Upstream integration, performance, correctness, and ViewerGL evidence for Newton's XPBD fluid solver.">
+  <title>Newton XPBD Fluid Support</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="shared.css?v=3">
+  <script>
+    (function () {
+      try { document.documentElement.dataset.theme = localStorage.getItem("report-theme") || "light"; }
+      catch (_) { document.documentElement.dataset.theme = "light"; }
+    })();
+  </script>
 </head>
 <body>
-  <a class="skip-link" href="#report">Skip to report</a>
-  <header class="topbar">
-    <a class="brand" href="../" aria-label="Research reports overview">
-      <span class="brand-mark" aria-hidden="true">N</span>
-      <span>Research reports</span>
-    </a>
-    <nav class="topnav" aria-label="Report sections">
-      <a href="#results">Results</a>
-      <a href="#renderings">Renderings</a>
-      <a href="#performance">Performance</a>
-      <a href="#validation">Validation</a>
-    </nav>
-    <button class="theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch color theme">
-      <span class="theme-icon" aria-hidden="true">◐</span>
-      <span class="theme-label">Dark</span>
-    </button>
+  <header class="site-nav">
+    <div class="nav-inner">
+      <a class="brand" href="../" aria-label="Back to research reports">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <span>Newton / Technical report</span>
+      </a>
+      <nav class="nav-links" aria-label="Report sections">
+        <a href="#results" data-section-link>Results</a>
+        <a href="#evidence" data-section-link>Figures</a>
+        <a href="#performance" data-section-link>Performance</a>
+        <a href="#validation" data-section-link>Validation</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">
+          <span class="theme-icon" aria-hidden="true">☀</span>
+          <span class="theme-label">Bright</span>
+        </button>
+      </div>
+    </div>
   </header>
 
-  <main id="report">
-    <header class="hero report-width">
-      <div class="eyebrow">Engineering report · Experimental feature</div>
-      <h1>Newton SPH Fluid Support</h1>
-      <p class="dek">Upstream integration, opacity-aware ViewerGL rendering, correctness validation, and performance tuning for the experimental weakly-compressible SPH solver.</p>
-      <div class="report-meta" aria-label="Report metadata">
-        <span>Created <time datetime="2026-09-07">2026-09-07</time></span>
-        <span>Modified <time datetime="2026-09-07">2026-09-07</time></span>
-        <span>Windows · RTX 4090 · Warp 1.17.0</span>
-      </div>
-    </header>
-
-    <article class="report-width report-body">
-      <section id="results" class="section-block">
-        <div class="section-heading">
-          <span class="section-number">01</span>
-          <div>
-            <p class="kicker">Outcome</p>
-            <h2>Integrated and running on current main</h2>
-          </div>
+  <div class="report-shell">
+    <main class="report" id="main-content">
+      <section class="report-hero" id="overview">
+        <div class="report-dates" aria-label="Report dates">
+          <span>Created <time datetime="2026-09-07">2026-09-07</time></span>
+          <span>Modified <time datetime="2026-09-07">2026-09-07</time></span>
         </div>
-        <p class="lead">The fluid-support branch now incorporates upstream <code>main</code> through <code>853c4fef</code>. Its fluid surface and diffuse passes coexist with ViewerGL’s layer lifecycle, headless frame capture, and mixed-opacity weighted order-independent transparency pipeline.</p>
-
-        <div class="metric-grid" role="list" aria-label="Key outcomes">
-          <div class="metric" role="listitem">
-            <strong>7,514</strong>
-            <span>tests discovered in the full merge-stability run</span>
-          </div>
-          <div class="metric" role="listitem">
-            <strong>172 + 1 skip</strong>
-            <span>targeted SPH and ViewerGL results green</span>
-          </div>
-          <div class="metric" role="listitem">
-            <strong>13–15%</strong>
-            <span>solver-side throughput gain from visual-buffer decimation</span>
-          </div>
-          <div class="metric" role="listitem">
-            <strong>+40%</strong>
-            <span>small-scene throughput from default CUDA graph capture</span>
-          </div>
-        </div>
-
-        <div class="callout callout-positive">
-          <div class="callout-label">Integration status</div>
-          <p>Fluid rendering now participates in layer-qualified naming and cleanup. CUDA–OpenGL registration uses the current ViewerGL interop helper and falls back once to host uploads when interop is unavailable. Frame readback remains valid in real and mocked headless contexts.</p>
-        </div>
-
-        <h3>What changed</h3>
-        <div class="change-grid">
-          <section>
-            <h4>ViewerGL compatibility</h4>
-            <p>Rebased the fluid surface and spray batches onto the current render orchestration, including opaque geometry, translucent OIT geometry, shadow/depth passes, layer activation, model clearing, and headless capture.</p>
-          </section>
-          <section>
-            <h4>Solver correctness</h4>
-            <p>Restored diffuse emission for isolated ballistic particles, which have no SPH neighbors but should qualify as surface spray. CPU and CUDA regression cases now cover the corrected slot-selection path.</p>
-          </section>
-          <section>
-            <h4>Hot-path work</h4>
-            <p>Skipped vorticity computation when confinement is disabled, refreshed anisotropy and diffuse render buffers every second step in the examples, and enabled CUDA graph capture by default with an explicit opt-out.</p>
-          </section>
-          <section>
-            <h4>Public surface</h4>
-            <p>Registered <code>SolverSPH</code> in Newton’s lazy public solver exports, marked it experimental in the solver guide, updated example discovery, and added Towncrier fragments.</p>
-          </section>
+        <p class="paper-series">Engineering report · XPBD fluids</p>
+        <h1>Newton XPBD Fluid Support</h1>
+        <p class="paper-authors">Upstream integration and ViewerGL rendering study</p>
+        <p class="paper-affiliation">Newton Physics · CUDA / OpenGL</p>
+        <dl class="paper-meta" aria-label="Report metadata">
+          <div><dt>Upstream</dt><dd><code>origin/main@853c4fef</code></dd></div>
+          <div><dt>Feature</dt><dd><code>eric-heiden/flex-fluid</code></dd></div>
+          <div><dt>Hardware</dt><dd>GeForce RTX 4090</dd></div>
+        </dl>
+        <div class="abstract-block">
+          <h2>Abstract</h2>
+          <p>The XPBD fluid work is integrated with Newton’s current collision, layer, opacity, fullscreen, and headless ViewerGL architecture. The integrated solver advances approximately 100,000 particles at a median 90.2 simulation frames per second on an RTX 4090. ViewerGL now reconstructs fluid surfaces at framebuffer resolution instead of half resolution, removing the visibly stepped silhouettes seen in the previous report. Five ten-second, 720p recordings below exercise free surfaces, transparent containment, multiple fluid materials, buoyant rigid bodies, foam, articulated manipulation, and sustained wave forcing.</p>
         </div>
       </section>
 
-      <section id="renderings" class="section-block media-section">
+      <section class="report-section" id="results">
         <div class="section-heading">
-          <span class="section-number">02</span>
-          <div>
-            <p class="kicker">ViewerGL evidence</p>
-            <h2>Simulations in motion</h2>
+          <div class="section-title-wrap">
+            <h2><span class="section-number">1.</span> Results</h2>
+            <p class="section-intro">The branch is current with upstream main, the XPBD path is restored, and the rendering regression is corrected.</p>
           </div>
         </div>
-        <p class="lead">Each sequence is a fresh, eight-second headless ViewerGL capture from the integrated branch. The clips contain 480 simulation steps and 240 encoded frames—long enough to expose startup, flow development, collision response, and settling behavior.</p>
-
-        <figure class="video-card">
-          <video controls muted loop playsinline preload="metadata" poster="assets/dam-break_poster.jpg" aria-label="SPH dam-break simulation">
-            <source src="assets/dam-break.mp4" type="video/mp4">
-            Your browser does not support the embedded video.
-          </video>
-          <figcaption>
-            <div>
-              <span class="figure-label">A · Free-surface flow</span>
-              <h3>Dam break</h3>
-              <p>A 7,056-particle column collapses, crosses the basin, strikes the wall, and settles. Surface reconstruction uses smoothed anisotropic particles; diffuse particles identify energetic spray and foam.</p>
-            </div>
-            <dl class="figure-facts">
-              <div><dt>Duration</dt><dd>8.0 s</dd></div>
-              <div><dt>Capture</dt><dd>960 × 540 · 30 fps</dd></div>
-              <div><dt>Simulation</dt><dd>60 Hz · 4 substeps</dd></div>
-            </dl>
-          </figcaption>
-        </figure>
-
-        <figure class="video-card">
-          <video controls muted loop playsinline preload="metadata" poster="assets/interactive-tank_poster.jpg" aria-label="Interactive SPH tank with opaque and translucent rigid bodies">
-            <source src="assets/interactive-tank.mp4" type="video/mp4">
-            Your browser does not support the embedded video.
-          </video>
-          <figcaption>
-            <div>
-              <span class="figure-label">B · Coupling and opacity</span>
-              <h3>Interactive tank</h3>
-              <p>Approximately 56,000 fluid particles couple to floating and sinking rigid bodies. The capture deliberately mixes opaque and 60%-opacity shapes to exercise ViewerGL’s OIT geometry beside the screen-space fluid surface and diffuse spray.</p>
-            </div>
-            <dl class="figure-facts">
-              <div><dt>Duration</dt><dd>8.0 s</dd></div>
-              <div><dt>Capture</dt><dd>960 × 540 · 30 fps</dd></div>
-              <div><dt>Simulation</dt><dd>60 Hz · 3 substeps</dd></div>
-            </dl>
-          </figcaption>
-        </figure>
-
-        <figure class="video-card">
-          <video controls muted loop playsinline preload="metadata" poster="assets/wave-pool_poster.jpg" aria-label="SPH wave pool with paddle and diffuse foam">
-            <source src="assets/wave-pool.mp4" type="video/mp4">
-            Your browser does not support the embedded video.
-          </video>
-          <figcaption>
-            <div>
-              <span class="figure-label">C · Sustained forcing</span>
-              <h3>Wave pool</h3>
-              <p>A kinematic paddle drives roughly 70,840 particles toward a sloped beach. Repeated crests stress long-horizon boundary handling, surface continuity, anisotropy, and diffuse-particle lifetime management.</p>
-            </div>
-            <dl class="figure-facts">
-              <div><dt>Duration</dt><dd>8.0 s</dd></div>
-              <div><dt>Capture</dt><dd>960 × 540 · 30 fps</dd></div>
-              <div><dt>Simulation</dt><dd>60 Hz · 3 substeps</dd></div>
-            </dl>
-          </figcaption>
-        </figure>
+        <div class="finding-list">
+          <article>
+            <h3>Current ViewerGL behavior is preserved</h3>
+            <p>Fluid batches follow ViewerGL’s layer-qualified lifecycle and render after multisample resolve. Current weighted transparency, opacity grouping, fullscreen rendering, image capture, frame limits, shadow passes, and CUDA interop remain intact.</p>
+          </article>
+          <article>
+            <h3>Fluid surfaces render at native framebuffer resolution</h3>
+            <p>The previous half-size depth and thickness targets reconstructed a 720p image from a 640×360 fluid buffer. Native-resolution targets remove the blocky contour and thin-sheet aliasing without changing the simulation state.</p>
+          </article>
+          <article>
+            <h3>Stability protections cover failure-prone boundaries</h3>
+            <p>World-qualified neighbor queries prevent cross-world coupling; density corrections no longer cancel shape contacts; non-finite particle corrections self-heal before contaminating the hash grid; and configurable rigid-body motion limits contain force spikes.</p>
+          </article>
+          <article>
+            <h3>Cold compilation carries less dead work</h3>
+            <p>Obsolete duplicate fluid kernels were removed from the general XPBD module. The dedicated fluid module remains the sole implementation, reducing a clean CUDA compilation of the XPBD kernel module from 26.65 s to 24.67 s on this host.</p>
+          </article>
+        </div>
       </section>
 
-      <section id="architecture" class="section-block">
+      <section class="report-section" id="evidence">
         <div class="section-heading">
-          <span class="section-number">03</span>
-          <div>
-            <p class="kicker">Implementation</p>
-            <h2>Simulation and rendering pipeline</h2>
+          <div class="section-title-wrap">
+            <h2><span class="section-number">2.</span> ViewerGL evidence</h2>
+            <p class="section-intro">Every recording is a direct headless ViewerGL capture from the integrated XPBD checkout: 1280×720, 30 fps, ten seconds, H.264, with native example materials.</p>
           </div>
         </div>
-        <p>The implementation is a weakly-compressible SPH solver with an optional position-based density projection. Calling the entire solver “XPBD” is imprecise: pressure, viscosity, cohesion, surface tension, vorticity, and XSPH terms remain SPH kernels, while the projection supplies the XPBD/PBF-style density correction.</p>
-
-        <div class="pipeline" role="img" aria-label="Fluid pipeline from model particles through SPH and position projection to ViewerGL rendering">
-          <div class="pipeline-stage"><span>1</span><strong>Model state</strong><small>Particles, shapes, materials</small></div>
-          <div class="pipeline-arrow" aria-hidden="true">→</div>
-          <div class="pipeline-stage"><span>2</span><strong>Neighbor grid</strong><small>Density and force kernels</small></div>
-          <div class="pipeline-arrow" aria-hidden="true">→</div>
-          <div class="pipeline-stage"><span>3</span><strong>Integrate + project</strong><small>Bounds, shapes, density</small></div>
-          <div class="pipeline-arrow" aria-hidden="true">→</div>
-          <div class="pipeline-stage"><span>4</span><strong>Visual buffers</strong><small>Anisotropy + diffuse</small></div>
-          <div class="pipeline-arrow" aria-hidden="true">→</div>
-          <div class="pipeline-stage"><span>5</span><strong>ViewerGL</strong><small>Depth, thickness, shade, OIT</small></div>
+        <div class="video-grid">
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/dam-break_poster.jpg" aria-label="XPBD dam-break simulation">
+              <source src="assets/dam-break.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 1.</span> Dam break, 99,960 particles. A collapsing column strikes two rigid obstacles, producing thin sheets, specular highlights, spray, and a broad free surface.</figcaption>
+          </figure>
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/interactive-tank_poster.jpg" aria-label="XPBD interactive tank simulation">
+              <source src="assets/interactive-tank.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 2.</span> Interactive tank, 100,300 particles. Mixed-density rigid bodies float and sink inside translucent walls, exercising fluid–rigid reaction and ViewerGL opacity ordering.</figcaption>
+          </figure>
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/multi-fluid-tank_poster.jpg" aria-label="XPBD multi-fluid tank simulation">
+              <source src="assets/multi-fluid-tank.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 3.</span> Three-fluid tank, 94,518 particles. Independently shaded density groups mix while sharing the same transparent container and rigid bodies.</figcaption>
+          </figure>
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/wave-pool_poster.jpg" aria-label="XPBD wave-pool simulation">
+              <source src="assets/wave-pool.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 4.</span> Wave pool, 100,491 particles. A kinematic paddle sustains waves across a sloped beach while mixed-density primitives expose buoyancy and contact stability.</figcaption>
+          </figure>
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/cup-transfer_poster.jpg" aria-label="Robot carrying an XPBD fluid cup">
+              <source src="assets/cup-transfer.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 5.</span> Robot cup transfer, 100,548 particles. A Franka arm solves inverse kinematics while carrying an SDF cup with transparent walls and a reconstructed fluid surface through a full 8.8 s manipulation cycle.</figcaption>
+          </figure>
         </div>
+        <div class="note">
+          <p><strong>Archimedes screw audit.</strong> Repository history, all remote fluid branches, local worktrees, and archived task summaries were searched. No Archimedes screw pump example exists in the available Newton work, so this report does not mislabel another example or fabricate footage.</p>
+        </div>
+      </section>
 
-        <div class="two-column">
-          <div>
-            <h3>Solver setup</h3>
-            <pre><code>solver = SolverSPH(
+      <section class="report-section" id="architecture">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">3.</span> Integrated simulation and rendering path</h2>
+            <p class="section-intro">The solver and renderer share particle state but remain separate: visual smoothing and foam do not alter the physical solution.</p>
+          </div>
+        </div>
+        <ol class="pipeline" aria-label="Fluid processing pipeline">
+          <li><strong>Collision</strong><span>Current <code>CollisionPipeline</code> generates shape contacts.</span></li>
+          <li><strong>XPBD solve</strong><span>Grouped hash-grid density, cohesion, viscosity, and body reaction advance each substep.</span></li>
+          <li><strong>Render fit</strong><span>Optional smoothing and anisotropy derive ellipsoids from the solved state.</span></li>
+          <li><strong>Surface passes</strong><span>Depth, thickness, bilateral blur, shadows, and refraction reconstruct the liquid.</span></li>
+          <li><strong>Composite</strong><span>Fluid and diffuse foam join the resolved scene with correct depth and opacity.</span></li>
+        </ol>
+      </section>
+
+      <section class="report-section" id="implementation">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">4.</span> Implementation</h2>
+            <p class="section-intro">Fluid behavior is enabled through the existing XPBD solver; ViewerGL consumes render-only particle derivatives.</p>
+          </div>
+        </div>
+        <div class="implementation-grid">
+          <div class="code-shell">
+            <div class="code-header">
+              <span>Listing 1. XPBD fluid configuration</span>
+              <button class="copy-button" type="button" data-copy-target="fluid-code">Copy code</button>
+            </div>
+            <pre><code class="code-block" id="fluid-code"><span class="tok-keyword">solver</span> = newton.solvers.SolverXPBD(
     model,
-    smoothing_length=0.12,
-    rest_density=1000.0,
-    pbf_iterations=3,
-    max_diffuse_particles=120_000,
-    render_update_interval=2,
-    diffuse_update_interval=2,
+    iterations=<span class="tok-number">2</span>,
+    fluid_density=<span class="tok-number">1000.0</span>,
+    fluid_cohesion=<span class="tok-number">0.6</span>,
+    fluid_viscosity=<span class="tok-number">0.03</span>,
+    fluid_max_neighbors=<span class="tok-number">128</span>,
+    max_diffuse_particles=<span class="tok-number">20_000</span>,
 )
 
-with wp.ScopedCapture() as capture:
-    simulate_frame()
-graph = capture.graph</code></pre>
+collision = newton.CollisionPipeline(model)
+contacts = collision.contacts()
+
+<span class="tok-keyword">for</span> _ <span class="tok-keyword">in</span> range(substeps):
+    state.clear_forces()
+    collision.collide(state, contacts)
+    solver.step(state, next_state, control, contacts, dt)
+    state, next_state = next_state, state</code></pre>
           </div>
-          <div>
-            <h3>Viewer handoff</h3>
-            <pre><code>viewer.log_fluid(
-    "/model/fluid",
-    state.particle_q,
-    radii=model.particle_radius,
-    anisotropy=solver.render_anisotropy,
-)
-
-viewer.log_fluid_diffuse(
-    "/model/fluid/diffuse",
-    solver.diffuse_positions,
-    solver.diffuse_velocities,
-)</code></pre>
+          <div class="method-stack">
+            <h3>Performance-oriented choices</h3>
+            <ol>
+              <li><strong>Spatial reordering.</strong> Morton sorting restores locality for repeated neighbor reads and is skipped for mixed topological particle systems.</li>
+              <li><strong>Bounded tail work.</strong> An optional neighbor cap limits rare over-compressed particles from stalling an entire GPU warp.</li>
+              <li><strong>Graph-safe storage.</strong> Group metadata, diffuse buffers, and reorder scratch are allocated before CUDA graph capture.</li>
+              <li><strong>Render fast paths.</strong> Unsmoothed output reuses solved positions, render decimation is optional, and the simulation hash grid is reused when safe.</li>
+            </ol>
           </div>
-        </div>
-
-        <h3>Opacity integration</h3>
-        <p>ViewerGL first separates opaque and translucent instance batches. Opaque objects populate the regular depth and shadow paths. Translucent geometry accumulates weighted color and revealage in the OIT targets. The fluid surface is reconstructed independently from particle depth and thickness, bilateral filtering, and screen-space shading; both results are composited without treating the water as an ordinary alpha-sorted mesh.</p>
-      </section>
-
-      <section id="performance" class="section-block">
-        <div class="section-heading">
-          <span class="section-number">04</span>
-          <div>
-            <p class="kicker">Performance</p>
-            <h2>Measured throughput gains</h2>
-          </div>
-        </div>
-        <p class="lead">The controlled comparison synchronizes every frame and uses <code>ViewerNull</code>. It measures simulation plus solver-owned visual-buffer preparation, excluding OpenGL rasterization. Each row used the same RTX 4090, Warp 1.17.0 environment and dam-break parameters before and after the interval change.</p>
-
-        <div class="table-wrap">
-          <table>
-            <caption>Visual-buffer decimation benchmark, higher is better</caption>
-            <thead>
-              <tr><th scope="col">Fluid particles</th><th scope="col">Every step</th><th scope="col">Every 2 steps</th><th scope="col">Gain</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">1,008</th><td>143.3 fps</td><td>165.3 fps</td><td class="positive">+15.4%</td></tr>
-              <tr><th scope="row">26,880</th><td>104.3 fps</td><td>118.3 fps</td><td class="positive">+13.4%</td></tr>
-              <tr><th scope="row">42,240</th><td>95.2 fps</td><td>108.1 fps</td><td class="positive">+13.6%</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="benchmark-callout">
-          <div>
-            <span class="benchmark-number">239.1</span>
-            <span class="benchmark-unit">fps</span>
-          </div>
-          <p><strong>CUDA graph result, 1,008-particle dam break.</strong> A controlled ten-second run increased from 170.7 fps uncaptured to 239.1 fps captured, a 40.1% improvement. Graph capture is now the CUDA default; <code>--no-capture-graph</code> preserves an explicit fallback.</p>
-        </div>
-
-        <h3>Default example workloads</h3>
-        <div class="table-wrap">
-          <table>
-            <caption>Ten-second synchronized runs with default graph capture</caption>
-            <thead>
-              <tr><th scope="col">Example</th><th scope="col">Particles</th><th scope="col">Substeps</th><th scope="col">Throughput</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">Dam break</th><td>1,008</td><td>4</td><td>239.1 fps</td></tr>
-              <tr><th scope="row">Interactive tank</th><td>≈56,000</td><td>3</td><td>114.1 fps</td></tr>
-              <tr><th scope="row">Wave pool</th><td>≈70,840</td><td>3</td><td>113.8 fps</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="callout">
-          <div class="callout-label">Interpretation</div>
-          <p>The decimation gain is repeatable across the sampled particle counts because render anisotropy and diffuse classification are visual derivatives, not state integration. Updating them at 30 Hz while simulation advances at 60 Hz removes work without changing the simulated particle state. These figures are single-host measurements, not cross-platform guarantees.</p>
         </div>
       </section>
 
-      <section id="validation" class="section-block">
+      <section class="report-section" id="performance">
         <div class="section-heading">
-          <span class="section-number">05</span>
-          <div>
-            <p class="kicker">Correctness and stability</p>
-            <h2>Validation matrix</h2>
+          <div class="section-title-wrap">
+            <h2><span class="section-number">5.</span> Performance</h2>
+            <p class="section-intro">Measurements use Warp 1.17, CUDA Toolkit 12.9, driver 13.2, and an RTX 4090. Solver trials exclude ViewerGL; capture trials include two 60 Hz simulation steps, rendering, readback, and H.264 encoding per 30 Hz output frame.</p>
           </div>
         </div>
-        <div class="validation-list">
-          <div><span class="status-pass">Pass</span><strong>SPH solver</strong><p>66 CPU/CUDA tests: pressure, density projection, viscosity, surface forces, bounds, mesh/heightfield/particle collisions, rigid feedback, diffuse behavior, anisotropy, public export, and CUDA graph replay. One expected CPU graph-capture skip.</p></div>
-          <div><span class="status-pass">Pass</span><strong>ViewerGL fluid routing</strong><p>7 tests covering material defaults, fallback rendering, hidden/active transitions, shader controls, and coupled tank behavior.</p></div>
-          <div><span class="status-pass">Pass</span><strong>Opacity and layers</strong><p>39 shape appearance/OIT tests, 24 layer tests, 4 shape-logging tests, 10 real/mocked frame-capture tests, 4 particle-flag tests, and 16 image-logger tests.</p></div>
-          <div><span class="status-pass">Pass</span><strong>End-to-end examples</strong><p>Dam break, interactive tank, and wave pool complete their CUDA test rollouts; a separate headless OpenGL smoke run terminates at the requested frame count.</p></div>
-          <div><span class="status-note">Resolved findings</span><strong>Full repository suite</strong><p id="full-suite-result">The eight-process run discovered 7,514 tests and executed 7,125 in 51m 42s. It exposed five Viewer regressions adjacent to the merge and one Windows asset-cache cleanup race in unchanged Kamino code. The Viewer cases were fixed and all 20 relevant tests passed on rerun; the Kamino test also passed standalone. No SPH or fluid-example failures occurred.</p></div>
-          <div><span class="status-pass">Pass</span><strong>Static checks</strong><p>All pre-commit hooks pass: large-file and merge checks, JSON/TOML/YAML, debug/private-key detection, Ruff lint and format, lockfile consistency, typos, and Warp array syntax.</p></div>
+        <div class="table-wrap">
+          <table>
+            <caption>Table 1. Warm XPBD dam-break throughput, approximately 100,000 particles, 500 requested frames.</caption>
+            <thead><tr><th>Trial</th><th>Measured frames</th><th>Elapsed</th><th>Throughput</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>497</td><td>5.69 s</td><td>87.4 fps</td></tr>
+              <tr><td>2</td><td>497</td><td>5.51 s</td><td>90.2 fps</td></tr>
+              <tr><td>3</td><td>497</td><td>5.46 s</td><td>91.0 fps</td></tr>
+              <tr><td><strong>Median</strong></td><td>497</td><td>5.51 s</td><td><strong>90.2 fps</strong></td></tr>
+            </tbody>
+          </table>
         </div>
+        <div class="table-wrap">
+          <table>
+            <caption>Table 2. End-to-end 1280×720 report capture throughput.</caption>
+            <thead><tr><th>Scene</th><th>Particles</th><th>Output frames</th><th>Wall time</th><th>Output fps</th></tr></thead>
+            <tbody>
+              <tr><td>Dam break</td><td>99,960</td><td>300</td><td>10.84 s</td><td>27.7</td></tr>
+              <tr><td>Interactive tank</td><td>100,300</td><td>300</td><td>8.72 s</td><td>34.4</td></tr>
+              <tr><td>Three-fluid tank</td><td>94,518</td><td>300</td><td>8.65 s</td><td>34.7</td></tr>
+              <tr><td>Wave pool</td><td>100,491</td><td>300</td><td>23.69 s</td><td>12.7</td></tr>
+              <tr><td>Robot cup transfer</td><td>100,548</td><td>300</td><td>151.57 s</td><td>2.0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine-print">The cup-transfer result is dominated by twelve inverse-kinematics iterations on each 60 Hz simulation frame and should not be interpreted as raw fluid-solver throughput. JSON sidecars beside each video retain the exact capture metadata.</p>
+      </section>
 
-        <h3>Representative commands</h3>
-        <pre><code>uv run --extra dev -m newton.tests -k test_solver_sph
+      <section class="report-section" id="validation">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">6.</span> Correctness and stability</h2>
+            <p class="section-intro">Focused coverage spans solver invariants, ViewerGL integration, opacity, layers, picking, and end-to-end examples.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <caption>Table 3. Validation performed on the integrated branch.</caption>
+            <thead><tr><th>Area</th><th>Result</th><th>Coverage</th></tr></thead>
+            <tbody>
+              <tr><td>XPBD fluid solver</td><td><span class="status">61 pass · 1 expected skip</span></td><td>CPU and CUDA density, cohesion, viscosity, diffuse particles, SDF confinement, world isolation, capture, reordering, momentum, and non-finite recovery.</td></tr>
+              <tr><td>ViewerGL fluid API</td><td><span class="status">5 pass</span></td><td>Batch defaults, lifecycle, visibility, and material paths.</td></tr>
+              <tr><td>ViewerGL layers</td><td><span class="status">24 pass</span></td><td>Layer qualification, visibility, clearing, and lifecycle.</td></tr>
+              <tr><td>Shape opacity</td><td><span class="status">39 pass</span></td><td>Shape color and weighted-transparency grouping behavior.</td></tr>
+              <tr><td>Viewer picking</td><td><span class="status">23 pass</span></td><td>Raycast compilation, masks, occlusion, world offsets, and force limits.</td></tr>
+              <tr><td>Fluid examples</td><td><span class="status" id="example-status">8 pass</span></td><td>Eight CUDA examples with reduced CI particle counts and their built-in assertions.</td></tr>
+              <tr><td>Headless ViewerGL</td><td><span class="status">Pass</span></td><td>Requested-frame termination and direct framebuffer capture.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="minor-heading">Representative commands</h3>
+        <pre class="command-block"><code>uv run --extra dev -m newton.tests -k test_solver_xpbd_fluid
 uv run --extra dev -m newton.tests -k test_viewer_fluid
+uv run --extra dev -m newton.tests -k test_viewer_layers
 uv run --extra dev -m newton.tests -k test_shape_colors
-uv run --extra dev -m newton.tests -k fluid.example_fluid_sph
-uv run -m newton.examples fluid_sph_dam_break \
-  --viewer gl --headless --num-frames 8 --no-show-diffuse
+uv run --extra dev -m newton.tests -k test_viewer_picking
+uv run --extra dev -m newton.tests -k TestFluidExamples
+uv run -m newton.examples fluid_xpbd_dam_break --viewer gl --headless --num-frames 10
 uvx pre-commit run -a</code></pre>
       </section>
 
-      <section id="limits" class="section-block">
+      <section class="report-section conclusion" id="conclusion">
         <div class="section-heading">
-          <span class="section-number">06</span>
-          <div>
-            <p class="kicker">Scope</p>
-            <h2>Known limitations</h2>
+          <div class="section-title-wrap">
+            <h2><span class="section-number">7.</span> Conclusion</h2>
+            <p class="section-intro">The XPBD fluid branch is again based on current Newton, preserves the modern ViewerGL opacity and layer model, removes the half-resolution surface regression, and sustains a median 90.2 fps at roughly 100,000 particles on the measured GPU. Remaining limits are explicit: screen-space rendering is view dependent, diffuse particles are visual, and the robot capture’s IK workload is not representative of solver throughput.</p>
           </div>
         </div>
-        <ul class="limitations">
-          <li><strong>Experimental API.</strong> <code>SolverSPH</code> is intentionally marked experimental; parameter names and behavior can evolve before stabilization.</li>
-          <li><strong>Rendering is screen-space.</strong> Surface quality depends on camera resolution, filter parameters, particle sampling, and thickness coverage. It is not a watertight geometry export.</li>
-          <li><strong>Diffuse particles are visual.</strong> Foam, spray, and bubbles improve readability but do not feed momentum back into the simulated fluid.</li>
-          <li><strong>Performance numbers are local.</strong> The reported solver benchmark excludes OpenGL rasterization and should be repeated on target hardware, especially when interop falls back to host transfer.</li>
-          <li><strong>Coverage is finite.</strong> The examples exercise free surfaces, sustained forcing, rigid coupling, transparency, and headless capture; they do not establish production readiness for every scale or material regime.</li>
-        </ul>
       </section>
 
       <footer class="report-footer">
-        <p><strong>Branch:</strong> <code>eric-heiden/fluid-support</code> · <strong>Upstream base:</strong> <code>853c4fef</code> · <strong>Integration commit:</strong> <code id="integration-commit">2c0109a41</code></p>
-        <p>Media was rendered directly from the integrated checkout with <code>tools/render_viewergl_video.py</code>. JSON sidecars record capture parameters and particle counts for reproducibility.</p>
+        <span>Source and media captured 2026-09-07.</span>
+        <span>Branch <code>eric-heiden/flex-fluid</code> · integration commit <code id="integration-commit">6cde7c379</code></span>
       </footer>
-    </article>
-  </main>
+    </main>
+  </div>
+  <script src="report.js?v=3" defer></script>
 </body>
 </html>

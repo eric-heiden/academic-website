@@ -17,26 +17,29 @@ import newton
 
 PRESETS = {
     "dam-break": (
-        "newton.examples.fluid.example_fluid_sph_dam_break",
-        [
-            "--dim-x", "28", "--dim-y", "18", "--dim-z", "14",
-            "--bounds-lower", "-0.8", "-0.55", "0.0",
-            "--bounds-upper", "2.2", "0.55", "1.2",
-            "--emit-lower", "-0.70", "-0.45", "0.06",
-            "--initial-velocity", "1.8", "0.0", "0.0",
-            "--camera-pos", "2.7", "-3.5", "1.7",
-            "--camera-pitch", "-18", "--camera-yaw", "132",
-            "--fluid-shadow-size", "1024",
-        ],
+        "newton.examples.fluid.example_fluid_xpbd_dam_break",
+        [],
     ),
     "interactive-tank": (
-        "newton.examples.fluid.example_fluid_sph_interactive_tank",
+        "newton.examples.fluid.example_fluid_xpbd_interactive_tank",
+        [],
+    ),
+    "multi-fluid-tank": (
+        "newton.examples.fluid.example_fluid_xpbd_multi_fluid_tank",
         [],
     ),
     "wave-pool": (
-        "newton.examples.fluid.example_fluid_sph_wave_pool",
+        "newton.examples.fluid.example_fluid_xpbd_wave_pool",
         [],
     ),
+    "cup-transfer": (
+        "newton.examples.fluid.example_fluid_xpbd_cup_transfer",
+        [],
+    ),
+}
+
+POSTER_SECONDS = {
+    "dam-break": 0.8,
 }
 
 
@@ -44,10 +47,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("preset", choices=PRESETS)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--duration", type=float, default=8.0)
+    parser.add_argument("--duration", type=float, default=10.0)
     parser.add_argument("--video-fps", type=int, default=30)
-    parser.add_argument("--width", type=int, default=960)
-    parser.add_argument("--height", type=int, default=540)
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=720)
     args = parser.parse_args()
 
     module_name, preset_args = PRESETS[args.preset]
@@ -66,13 +69,6 @@ def main() -> None:
         num_frames=100000,
     )
     example = module.Example(viewer, example_args)
-    if args.preset == "interactive-tank":
-        # Exercise the merged ViewerGL mixed-opacity batching and weighted OIT
-        # path while the same bodies continue to interact with the fluid.
-        opacities = example.model.shape_opacity.numpy()
-        opacities[2:] = (0.45, 0.65, 0.35, 0.60)
-        example.model.shape_opacity.assign(opacities)
-
     output_frames = int(round(args.duration * args.video_fps))
     simulation_steps_per_frame = max(int(round(example.fps / args.video_fps)), 1)
     ffmpeg = subprocess.Popen(
@@ -81,7 +77,7 @@ def main() -> None:
             "-f", "rawvideo", "-pix_fmt", "rgb24",
             "-s:v", f"{args.width}x{args.height}",
             "-r", str(args.video_fps), "-i", "-",
-            "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "16",
             "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(args.output),
         ],
         stdin=subprocess.PIPE,
@@ -89,7 +85,10 @@ def main() -> None:
 
     started = time.perf_counter()
     poster_frame: np.ndarray | None = None
-    poster_index = output_frames // 3
+    poster_index = min(
+        int(round(POSTER_SECONDS.get(args.preset, 0.5 * args.duration) * args.video_fps)),
+        output_frames - 1,
+    )
     try:
         assert ffmpeg.stdin is not None
         for frame_index in range(output_frames):
@@ -124,6 +123,7 @@ def main() -> None:
                 "simulation_fps": example.fps,
                 "simulation_steps_per_video_frame": simulation_steps_per_frame,
                 "render_wall_seconds": round(time.perf_counter() - started, 3),
+                "end_to_end_fps": round(output_frames / max(time.perf_counter() - started, 1.0e-9), 3),
                 "particle_count": example.model.particle_count,
             },
             indent=2,
