@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-template="prism">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive Newton simulation report template with plots, videos, code, and architecture diagrams.">
+  <title>Newton Reproducibility Study — Report Template</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="shared.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex-swap.min.css" integrity="sha384-GiTJOrt1vBIOkt46uJewl8dAj3Rh/j00JmIAhm7ewwCBpZAmt5FIm6yEvop7Cn0N" crossorigin="anonymous">
+  <script>
+    (function () {
+      var allowed = ["prism", "signal", "aperture"];
+      var choice = new URLSearchParams(location.search).get("template");
+      document.documentElement.dataset.template = allowed.indexOf(choice) >= 0 ? choice : "prism";
+      try { document.documentElement.dataset.theme = localStorage.getItem("report-theme") || "light"; }
+      catch (_) { document.documentElement.dataset.theme = "light"; }
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-nav">
+    <div class="nav-inner">
+      <a class="brand" href="index.html" aria-label="Back to report template gallery">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <span>Newton / Reproducibility report</span>
+      </a>
+      <nav class="nav-links" aria-label="Report sections">
+        <a href="#findings" data-section-link>Results</a>
+        <a href="#evidence" data-section-link>Figures</a>
+        <a href="#architecture" data-section-link>Methods</a>
+        <a href="#implementation" data-section-link>Implementation</a>
+      </nav>
+      <div class="nav-actions">
+        <label class="sr-only" for="template-picker">Report template</label>
+        <select class="template-picker" id="template-picker" aria-label="Report template">
+          <option value="prism">Prism</option>
+          <option value="signal">Signal</option>
+          <option value="aperture">Aperture</option>
+        </select>
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">
+          <span class="theme-icon" aria-hidden="true">☀</span>
+          <span class="theme-label">Bright</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="report-shell">
+    <aside class="section-nav" aria-label="On this page">
+      <p>Contents</p>
+      <a href="#overview" data-section-link>Abstract</a>
+      <a href="#findings" data-section-link>Results</a>
+      <a href="#evidence" data-section-link>Replay figures</a>
+      <a href="#architecture" data-section-link>Architecture</a>
+      <a href="#implementation" data-section-link>Implementation</a>
+      <a href="#matrix" data-section-link>Test matrix</a>
+      <a href="#conclusion" data-section-link>Conclusion</a>
+    </aside>
+
+    <main class="report" id="main-content">
+      <section class="report-hero" id="overview">
+        <div class="report-dates" aria-label="Report dates">
+          <span>Created <time datetime="2026-09-05">2026-09-05</time></span>
+          <span>Modified <time datetime="2026-09-06">2026-09-06</time></span>
+        </div>
+        <p class="paper-series">Technical report</p>
+        <h1>Newton determinism evaluation</h1>
+        <p class="paper-authors">Simulation Systems</p>
+        <p class="paper-affiliation">Newton Physics · Reproducibility study</p>
+        <dl class="paper-meta" aria-label="Report metadata">
+          <div><dt>Software</dt><dd>Newton development build · NVIDIA CUDA 13 GPU platform</dd></div>
+          <div><dt>Protocol</dt><dd>Three independent runs · 180 steps</dd></div>
+        </dl>
+        <div class="abstract-block">
+          <h2>Abstract</h2>
+          <p>This report examines whether a Newton physics simulation produces the same numerical result each time it receives the same input. This property is called <em>run-to-run determinism</em>. A simulation state is the complete set of values—such as position, velocity, and orientation—that describes the simulated system at one moment. A solver is the numerical method that advances this state from one step to the next. The study compares repeated runs of three rigid-body solver configurations and one deformable-body case. The rigid-body results remain within the chosen tolerance, which is the maximum difference accepted as equivalent. The deformable-body case, which also measures how outputs respond to input changes, shows a larger difference and requires further analysis.</p>
+        </div>
+      </section>
+
+      <section class="report-section" id="findings">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">1.</span> Results</h2>
+            <p class="section-intro">The repeated simulations agree closely until contact introduces a small difference between runs.</p>
+          </div>
+        </div>
+        <div class="finding-list">
+          <article>
+            <h3>Rigid-body simulations are repeatable</h3>
+            <p>Rigid bodies keep a fixed shape while they move. The eXtended Position-Based Dynamics (XPBD), Featherstone articulated-body, and MuJoCo-compatible solver configurations remain below the selected tolerance after 180 simulation steps.</p>
+          </article>
+          <article>
+            <h3>The first contact introduces most of the difference</h3>
+            <p>The largest change between repeated runs appears when objects first touch. The difference then remains limited instead of growing continuously through the rest of the simulation.</p>
+          </article>
+          <article>
+            <h3>The deformable-body gradient needs further analysis</h3>
+            <p>A differentiable simulation also computes how its result changes when an input changes. During this gradient calculation, parallel updates can arrive in a different order and produce a small numerical difference. This case exceeds the strict tolerance and is therefore not classified as deterministic.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="report-section" aria-labelledby="plot-heading">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2 id="plot-heading"><span class="section-number">2.</span> Numerical difference between repeated runs</h2>
+            <p class="section-intro">The comparison uses the largest absolute difference among all state values at each simulation step.</p>
+          </div>
+        </div>
+        <div class="equation-explanation">
+          <p>For simulation step \(t\), the reported difference is</p>
+          <div class="display-equation">\[\Delta_t = \max_i \left|x_i^{(1)}(t) - x_i^{(2)}(t)\right|.\]</div>
+          <p>Here, \(\Delta_t\) is the maximum state difference at step \(t\); \(i\) identifies one value in the state; and \(x_i^{(1)}\) and \(x_i^{(2)}\) are that value in the first and second run. Smaller values indicate closer agreement.</p>
+        </div>
+        <figure class="chart-panel">
+          <div class="chart-toolbar">
+            <div>
+              <h3 class="chart-title">Maximum state difference, Δ<sub>t</sub></h3>
+              <p class="chart-subtitle">Independent runs · logarithmic vertical scale</p>
+            </div>
+            <div class="legend" aria-label="Plot series">
+              <button class="legend-button" type="button" aria-pressed="true" data-series="xpbd"><span class="legend-swatch" style="--series-color:var(--accent)"></span>XPBD</button>
+              <button class="legend-button" type="button" aria-pressed="true" data-series="featherstone"><span class="legend-swatch" style="--series-color:var(--accent-2)"></span>Featherstone</button>
+              <button class="legend-button" type="button" aria-pressed="true" data-series="mujoco"><span class="legend-swatch" style="--series-color:var(--accent-3)"></span>MuJoCo</button>
+            </div>
+          </div>
+          <div class="plotly-chart" id="delta-chart" role="img" aria-labelledby="plot-heading"></div>
+          <div class="threshold-control">
+            <label for="threshold-range">
+              <span class="range-label"><span>Acceptance threshold</span><output id="threshold-value">1e-8</output></span>
+              <input id="threshold-range" type="range" min="-12" max="-4" value="-8" step="1">
+            </label>
+            <div class="threshold-readout" aria-live="polite">
+              <span class="threshold-count" id="threshold-count">8 of 12 scenarios below threshold</span>
+            </div>
+          </div>
+          <figcaption class="figure-caption"><span class="caption-label">Figure 1.</span> Maximum state difference by simulation step for three rigid-body solver configurations. The horizontal rule is the selected acceptance threshold.</figcaption>
+        </figure>
+      </section>
+
+      <section class="report-section" id="evidence">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">3.</span> Replay figures</h2>
+            <p class="section-intro">The recordings make visible changes easy to compare with the numerical results.</p>
+          </div>
+        </div>
+        <div class="video-grid">
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/box_stack_xpbd_poster.png" aria-label="Box stack replay">
+              <source src="assets/box_stack_xpbd.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 2.</span> A stack of rigid boxes after first contact using XPBD.</figcaption>
+          </figure>
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/humanoid_featherstone_poster.png" aria-label="Humanoid balance replay">
+              <source src="assets/humanoid_featherstone.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 3.</span> A humanoid maintaining balance under fixed controls with the Featherstone solver.</figcaption>
+          </figure>
+          <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/diffsim_bear_semi_implicit_poster.png" aria-label="Soft-body gradient replay">
+              <source src="assets/diffsim_bear_semi_implicit.mp4" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 4.</span> A deformable body used to compare the simulated motion and its calculated gradient.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="report-section" id="architecture">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">4.</span> Newton simulation workflow</h2>
+            <p class="section-intro">The model describes the scene. The current state and control input enter collision detection, then the solver computes the state for the next time step.</p>
+          </div>
+        </div>
+        <figure class="diagram-panel">
+          <div class="mermaid-shell" data-mermaid-source="flowchart LR
+            INPUT[Model + state + control] --> COLLIDE[Collision pipeline]
+            COLLIDE --> STEP[Solver step]
+            DT[Time step] --> STEP
+            STEP --> OUTPUT[Updated state]
+            OUTPUT --> LOG[Measurements + recording]
+            OUTPUT -. next frame .-> COLLIDE"></div>
+          <figcaption class="diagram-caption">
+            <span><span class="caption-label">Figure 5.</span> Information flow for one Newton simulation step.</span>
+            <a href="https://github.com/newton-physics/newton/blob/main/docs/solvers/index.rst">Newton solver workflow ↗</a>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="report-section" id="implementation">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">5.</span> Reproducibility method</h2>
+            <p class="section-intro">The short implementation below runs the same model with a fixed time step and requests run-to-run deterministic execution.</p>
+          </div>
+        </div>
+        <div class="implementation-grid">
+          <div class="code-shell">
+            <div class="code-header">
+              <span>Listing 1. <code>run_replay.py</code></span>
+              <button class="copy-button" type="button" data-copy-target="newton-code">Copy code</button>
+            </div>
+            <pre><code class="code-block" id="newton-code"><span class="tok-keyword">import</span> warp <span class="tok-keyword">as</span> wp
+<span class="tok-keyword">import</span> newton
+
+current_state = model.<span class="tok-name">state</span>()
+next_state = model.<span class="tok-name">state</span>()
+control = model.<span class="tok-name">control</span>()
+collision = newton.<span class="tok-name">CollisionPipeline</span>(model)
+contacts = collision.<span class="tok-name">contacts</span>()
+solver = newton.solvers.<span class="tok-name">SolverXPBD</span>(
+    model,
+    deterministic=wp.DeterministicMode.<span class="tok-name">RUN_TO_RUN</span>,
+)
+
+<span class="tok-keyword">for</span> step <span class="tok-keyword">in</span> <span class="tok-name">range</span>(<span class="tok-number">180</span>):
+    current_state.<span class="tok-name">clear_forces</span>()
+    collision.<span class="tok-name">collide</span>(current_state, contacts)
+    solver.<span class="tok-name">step</span>(current_state, next_state, control, contacts, <span class="tok-number">1.0</span> / <span class="tok-number">60.0</span>)
+    current_state, next_state = next_state, current_state</code></pre>
+          </div>
+          <div class="method-stack">
+            <h3>Reproducibility protocol</h3>
+            <p>In Listing 1, <code>model</code> contains the scene, <code>current_state</code> is the input state for the present step, <code>next_state</code> receives the result, <code>control</code> contains commanded inputs, and <code>contacts</code> stores detected object contacts. Each step advances time by \(1/60\) second.</p>
+            <ol>
+              <li><strong>Start each run independently.</strong> This prevents data left by an earlier run from affecting the next one.</li>
+              <li><strong>Compare the complete state.</strong> Check for exact equality first, then measure the numerical difference when values do not match.</li>
+              <li><strong>Retain visible evidence.</strong> Keep a short recording beside the numerical result so unexpected motion can be inspected.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="report-section" id="matrix">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">6.</span> Scenario summary</h2>
+            <p class="section-intro">The state difference is the maximum value \(\Delta_t\) observed over the complete 180-step run.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Scenario</th><th>Solver</th><th>Maximum difference</th><th>Recorded motion</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>Box stack</td><td>XPBD</td><td>2.8e−09</td><td>Matched</td><td><span class="status">Pass</span></td></tr>
+              <tr><td>Humanoid stand</td><td>Featherstone</td><td>4.1e−11</td><td>Matched</td><td><span class="status">Pass</span></td></tr>
+              <tr><td>Rigid cube</td><td>MuJoCo</td><td>7.3e−08</td><td>Matched</td><td><span class="status">Pass</span></td></tr>
+              <tr><td>Soft-body gradient</td><td>Semi-implicit</td><td>1.2e−06</td><td>Near-match</td><td><span class="status warn">Review</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="report-section conclusion" id="conclusion">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">7.</span> Conclusion</h2>
+            <p class="section-intro">The three rigid-body configurations remain within the selected tolerance when the same scene is run independently three times. The deformable-body gradient case does not. The evidence indicates that contact ordering and parallel gradient updates should be examined before that case is classified as deterministic.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="report-footer">
+        <span>Values are representative template data, not measurements from a published experiment.</span>
+        <a href="index.html">Report layout index</a>
+      </footer>
+    </main>
+  </div>
+
+  <script src="https://cdn.plot.ly/plotly-basic-4.0.0.min.js" charset="utf-8" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js" integrity="sha384-+7Keh381hSkXmXqnjC0JBM/kzsN6TFj+wMKychSLjTvJ8/0ElMde2uKl8i6p6Buj" crossorigin="anonymous" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous" defer></script>
+  <script src="math.js?v=1" defer></script>
+  <script src="report.js?v=5" defer></script>
+  <script type="module" src="mermaid.js?v=2"></script>
+</body>
+</html>
