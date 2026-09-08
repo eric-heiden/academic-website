@@ -16,6 +16,10 @@ import newton
 
 
 PRESETS = {
+    "archimedes-screw": (
+        "newton.examples.fluid.example_fluid_xpbd_archimedes_screw",
+        [],
+    ),
     "dam-break": (
         "newton.examples.fluid.example_fluid_xpbd_dam_break",
         [],
@@ -39,6 +43,7 @@ PRESETS = {
 }
 
 POSTER_SECONDS = {
+    "archimedes-screw": 6.0,
     "dam-break": 0.8,
 }
 

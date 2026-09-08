@@ -41,20 +41,20 @@
       <section class="report-hero" id="overview">
         <div class="report-dates" aria-label="Report dates">
           <span>Created <time datetime="2026-09-07">2026-09-07</time></span>
-          <span>Modified <time datetime="2026-09-07">2026-09-07</time></span>
+          <span>Modified <time datetime="2026-09-08">2026-09-08</time></span>
         </div>
         <p class="paper-series">Engineering report · XPBD fluids</p>
         <h1>Newton XPBD Fluid Support</h1>
         <p class="paper-authors">Upstream integration and ViewerGL rendering study</p>
         <p class="paper-affiliation">Newton Physics · CUDA / OpenGL</p>
         <dl class="paper-meta" aria-label="Report metadata">
-          <div><dt>Upstream</dt><dd><code>origin/main@853c4fef</code></dd></div>
+          <div><dt>Upstream</dt><dd><code>origin/main@5ca5f49c</code></dd></div>
           <div><dt>Feature</dt><dd><code>eric-heiden/flex-fluid</code></dd></div>
           <div><dt>Hardware</dt><dd>GeForce RTX 4090</dd></div>
         </dl>
         <div class="abstract-block">
           <h2>Abstract</h2>
-          <p>The XPBD fluid work is integrated with Newton’s current collision, layer, opacity, fullscreen, and headless ViewerGL architecture. The integrated solver advances approximately 100,000 particles at a median 90.2 simulation frames per second on an RTX 4090. ViewerGL now reconstructs fluid surfaces at framebuffer resolution instead of half resolution, removing the visibly stepped silhouettes seen in the previous report. Five ten-second, 720p recordings below exercise free surfaces, transparent containment, multiple fluid materials, buoyant rigid bodies, foam, articulated manipulation, and sustained wave forcing.</p>
+          <p>The XPBD fluid work is integrated with Newton’s current collision, layer, opacity, fullscreen, and headless ViewerGL architecture. The integrated solver advances approximately 100,000 particles at a median 90.2 simulation frames per second on an RTX 4090. ViewerGL now reconstructs fluid surfaces at framebuffer resolution instead of half resolution, removing the visibly stepped silhouettes seen in the previous report. Six ten-second, 720p recordings below exercise powered pumping, a passive water wheel, free surfaces, transparent containment, multiple fluid materials, buoyant rigid bodies, foam, articulated manipulation, and sustained wave forcing.</p>
         </div>
       </section>
 
@@ -94,38 +94,41 @@
         </div>
         <div class="video-grid">
           <figure class="video-card">
+            <video controls muted loop playsinline preload="metadata" poster="assets/archimedes-screw_poster.jpg?v=xpbd-native-720p" aria-label="XPBD Archimedes screw pump simulation">
+              <source src="assets/archimedes-screw.mp4?v=xpbd-native-720p" type="video/mp4">
+            </video>
+            <figcaption class="video-copy"><span class="caption-label">Figure 1.</span> Archimedes screw pump, 130,001 particles. A powered helical screw lifts water through a transparent round pipe and descending bend onto an unactuated paddle wheel; the wheel’s motion comes entirely from two-way fluid contact forces.</figcaption>
+          </figure>
+          <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/dam-break_poster.jpg?v=xpbd-native-720p" aria-label="XPBD dam-break simulation">
               <source src="assets/dam-break.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 1.</span> Dam break, 99,960 particles. A collapsing column strikes two rigid obstacles, producing thin sheets, specular highlights, spray, and a broad free surface.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 2.</span> Dam break, 99,960 particles. A collapsing column strikes two rigid obstacles, producing thin sheets, specular highlights, spray, and a broad free surface.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/interactive-tank_poster.jpg?v=xpbd-native-720p" aria-label="XPBD interactive tank simulation">
               <source src="assets/interactive-tank.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 2.</span> Interactive tank, 100,300 particles. Mixed-density rigid bodies float and sink inside translucent walls, exercising fluid–rigid reaction and ViewerGL opacity ordering.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 3.</span> Interactive tank, 100,300 particles. Mixed-density rigid bodies float and sink inside translucent walls, exercising fluid–rigid reaction and ViewerGL opacity ordering.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/multi-fluid-tank_poster.jpg?v=xpbd-native-720p" aria-label="XPBD multi-fluid tank simulation">
               <source src="assets/multi-fluid-tank.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 3.</span> Three-fluid tank, 94,518 particles. Independently shaded density groups mix while sharing the same transparent container and rigid bodies.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 4.</span> Three-fluid tank, 94,518 particles. Independently shaded density groups mix while sharing the same transparent container and rigid bodies.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/wave-pool_poster.jpg?v=xpbd-native-720p" aria-label="XPBD wave-pool simulation">
               <source src="assets/wave-pool.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 4.</span> Wave pool, 100,491 particles. A kinematic paddle sustains waves across a sloped beach while mixed-density primitives expose buoyancy and contact stability.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 5.</span> Wave pool, 100,491 particles. A kinematic paddle sustains waves across a sloped beach while mixed-density primitives expose buoyancy and contact stability.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/cup-transfer_poster.jpg?v=xpbd-native-720p" aria-label="Robot carrying an XPBD fluid cup">
               <source src="assets/cup-transfer.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 5.</span> Robot cup transfer, 100,548 particles. A Franka arm solves inverse kinematics while carrying an SDF cup with transparent walls and a reconstructed fluid surface through a full 8.8 s manipulation cycle.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 6.</span> Robot cup transfer, 100,548 particles. A Franka arm solves inverse kinematics while carrying an SDF cup with transparent walls and a reconstructed fluid surface through a full 8.8 s manipulation cycle.</figcaption>
           </figure>
-        </div>
-        <div class="note">
-          <p><strong>Archimedes screw audit.</strong> Repository history, all remote fluid branches, local worktrees, and archived task summaries were searched. No Archimedes screw pump example exists in the available Newton work, so this report does not mislabel another example or fabricate footage.</p>
         </div>
       </section>
 
@@ -213,6 +216,7 @@ contacts = collision.contacts()
             <caption>Table 2. End-to-end 1280×720 report capture throughput.</caption>
             <thead><tr><th>Scene</th><th>Particles</th><th>Output frames</th><th>Wall time</th><th>Output fps</th></tr></thead>
             <tbody>
+              <tr><td>Archimedes screw</td><td>130,001</td><td>300</td><td>11.70 s</td><td>25.7</td></tr>
               <tr><td>Dam break</td><td>99,960</td><td>300</td><td>10.84 s</td><td>27.7</td></tr>
               <tr><td>Interactive tank</td><td>100,300</td><td>300</td><td>8.72 s</td><td>34.4</td></tr>
               <tr><td>Three-fluid tank</td><td>94,518</td><td>300</td><td>8.65 s</td><td>34.7</td></tr>
@@ -241,7 +245,7 @@ contacts = collision.contacts()
               <tr><td>ViewerGL layers</td><td><span class="status">24 pass</span></td><td>Layer qualification, visibility, clearing, and lifecycle.</td></tr>
               <tr><td>Shape opacity</td><td><span class="status">39 pass</span></td><td>Shape color and weighted-transparency grouping behavior.</td></tr>
               <tr><td>Viewer picking</td><td><span class="status">23 pass</span></td><td>Raycast compilation, masks, occlusion, world offsets, and force limits.</td></tr>
-              <tr><td>Fluid examples</td><td><span class="status" id="example-status">8 pass</span></td><td>Eight CUDA examples with reduced CI particle counts and their built-in assertions.</td></tr>
+              <tr><td>Fluid examples</td><td><span class="status" id="example-status">9 pass</span></td><td>Nine CUDA examples with reduced CI particle counts and their built-in assertions.</td></tr>
               <tr><td>Headless ViewerGL</td><td><span class="status">Pass</span></td><td>Requested-frame termination and direct framebuffer capture.</td></tr>
             </tbody>
           </table>
@@ -253,7 +257,7 @@ uv run --extra dev -m newton.tests -k test_viewer_layers
 uv run --extra dev -m newton.tests -k test_shape_colors
 uv run --extra dev -m newton.tests -k test_viewer_picking
 uv run --extra dev -m newton.tests -k TestFluidExamples
-uv run -m newton.examples fluid_xpbd_dam_break --viewer gl --headless --num-frames 10
+uv run -m newton.examples fluid_xpbd_archimedes_screw --viewer gl --headless --num-frames 10
 uvx pre-commit run -a</code></pre>
       </section>
 
@@ -267,8 +271,8 @@ uvx pre-commit run -a</code></pre>
       </section>
 
       <footer class="report-footer">
-        <span>Source and media captured 2026-09-07.</span>
-        <span>Branch <code>eric-heiden/flex-fluid</code> · integration commit <code id="integration-commit">6cde7c379</code></span>
+        <span>Source and media captured 2026-09-08.</span>
+        <span>Branch <code>eric-heiden/flex-fluid</code> · integration commit <code id="integration-commit">dbb1d4f8a</code></span>
       </footer>
     </main>
   </div>
