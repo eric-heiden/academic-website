@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Upstream integration, performance, correctness, and ViewerGL evidence for Newton's XPBD fluid solver.">
+  <meta name="description" content="XPBD fluid formulation, rendering, public API, examples, validation, and performance in Newton.">
   <title>Newton XPBD Fluid Support</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="shared.css?v=3">
+  <link rel="stylesheet" href="shared.css?v=4">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex-swap.min.css" integrity="sha384-GiTJOrt1vBIOkt46uJewl8dAj3Rh/j00JmIAhm7ewwCBpZAmt5FIm6yEvop7Cn0N" crossorigin="anonymous">
   <script>
     (function () {
       try { document.documentElement.dataset.theme = localStorage.getItem("report-theme") || "light"; }
@@ -22,10 +23,10 @@
         <span>Newton / Technical report</span>
       </a>
       <nav class="nav-links" aria-label="Report sections">
-        <a href="#results" data-section-link>Results</a>
-        <a href="#evidence" data-section-link>Figures</a>
-        <a href="#performance" data-section-link>Performance</a>
-        <a href="#validation" data-section-link>Validation</a>
+        <a href="#simulation" data-section-link>XPBD</a>
+        <a href="#rendering" data-section-link>Rendering</a>
+        <a href="#api" data-section-link>API</a>
+        <a href="#examples" data-section-link>Examples</a>
       </nav>
       <div class="nav-actions">
         <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">
@@ -45,7 +46,7 @@
         </div>
         <p class="paper-series">Engineering report · XPBD fluids</p>
         <h1>Newton XPBD Fluid Support</h1>
-        <p class="paper-authors">Upstream integration and ViewerGL rendering study</p>
+        <p class="paper-authors">Simulation formulation, rendering, and public API</p>
         <p class="paper-affiliation">Newton Physics · CUDA / OpenGL</p>
         <dl class="paper-meta" aria-label="Report metadata">
           <div><dt>Upstream</dt><dd><code>origin/main@5ca5f49c</code></dd></div>
@@ -54,42 +55,240 @@
         </dl>
         <div class="abstract-block">
           <h2>Abstract</h2>
-          <p>The XPBD fluid work is integrated with Newton’s current collision, layer, opacity, fullscreen, and headless ViewerGL architecture. The integrated solver advances approximately 100,000 particles at a median 90.2 simulation frames per second on an RTX 4090. ViewerGL now reconstructs fluid surfaces at framebuffer resolution instead of half resolution, removing the visibly stepped silhouettes seen in the previous report. Six ten-second, 720p recordings below exercise powered pumping, a passive water wheel, free surfaces, transparent containment, multiple fluid materials, buoyant rigid bodies, foam, articulated manipulation, and sustained wave forcing.</p>
+          <p>Newton’s XPBD solver now treats selected particles as fluids using position-based density constraints, bounded cohesion, viscosity, optional vorticity confinement, grouped neighborhoods, and two-way particle–rigid contact. A render-only path fits smoothed anisotropic particles and reconstructs an optically shaded surface in ViewerGL without changing the simulated state. Nine examples cover free surfaces, pumping, multiple fluids and worlds, buoyancy, SDF containers, articulated manipulation, waves, foam, and spray. At approximately 100,000 particles, the measured dam-break simulation reaches a median 90.2 frames per second on an RTX 4090.</p>
         </div>
       </section>
 
       <section class="report-section" id="results">
         <div class="section-heading">
           <div class="section-title-wrap">
-            <h2><span class="section-number">1.</span> Results</h2>
-            <p class="section-intro">The branch is current with upstream main, the XPBD path is restored, and the rendering regression is corrected.</p>
+            <h2><span class="section-number">1.</span> Scope</h2>
+            <p class="section-intro">The branch adds a fluid particle type to the existing XPBD solver and a corresponding surface representation for ViewerGL.</p>
           </div>
         </div>
         <div class="finding-list">
           <article>
-            <h3>Current ViewerGL behavior is preserved</h3>
-            <p>Fluid batches follow ViewerGL’s layer-qualified lifecycle and render after multisample resolve. Current weighted transparency, opacity grouping, fullscreen rendering, image capture, frame limits, shadow passes, and CUDA interop remain intact.</p>
+            <h3>Fluids use the same particle state and timestep</h3>
+            <p>Particles marked <code>ACTIVE | FLUID</code> participate in a density projection inside <code>SolverXPBD.step()</code>. Cloth, granular particles, rigid contacts, and fluid particles can therefore advance through the same state pair and collision pipeline.</p>
           </article>
           <article>
-            <h3>Fluid surfaces render at native framebuffer resolution</h3>
-            <p>The previous half-size depth and thickness targets reconstructed a 720p image from a 640×360 fluid buffer. Native-resolution targets remove the blocky contour and thin-sheet aliasing without changing the simulation state.</p>
+            <h3>The physical and visual representations are separate</h3>
+            <p>The solver owns particle positions, velocities, density data, and optional diffuse particles. Rendering may smooth positions and fit ellipsoids, but those derived arrays never feed back into the simulation.</p>
           </article>
           <article>
-            <h3>Stability protections cover failure-prone boundaries</h3>
-            <p>World-qualified neighbor queries prevent cross-world coupling; density corrections no longer cancel shape contacts; non-finite particle corrections self-heal before contaminating the hash grid; and configurable rigid-body motion limits contain force spikes.</p>
+            <h3>Fluid–rigid coupling is two-way</h3>
+            <p>Shape contacts constrain fluid particles while the equal-and-opposite correction is accumulated onto dynamic bodies. The Archimedes screw example uses this coupling to transfer simulated water momentum to a freely rotating wheel.</p>
           </article>
           <article>
-            <h3>Cold compilation carries less dead work</h3>
-            <p>Obsolete duplicate fluid kernels were removed from the general XPBD module. The dedicated fluid module remains the sole implementation, reducing a clean CUDA compilation of the XPBD kernel module from 26.65 s to 24.67 s on this host.</p>
+            <h3>Nine runnable examples define the supported surface area</h3>
+            <p>The examples exercise containers, pumps, manipulators, mixed fluids, multiple isolated worlds, buoyant objects, wave forcing, and diffuse spray. Each example is registered with an end-state stability check.</p>
           </article>
         </div>
       </section>
 
-      <section class="report-section" id="evidence">
+      <section class="report-section" id="simulation">
         <div class="section-heading">
           <div class="section-title-wrap">
-            <h2><span class="section-number">2.</span> ViewerGL evidence</h2>
-            <p class="section-intro">Every recording is a direct headless ViewerGL capture from the integrated XPBD checkout: 1280×720, 30 fps, ten seconds, H.264, with native example materials.</p>
+            <h2><span class="section-number">2.</span> XPBD fluid simulation</h2>
+            <p class="section-intro">A position-based fluids solve is embedded in each XPBD substep. The implementation uses the same particle arrays, inverse masses, contacts, and state update as Newton’s other XPBD constraints.</p>
+          </div>
+        </div>
+        <div class="technical-copy">
+          <h3>Density constraint</h3>
+          <p>For every active fluid particle \(i\), a grouped hash-grid query finds same-world neighbors inside the smoothing radius \(h\). The poly6 kernel estimates density and a unilateral constraint removes compression while allowing a free surface to remain under-dense:</p>
+          <div class="display-equation">
+            \[
+              \rho_i = \sum_{j \in \mathcal{N}_i} m_j
+              W_{\mathrm{poly6}}\!\left(\lVert \mathbf{x}_i-\mathbf{x}_j\rVert,h\right),
+              \qquad
+              C_i(\mathbf{x}) = \max\!\left(\frac{\rho_i}{\rho_0}-1,\,0\right).
+            \]
+          </div>
+          <p>The Jacobi projection computes one multiplier per fluid particle. Here \(w_k\) is inverse mass and \(\varepsilon\) is the relaxation regularizer:</p>
+          <div class="display-equation">
+            \[
+              \lambda_i =
+              \frac{-C_i}
+              {\displaystyle \sum_k w_k
+              \left\lVert \nabla_{\mathbf{x}_k} C_i \right\rVert^2+\varepsilon},
+              \qquad
+              \Delta \mathbf{x}^{\rho}_i =
+              w_i \sum_{j \in \mathcal{N}_i}
+              (\lambda_i+\lambda_j)\frac{m_j}{\rho_0}
+              \nabla W_{\mathrm{spiky}}(\mathbf{x}_i-\mathbf{x}_j,h).
+            \]
+          </div>
+          <p><code>fluid_relaxation</code> scales this density correction and a particle-scale bound limits each iteration. A deterministic separation direction resolves coincident samples. The neighbor cap is optional; setting <code>fluid_max_neighbors=0</code> processes the complete neighborhood.</p>
+
+          <h3>Substep sequence</h3>
+          <ol class="step-list">
+            <li><strong>Predict.</strong> External forces advance particle and body velocities and predict new positions.</li>
+            <li><strong>Collide.</strong> <code>CollisionPipeline</code> generates particle–shape contacts. Texture SDFs provide smooth confinement for mesh containers and pump surfaces.</li>
+            <li><strong>Project.</strong> Each XPBD iteration solves fluid density, particle contacts, rigid contacts, joints, and deformable constraints. Fluid contact corrections can transfer momentum to dynamic bodies.</li>
+            <li><strong>Update velocity.</strong> Corrected positions determine particle velocity; a kernel-weighted neighborhood blend applies viscosity, while optional vorticity confinement restores rotational detail.</li>
+            <li><strong>Emit diffuse particles.</strong> When enabled, low-density crest and trapped-air candidates spawn finite-lifetime foam and spray that advect with the resolved velocity field.</li>
+          </ol>
+
+          <h3>Cohesion and viscosity</h3>
+          <p>Free-surface attraction is a bounded Akinci-style pair bias rather than the negative branch of the density constraint. This keeps isolated particles stable while still forming droplets and strands. Viscosity is applied after projection as a per-substep blend toward the mass- and density-weighted neighborhood velocity:</p>
+          <div class="display-equation">
+            \[
+              \mathbf{v}^{\,\prime}_i =
+              \mathbf{v}_i +
+              \nu\left(
+              \frac{\displaystyle\sum_{j \in \mathcal{N}_i}
+              \frac{m_j}{\rho_j}W_{ij}\mathbf{v}_j}
+              {\displaystyle\sum_{j \in \mathcal{N}_i}
+              \frac{m_j}{\rho_j}W_{ij}}
+              - \mathbf{v}_i\right),
+              \qquad 0 \le \nu \le 1.
+            \]
+          </div>
+        </div>
+      </section>
+
+      <section class="report-section" id="rendering">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">3.</span> Fluid surface rendering</h2>
+            <p class="section-intro">ViewerGL derives a smooth surface from the solved particle state. All smoothing and anisotropy are visual outputs; they do not alter density, contacts, or the next simulation step.</p>
+          </div>
+        </div>
+        <div class="technical-copy">
+          <h3>Render-particle fit</h3>
+          <p><code>SolverXPBD.update_render_particles()</code> computes a weighted neighborhood center and blends it with the simulated position. A regularized covariance fit supplies three clamped ellipsoid axes, allowing sheets and strands to connect without inflating the simulation radius:</p>
+          <div class="display-equation">
+            \[
+              \bar{\mathbf{x}}_i =
+              \frac{\sum_j \omega_{ij}\mathbf{x}_j}{\sum_j \omega_{ij}},
+              \qquad
+              \widetilde{\mathbf{x}}_i =
+              (1-s)\mathbf{x}_i+s\bar{\mathbf{x}}_i,
+              \qquad
+              \boldsymbol{\Sigma}_i =
+              \frac{\sum_j \omega_{ij}
+              (\mathbf{x}_j-\bar{\mathbf{x}}_i)
+              (\mathbf{x}_j-\bar{\mathbf{x}}_i)^{\mathsf T}}
+              {\sum_j \omega_{ij}}.
+            \]
+          </div>
+          <ol class="pipeline" aria-label="Fluid surface rendering passes">
+            <li><strong>Depth</strong><span>Ray-cast anisotropic ellipsoids into linear eye-space depth.</span></li>
+            <li><strong>Thickness</strong><span>Accumulate depth-tested optical thickness from enlarged splats.</span></li>
+            <li><strong>Smooth</strong><span>Apply a separable depth-aware bilateral filter at framebuffer resolution.</span></li>
+            <li><strong>Shade</strong><span>Recover normals from depth and evaluate refraction, reflection, shadow, and specular light.</span></li>
+            <li><strong>Diffuse</strong><span>Composite optional velocity-stretched foam and spray against the fluid depth.</span></li>
+          </ol>
+          <h3>Optical model</h3>
+          <p>Thickness controls Beer–Lambert transmission, while Schlick’s approximation blends the transmitted scene with reflection at grazing angles. The public material parameters expose absorption, index of refraction, normal-incidence reflectance, and specular response:</p>
+          <div class="display-equation">
+            \[
+              \mathbf{T}(\tau)=\exp(-\boldsymbol{\sigma}_a\tau),
+              \qquad
+              F(\theta)=F_0+(1-F_0)(1-\cos\theta)^5.
+            \]
+          </div>
+          <p>Depth, thickness, and bilateral-filter targets use the native framebuffer size. This preserves thin sheets and curved silhouettes in the 1280×720 recordings below.</p>
+        </div>
+      </section>
+
+      <section class="report-section" id="api">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">4.</span> User-level API</h2>
+            <p class="section-intro">Fluid simulation is configured on <code>SolverXPBD</code>; surface generation and optical material settings are explicit rendering calls.</p>
+          </div>
+        </div>
+        <div class="implementation-grid">
+          <div class="code-shell">
+            <div class="code-header">
+              <span>Listing 1. Mark particles as fluid and advance XPBD</span>
+              <button class="copy-button" type="button" data-copy-target="fluid-code">Copy code</button>
+            </div>
+            <pre><code class="code-block language-python" id="fluid-code"><span class="tok-name">fluid_flags</span> <span class="tok-operator">=</span> <span class="tok-call">int</span>(
+    <span class="tok-name">newton</span>.<span class="tok-name">ParticleFlags</span>.<span class="tok-constant">ACTIVE</span>
+    <span class="tok-operator">|</span> <span class="tok-name">newton</span>.<span class="tok-name">ParticleFlags</span>.<span class="tok-constant">FLUID</span>
+)
+<span class="tok-name">builder</span>.<span class="tok-call">add_particles</span>(
+    <span class="tok-param">pos</span><span class="tok-operator">=</span><span class="tok-name">positions</span>,
+    <span class="tok-param">vel</span><span class="tok-operator">=</span><span class="tok-name">velocities</span>,
+    <span class="tok-param">mass</span><span class="tok-operator">=</span><span class="tok-name">masses</span>,
+    <span class="tok-param">radius</span><span class="tok-operator">=</span><span class="tok-name">radius</span>,
+    <span class="tok-param">flags</span><span class="tok-operator">=</span><span class="tok-name">fluid_flags</span>,
+)
+
+<span class="tok-name">model</span> <span class="tok-operator">=</span> <span class="tok-name">builder</span>.<span class="tok-call">finalize</span>()
+<span class="tok-name">solver</span> <span class="tok-operator">=</span> <span class="tok-name">newton</span>.<span class="tok-name">solvers</span>.<span class="tok-call">SolverXPBD</span>(
+    <span class="tok-name">model</span>,
+    <span class="tok-param">iterations</span><span class="tok-operator">=</span><span class="tok-number">2</span>,
+    <span class="tok-param">fluid_rest_distance</span><span class="tok-operator">=</span><span class="tok-name">spacing</span>,
+    <span class="tok-param">fluid_rest_density</span><span class="tok-operator">=</span><span class="tok-number">1000.0</span>,
+    <span class="tok-param">fluid_cohesion</span><span class="tok-operator">=</span><span class="tok-number">0.5</span>,
+    <span class="tok-param">fluid_viscosity</span><span class="tok-operator">=</span><span class="tok-number">0.2</span>,
+    <span class="tok-param">fluid_relaxation</span><span class="tok-operator">=</span><span class="tok-number">0.6</span>,
+    <span class="tok-param">fluid_max_neighbors</span><span class="tok-operator">=</span><span class="tok-number">128</span>,
+)
+
+<span class="tok-name">collision</span> <span class="tok-operator">=</span> <span class="tok-name">newton</span>.<span class="tok-call">CollisionPipeline</span>(<span class="tok-name">model</span>)
+<span class="tok-name">contacts</span> <span class="tok-operator">=</span> <span class="tok-name">collision</span>.<span class="tok-call">contacts</span>()
+
+<span class="tok-keyword">for</span> <span class="tok-name">_</span> <span class="tok-keyword">in</span> <span class="tok-call">range</span>(<span class="tok-name">substeps</span>):
+    <span class="tok-name">state</span>.<span class="tok-call">clear_forces</span>()
+    <span class="tok-name">collision</span>.<span class="tok-call">collide</span>(<span class="tok-name">state</span>, <span class="tok-name">contacts</span>)
+    <span class="tok-name">solver</span>.<span class="tok-call">step</span>(<span class="tok-name">state</span>, <span class="tok-name">next_state</span>, <span class="tok-constant">None</span>, <span class="tok-name">contacts</span>, <span class="tok-name">dt</span>)
+    <span class="tok-name">state</span>, <span class="tok-name">next_state</span> <span class="tok-operator">=</span> <span class="tok-name">next_state</span>, <span class="tok-name">state</span></code></pre>
+          </div>
+
+          <div class="code-shell">
+            <div class="code-header">
+              <span>Listing 2. Build and shade the render surface</span>
+              <button class="copy-button" type="button" data-copy-target="render-code">Copy code</button>
+            </div>
+            <pre><code class="code-block language-python" id="render-code"><span class="tok-name">solver</span>.<span class="tok-call">update_render_particles</span>(
+    <span class="tok-name">state</span>,
+    <span class="tok-param">smoothing</span><span class="tok-operator">=</span><span class="tok-number">0.6</span>,
+    <span class="tok-param">anisotropy_scale</span><span class="tok-operator">=</span><span class="tok-number">1.0</span>,
+)
+
+<span class="tok-name">viewer</span>.<span class="tok-call">log_fluid</span>(
+    <span class="tok-string">"/model/fluid"</span>,
+    <span class="tok-name">solver</span>.<span class="tok-name">render_positions</span>,
+    <span class="tok-param">radii</span><span class="tok-operator">=</span><span class="tok-name">model</span>.<span class="tok-name">particle_max_radius</span>,
+    <span class="tok-param">radius_scale</span><span class="tok-operator">=</span><span class="tok-number">1.8</span>,
+    <span class="tok-param">color</span><span class="tok-operator">=</span>(<span class="tok-number">0.113</span>, <span class="tok-number">0.425</span>, <span class="tok-number">0.55</span>, <span class="tok-number">0.8</span>),
+    <span class="tok-param">absorption</span><span class="tok-operator">=</span>(<span class="tok-number">0.20</span>, <span class="tok-number">0.08</span>, <span class="tok-number">0.03</span>),
+    <span class="tok-param">ior</span><span class="tok-operator">=</span><span class="tok-number">1.333</span>,
+    <span class="tok-param">blur_radius_world</span><span class="tok-operator">=</span><span class="tok-number">0.035</span>,
+    <span class="tok-param">anisotropy</span><span class="tok-operator">=</span><span class="tok-name">solver</span>.<span class="tok-name">render_anisotropy</span>,
+    <span class="tok-param">anisotropy_secondary</span><span class="tok-operator">=</span><span class="tok-name">solver</span>.<span class="tok-name">render_anisotropy_secondary</span>,
+    <span class="tok-param">anisotropy_tertiary</span><span class="tok-operator">=</span><span class="tok-name">solver</span>.<span class="tok-name">render_anisotropy_tertiary</span>,
+)</code></pre>
+          </div>
+        </div>
+
+        <div class="table-wrap api-table">
+          <table>
+            <caption>Principal fluid controls on <code>SolverXPBD</code>.</caption>
+            <thead><tr><th>Argument</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td><code>fluid_rest_distance</code></td><td>Particle spacing at which a regular lattice is calibrated to rest density.</td></tr>
+              <tr><td><code>fluid_smoothing_length</code></td><td>Neighbor-kernel support radius; defaults to 1.8 times rest distance.</td></tr>
+              <tr><td><code>fluid_rest_density</code></td><td>Target density in kg/m³; may be inferred from particle mass and rest spacing.</td></tr>
+              <tr><td><code>fluid_cohesion</code></td><td>Bounded free-surface attraction in the range [0, 1].</td></tr>
+              <tr><td><code>fluid_viscosity</code></td><td>Per-substep blend toward neighborhood velocity in the range [0, 1].</td></tr>
+              <tr><td><code>fluid_relaxation</code></td><td>Scale applied to each density-projection correction.</td></tr>
+              <tr><td><code>fluid_max_neighbors</code></td><td>Optional work bound for over-compressed neighborhoods; zero disables the cap.</td></tr>
+              <tr><td><code>max_diffuse_particles</code></td><td>Capacity for visual foam and spray; zero disables diffuse emission.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="report-section" id="examples">
+        <div class="section-heading">
+          <div class="section-title-wrap">
+            <h2><span class="section-number">5.</span> Example simulations</h2>
+            <p class="section-intro">Six runnable XPBD examples are shown at 1280×720 and 30 fps. Every clip contains ten seconds of simulation using the branch’s native ViewerGL fluid surface.</p>
           </div>
         </div>
         <div class="video-grid">
@@ -97,105 +296,45 @@
             <video controls muted loop playsinline preload="metadata" poster="assets/archimedes-screw_poster.jpg?v=xpbd-native-720p" aria-label="XPBD Archimedes screw pump simulation">
               <source src="assets/archimedes-screw.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 1.</span> Archimedes screw pump, 130,001 particles. A powered helical screw lifts water through a transparent round pipe and descending bend onto an unactuated paddle wheel; the wheel’s motion comes entirely from two-way fluid contact forces.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 1.</span> Archimedes screw, 130,001 particles. Fluid–rigid contact carries water upslope through the helical channel; discharged water transfers momentum to a freely rotating paddle wheel before returning to the reservoir.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/dam-break_poster.jpg?v=xpbd-native-720p" aria-label="XPBD dam-break simulation">
               <source src="assets/dam-break.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 2.</span> Dam break, 99,960 particles. A collapsing column strikes two rigid obstacles, producing thin sheets, specular highlights, spray, and a broad free surface.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 2.</span> Dam break, 99,960 particles. A collapsing column impacts two rigid obstacles, testing incompressibility, free-surface cohesion, splashing, and contact response.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/interactive-tank_poster.jpg?v=xpbd-native-720p" aria-label="XPBD interactive tank simulation">
               <source src="assets/interactive-tank.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 3.</span> Interactive tank, 100,300 particles. Mixed-density rigid bodies float and sink inside translucent walls, exercising fluid–rigid reaction and ViewerGL opacity ordering.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 3.</span> Interactive tank, 100,300 particles. Rigid bodies with different densities float, settle, and sink under two-way particle contact.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/multi-fluid-tank_poster.jpg?v=xpbd-native-720p" aria-label="XPBD multi-fluid tank simulation">
               <source src="assets/multi-fluid-tank.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 4.</span> Three-fluid tank, 94,518 particles. Independently shaded density groups mix while sharing the same transparent container and rigid bodies.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 4.</span> Three-fluid tank, 94,518 particles. Three independently configured particle groups share one container and interact with buoyant rigid bodies.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/wave-pool_poster.jpg?v=xpbd-native-720p" aria-label="XPBD wave-pool simulation">
               <source src="assets/wave-pool.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 5.</span> Wave pool, 100,491 particles. A kinematic paddle sustains waves across a sloped beach while mixed-density primitives expose buoyancy and contact stability.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 5.</span> Wave pool, 100,491 particles. A kinematic paddle drives sustained waves across a sloped beach while mixed-density bodies test buoyancy and contact stability.</figcaption>
           </figure>
           <figure class="video-card">
             <video controls muted loop playsinline preload="metadata" poster="assets/cup-transfer_poster.jpg?v=xpbd-native-720p" aria-label="Robot carrying an XPBD fluid cup">
               <source src="assets/cup-transfer.mp4?v=xpbd-native-720p" type="video/mp4">
             </video>
-            <figcaption class="video-copy"><span class="caption-label">Figure 6.</span> Robot cup transfer, 100,548 particles. A Franka arm solves inverse kinematics while carrying an SDF cup with transparent walls and a reconstructed fluid surface through a full 8.8 s manipulation cycle.</figcaption>
+            <figcaption class="video-copy"><span class="caption-label">Figure 6.</span> Robot cup transfer, 100,548 particles. A Franka arm carries an SDF-confined fluid through an 8.8-second manipulation trajectory without losing containment.</figcaption>
           </figure>
-        </div>
-      </section>
-
-      <section class="report-section" id="architecture">
-        <div class="section-heading">
-          <div class="section-title-wrap">
-            <h2><span class="section-number">3.</span> Integrated simulation and rendering path</h2>
-            <p class="section-intro">The solver and renderer share particle state but remain separate: visual smoothing and foam do not alter the physical solution.</p>
-          </div>
-        </div>
-        <ol class="pipeline" aria-label="Fluid processing pipeline">
-          <li><strong>Collision</strong><span>Current <code>CollisionPipeline</code> generates shape contacts.</span></li>
-          <li><strong>XPBD solve</strong><span>Grouped hash-grid density, cohesion, viscosity, and body reaction advance each substep.</span></li>
-          <li><strong>Render fit</strong><span>Optional smoothing and anisotropy derive ellipsoids from the solved state.</span></li>
-          <li><strong>Surface passes</strong><span>Depth, thickness, bilateral blur, shadows, and refraction reconstruct the liquid.</span></li>
-          <li><strong>Composite</strong><span>Fluid and diffuse foam join the resolved scene with correct depth and opacity.</span></li>
-        </ol>
-      </section>
-
-      <section class="report-section" id="implementation">
-        <div class="section-heading">
-          <div class="section-title-wrap">
-            <h2><span class="section-number">4.</span> Implementation</h2>
-            <p class="section-intro">Fluid behavior is enabled through the existing XPBD solver; ViewerGL consumes render-only particle derivatives.</p>
-          </div>
-        </div>
-        <div class="implementation-grid">
-          <div class="code-shell">
-            <div class="code-header">
-              <span>Listing 1. XPBD fluid configuration</span>
-              <button class="copy-button" type="button" data-copy-target="fluid-code">Copy code</button>
-            </div>
-            <pre><code class="code-block" id="fluid-code"><span class="tok-keyword">solver</span> = newton.solvers.SolverXPBD(
-    model,
-    iterations=<span class="tok-number">2</span>,
-    fluid_density=<span class="tok-number">1000.0</span>,
-    fluid_cohesion=<span class="tok-number">0.6</span>,
-    fluid_viscosity=<span class="tok-number">0.03</span>,
-    fluid_max_neighbors=<span class="tok-number">128</span>,
-    max_diffuse_particles=<span class="tok-number">20_000</span>,
-)
-
-collision = newton.CollisionPipeline(model)
-contacts = collision.contacts()
-
-<span class="tok-keyword">for</span> _ <span class="tok-keyword">in</span> range(substeps):
-    state.clear_forces()
-    collision.collide(state, contacts)
-    solver.step(state, next_state, control, contacts, dt)
-    state, next_state = next_state, state</code></pre>
-          </div>
-          <div class="method-stack">
-            <h3>Performance-oriented choices</h3>
-            <ol>
-              <li><strong>Spatial reordering.</strong> Morton sorting restores locality for repeated neighbor reads and is skipped for mixed topological particle systems.</li>
-              <li><strong>Bounded tail work.</strong> An optional neighbor cap limits rare over-compressed particles from stalling an entire GPU warp.</li>
-              <li><strong>Graph-safe storage.</strong> Group metadata, diffuse buffers, and reorder scratch are allocated before CUDA graph capture.</li>
-              <li><strong>Render fast paths.</strong> Unsmoothed output reuses solved positions, render decimation is optional, and the simulation hash grid is reused when safe.</li>
-            </ol>
-          </div>
         </div>
       </section>
 
       <section class="report-section" id="performance">
         <div class="section-heading">
           <div class="section-title-wrap">
-            <h2><span class="section-number">5.</span> Performance</h2>
+            <h2><span class="section-number">6.</span> Performance</h2>
             <p class="section-intro">Measurements use Warp 1.17, CUDA Toolkit 12.9, driver 13.2, and an RTX 4090. Solver trials exclude ViewerGL; capture trials include two 60 Hz simulation steps, rendering, readback, and H.264 encoding per 30 Hz output frame.</p>
           </div>
         </div>
@@ -231,8 +370,8 @@ contacts = collision.contacts()
       <section class="report-section" id="validation">
         <div class="section-heading">
           <div class="section-title-wrap">
-            <h2><span class="section-number">6.</span> Correctness and stability</h2>
-            <p class="section-intro">Focused coverage spans solver invariants, ViewerGL integration, opacity, layers, picking, and end-to-end examples.</p>
+            <h2><span class="section-number">7.</span> Correctness and stability</h2>
+            <p class="section-intro">Focused coverage spans density projection, fluid material terms, coupling, world isolation, surface generation, diffuse particles, and end-to-end examples.</p>
           </div>
         </div>
         <div class="table-wrap">
@@ -241,12 +380,10 @@ contacts = collision.contacts()
             <thead><tr><th>Area</th><th>Result</th><th>Coverage</th></tr></thead>
             <tbody>
               <tr><td>XPBD fluid solver</td><td><span class="status">61 pass · 1 expected skip</span></td><td>CPU and CUDA density, cohesion, viscosity, diffuse particles, SDF confinement, world isolation, capture, reordering, momentum, and non-finite recovery.</td></tr>
-              <tr><td>ViewerGL fluid API</td><td><span class="status">5 pass</span></td><td>Batch defaults, lifecycle, visibility, and material paths.</td></tr>
-              <tr><td>ViewerGL layers</td><td><span class="status">24 pass</span></td><td>Layer qualification, visibility, clearing, and lifecycle.</td></tr>
-              <tr><td>Shape opacity</td><td><span class="status">39 pass</span></td><td>Shape color and weighted-transparency grouping behavior.</td></tr>
-              <tr><td>Viewer picking</td><td><span class="status">23 pass</span></td><td>Raycast compilation, masks, occlusion, world offsets, and force limits.</td></tr>
-              <tr><td>Fluid examples</td><td><span class="status" id="example-status">9 pass</span></td><td>Nine CUDA examples with reduced CI particle counts and their built-in assertions.</td></tr>
-              <tr><td>Headless ViewerGL</td><td><span class="status">Pass</span></td><td>Requested-frame termination and direct framebuffer capture.</td></tr>
+              <tr><td>Fluid surface API</td><td><span class="status">5 pass</span></td><td>Render-particle fitting, material grouping, lifecycle, visibility, and point fallback.</td></tr>
+              <tr><td>Fluid examples</td><td><span class="status" id="example-status">9 pass</span></td><td>Nine CUDA examples with reduced test particle counts and their built-in physical assertions.</td></tr>
+              <tr><td>Archimedes screw</td><td><span class="status">240 frames pass</span></td><td>Finite particle and body state, water lift, passive wheel rotation, basin containment, and revolute-bearing integrity.</td></tr>
+              <tr><td>Report captures</td><td><span class="status">6 pass</span></td><td>Six H.264 simulations at 1280×720, 30 fps, and ten seconds each.</td></tr>
             </tbody>
           </table>
         </div>
@@ -264,8 +401,8 @@ uvx pre-commit run -a</code></pre>
       <section class="report-section conclusion" id="conclusion">
         <div class="section-heading">
           <div class="section-title-wrap">
-            <h2><span class="section-number">7.</span> Conclusion</h2>
-            <p class="section-intro">The XPBD fluid branch is again based on current Newton, preserves the modern ViewerGL opacity and layer model, removes the half-resolution surface regression, and sustains a median 90.2 fps at roughly 100,000 particles on the measured GPU. Remaining limits are explicit: screen-space rendering is view dependent, diffuse particles are visual, and the robot capture’s IK workload is not representative of solver throughput.</p>
+            <h2><span class="section-number">8.</span> Conclusion</h2>
+            <p class="section-intro">The branch adds a position-based fluid model directly to <code>SolverXPBD</code>, including density projection, cohesion, viscosity, vorticity, diffuse particles, multi-world isolation, and two-way rigid coupling. ViewerGL converts the solved particles into a native-resolution anisotropic surface through an explicit public API. Nine examples—including the Archimedes screw pump—exercise the implementation, while the measured dam break sustains a median 90.2 simulation fps at approximately 100,000 particles.</p>
           </div>
         </div>
       </section>
@@ -276,6 +413,9 @@ uvx pre-commit run -a</code></pre>
       </footer>
     </main>
   </div>
-  <script src="report.js?v=3" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js" integrity="sha384-+7Keh381hSkXmXqnjC0JBM/kzsN6TFj+wMKychSLjTvJ8/0ElMde2uKl8i6p6Buj" crossorigin="anonymous" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous" defer></script>
+  <script src="math.js?v=1" defer></script>
+  <script src="report.js?v=4" defer></script>
 </body>
 </html>
