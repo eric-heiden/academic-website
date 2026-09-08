@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "environment": {
+    "platform": "Linux-6.8.0-1055-gke-x86_64-with-glibc2.35",
+    "python": "3.12.13",
+    "newton_commit": "86daf4b758edd260b42377cdcfbc3945471dfab7",
+    "warp": "1.17.0",
+    "device": "cuda:0",
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition"
+  },
+  "graph_modes": [
+    {
+      "mode": "conditional",
+      "particle_count": 4096,
+      "capture_ms": 19.623705884441733,
+      "status": "CONVERGED",
+      "median_us": 159.39843491651118,
+      "p95_us": 159.52959458809346,
+      "minimum_us": 159.23188999295235,
+      "batches": 30,
+      "launches_per_batch": 100
+    },
+    {
+      "mode": "unrolled",
+      "particle_count": 4096,
+      "capture_ms": 25.46760207042098,
+      "status": "CONVERGED",
+      "median_us": 4316.432279301807,
+      "p95_us": 4317.252669017762,
+      "minimum_us": 4315.026479307562,
+      "batches": 30,
+      "launches_per_batch": 100
+    }
+  ],
+  "factorizations": [
+    {
+      "factorization": "rank_one",
+      "block_count": 1000000,
+      "capture_ms": 0.12909993529319763,
+      "median_us": 185.89891609735787,
+      "p95_us": 186.1348053207621,
+      "minimum_us": 185.47486048191786,
+      "batches": 40,
+      "launches_per_batch": 100
+    },
+    {
+      "factorization": "dense_inverse",
+      "block_count": 1000000,
+      "capture_ms": 0.16897986643016338,
+      "median_us": 192.51451012678444,
+      "p95_us": 192.78572860639542,
+      "minimum_us": 192.2326604835689,
+      "batches": 40,
+      "launches_per_batch": 100
+    }
+  ],
+  "reductions": [
+    {
+      "reduction": "per_element_atomic",
+      "vector_count": 1000000,
+      "atomic_adds": 1000000,
+      "result": 1375000.0,
+      "expected": 1375000.0,
+      "median_us": 1484.4304241705686,
+      "p95_us": 1484.5149975735694,
+      "minimum_us": 1484.3714539892972,
+      "batches": 20,
+      "launches_per_batch": 20
+    },
+    {
+      "reduction": "tile_sum",
+      "vector_count": 1000000,
+      "atomic_adds": 3907,
+      "result": 1375000.0,
+      "expected": 1375000.0,
+      "median_us": 22.729753982275724,
+      "p95_us": 22.772697848267853,
+      "minimum_us": 22.000994067639112,
+      "batches": 20,
+      "launches_per_batch": 20
+    }
+  ],
+  "cloth_scaling": [
+    {
+      "resolution": 8,
+      "particle_count": 81,
+      "triangle_count": 128,
+      "capture_ms": 3.324897028505802,
+      "status": "CONVERGED",
+      "newton_iterations": 43,
+      "line_search_iterations": 43,
+      "residual_n": 0.010199170559644699,
+      "minimum_gap_m": 0.03195727616548538,
+      "median_us": 14789.67501083389,
+      "p95_us": 14794.000850757584,
+      "minimum_us": 14781.132722273469,
+      "batches": 30,
+      "launches_per_batch": 50
+    },
+    {
+      "resolution": 16,
+      "particle_count": 289,
+      "triangle_count": 512,
+      "capture_ms": 3.470076946541667,
+      "status": "CONVERGED",
+      "newton_iterations": 46,
+      "line_search_iterations": 46,
+      "residual_n": 0.010298698209226131,
+      "minimum_gap_m": 0.03220473974943161,
+      "median_us": 17033.312590792775,
+      "p95_us": 17052.820848533884,
+      "minimum_us": 17027.66589820385,
+      "batches": 30,
+      "launches_per_batch": 50
+    },
+    {
+      "resolution": 32,
+      "particle_count": 1089,
+      "triangle_count": 2048,
+      "capture_ms": 3.664386924356222,
+      "status": "CONVERGED",
+      "newton_iterations": 48,
+      "line_search_iterations": 48,
+      "residual_n": 0.01014803722500801,
+      "minimum_gap_m": 0.032340966165065765,
+      "median_us": 18724.61515944451,
+      "p95_us": 18734.581359429285,
+      "minimum_us": 18717.1882763505,
+      "batches": 30,
+      "launches_per_batch": 50
+    }
+  ],
+  "step_size_sweep": [
+    {
+      "initial_step_size": 1.0,
+      "status": "CONVERGED",
+      "newton_iterations": 40,
+      "line_search_iterations": 40,
+      "residual_n": 0.01632806286215782,
+      "wall_ms": 110.97211902961135
+    },
+    {
+      "initial_step_size": 2.0,
+      "status": "CONVERGED",
+      "newton_iterations": 31,
+      "line_search_iterations": 32,
+      "residual_n": 0.0154239721596241,
+      "wall_ms": 86.578557966277
+    },
+    {
+      "initial_step_size": 4.0,
+      "status": "CONVERGED",
+      "newton_iterations": 26,
+      "line_search_iterations": 49,
+      "residual_n": 0.016207722947001457,
+      "wall_ms": 76.9174040760845
+    },
+    {
+      "initial_step_size": 8.0,
+      "status": "CONVERGED",
+      "newton_iterations": 22,
+      "line_search_iterations": 61,
+      "residual_n": 0.016608616337180138,
+      "wall_ms": 66.83506211265922
+    }
+  ],
+  "stability_tuning": [
+    {
+      "name": "strict_absolute",
+      "requested_frames": 250,
+      "completed_frames": 30,
+      "simulated_steps": 59,
+      "simulated_seconds": 0.49166666666666664,
+      "wall_seconds": 0.07050455897115171,
+      "particle_count": 289,
+      "triangle_count": 512,
+      "minimum_gap_m": 0.06773509085178375,
+      "maximum_residual_n": 0.005843176506459713,
+      "maximum_newton_iterations": 64,
+      "failure_count": 1,
+      "failures": [
+        {
+          "frame": 29,
+          "substep": 0,
+          "status": "NEWTON_EXHAUSTED"
+        }
+      ],
+      "finite_positions": true,
+      "finite_velocities": true,
+      "final_speed_max_m_s": 4.470317840576172
+    },
+    {
+      "name": "scale_aware",
+      "requested_frames": 250,
+      "completed_frames": 250,
+      "simulated_steps": 500,
+      "simulated_seconds": 4.166666666666667,
+      "wall_seconds": 0.9564195089042187,
+      "particle_count": 289,
+      "triangle_count": 512,
+      "minimum_gap_m": 0.006049292162060738,
+      "maximum_residual_n": 0.016484137624502182,
+      "maximum_newton_iterations": 56,
+      "failure_count": 0,
+      "failures": [],
+      "finite_positions": true,
+      "finite_velocities": true,
+      "final_speed_max_m_s": 0.0
+    }
+  ],
+  "stability": {
+    "requested_frames": 1000,
+    "completed_frames": 1000,
+    "simulated_steps": 2000,
+    "simulated_seconds": 16.666666666666668,
+    "wall_seconds": 1.6041578901931643,
+    "particle_count": 289,
+    "triangle_count": 512,
+    "minimum_gap_m": 0.006049284711480141,
+    "maximum_residual_n": 0.016484225168824196,
+    "maximum_newton_iterations": 56,
+    "failure_count": 0,
+    "failures": [],
+    "finite_positions": true,
+    "finite_velocities": true,
+    "final_speed_max_m_s": 0.0
+  }
+}

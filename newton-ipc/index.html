@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A concrete design for Warp-native incremental potential contact in Newton, with graph capture, API changes, research references, and CPU validation.">
+  <meta name="description" content="Design and implementation results for an experimental Warp-native SolverIPC in Newton, including CUDA graph capture, cloth examples, stability tests, and performance measurements.">
   <title>Incremental potential contact in Newton</title>
   <link rel="icon" href="../favicon.svg">
   <link rel="stylesheet" href="shared.css">
@@ -27,20 +27,21 @@
 </div></header>
 <div class="report-shell"><main class="report" id="main-content">
 <section class="report-hero" id="overview">
-  <div class="report-dates"><span>Created <time datetime="2026-09-07">2026-09-07</time></span></div>
+  <div class="report-dates"><span>Created <time datetime="2026-09-07">2026-09-07</time></span><span>Updated <time datetime="2026-09-08">2026-09-08</time></span></div>
   <p class="paper-series">Technical design report</p>
   <h1>Incremental potential contact in Newton</h1>
   <p class="paper-affiliation">A Warp-native solver with captured nonlinear optimization</p>
   <dl class="paper-meta">
-    <div><dt>Baseline</dt><dd>Newton <a href="https://github.com/newton-physics/newton/commit/853c4fef9543fae380de59464cb804465c041721">853c4fef</a> · 2026-09-07</dd></div>
-    <div><dt>Local validation</dt><dd>Warp 1.17.0 · macOS arm64 · CPU</dd></div>
-    <div><dt>Status</dt><dd>Implementation proposal and scalar experiments; CUDA untested</dd></div>
+    <div><dt>Implementation</dt><dd><a href="https://github.com/eric-heiden/newton/tree/eric/solver-ipc">eric/solver-ipc</a> · <a href="https://github.com/eric-heiden/newton/commit/86daf4b758edd260b42377cdcfbc3945471dfab7">86daf4b7</a></dd></div>
+    <div><dt>Baseline</dt><dd>upstream Newton <a href="https://github.com/newton-physics/newton/commit/853c4fef9543fae380de59464cb804465c041721">853c4fef</a></dd></div>
+    <div><dt>Measured on</dt><dd>Warp 1.17.0 · RTX PRO 6000 Blackwell MIG · CUDA 12.9</dd></div>
+    <div><dt>Status</dt><dd>Experimental cloth/particle–plane vertical slice; full mesh IPC remains future work</dd></div>
   </dl>
   <div class="abstract-block"><h2>Abstract</h2>
-  <p>Incremental potential contact (IPC) combines implicit time integration, a contact barrier, and continuous collision detection to advance contacting solids along feasible optimization trajectories. This report proposes an additive <code>SolverIPC</code> for Newton, starting with tetrahedral deformables and fixed triangle-mesh obstacles. The solver would retain Newton's model and state objects while owning primitive-level collision queries, a preallocated workspace, and a matrix-free contact operator. Captured execution requires device-side decisions throughout Newton optimization, the linear solve, and line search; capturing only the linear solver is insufficient. Current Newton and libuipc sources provide useful components but do not establish this complete contract. Eight local tests validate a scalar barrier problem, nested CPU graph replay, and bounded failure handling. Full mesh IPC, robust continuous collision detection, and CUDA performance remain implementation and validation work.</p></div>
+  <p>Incremental potential contact (IPC) combines implicit time integration, a contact barrier, and continuous collision detection to advance contacting solids along feasible optimization trajectories. This update turns the report's smallest useful subset into an experimental Newton <code>SolverIPC</code>: particles and anisotropic Style3D cloth against one fixed plane, with a true incremental objective, exact point–plane step bounds, transactional state commit, matrix-free contact curvature, and nested CUDA-conditional Newton, PCG, and Armijo loops. A 2,000-substep captured cloth campaign completed with no failures or penetrations. Warp Tile dot reductions were 65× faster than a per-element atomic baseline, conditional early exit was 27× faster than a fixed unrolled graph in its intended no-work case, and an analytic rank-one block inverse was 3.4% faster than dense 3×3 inversion. This is not yet general mesh IPC: self-contact, point–triangle/edge–edge CCD, friction, tetrahedra, rigid bodies, multiple worlds, and differentiation remain explicit limitations.</p></div>
 </section>
 
-<nav class="article-contents" aria-label="Article contents"><strong>Contents</strong><ol><li><a href="#recommendation">Recommendation</a></li><li><a href="#formulation">Formulation</a></li><li><a href="#literature">Research and code</a></li><li><a href="#newton">Newton audit</a></li><li><a href="#api">Proposed API</a></li><li><a href="#capture">Graph execution</a></li><li><a href="#collision">Collision geometry</a></li><li><a href="#linear">Linear algebra</a></li><li><a href="#rigid">Rigid bodies and gradients</a></li><li><a href="#validation">Local evidence</a></li><li><a href="#roadmap">Implementation sequence</a></li><li><a href="#conclusion">Conclusion</a></li></ol></nav>
+<nav class="article-contents" aria-label="Article contents"><strong>Contents</strong><ol><li><a href="#recommendation">Recommendation</a></li><li><a href="#implementation">Implementation update</a></li><li><a href="#formulation">Formulation</a></li><li><a href="#literature">Research and code</a></li><li><a href="#newton">Newton audit</a></li><li><a href="#api">Implemented API</a></li><li><a href="#capture">Graph execution</a></li><li><a href="#collision">Collision geometry</a></li><li><a href="#linear">Linear algebra</a></li><li><a href="#rigid">Rigid bodies and gradients</a></li><li><a href="#validation">CUDA evidence</a></li><li><a href="#roadmap">Implementation sequence</a></li><li><a href="#conclusion">Conclusion</a></li></ol></nav>
 <section class="report-section" id="recommendation">
 <h2>1. Recommended implementation</h2>
 <p>Implement IPC as a new solver in Warp, with the existing <code>step(state_in, state_out, control, contacts, dt)</code> interface. Use Newton's particle positions, velocities, mass, tetrahedra, triangles, world identifiers, and material authoring. Build a dedicated contact surface and optimization workspace before capture. Keep trial positions internal until a step satisfies its acceptance policy.</p>
@@ -51,7 +52,26 @@
 <li><strong>Use fixed storage with changing device counts.</strong> Contact sets, Newton iterations, preconditioned conjugate gradient (PCG) iterations, and accepted step lengths may change on every replay. Buffer addresses and launch structure must remain stable; capacity exhaustion must prevent a state commit.</li>
 <li><strong>Separate feasibility, convergence, and throughput.</strong> An intersection-free iterate is not necessarily a converged time step. Graph capture reduces launch overhead but does not resolve ill-conditioning. Report both properties independently.</li>
 </ol>
-<p>This is a proposed design, not an implementation of mesh IPC in Newton. All new API names below are proposals. No existing solver or public symbol needs to be renamed or removed.</p>
+<p>The branch now implements a deliberately bounded cloth/particle–plane vertical slice. The broader mesh-contact design below remains the recommendation for production IPC; names and capacities that are not listed in the implementation update remain proposals. No existing solver or public symbol was renamed or removed.</p>
+</section>
+
+<section class="report-section" id="implementation">
+<h2>Implementation update: experimental SolverIPC</h2>
+<p>The <a href="https://github.com/eric-heiden/newton/tree/eric/solver-ipc"><code>eric/solver-ipc</code> branch</a> adds a public, lazy-loaded <code>newton.solvers.SolverIPC</code>, a dedicated <a href="https://github.com/eric-heiden/newton/blob/eric/solver-ipc/newton/examples/cloth/example_cloth_ipc.py"><code>cloth_ipc</code> example</a>, and an <code>ipc</code> option in <code>cloth_hanging</code>. It reuses Style3D's authored anisotropic cloth data and fixed projective-dynamics sparse operator, but evaluates the true stretch, shear, bending, inertial, and normalized barrier energy during Armijo search.</p>
+<div class="table-wrap"><table><thead><tr><th>Implemented now</th><th>Deliberately not claimed</th></tr></thead><tbody>
+<tr><td>Particles and Style3D triangle cloth; one fixed plane; configurable finite separation</td><td>Point–triangle or edge–edge contact, cloth self-contact, mesh obstacles, friction</td></tr>
+<tr><td>Backward-Euler objective; normalized logarithmic barrier; analytic gradient and rank-one normal curvature</td><td>Neo-Hookean tetrahedra, inversion filtering, rigid/articulated degrees of freedom</td></tr>
+<tr><td>Exact linear point–plane collision step bound, 0.9 safety factor, true-energy Armijo backtracking</td><td>General primitive CCD or a proof for nonlinear trajectories</td></tr>
+<tr><td>Preallocated workspace; nested <code>wp.capture_while</code> on CUDA; fixed unrolled fallback</td><td>CPU APIC parity for nested conditional replay, dynamic topology, multiple independent worlds</td></tr>
+<tr><td>Transactional work state, exact rollback, terminal status, residual/gap/iteration diagnostics, persistent failed-step count</td><td>Differentiation, warm starts, adaptive time stepping, capacity-managed broad phase</td></tr>
+</tbody></table></div>
+<p class="table-caption"><strong>Implementation boundary.</strong> The branch is a useful captured vertical slice, not a relabeling of penalty contact as full IPC.</p>
+<figure class="media-figure"><video controls muted loop playsinline preload="metadata" poster="assets/cloth-ipc_poster.jpg"><source src="assets/cloth-ipc.mp4" type="video/mp4">Your browser does not support MP4 video.</video><figcaption class="figure-caption"><span class="caption-label">Video 1.</span> The 16×16 <code>cloth_ipc</code> example, simulated at 120 Hz inside a two-substep CUDA graph and rendered at 30 fps. Point–plane separation is 0.01 m; the visible sheet contains 289 particles and 512 triangles.</figcaption></figure>
+<h3>Captured solve structure</h3>
+<p>Each step copies the committed input into private work arrays, forms the inertial predictor, and validates initial gaps. The outer device condition drives nonlinear updates. Every update assembles force residuals, prepares a block preconditioner, invokes fixed-budget PCG with device reductions, checks descent, computes the exact point–plane collision step bound, and enters a nested device-conditioned line search. Only <code>CONVERGED</code> publishes positions and velocities; every other status copies the input through unchanged. A persistent <code>failed_steps</code> device counter prevents a later substep from hiding an earlier failure.</p>
+<p>The contact Hessian action is matrix-free: each particle contributes (h_c,n n^T p). The default preconditioner uses the Sherman–Morrison identity for (aI+h_cnn^T), avoiding a generic inverse:</p>
+<div class="display-equation">\[(aI+h_cnn^T)^{-1}=a^{-1}I-\frac{h_c}{a(a+h_c)}nn^T,\qquad \lVert n\rVert=1.\]</div>
+<p>PCG originally inherited a native reduction that allocates inside Warp's conditional body and therefore could not be captured. The implemented reduction groups 256 lanes, applies <code>wp.tile_sum(wp.tile(value))</code>, and emits one atomic addition per tile. It is allocation-free during replay and reduces one million atomics to 3,907 in the measured case.</p>
 </section>
 
 <section class="report-section" id="formulation">
@@ -122,59 +142,64 @@
 </section>
 
 <section class="report-section" id="api">
-<h2>5. Proposed Newton API</h2>
-<p>The smallest useful public addition is <code>newton.solvers.SolverIPC</code> with nested configuration, capacity, and status types. Geometry construction can initially remain an internal solver component. Promote a shared <code>newton.geometry.ContactSurface</code> and swept-query interface only when a second consumer or a clear extension requirement justifies the public commitment.</p>
-<div class="table-wrap"><table><thead><tr><th>Proposed contract</th><th>Purpose and capture behavior</th></tr></thead><tbody>
-<tr><td><code>SolverIPC.Config</code></td><td>Integration, barrier model, geometric/force/friction tolerances, linear solver, bounded iteration limits, and conditional/unrolled execution policy. Units are documented per field.</td></tr>
-<tr><td><code>SolverIPC.Capacities</code></td><td>Separate upper bounds for swept candidates, active stencils, friction history, CCD work items, and linear/preconditioner scratch. Capacity changes require preparation and recapture.</td></tr>
-<tr><td><code>register_custom_attributes(builder)</code></td><td>Opt-in IPC material/contact fields under <code>model.ipc</code>, registered before model construction. Keep existing mass and Lamé parameter data authoritative.</td></tr>
-<tr><td><code>prepare(state, *, dt)</code></td><td>Validate topology and feasible initialization, construct surface maps and BVHs, reserve scratch, compile kernels, and exercise branches on scratch state. Must not advance the supplied state.</td></tr>
-<tr><td><code>step(..., contacts=None, dt=h)</code></td><td>Runs all optimization and required queries without allocation or host readback. IPC owns its optimization stencils. A non-None external contact manifold is rejected until a precise supported meaning is defined.</td></tr>
-<tr><td><code>diagnostics</code></td><td>Persistent device arrays for per-world status, iteration counts, residuals, minimum gap, accepted step length, and capacity high-water marks. Reading them with <code>.numpy()</code> is outside capture.</td></tr>
-<tr><td><code>reset(..., world_mask=...)</code></td><td>Clear selected worlds' friction history, warm starts, and latched failures. Same-size reset can be captured; geometry reconstruction cannot.</td></tr>
-<tr><td><code>notify_model_changed(flags)</code></td><td>Refresh same-layout coefficients or invalidate preparation after geometry/topology changes. Document which changes are replay-visible and which require recapture.</td></tr>
-<tr><td><code>update_contacts(contacts, state)</code></td><td>Optional conversion of accepted primitive forces to Newton's contact reporting format, with its own bounded capacity and diagnostic truncation status.</td></tr>
+<h2>5. Implemented Newton API and future extensions</h2>
+<p>The branch implements the smallest useful public addition as <code>newton.solvers.SolverIPC</code> with nested <code>Config</code> and <code>Status</code> types. Geometry remains internal and intentionally limited to a fixed plane. Promote a shared <code>newton.geometry.ContactSurface</code> and swept-query interface only when the mesh-contact milestone provides a second consumer or a clear extension requirement.</p>
+<div class="table-wrap"><table><thead><tr><th>Implemented contract</th><th>Purpose and capture behavior</th></tr></thead><tbody>
+<tr><td><code>SolverIPC.Config</code></td><td>Plane geometry, minimum separation, activation distance, barrier scale, force/energy tolerances, bounded Newton/PCG/line-search budgets, rank-one or dense preconditioning, and conditional or unrolled graph mode. Float values and <code>dt</code> are fixed on graph capture.</td></tr>
+<tr><td><code>register_custom_attributes(builder)</code></td><td>Registers the Style3D anisotropic cloth attributes before calling <code>style3d.add_cloth_grid</code> or <code>add_cloth_mesh</code>.</td></tr>
+<tr><td><code>step(..., contacts=None, dt=h)</code></td><td>Runs optimization without host readback. A non-<code>None</code> external contact manifold is rejected because IPC owns its current plane query.</td></tr>
+<tr><td><code>SolverIPC.Status</code></td><td><code>CONVERGED</code>, invalid initialization, linear breakdown, line-search exhaustion, and Newton exhaustion. Only convergence commits.</td></tr>
+<tr><td><code>diagnostics</code></td><td>Device arrays for terminal status, residual, minimum gap, Newton and line-search counts, plus a persistent failed-step count. Reading with <code>.numpy()</code> is outside capture.</td></tr>
 </tbody></table></div>
-<p class="table-caption"><strong>Table 3.</strong> Proposed additive API and its capture contract.</p>
-<p>Do not add an IPC-wide parameter to every existing solver, and do not globally enlarge every <code>State</code> or <code>Contacts</code>. Newton's custom attribute mechanism already supports solver-specific state where serialization or interoperability requires it. Temporary Newton iterates, PCG vectors, and contact factors belong to the solver workspace. Independent solver instances need independent workspaces.</p>
-<h3>Illustrative public usage</h3>
-<p>This snippet describes the proposed interface; it is not executable on the audited Newton revision. The mesh, material, and initial state would be built through the existing public <code>ModelBuilder</code> methods before this setup. Capacities shown are illustrative reservations, not universal defaults.</p>
-<div class="code-shell"><div class="code-header"><span>Proposed API</span><button class="copy-button" data-copy-target="api-code">Copy</button></div><pre><code class="code-block" id="api-code">import warp as wp
+<p class="table-caption"><strong>Table 3.</strong> Additive API implemented at <code>86daf4b7</code>. Capacity types, general contact surfaces, reset masks, and contact-force export remain future interfaces.</p>
+<p>The implementation does not add an IPC-wide parameter to every existing solver or enlarge every <code>State</code> or <code>Contacts</code>. Temporary iterates, PCG vectors, contact curvature, and diagnostics belong to each solver workspace.</p>
+<h3>Executable public usage</h3>
+<p>This is the core of the checked-in cloth example. The 0.01 m minimum separation matches the authored particle radius; the 0.05 m activation distance is a distinct numerical envelope.</p>
+<div class="code-shell"><div class="code-header"><span>Implemented API</span><button class="copy-button" data-copy-target="api-code">Copy</button></div><pre><code class="code-block" id="api-code">import warp as wp
 import newton
-from newton.solvers import SolverIPC  # proposed
+from newton.solvers import SolverIPC, style3d
 
-builder = newton.ModelBuilder()
+builder = newton.ModelBuilder(gravity=(0.0, 0.0, -9.81))
 SolverIPC.register_custom_attributes(builder)
-# Populate the scene with public ModelBuilder methods.
-model = builder.finalize(device=device)
+builder.add_ground_plane()
+style3d.add_cloth_grid(
+    builder,
+    pos=(-0.64, -0.64, 1.2),
+    rot=wp.quat_rpy(0.12, -0.18, 0.2),
+    vel=(0.0, 0.0, 0.0),
+    dim_x=32,
+    dim_y=32,
+    cell_x=0.04,
+    cell_y=0.04,
+    mass=0.005,
+    particle_radius=0.01,
+    tri_aniso_ke=wp.vec3(5.0e2, 5.0e2, 5.0e1),
+    edge_aniso_ke=wp.vec3(2.0e-5),
+)
+model = builder.finalize(device="cuda:0")
 state_a, state_b = model.state(), model.state()
 
 solver = SolverIPC(
     model,
     config=SolverIPC.Config(
-        contact_distance=1.0e-3,       # [m]
-        friction_velocity=1.0e-3,      # [m/s]
-        max_newton_iterations=50,
-        max_pcg_iterations=200,
-        max_line_search_iterations=24,
-        graph_mode="auto",
-    ),
-    capacities=SolverIPC.Capacities(
-        swept_pairs=200_000,
-        active_stencils=100_000,
-        ccd_work_items=800_000,
+        minimum_separation=0.01,
+        contact_distance=0.05,
+        barrier_stiffness=0.005,
+        max_newton_iterations=64,
+        max_pcg_iterations=24,
+        absolute_tolerance=1.0e-2,
+        relative_tolerance=2.0e-3,
+        energy_tolerance=1.0e-5,
     ),
 )
 h = 1.0 / 120.0
-solver.prepare(state_a, dt=h)         # outside capture
 
 with wp.ScopedCapture(device=model.device) as capture:
     solver.step(state_a, state_b, None, None, h)
     solver.step(state_b, state_a, None, None, h)
 
-wp.capture_launch(capture.graph)      # advances two steps
-# state_a is always the replay boundary; no Python swap needed.
-status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
+wp.capture_launch(capture.graph)  # advances two steps
+assert solver.diagnostics.failed_steps.numpy()[0] == 0</code></pre></div>
 <p>The two-step graph deliberately returns to the same state buffer. Python variable swaps occur while recording and do not run at replay; a captured single <code>a→b</code> step will keep reading <code>a</code> unless the caller supplies a defined copy, alternates graphs, or uses a device-side state convention. Keep graph inputs, outputs, BVHs, and scratch alive for the graph's lifetime.</p>
 <p>A floating-point <code>dt</code> passed by value is fixed in the graph. The initial API can require recapture when it changes. If adaptive time steps become important, add an optional device time-step array in the IPC configuration and ensure every dependent kernel, tolerance conversion, predictor, and velocity update reads it. The same rule applies to stiffness, counts, launch dimensions, and per-world activity: changing a Python field cannot update an already captured scalar.</p>
 <h3>Shared collision API, after the first solver</h3>
@@ -185,6 +210,7 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 <section class="report-section" id="capture">
 <h2>6. Execution during graph capture</h2>
 <p>Graph construction records a program of operations. Replay executes it with new data. A graph-compatible IPC step must express data-dependent branches with device conditions or masked fixed schedules, rather than Python decisions based on copied scalars. Warp 1.17 provides <code>wp.capture_while</code> and <code>wp.capture_if</code>. Native CUDA conditional nodes require a compatible Warp build and NVIDIA driver supporting CUDA 12.4 or later. CPU capture uses Warp's API-capture representation (APIC), a different execution path. <a href="#ref-warp">[16]</a></p>
+<p>The branch confirms nested CUDA conditional capture for the Newton and Armijo loops, including PCG inside the outer condition. An initial attempt failed because the inherited PCG dot reduction allocated scratch inside the conditional body; replacing it with a prepared Tile reduction removed that operation. CPU eager execution passes, but nested CPU APIC replay did not match eager trajectories reliably and is therefore disabled in the examples rather than advertised.</p>
 <figure class="diagram-panel"><div class="mermaid-shell" role="img" aria-label="A prepared workspace enters a captured step with a friction loop, nested Newton solve, PCG, swept collision detection and line search, then a guarded state commit." data-mermaid-source="flowchart TD
  A[Prepared workspace] --> B[Initialize step]
  B --> C[Newton loop]
@@ -242,6 +268,7 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 <p>Matrix-free scatter introduces atomic contention. Start with direct accumulation for simplicity, then evaluate segmented reduction, contact sorting, or graph coloring if profiling justifies it. Deterministic reductions should be an explicit option with measured cost. Stable ordering improves reproducibility but does not by itself prove bitwise equality across hardware.</p>
 <h3>Preconditioning</h3>
 <p>Use 3×3 block Jacobi as an initial correctness baseline, not the final performance claim for stiff solids. A connectivity-based multilevel additive Schwarz preconditioner is a plausible production direction: prepare fixed mesh aggregates, refresh numeric block values, and include contact-induced coupling where beneficial. StiffGIPC motivates this choice, but Newton's tile layout, memory traffic, and batch sizes need measurement. If hierarchy structure changes dynamically, reserve its maximum storage or rebuild outside capture. <a href="#ref-stiff">[8]</a></p>
+<p>For the implemented plane stencil, the contact update is exactly rank one. Sherman–Morrison produces the same solution as a dense 3×3 inverse in CPU/CUDA tests and measured 185.90 µs rather than 192.51 µs for one million blocks. This 3.4% construction gain is worthwhile because it also stores the contact operator as one scalar and one shared normal, but it is not a substitute for a stronger cloth-wide preconditioner. Increasing PCG iterations did not cure float32 Armijo failures during tuning; scale-aware nonlinear/energy stopping was the effective intervention.</p>
 <p>For small rigid systems, assembled block matrices and direct solves may be competitive. For large deformables, matrix-free contact plus an assembled static elastic pattern may be better. Select by measured full-step cost, including preconditioner construction and collision work. A speedup in PCG alone can disappear when CCD or assembly dominates.</p>
 <h3>Independent worlds</h3>
 <p>Newton's replicated-world model is important for robotics. Keep one residual, step length, barrier adaptation state, and nonlinear/linear activity mask per world. A global loop condition is the logical OR of active worlds; all energy sums, dot products, minima, and tolerance comparisons remain segmented by world. A single global PCG dot product couples otherwise independent solves algorithmically and lets one difficult environment control all others.</p>
@@ -267,7 +294,39 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 </section>
 
 <section class="report-section" id="validation">
-<h2>10. Local evidence without CUDA</h2>
+<h2>10. CUDA implementation evidence</h2>
+<p>All measurements below come from commit <a href="https://github.com/eric-heiden/newton/commit/86daf4b758edd260b42377cdcfbc3945471dfab7"><code>86daf4b7</code></a> with Warp 1.17.0 on an NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb. The checked-in <a href="tools/benchmark_solver_ipc.py">benchmark source</a>, <a href="data/benchmark_results.json">raw JSON</a>, and <a href="tools/plot_benchmarks.py">plot source</a> preserve exact counts, warmups, batch sizes, medians, and 95th percentiles. Timings describe this narrow implementation and machine; they are not comparisons against general IPC packages.</p>
+<figure class="media-figure"><img src="assets/performance.svg" alt="Four plots compare conditional and unrolled graphs, atomic and Tile reductions, rank-one and dense inverses, and cloth scaling."><figcaption class="figure-caption"><span class="caption-label">Figure 2.</span> CUDA results. Conditional early exit avoids most of a deliberately oversized fixed schedule; Tile reduction removes nearly all contended atomics; the analytic factorization gives a smaller but repeatable gain. Cloth timings are contact-active single-step replays.</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Experiment</th><th>Measured median</th><th>Interpretation</th></tr></thead><tbody>
+<tr><td>4,096 inactive particles, conditional vs 16×8×8 unrolled budget</td><td>0.159 ms vs 4.316 ms</td><td>27.1× early-exit advantage. This is the intended best case for conditional nodes, not a universal solver speedup.</td></tr>
+<tr><td>1M-vector dot product, Tile vs one atomic per vector</td><td>22.73 µs vs 1,484.43 µs</td><td>65.3×; both return exactly 1,375,000 in the constructed test. Atomics fall from 1,000,000 to 3,907.</td></tr>
+<tr><td>1M scalar-plus-rank-one blocks vs dense 3×3 inverse</td><td>185.90 µs vs 192.51 µs</td><td>3.4% faster and algebraically exact for the plane-contact block.</td></tr>
+<tr><td>8×8, 16×16, 32×32 contact-active cloth</td><td>14.79, 17.03, 18.72 ms</td><td>81/289/1,089 particles and 128/512/2,048 triangles; all converged with positive gaps.</td></tr>
+</tbody></table></div>
+<p class="table-caption"><strong>Table 5.</strong> Median CUDA graph replay times. Capture costs and tail measurements are available in the raw JSON.</p>
+<h3>Stability and tolerance selection</h3>
+<p>A strict 0.005 N absolute tolerance with (10^{-8}) J energy roundoff allowance exhausted its Newton budget after 59 captured substeps. This was a useful failure: all positions and velocities remained finite, rollback prevented an invalid commit, and the persistent counter retained the failure. The selected cloth configuration uses a 0.01 N absolute plus 0.002 relative residual tolerance and a (10^{-5}) J float32 Armijo allowance. It preserves the geometric result while avoiding attempts to distinguish energy changes below reliable accumulation resolution.</p>
+<figure class="media-figure"><img src="assets/tuning-and-stability.svg" alt="Plots show trial step multiplier costs and completed captured substeps for strict and scale-aware tolerances."><figcaption class="figure-caption"><span class="caption-label">Figure 3.</span> A larger initial multiplier can accelerate one transient step, but that micro-result does not establish trajectory robustness. The shipped examples retain the conservative multiplier 1.0; the selected scale-aware policy completed every requested long-run substep.</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>Campaign</th><th>Outcome</th><th>Worst observed diagnostic</th></tr></thead><tbody>
+<tr><td>Strict float32 tuning, 16×16 cloth</td><td>59/500 substeps; safe <code>NEWTON_EXHAUSTED</code> rollback</td><td>64 Newton updates; all state finite</td></tr>
+<tr><td>Selected tuning, same 250-frame test</td><td>500/500 substeps; zero failures</td><td>minimum gap 0.006049 m; 56 Newton updates</td></tr>
+<tr><td>Selected long horizon</td><td>2,000/2,000 substeps (16.67 simulated s); zero failures</td><td>minimum gap 0.006049 m; maximum residual 0.01649 N; final maximum speed 0</td></tr>
+<tr><td><code>cloth_ipc</code> example tests</td><td>1,000 CUDA frames at 32×32; 300 CPU frames at 16×16</td><td>persistent failed-step count remained zero</td></tr>
+<tr><td><code>cloth_hanging --solver ipc</code></td><td>500 CUDA frames at 16×16; 240 CPU frames at 8×8</td><td>persistent failed-step count remained zero</td></tr>
+</tbody></table></div>
+<p class="table-caption"><strong>Table 6.</strong> Every long-run check inspects each substep, not only the final frame. The minimum gap is measured relative to the configured 0.01 m separation plane, so positive values are feasible.</p>
+<h3>Correctness and regression tests</h3>
+<p>The Newton test suite adds 16 device-instantiated IPC tests: seven behaviors on both CPU and CUDA plus CUDA captured-replay cases. Fourteen pass and the two CPU APIC conditional-capture variants skip with a documented limitation. Tests compare a particle equilibrium to an independent double-precision bisection reference, cloth forces to central differences of the true energy, rank-one and dense factorization outputs, eager and captured CUDA results, positive gaps through long replay, invalid-state and budget-exhaustion rollback, input immutability, and persistent failure accounting. All 12 neighboring Style3D regression tests also pass. Repository-wide pre-commit checks pass.</p>
+<div class="code-shell"><div class="code-header"><span>Reproduce implementation tests and measurements</span><button class="copy-button" data-copy-target="implementation-test-code">Copy</button></div><pre><code class="code-block" id="implementation-test-code"># From the Newton branch
+uv run --extra dev -m newton.tests -k test_solver_ipc
+uv run --extra dev -m newton.tests -k test_solver_style3d
+uv run --extra examples python -m newton.examples cloth_ipc \
+    --viewer null --num-frames 1000 --resolution 32 --test
+
+# From the reports checkout, with the branch on PYTHONPATH
+python newton-ipc/tools/benchmark_solver_ipc.py \
+    --output newton-ipc/data/benchmark_results.json</code></pre></div>
+<h3>Original CPU design probes</h3>
 <p>The local machine exposes Warp's <code>cpu</code> device on macOS arm64. Warp reports that CUDA is not enabled in this build. The accompanying <a href="capture_probe.py">source</a> uses only Warp, NumPy, and Python's <code>unittest</code>; its <a href="probe_results.json">results JSON</a> records eight passing tests. This is a control-flow and scalar-numerics experiment, not a benchmark or full Newton solver.</p>
 <p>The experiment solves four independent one-dimensional particle–plane problems. The coordinate \(x&gt;0\) is distance above the plane in meters, the inertial target is \(y\), mass is 1 kg, and \(h=0.1\) s. With \(\hat d=0.2\) m and normalized barrier scale 0.1 J, the objective is \(50(x-y)^2+0.1\beta(x^2/0.04)\) in joules. All cases start at \(x=0.1\) m. Newton directions use analytic derivatives and the step is bounded to retain at least 10% of the current positive gap for a downward direction. This bound is exact for the one-dimensional linear trajectory; it is not a general mesh CCD implementation.</p>
 <div class="table-wrap"><table><thead><tr><th>Inertial target y [m]</th><th>Accepted distance [m]</th><th>Newton updates</th><th>Result</th></tr></thead><tbody>
@@ -276,7 +335,7 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 <tr><td>0.12</td><td>0.131237900750</td><td>3</td><td>Converged; active barrier</td></tr>
 <tr><td>0.30</td><td>0.300000000000</td><td>2</td><td>Converged; inactive barrier</td></tr>
 </tbody></table></div>
-<p class="table-caption"><strong>Table 5.</strong> Measured scalar solutions in float64.</p>
+<p class="table-caption"><strong>Table 7.</strong> Measured scalar solutions in float64.</p>
 <p>The nonlinear stopping tolerance is an absolute gradient magnitude of \(10^{-7}\) N, with budgets of 40 Newton updates and 24 line-search trials. These four cases each accepted the first CCD-bounded trial at every update, so they do not constitute a challenging backtracking benchmark.</p>
 <div class="table-wrap"><table><thead><tr><th>Test</th><th>Evidence</th><th>Limit</th></tr></thead><tbody>
 <tr><td>Analytic derivatives</td><td>Five distances, including both sides of activation, agree with central finite differences.</td><td>No triangle feature boundaries or friction derivatives.</td></tr>
@@ -288,8 +347,8 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 <tr><td>Invalid initialization</td><td>Zero/negative starting gaps are rejected independently while valid worlds solve.</td><td>No mesh intersection detector.</td></tr>
 <tr><td>Bounded append</td><td>Seven emitted candidates into capacity three retain total count seven and set overflow without writing beyond storage.</td><td>Overflow signaling only; no full mesh transaction.</td></tr>
 </tbody></table></div>
-<p class="table-caption"><strong>Table 6.</strong> Local test evidence and the limits of each experiment.</p>
-<p>These results support writing device-conditional control flow now despite the lack of a CUDA GPU. They do not validate CUDA streams, conditional-node restrictions in BVH/sort libraries, GPU atomics, large reductions, floating-point CCD guarantees, or end-to-end performance. They also do not validate a PCG implementation: the scalar problem uses an analytic one-dimensional Newton solve.</p>
+<p class="table-caption"><strong>Table 8.</strong> Original local test evidence and the limits of each experiment.</p>
+<p>These earlier results supported writing device-conditional control flow before CUDA access was available. The new implementation campaign now validates CUDA conditional nodes, GPU atomics, tile reductions, PCG, rollback, and the bounded cloth/plane solve. It still does not validate general primitive CCD, dynamic contact storage, or full mesh IPC.</p>
 <div class="code-shell"><div class="code-header"><span>Reproduce the standalone probes</span><button class="copy-button" data-copy-target="probe-code">Copy</button></div><pre><code class="code-block" id="probe-code">uv run --with warp-lang==1.17.0 --with numpy==2.5.0 \
     python capture_probe.py</code></pre></div>
 </section>
@@ -306,7 +365,7 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 <tr><td>6. Performance</td><td>Compact contact factors, improved reductions, connectivity-aware preconditioning, and graph bucketing.</td><td>Full-step timing and memory improve at equivalent physical/geometric tolerances.</td></tr>
 <tr><td>7. Broader dynamics</td><td>Cloth/thickness, exact rigid or explicit affine bodies, articulation, and an implicit adjoint.</td><td>Separate physical, feasibility, and derivative validation for each extension.</td></tr>
 </tbody></table></div>
-<p class="table-caption"><strong>Table 7.</strong> Proposed implementation stages and release criteria.</p>
+<p class="table-caption"><strong>Table 9.</strong> Proposed implementation stages and release criteria. The branch completes a plane-contact subset of stages 1, 3, 4, and 6; stages involving general primitive geometry remain open.</p>
 <h3>Tests that should precede a CUDA support claim</h3>
 <p>Run the same scene eagerly and through a captured graph for many replays while changing controls, same-size state buffers, contact counts, and selected-world resets. Include no-contact scenes, near-capacity and over-capacity scenes, different world convergence rates, newly appearing contacts, almost parallel edges, grazing motion, small initial gaps, invalid boundary motion, and line-search/CCD exhaustion. Use device memory checking and a CUDA timeline profiler to detect illegal access, unexpected allocation, host transfers, or operations launched outside the capture stream.</p>
 <p>For numerical validation, compare energy, gradient, and operator products against independent float64 references on small meshes; compare CCD against Tight Inclusion or another conservative oracle. Check minimum separation and positive tetrahedral volume after every accepted iterate, not just at the final frame. Test translation of identical scenes to large coordinate offsets, mesh refinement, contact-force balance, and frictionless sliding over triangulations. Friction should dissipate mechanical energy consistently with the chosen regularization.</p>
@@ -320,8 +379,8 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 
 <section class="report-section" id="conclusion">
 <h2>12. Conclusion</h2>
-<p>Newton has enough infrastructure to begin a Warp-native IPC implementation without a local CUDA GPU. Its model/state interface can remain stable, and CPU graph capture provides useful early validation of the intended control flow. The necessary additions are a solver-owned primitive contact representation, conservative swept collision queries, prepared capacity-bounded workspace, device-side nonlinear control, and explicit failure/time-advancement semantics.</p>
-<p>libuipc is the strongest architectural inspiration in this assessment, including its recent PCG graph work, while IPC Toolkit and conservative CCD repositories provide useful correctness references. A full captured step still requires more than wrapping those libraries. Start with a small deformable solver that preserves the complete feasibility contract, validate CUDA execution before advertising it, and optimize the contact operator and preconditioner against measured full-step costs.</p>
+<p>Newton now has a working experimental proof that an entire incremental-potential cloth/plane step—not only its linear solver—can live inside nested CUDA conditional graphs. The implementation preserves Newton's model/state interface, publishes a real <code>SolverIPC</code>, keeps trial state private, rolls back every failed solve, and makes failure history observable. The measured Warp Tile reduction is the clearest optimization win; the analytic rank-one factorization is a smaller structural improvement, and scale-aware stopping is essential for stable float32 trajectories.</p>
+<p>The result deliberately stops at the boundary its tests support. A fixed-plane point constraint does not establish self-contact or general IPC. Production work still needs a complete contact surface, bounded swept broad phase, conservative point–triangle and edge–edge CCD, feature-consistent barriers, friction, tetrahedral orientation bounds, per-world solves, and stronger preconditioning. The branch provides the capture-safe optimization skeleton and a tested cloth integration on which those milestones can be built.</p>
 </section>
 
 <section class="report-section references" id="references">
@@ -344,9 +403,9 @@ status = solver.diagnostics.status.numpy()  # outside capture</code></pre></div>
 <li id="ref-yasps">Xuan Tang, Kemeng Huang, Gilbert Bernstein, Minchen Li, and Tzumao Li. YASPS: A Symbolic Framework for Extensible, High-Performance IPC Simulation. ACM TOG, 2026. <a href="https://github.com/txstc55/yasps">Code</a>; <a href="https://kemenghuang.github.io/">author publication listing</a>.</li>
 <li id="ref-warp">NVIDIA Warp. <a href="https://nvidia.github.io/warp/v1.16/user_guide/runtime.html#conditional-execution">Runtime documentation: conditional execution and CPU APIC</a>; <a href="https://github.com/NVIDIA/warp/blob/v1.17.0/warp/_src/context.py">v1.17.0 runtime source</a>. Local behavior was checked against the installed 1.17.0 package.</li>
 </ol>
-<p>Source snapshots: <a href="https://github.com/newton-physics/newton/tree/853c4fef9543fae380de59464cb804465c041721">Newton</a>, <a href="https://github.com/spiriMirror/libuipc/tree/9c5710ee4b716502e3757e7312360e5ee68cb79f">libuipc</a>, and <a href="https://github.com/ipc-sim/ipc-toolkit/tree/b778f64e5985449db659aff4110bed3a63ea8c3e">IPC Toolkit</a>. Local experiment: <a href="capture_probe.py">Python source</a> and <a href="probe_results.json">results</a>. The report follows the <a href="https://github.com/eric-heiden/academic-website/tree/d3fb5a17861ad8b5c0cd8b91723754c2ddff4838/static/reports/template-gallery">Prism research report template</a>.</p>
+<p>Source snapshots: <a href="https://github.com/newton-physics/newton/tree/853c4fef9543fae380de59464cb804465c041721">upstream Newton baseline</a>, <a href="https://github.com/eric-heiden/newton/tree/eric/solver-ipc">SolverIPC implementation branch</a>, <a href="https://github.com/spiriMirror/libuipc/tree/9c5710ee4b716502e3757e7312360e5ee68cb79f">libuipc</a>, and <a href="https://github.com/ipc-sim/ipc-toolkit/tree/b778f64e5985449db659aff4110bed3a63ea8c3e">IPC Toolkit</a>. Reproducibility artifacts: original <a href="capture_probe.py">CPU probe</a> and <a href="probe_results.json">results</a>; implementation <a href="tools/benchmark_solver_ipc.py">benchmark</a>, <a href="data/benchmark_results.json">results</a>, <a href="tools/plot_benchmarks.py">plots</a>, and <a href="tools/render_cloth_ipc_video.py">video renderer</a>. The report follows the <a href="https://github.com/eric-heiden/academic-website/tree/d3fb5a17861ad8b5c0cd8b91723754c2ddff4838/static/reports/template-gallery">Prism research report template</a>.</p>
 </section>
-<footer class="report-footer"><a href="../">All reports</a><span>Created 2026-09-07 · Research and implementation proposal</span></footer>
+<footer class="report-footer"><a href="../">All reports</a><span>Updated 2026-09-08 · Design and experimental implementation</span></footer>
 </main></div>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js" integrity="sha384-+7Keh381hSkXmXqnjC0JBM/kzsN6TFj+wMKychSLjTvJ8/0ElMde2uKl8i6p6Buj" crossorigin="anonymous" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous" defer></script>
