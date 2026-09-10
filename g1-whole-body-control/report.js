@@ -16,7 +16,7 @@ function draw() {
   const color = name => style.getPropertyValue(name).trim();
   const traces = ['pd','qp','mpc'].map((controller,i) => {
     const d = measurements[clip][controller];
-    return {x:d.time,y:d.error,type:'scatter',mode:'lines',name:controller.toUpperCase(),
+    return {x:d.time,y:d.error,type:'scatter',mode:'lines',name:controller === 'mpc' ? 'GPU MPC' : controller.toUpperCase(),
       line:{color:[color('--accent-2'),color('--danger'),color('--accent')][i],width:2},
       hovertemplate:'%{x:.2f} s<br>%{y:.3f} m<extra>%{fullData.name}</extra>'};
   });
@@ -30,4 +30,4 @@ function draw() {
 themeButton.addEventListener('click',()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('report-theme',root.dataset.theme)}catch(e){}updateThemeLabel();draw()});
 document.getElementById('clip-select').addEventListener('change',draw);
 updateThemeLabel();
-fetch('assets/plot-data.json').then(r=>{if(!r.ok)throw new Error('Plot data unavailable');return r.json()}).then(d=>{measurements=d;draw()}).catch(()=>{document.getElementById('tracking-chart').textContent='The interactive plot could not load. Exact measurements remain available in Table 1 and the downloadable results.'});
+fetch('assets/gpu-plot-data.json').then(r=>{if(!r.ok)throw new Error('Plot data unavailable');return r.json()}).then(d=>{measurements=d;draw()}).catch(()=>{document.getElementById('tracking-chart').textContent='The interactive plot could not load. Exact measurements remain available in Table 1 and the downloadable results.'});
