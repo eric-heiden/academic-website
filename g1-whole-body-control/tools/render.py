@@ -18,6 +18,7 @@ p = argparse.ArgumentParser()
 p.add_argument("trajectory")
 p.add_argument("output")
 p.add_argument("--poster-time", type=float, default=1.0)
+p.add_argument("--camera-distance", type=float, default=2.55)
 p.add_argument("--poster-only", action="store_true")
 p.add_argument("--thumbnail", help="Optional 320 by 320 JPEG of the simulated pose")
 a = p.parse_args()
@@ -58,7 +59,7 @@ with wp.ScopedDevice("cpu"):
         qr, qa = reference.sample(t)[0], poses[index]
         center = (qr[:3] + qa[:3]) / 2
         center[2] = 0.8
-        distance = max(2.55, float(np.linalg.norm(qr[:2] - qa[:2])) + 1.8)
+        distance = max(a.camera_distance, float(np.linalg.norm(qr[:2] - qa[:2])) + 1.8)
         yaw, pitch = 135.0, -12.0
         direction = np.array(
             [
