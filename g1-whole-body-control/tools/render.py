@@ -17,6 +17,7 @@ from newton.examples.robot.wbc_controller import MotionReference
 p = argparse.ArgumentParser()
 p.add_argument("trajectory")
 p.add_argument("output")
+p.add_argument("--previous", help="Optional prior measured trajectory for a third comparison panel")
 p.add_argument("--poster-time", type=float, default=1.0)
 p.add_argument("--camera-distance", type=float, default=2.55)
 p.add_argument("--poster-only", action="store_true")
@@ -41,10 +42,12 @@ with wp.ScopedDevice("cpu"):
     raw = np.load(a.trajectory)
     reference = MotionReference(mujoco.MjModel.from_xml_path(xml), raw["reference"])
     rows, poses = raw["rows"], raw["qpos"]
+    previous = np.load(a.previous) if a.previous else None
+    panels = 3 if previous is not None else 2
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
     writer = imageio_ffmpeg.write_frames(
         a.output,
-        (1280, 640),
+        (640 * panels, 640),
         fps=25,
         codec="libx264",
         pix_fmt_out="yuv420p",
@@ -57,7 +60,13 @@ with wp.ScopedDevice("cpu"):
         index = min(int(np.searchsorted(rows[:, 0], t)), len(rows) - 1)
         t = rows[index, 0]
         qr, qa = reference.sample(t)[0], poses[index]
-        center = (qr[:3] + qa[:3]) / 2
+        configurations = [qr, qa]
+        labels = ["Reference (kinematic)", "SolverMuJoCo (actuated simulation)"]
+        if previous is not None:
+            old_index = min(int(np.searchsorted(previous["rows"][:, 0], t)), len(previous["rows"]) - 1)
+            configurations = [qr, previous["qpos"][old_index], qa]
+            labels = ["Reference (kinematic)", "Previous MPC", "Hand and velocity MPC"]
+        center = np.mean([q[:3] for q in configurations], axis=0)
         center[2] = 0.8
         distance = max(a.camera_distance, float(np.linalg.norm(qr[:2] - qa[:2])) + 1.8)
         yaw, pitch = 135.0, -12.0
@@ -70,7 +79,7 @@ with wp.ScopedDevice("cpu"):
         )
         viewer.set_camera(wp.vec3(*(center - distance * direction)), pitch=pitch, yaw=yaw)
         views = []
-        for q in (qr, qa):
+        for q in configurations:
             nq = q.copy()
             nq[3:7] = q[[4, 5, 6, 3]]
             state.joint_q.assign(nq.astype(np.float32))
@@ -81,16 +90,17 @@ with wp.ScopedDevice("cpu"):
             views.append(viewer.get_frame().numpy())
         frame = Image.fromarray(np.concatenate(views, axis=1))
         draw = ImageDraw.Draw(frame)
-        draw.rectangle((0, 0, 1280, 38), fill="#ffffff")
-        draw.text((14, 9), "Kimodo reference (kinematic)", font=font, fill="#192531")
-        draw.text((654, 9), "SolverMuJoCo (actuated simulation)", font=font, fill="#192531")
-        draw.text((1170, 9), f"{t:.2f} s", font=font, fill="#192531")
-        draw.line((640, 38, 640, 640), fill="#ffffff", width=2)
+        draw.rectangle((0, 0, panels * 640, 38), fill="#ffffff")
+        for panel, label in enumerate(labels):
+            draw.text((panel * 640 + 14, 9), label, font=font, fill="#192531")
+            if panel:
+                draw.line((panel * 640, 38, panel * 640, 640), fill="#ffffff", width=2)
+        draw.text((panels * 640 - 110, 9), f"{t:.2f} s", font=font, fill="#192531")
         writer.send(np.asarray(frame))
         if abs(t - a.poster_time) < poster_distance:
             poster_distance = abs(t - a.poster_time)
             poster = frame.copy()
-            thumbnail = Image.fromarray(views[1]).resize((320, 320), Image.Resampling.LANCZOS)
+            thumbnail = Image.fromarray(views[-1]).resize((320, 320), Image.Resampling.LANCZOS)
     writer.close()
     viewer.close()
     poster.save(Path(a.output).with_suffix(".jpg"), quality=94)
