@@ -40,13 +40,16 @@ USD (Universal Scene Description) composes geometry, materials, lights and envir
 
 ```python
 ovrtx.register_schema_paths()
-renderer = ovrtx.Renderer(
-    config=ovrtx.RendererConfig(sync_mode=True))
+renderer = ovrtx.Renderer(config=ovrtx.RendererConfig(sync_mode=True))
 stage = ovstage.Stage("scene")
+
 renderer.attach_ovstage(stage)
 ovstage.population.open_usd(
-    stage, scene_usd, ordinal=1,
-    domains=ovstage.PopulationDomain.ALL)
+    stage,
+    scene_usd,
+    ordinal=1,
+    domains=ovstage.PopulationDomain.ALL,
+)
 stage.advance_write_floor(1).wait()
 ```
 
@@ -54,11 +57,18 @@ stage.advance_write_floor(1).wait()
 
 ```python
 binding = OvstageBodyBinding(
-    stage, model, ordinal=1,
-    prim_paths=paths, body_indices=indices,
-    body_local_transforms=offsets)
-viewer = ViewerRTX(stage=stage, renderer=renderer,
-                   render_product=product)
+    stage,
+    model,
+    ordinal=1,
+    prim_paths=paths,
+    body_indices=indices,
+    body_local_transforms=offsets,
+)
+viewer = ViewerRTX(
+    stage=stage,
+    renderer=renderer,
+    render_product=product,
+)
 
 # Finish rendering before the next write.
 binding.write(state, ordinal=frame)

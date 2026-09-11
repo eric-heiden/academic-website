@@ -103,26 +103,37 @@ POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstag
 <div class="code-pair">
 <h3>Load once — current APIs</h3>
 <div class="code-shell"><div class="code-header"><span>Listing 1 · Python</span><button aria-label="Copy Python listing 1" class="copy-button" data-copy-target="listing-1" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-1"><span class="n">ovrtx</span><span class="o">.</span><span class="n">register_schema_paths</span><span class="p">()</span>
-<span class="n">renderer</span> <span class="o">=</span> <span class="n">ovrtx</span><span class="o">.</span><span class="n">Renderer</span><span class="p">(</span>
-<span class="n">config</span><span class="o">=</span><span class="n">ovrtx</span><span class="o">.</span><span class="n">RendererConfig</span><span class="p">(</span><span class="n">sync_mode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="n">renderer</span> <span class="o">=</span> <span class="n">ovrtx</span><span class="o">.</span><span class="n">Renderer</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">ovrtx</span><span class="o">.</span><span class="n">RendererConfig</span><span class="p">(</span><span class="n">sync_mode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 <span class="n">stage</span> <span class="o">=</span> <span class="n">ovstage</span><span class="o">.</span><span class="n">Stage</span><span class="p">(</span><span class="s2">"scene"</span><span class="p">)</span>
+
 <span class="n">renderer</span><span class="o">.</span><span class="n">attach_ovstage</span><span class="p">(</span><span class="n">stage</span><span class="p">)</span>
 <span class="n">ovstage</span><span class="o">.</span><span class="n">population</span><span class="o">.</span><span class="n">open_usd</span><span class="p">(</span>
-<span class="n">stage</span><span class="p">,</span> <span class="n">scene_usd</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-<span class="n">domains</span><span class="o">=</span><span class="n">ovstage</span><span class="o">.</span><span class="n">PopulationDomain</span><span class="o">.</span><span class="n">ALL</span><span class="p">)</span>
+    <span class="n">stage</span><span class="p">,</span>
+    <span class="n">scene_usd</span><span class="p">,</span>
+    <span class="n">ordinal</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">domains</span><span class="o">=</span><span class="n">ovstage</span><span class="o">.</span><span class="n">PopulationDomain</span><span class="o">.</span><span class="n">ALL</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="n">stage</span><span class="o">.</span><span class="n">advance_write_floor</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
 </code></pre></div>
 <h3>Publish, then render — prototype API</h3>
 <div class="code-shell"><div class="code-header"><span>Listing 2 · Python</span><button aria-label="Copy Python listing 2" class="copy-button" data-copy-target="listing-2" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-2"><span class="n">binding</span> <span class="o">=</span> <span class="n">OvstageBodyBinding</span><span class="p">(</span>
-<span class="n">stage</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-<span class="n">prim_paths</span><span class="o">=</span><span class="n">paths</span><span class="p">,</span> <span class="n">body_indices</span><span class="o">=</span><span class="n">indices</span><span class="p">,</span>
-<span class="n">body_local_transforms</span><span class="o">=</span><span class="n">offsets</span><span class="p">)</span>
-<span class="n">viewer</span> <span class="o">=</span> <span class="n">ViewerRTX</span><span class="p">(</span><span class="n">stage</span><span class="o">=</span><span class="n">stage</span><span class="p">,</span> <span class="n">renderer</span><span class="o">=</span><span class="n">renderer</span><span class="p">,</span>
-<span class="n">render_product</span><span class="o">=</span><span class="n">product</span><span class="p">)</span>
+    <span class="n">stage</span><span class="p">,</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ordinal</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">prim_paths</span><span class="o">=</span><span class="n">paths</span><span class="p">,</span>
+    <span class="n">body_indices</span><span class="o">=</span><span class="n">indices</span><span class="p">,</span>
+    <span class="n">body_local_transforms</span><span class="o">=</span><span class="n">offsets</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">viewer</span> <span class="o">=</span> <span class="n">ViewerRTX</span><span class="p">(</span>
+    <span class="n">stage</span><span class="o">=</span><span class="n">stage</span><span class="p">,</span>
+    <span class="n">renderer</span><span class="o">=</span><span class="n">renderer</span><span class="p">,</span>
+    <span class="n">render_product</span><span class="o">=</span><span class="n">product</span><span class="p">,</span>
+<span class="p">)</span>
+
 <span class="c1"># Finish rendering before the next write.</span>
 <span class="n">binding</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="n">frame</span><span class="p">)</span>
 <span class="n">stage</span><span class="o">.</span><span class="n">advance_write_floor</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
-<span class="n">viewer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">ordinal</span><span class="o">=</span><span class="n">frame</span><span class="p">)</span> <span class="c1"># frame starts at 2</span>
+<span class="n">viewer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">ordinal</span><span class="o">=</span><span class="n">frame</span><span class="p">)</span>  <span class="c1"># frame starts at 2</span>
 </code></pre></div>
 </div>
 <p class="caption">Excerpts assume an authored camera/RenderProduct and final-model mappings. Register additional physics schemas before population. See <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/docs/prototypes/ovstage-viewer.md">imports and cleanup</a> and <a href="https://github.com/NVIDIA-Omniverse/ovrtx/blob/e3ebb35a6024d070fe21125f3806d6152ed3c753/CHANGELOG.md">0.5 API changes</a>. The prototype window is a fixed-camera preview; full interaction still needs porting.</p>

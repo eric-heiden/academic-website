@@ -124,7 +124,14 @@ def main():
         code.clear()
         code["class"] = ["code-block", "language-python"]
         code["id"] = f"listing-{i}"
-        code.append(BeautifulSoup(highlight(original, PythonLexer(), formatter), "html.parser"))
+        # Parse inside <pre> so whitespace-only tokens keep their indentation
+        # and blank lines instead of being normalized as ordinary HTML text.
+        highlighted = BeautifulSoup(
+            "<pre>" + highlight(original, PythonLexer(), formatter) + "</pre>",
+            "html.parser",
+        )
+        code.extend(list(highlighted.pre.children))
+        assert code.get_text() == original, f"Listing {i} changed during highlighting"
         shell = content.new_tag("div", attrs={"class": "code-shell"})
         pre.wrap(shell)
         header = BeautifulSoup(f'<div class="code-header"><span>Listing {i} · Python</span><button class="copy-button" type="button" data-copy-target="listing-{i}" aria-label="Copy Python listing {i}">Copy code</button></div>', "html.parser")
