@@ -428,7 +428,7 @@ temperature <span class="tok-operator">=</span> view.get_attribute(<span class="
 </section>
 <section class="report-section" id="migration">
   <h2><span class="section-number">8.</span> Migration from extended attributes</h2>
-  <p>The existing paths remain available for a deprecation window. New code should request diagnostics on the solver and pass the resulting container explicitly.</p>
+  <p>The existing paths are deprecated in Newton 1.7 and remain available during migration. New code should request diagnostics on the solver and pass the resulting container explicitly.</p>
   <div class="table-wrap"><table><thead><tr><th>Deprecated path</th><th>Replacement</th></tr></thead><tbody>
     <tr><td><code>State.body_qdd</code></td><td><code>observables.body_qdd</code></td></tr>
     <tr><td><code>State.body_parent_f</code></td><td><code>observables.body_parent_f</code></td></tr>
@@ -462,7 +462,7 @@ solver<span class="tok-operator">.</span>step(state_in, state_out, control, cont
 
 parent_wrench <span class="tok-operator">=</span> observables<span class="tok-operator">.</span>body_parent_f
 contact_force <span class="tok-operator">=</span> observables<span class="tok-operator">.</span>contact_f</code></pre>
-  <p>During migration, sensors can opt into their deprecated automatic request behavior with <code>request_state_attributes=True</code> or <code>request_contact_attributes=True</code>. New sensor code should use the flag sets and explicit input shown above.</p>
+  <p>During migration, sensors can opt into their automatic request behavior with <code>request_state_attributes=True</code> or <code>request_contact_attributes=True</code>. These options are deprecated in Newton 1.7 and each emits one sensor-specific warning at the caller's location. Both default to <code>False</code>, which neither warns nor requests legacy fields. New sensor code should use the flag sets and explicit input shown above.</p>
 </section>
 <section class="report-section" id="benefits">
   <h2><span class="section-number">9.</span> Benefits and limitations</h2>
