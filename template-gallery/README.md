@@ -19,3 +19,11 @@ The report uses a compact single-column article layout with responsive navigatio
 - `assets/` — compact videos and posters reused from the determinism report work.
 
 All report data is representative prototype content. Replace the chart series, table rows, prose, code, and Mermaid source with generated report data when adopting a direction.
+
+For method comparisons, group rows by task, label units and preferred directions,
+and use the `.metric-best` class with `<strong>` for the best eligible value in
+each column. Use `.metric-second` only when a runner-up distinction helps.
+Highlight displayed ties equally and add a short legend. Color must supplement
+bold text, remain readable in both themes, and never promote failed runs as
+overall winners. Keep media captions brief; put methods, equations, and measured
+findings in prose instead of repeating panel labels or rendering procedures.

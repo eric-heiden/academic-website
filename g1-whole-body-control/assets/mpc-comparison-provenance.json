@@ -1,0 +1,136 @@
+{
+  "date": "2026-09-11",
+  "branch": "https://github.com/eric-heiden/newton/tree/feature/g1-kimodo-wbc",
+  "latest_evaluated_commit": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+  "base_commit": "31f58571",
+  "dependency": {
+    "repository": "https://github.com/google-deepmind/mujoco_warp",
+    "pr": 1535,
+    "commit": "357a75d60a56d67d476942a1b6e54b3045ee8e87",
+    "install": "Checkout the pinned PR in a sibling directory and prepend it to PYTHONPATH; the installed package remains unchanged."
+  },
+  "environment": {
+    "python": "3.12.13",
+    "packages": {
+      "newton": "1.7.0.dev0",
+      "mujoco": "3.12.0",
+      "mujoco-warp": "3.12.0",
+      "warp-lang": "1.17.0",
+      "numpy": "2.5.0",
+      "scipy": "1.17.1",
+      "osqp": "1.1.3"
+    },
+    "platform": "Linux-6.8.0-1055-gke-x86_64-with-glibc2.35",
+    "cpu": "AMD EPYC 9B45",
+    "cpu_quota": "4 cores",
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb",
+    "gpu_sms": 46,
+    "memory_gib": 24,
+    "driver": "595.58.03"
+  },
+  "protocol": {
+    "plant_dt": 0.002,
+    "replan_hz": 100,
+    "default_horizon": 0.5,
+    "default_prediction_dt": 0.005,
+    "matched_horizon": 0.3,
+    "matched_prediction_dt": 0.01,
+    "durations": {
+      "ordinary": 5,
+      "backflip": 6
+    },
+    "primary_seed": 123,
+    "repeat_seeds": [
+      123,
+      124,
+      125
+    ],
+    "backend": "All current main-matrix methods, including original GN, use the same pinned PR forward backend.",
+    "timing": "Sequential fresh processes without overlapping GPU benchmarks. First 10 updates excluded; trace snapshots and rendering excluded. Wall time includes plant advance, synchronization, and diagnostics for each control period.",
+    "selection": "Settings selected using two-second walking pilots, then evaluated for full clips. No claim of optimal tuning.",
+    "source_note": "code_commit is the recorded HEAD at process launch; source_tree_commit identifies the committed tree matching all recorded controller file hashes, including edits committed shortly after launch. Earlier FD runs use the same forward objective; later changes correct its derivative at exactly zero rotation, DIAL path visibility, and an optional first-knot boundary.",
+    "archives": "NPZ trajectory recordings remain local; public artifacts contain measurements, configurations, source hashes, CSV references, videos and posters."
+  },
+  "artifacts": {
+    "results": "mpc-comparison-results.json",
+    "runs": "mpc-comparison-runs.json",
+    "validation": "mpc-comparison-validation.json",
+    "graphs": "mpc-comparison-graphs.json",
+    "exploration": "mpc-comparison-exploration.json",
+    "motion_provenance": "provenance.json"
+  },
+  "evaluated_source_trees": {
+    "9cfde981dd1c743e316414fd796e0ee8860a0132": {
+      "example_robot_g1_wbc.py": "55a7e88da17f3f63b36c6d0ca21958dc97e88caf0ceed0e091258061d7388e07",
+      "wbc_mpc_dial.py": "f17ed31ae691db1dd082fe18a6cc27b9de02c18cce7b5dbbdee673eaafe8e2dc",
+      "wbc_mpc_gn.py": "c41a074b34eb76821e15f9f197103d7d65e14b9d9e76bd7e9603c85ff3e90f52",
+      "wbc_controller.py": "4aeeb0376649213589f22a0cc8a35126480a77c38e7ddde9b35daed97ae313ee",
+      "wbc_mpc.py": "2e8df9fa284a3dd747c75bea0301432b9880f973f8d91f9278234d09562df64a",
+      "wbc_rollouts.py": "f6cd5aa15096a9ca86c3b9d984956480340d43628ead06f052c29ee6171f41a6",
+      "wbc_mpc_adjoint.py": "556fb931db187cf8e5ff28ef59e4570895847dbdd70c251b33e2bb4a18e604e5"
+    },
+    "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322": {
+      "example_robot_g1_wbc.py": "f611ef221da6c1589094e5601f82fa341753257cfb69503fed2dd8316501b66b",
+      "wbc_mpc_dial.py": "1ab4883e5b939b104048238e1027ecf38122a673b6863dfd922aa90bc85107d4",
+      "wbc_mpc_gn.py": "c41a074b34eb76821e15f9f197103d7d65e14b9d9e76bd7e9603c85ff3e90f52",
+      "wbc_controller.py": "4aeeb0376649213589f22a0cc8a35126480a77c38e7ddde9b35daed97ae313ee",
+      "wbc_mpc.py": "2e8df9fa284a3dd747c75bea0301432b9880f973f8d91f9278234d09562df64a",
+      "wbc_rollouts.py": "f6cd5aa15096a9ca86c3b9d984956480340d43628ead06f052c29ee6171f41a6",
+      "wbc_mpc_adjoint.py": "556fb931db187cf8e5ff28ef59e4570895847dbdd70c251b33e2bb4a18e604e5"
+    },
+    "15c67a0e6a2cc610dd930b480da21e3f581e796e": {
+      "example_robot_g1_wbc.py": "f611ef221da6c1589094e5601f82fa341753257cfb69503fed2dd8316501b66b",
+      "wbc_mpc_dial.py": "1ab4883e5b939b104048238e1027ecf38122a673b6863dfd922aa90bc85107d4",
+      "wbc_mpc_gn.py": "c41a074b34eb76821e15f9f197103d7d65e14b9d9e76bd7e9603c85ff3e90f52",
+      "wbc_controller.py": "4aeeb0376649213589f22a0cc8a35126480a77c38e7ddde9b35daed97ae313ee",
+      "wbc_mpc.py": "4b32205295a23e5b62124ea8a640a17506a612d05b1f75185e4443b99ea3841e",
+      "wbc_rollouts.py": "f6cd5aa15096a9ca86c3b9d984956480340d43628ead06f052c29ee6171f41a6",
+      "wbc_mpc_adjoint.py": "556fb931db187cf8e5ff28ef59e4570895847dbdd70c251b33e2bb4a18e604e5"
+    },
+    "c9d7ed62a38ebdcc8b2c84f8ba2f185f58a8ad35": {
+      "example_robot_g1_wbc.py": "f611ef221da6c1589094e5601f82fa341753257cfb69503fed2dd8316501b66b",
+      "wbc_mpc_dial.py": "1ab4883e5b939b104048238e1027ecf38122a673b6863dfd922aa90bc85107d4",
+      "wbc_mpc_gn.py": "c41a074b34eb76821e15f9f197103d7d65e14b9d9e76bd7e9603c85ff3e90f52",
+      "wbc_controller.py": "4aeeb0376649213589f22a0cc8a35126480a77c38e7ddde9b35daed97ae313ee",
+      "wbc_mpc.py": "4b32205295a23e5b62124ea8a640a17506a612d05b1f75185e4443b99ea3841e",
+      "wbc_rollouts.py": "a2be46e2f778ead5ce02c7c24eac644832f6860b7ebcf85345e1ad235b7689a3",
+      "wbc_mpc_adjoint.py": "556fb931db187cf8e5ff28ef59e4570895847dbdd70c251b33e2bb4a18e604e5"
+    }
+  },
+  "run_source_commits": {
+    "final_walk_fd_1": "c9d7ed62a38ebdcc8b2c84f8ba2f185f58a8ad35",
+    "final_walk_dial_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_walk_analytic_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_walk_hybrid_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_dance_fd_1": "c9d7ed62a38ebdcc8b2c84f8ba2f185f58a8ad35",
+    "final_dance_dial_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_dance_analytic_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_dance_hybrid_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_jumpjack_fd_1": "c9d7ed62a38ebdcc8b2c84f8ba2f185f58a8ad35",
+    "final_jumpjack_dial_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_jumpjack_analytic_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_jumpjack_hybrid_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_backflip_fd_1": "c9d7ed62a38ebdcc8b2c84f8ba2f185f58a8ad35",
+    "final_backflip_dial_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_backflip_analytic_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_backflip_hybrid_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_walk_previous_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_dance_previous_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_jumpjack_previous_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_walk_fast_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_dance_fast_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_jumpjack_fast_1": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_walk_fd_2": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_walk_dial_2": "15c67a0e6a2cc610dd930b480da21e3f581e796e",
+    "final_walk_analytic_2": "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322",
+    "final_walk_hybrid_2": "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322",
+    "final_walk_fd_3": "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322",
+    "final_walk_dial_3": "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322",
+    "final_walk_analytic_3": "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322",
+    "final_walk_hybrid_3": "f9a90a3352f6d9a0d0e9181f89eeb9691d0cc322",
+    "final_backflip_previous_1": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_dance_hybrid_2": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+    "final_dance_hybrid_3": "9cfde981dd1c743e316414fd796e0ee8860a0132"
+  },
+  "published_branch_checkpoint": "84c1c05793c0886e1f5e941b6497dc7152a9804b"
+}

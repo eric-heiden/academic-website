@@ -62,7 +62,7 @@
       <section class="report-hero" id="overview">
         <div class="report-dates" aria-label="Report dates">
           <span>Created <time datetime="2026-09-05">2026-09-05</time></span>
-          <span>Modified <time datetime="2026-09-07">2026-09-07</time></span>
+          <span>Modified <time datetime="2026-09-11">2026-09-11</time></span>
         </div>
         <p class="paper-series">Technical report</p>
         <h1>Newton determinism evaluation</h1>
@@ -250,6 +250,23 @@ solver = newton.solvers.<span class="tok-name">SolverXPBD</span>(
               <tr><td>Rigid cube</td><td>MuJoCo</td><td>7.3e−08</td><td>Matched</td><td><span class="status">Pass</span></td></tr>
               <tr><td>Soft-body gradient</td><td>Semi-implicit</td><td>1.2e−06</td><td>Near-match</td><td><span class="status warn">Review</span></td></tr>
             </tbody>
+          </table>
+        </div>
+        <p class="metric-legend">Comparison example: <strong class="metric-best">green + bold = best</strong>; <span class="metric-second">amber = next best</span> within each scenario. Values are illustrative.</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Illustrative method comparison">
+          <table class="comparison-table">
+            <thead><tr><th scope="col">Scenario / method</th><th scope="col">Position RMS (cm) ↓</th><th scope="col">Step time (ms) ↓</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Walking / Method A</th><td class="metric-best"><strong>1.2</strong></td><td>8.0</td></tr>
+              <tr><th scope="row">Walking / Method B</th><td class="metric-second">1.5</td><td class="metric-best"><strong>3.0</strong></td></tr>
+              <tr><th scope="row">Walking / Method C</th><td>2.1</td><td class="metric-second">4.0</td></tr>
+            </tbody>
+            <tbody>
+              <tr><th scope="row">Reaching / Method A</th><td class="metric-best"><strong>0.8</strong></td><td class="metric-second">6.0</td></tr>
+              <tr><th scope="row">Reaching / Method B</th><td class="metric-best"><strong>0.8</strong></td><td class="metric-best"><strong>2.0</strong></td></tr>
+              <tr><th scope="row">Reaching / Method C</th><td class="metric-second">1.3</td><td>7.0</td></tr>
+            </tbody>
+            <caption>Table 2. Per-metric rankings within each scenario; displayed ties receive equal emphasis.</caption>
           </table>
         </div>
       </section>

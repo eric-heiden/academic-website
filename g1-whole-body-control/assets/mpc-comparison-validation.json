@@ -1,0 +1,267 @@
+{
+  "source_commit": "9cfde981dd1c743e316414fd796e0ee8860a0132",
+  "dependency_commit": "357a75d60a56d67d476942a1b6e54b3045ee8e87",
+  "test_command": "uv run --extra wbc -m unittest newton.tests.test_g1_wbc newton.tests.test_sensor_contact.TestSensorContactMuJoCo",
+  "tests": {
+    "analytic_branch": {
+      "run": 23,
+      "passed": 23,
+      "skipped": 0
+    },
+    "installed_backend": {
+      "run": 23,
+      "passed": 22,
+      "skipped": 1,
+      "reason": "Analytic-only test requires PR #1535"
+    }
+  },
+  "negative_regressions": {
+    "negative_saturation": " test_adjoint_multistep_gradient_and_graph (newton.tests.test_g1_wbc.TestG1WBC.test_adjoint_multistep_gradient_and_graph)",
+    "negative_adjoint": " test_adjoint_multistep_gradient_and_graph (newton.tests.test_g1_wbc.TestG1WBC.test_adjoint_multistep_gradient_and_graph)",
+    "negative_boundary": " test_dial_annealing_and_normalized_update (newton.tests.test_g1_wbc.TestG1WBC.test_dial_annealing_and_normalized_update)",
+    "negative_dial": " test_dial_annealing_and_normalized_update (newton.tests.test_g1_wbc.TestG1WBC.test_dial_annealing_and_normalized_update)",
+    "negative_contact": "Expected failure observed",
+    "negative_trace_batches": " test_custom_batches_keep_candidate_alternatives (newton.tests.test_g1_wbc.TestG1WBC.test_custom_batches_keep_candidate_alternatives)",
+    "negative_rotation_slope": " test_rotation_residual_identity_derivative (newton.tests.test_g1_wbc.TestG1WBC.test_rotation_residual_identity_derivative)"
+  },
+  "trajectory_directional_derivative": {
+    "motion": "assets/motions/walk.csv",
+    "reference_time_seconds": 0.43,
+    "prediction_dt": 0.005,
+    "nonfoot_weight": 0,
+    "sketch": 8,
+    "random_generator_seed": 57,
+    "relative_error": "abs(FD-AD)/max(abs(FD),abs(AD),1e-6)",
+    "steps": {
+      "4": [
+        {
+          "epsilon": 0.001,
+          "cost_fd": -0.12123584002256393,
+          "cost_ad": -0.12037727236747742,
+          "cost_relative": 0.00708179734647274,
+          "sketch_fd": -0.06329505398609273,
+          "sketch_ad": -0.06313054263591766,
+          "sketch_relative": 0.0025991185695363865
+        },
+        {
+          "epsilon": 0.003,
+          "cost_fd": -0.12059012800455093,
+          "cost_ad": -0.12037727236747742,
+          "cost_relative": 0.0017651165835559368,
+          "sketch_fd": -0.06250120252435218,
+          "sketch_ad": -0.06313054263591766,
+          "sketch_relative": 0.00996886903372547
+        },
+        {
+          "epsilon": 0.01,
+          "cost_fd": -0.12004077434539795,
+          "cost_ad": -0.12037727236747742,
+          "cost_relative": 0.0027953616809099913,
+          "sketch_fd": -0.06316081247590752,
+          "sketch_ad": -0.06313054263591766,
+          "sketch_relative": 0.00047925032632221466
+        }
+      ],
+      "20": [
+        {
+          "epsilon": 0.001,
+          "cost_fd": -1.0523796081542969,
+          "cost_ad": -1.1847639083862305,
+          "cost_relative": 0.11173897236585617,
+          "sketch_fd": 0.5456774744246944,
+          "sketch_ad": 0.5952702760696411,
+          "sketch_relative": 0.08331140263275102
+        },
+        {
+          "epsilon": 0.003,
+          "cost_fd": -1.044432282447815,
+          "cost_ad": -1.1847639083862305,
+          "cost_relative": 0.11844690889120102,
+          "sketch_fd": 0.5443810092074882,
+          "sketch_ad": 0.5952702760696411,
+          "sketch_relative": 0.08548934644974499
+        },
+        {
+          "epsilon": 0.01,
+          "cost_fd": -1.102137565612793,
+          "cost_ad": -1.1847639083862305,
+          "cost_relative": 0.06974076479673386,
+          "sketch_fd": 0.5585571255734447,
+          "sketch_ad": 0.5952702760696411,
+          "sketch_relative": 0.0616747584619886
+        }
+      ],
+      "100": [
+        {
+          "epsilon": 0.001,
+          "cost_fd": -203.14024353027344,
+          "cost_ad": -110.9426498413086,
+          "cost_relative": 0.4538617730140686,
+          "sketch_fd": 3.252156694814073,
+          "sketch_ad": 4.674319267272949,
+          "sketch_relative": 0.3042502001127924
+        },
+        {
+          "epsilon": 0.003,
+          "cost_fd": -203.5980224609375,
+          "cost_ad": -110.9426498413086,
+          "cost_relative": 0.4550897479057312,
+          "sketch_fd": 3.2541396691486972,
+          "sketch_ad": 4.674319267272949,
+          "sketch_relative": 0.3038259727074229
+        },
+        {
+          "epsilon": 0.01,
+          "cost_fd": -402.45361328125,
+          "cost_ad": -110.9426498413086,
+          "cost_relative": 0.7243342995643616,
+          "sketch_fd": -0.06257029621857346,
+          "sketch_ad": 4.674319267272949,
+          "sketch_relative": 1.0133859697296794
+        }
+      ]
+    },
+    "code": "tools/check_analytic_gradient.py"
+  },
+  "one_step": {
+    "results": [
+      {
+        "kind": "q",
+        "epsilon": 0.001,
+        "adjoint": -0.522420786293779,
+        "finite_difference": -0.5228519439697266,
+        "relative_error": 0.0008246267053614614
+      },
+      {
+        "kind": "q",
+        "epsilon": 0.0003,
+        "adjoint": -0.522420786293779,
+        "finite_difference": -0.5225340525309246,
+        "relative_error": 0.0002167633603914807
+      },
+      {
+        "kind": "q",
+        "epsilon": 0.0001,
+        "adjoint": -0.522420786293779,
+        "finite_difference": -0.5251169204711914,
+        "relative_error": 0.005134350222409846
+      },
+      {
+        "kind": "v",
+        "epsilon": 0.001,
+        "adjoint": 0.08140686857573308,
+        "finite_difference": 0.08118152618408203,
+        "relative_error": 0.002768100475961823
+      },
+      {
+        "kind": "v",
+        "epsilon": 0.0003,
+        "adjoint": 0.08140686857573308,
+        "finite_difference": 0.08165836334228517,
+        "relative_error": 0.0030798408914700717
+      },
+      {
+        "kind": "v",
+        "epsilon": 0.0001,
+        "adjoint": 0.08140686857573308,
+        "finite_difference": 0.08344650268554688,
+        "relative_error": 0.024442415729509833
+      },
+      {
+        "kind": "u",
+        "epsilon": 0.001,
+        "adjoint": 1.4225021346914573,
+        "finite_difference": 1.422584056854248,
+        "relative_error": 5.758686975021139e-05
+      },
+      {
+        "kind": "u",
+        "epsilon": 0.0003,
+        "adjoint": 1.4225021346914573,
+        "finite_difference": 1.422564188639323,
+        "relative_error": 4.362119358922641e-05
+      },
+      {
+        "kind": "u",
+        "epsilon": 0.0001,
+        "adjoint": 1.4225021346914573,
+        "finite_difference": 1.4215707778930664,
+        "relative_error": 0.0006547313889218594
+      }
+    ],
+    "forward_backward_ms": [
+      2.480448007583618,
+      1.3911679983139038,
+      1.4030719995498657,
+      1.36844801902771,
+      1.3670079708099365,
+      1.3621759414672852,
+      1.3687360286712646,
+      1.386080026626587,
+      1.3724479675292969,
+      1.3627519607543945
+    ],
+    "gradient_norms": [
+      10.339519500732422,
+      0.4503222405910492,
+      6.530402660369873
+    ],
+    "source": "mujoco-warp-adjoint/mujoco_warp/__init__.py"
+  },
+  "public_gradient_script_check": [
+    {
+      "epsilon": 0.001,
+      "cost_fd": -0.12123584002256393,
+      "cost_ad": -0.12037734687328339,
+      "cost_relative": 0.007081182673573494,
+      "sketch_fd": -0.06329505398609273,
+      "sketch_ad": -0.06313079595565796,
+      "sketch_relative": 0.0025951163651879855
+    },
+    {
+      "epsilon": 0.003,
+      "cost_fd": -0.12059012800455093,
+      "cost_ad": -0.12037734687328339,
+      "cost_relative": 0.0017644987674430013,
+      "sketch_fd": -0.06250120252435218,
+      "sketch_ad": -0.06313079595565796,
+      "sketch_relative": 0.009972841650024445
+    },
+    {
+      "epsilon": 0.01,
+      "cost_fd": -0.12004077434539795,
+      "cost_ad": -0.12037734687328339,
+      "cost_relative": 0.0027959789149463177,
+      "sketch_fd": -0.06316081247590752,
+      "sketch_ad": -0.06313079595565796,
+      "sketch_relative": 0.00047523961571914827
+    }
+  ],
+  "browser_checks": {
+    "viewports": [
+      1024,
+      736,
+      360,
+      320
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "media": 23,
+    "checks": [
+      "pure-white first visit",
+      "no page overflow",
+      "math rendering",
+      "metric rankings and displayed ties",
+      "failure exclusion",
+      "plot quantities and sides",
+      "keyboard and mouse legends",
+      "theme switching preserves zoom",
+      "video switching and seeking",
+      "three prior-study archives",
+      "overview link",
+      "template comparison table"
+    ]
+  }
+}

@@ -65,6 +65,7 @@ These instructions apply to the entire repository.
 - Keep plots transparent and embedded in the article rather than inside dashboard cards. Match plot colors, grid lines, labels, and hover content to bright and dark modes.
 - Preserve important values and uncertainty. Do not invent secondary metrics, scores, or KPI summaries merely to fill space.
 - Use tables for exact values when the reader needs them. Do not duplicate the same data across multiple decorative visualizations.
+- Make method comparisons easy to scan: group rows by task, use short method names, align numbers with tabular numerals, and label units and the preferred direction (↑ or ↓). Highlight the best eligible value in each metric with a restrained background color and bold text; highlight ties at the displayed precision equally. A second color may identify the runner-up when useful. Explain the color meaning in one short legend, preserve contrast in both themes, and never rely on color alone. Do not mark a failed or infeasible run as the best controller merely because one error or runtime is small.
 
 ## Source code
 
@@ -79,6 +80,7 @@ These instructions apply to the entire repository.
 - Simplify diagrams to the minimum set of nodes needed for the argument. Use a horizontal flow when space permits and a vertical flow on narrow screens.
 - Treat videos as evidence, not decoration. Provide controls, a representative poster, `playsinline`, and `preload="metadata"`. Add a caption explaining what the reader should observe.
 - Do not describe media encoding or rendering tools unless those details affect the evidence.
+- Keep media labels and numbered captions short. Identify the method, motion, and any material failure or timing caveat in the caption; avoid a separate paragraph that repeats what each video shows. Focus the surrounding prose on methods, equations, measured results, and limitations. Move routine reproduction commands or detailed artifact provenance into a compact reproduction section or linked manifest.
 - State whether data and media are measured, simulated, illustrative, or representative. Never present representative template data as an experimental measurement.
 
 ## Performance, accessibility, and verification
