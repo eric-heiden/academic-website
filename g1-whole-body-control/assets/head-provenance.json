@@ -1,0 +1,278 @@
+{
+  "base_main": "31f58571",
+  "branch": "feature/g1-kimodo-wbc",
+  "hardware": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb; AMD EPYC 9B45 host, four-CPU quota",
+  "code_commit": "f0ab321cf51e2a2f533810a3f061bb56d5f42b47",
+  "repository": "https://github.com/eric-heiden/newton",
+  "preceding_objective_commit": "6a4a05c3c8c4003c117ce8a26ec494bc5c14d943",
+  "source_sha256": {
+    "wbc_mpc_gn.py": "c41a074b34eb76821e15f9f197103d7d65e14b9d9e76bd7e9603c85ff3e90f52",
+    "example_robot_g1_wbc.py": "00251baa47529920089e98494cac0bb5a58eefdc8cfcb7159f6c1ff0bdf4f500",
+    "wbc_controller.py": "4aeeb0376649213589f22a0cc8a35126480a77c38e7ddde9b35daed97ae313ee",
+    "wbc_mpc.py": "a8a0cccc4bf20f94afd9e183315f2dd49201505a0a0baffe97e28ae0ed4b9dba",
+    "wbc_rollouts.py": "7d1df098d313f3ae3693f028e7ad1a07bf51cb309402569ae0619955ab3c460e"
+  },
+  "checkpoints": [
+    "6a4a05c3c8c4003c117ce8a26ec494bc5c14d943",
+    "c969244d1aced919383cab93801bec4a530c3ed1",
+    "f0ab321cf51e2a2f533810a3f061bb56d5f42b47"
+  ],
+  "python": "3.12.13 (main, Jun  2 2026, 22:27:15) [Clang 22.1.3 ]",
+  "packages": {
+    "warp-lang": "1.17.0",
+    "mujoco": "3.12.0",
+    "mujoco-warp": "3.12.0",
+    "numpy": "2.5.0",
+    "scipy": "1.17.1",
+    "osqp": "1.1.3"
+  },
+  "head_task": {
+    "body": "torso_link",
+    "local_position_m": [
+      0.00765,
+      0,
+      0.38513
+    ],
+    "orientation": "Torso frame; rigid visual head without a neck joint",
+    "position_weight": 100,
+    "half_angle_rotation_weight": 300,
+    "metric": "Full shortest SO(3) angle in degrees"
+  },
+  "evaluation": {
+    "manifest": "head-evaluation.json",
+    "final_runs": 13,
+    "ordinary_repeats": 3,
+    "exploratory_trials": 20,
+    "exploratory_manifest": "head-exploration.json",
+    "reference_timing": "Original 30 Hz samples; no slowdown; initial reference pose and velocity",
+    "plant": "500 Hz MuJoCo Warp, native force-limited PD",
+    "predictor": "100 steps of 5 ms; four offset knots; one 241-trajectory Gauss-Newton iteration; 100 Hz synchronous replanning",
+    "baseline": "Zero head weights under the new recording code; otherwise preceding objective",
+    "selection": "20 exploratory trials selected 100/300 head weights. Final runs repeat the defaults. First runs supply primary tables and videos.",
+    "limitation": "Ordinary/gesture/standing trials end upright without non-foot support. Backflip ends upright with 0.08 s of non-foot contact. Jumping-jack lift recall regresses in final repeats despite improved head alignment."
+  },
+  "reference_csv_sha256": {
+    "backflip.csv": "abe0087d999aecf1eca57966614d0eb9e57092a2b79f148c3d464aa77e89c638",
+    "dance.csv": "a3ac442364775baf9148883e7143237505ee73aa4c7b949a3cb90af8a5d9f996",
+    "high5.csv": "1ee6973aff91dfd2b82c07d9815983116cee199c376b567b1ca4153e551d32fe",
+    "jumpjack.csv": "0d28cfc155ae1750dbc0cbfb45484984490aa77a6e9eaba10f665d8b6a088a5f",
+    "walk.csv": "b0096825c3ce05daa31ba0eaf6ce2353a95fea5660d46ad35635b13699ef652e",
+    "wave.csv": "a48b22a988b60ea83cdf05d005296d8a1f2f0fc565488518977019544e58bdd3"
+  },
+  "motion_provenance": "provenance.json",
+  "predictions": {
+    "bodies": [
+      "left_ankle_roll_link",
+      "right_ankle_roll_link",
+      "left_wrist_yaw_link",
+      "right_wrist_yaw_link",
+      "head"
+    ],
+    "candidate_count": 4,
+    "selected_index": 0,
+    "alternatives": "Three valid candidates selected for spatial diversity; not uncertainty bounds",
+    "horizon_s": 0.4,
+    "spacing_s": 0.02,
+    "points_per_path": 21,
+    "snapshot_rate_hz": 50,
+    "video_fps": 25,
+    "recording": "GPU buffers inside the optimization CUDA graph; no extra physical rollouts",
+    "alignment": "Robot pose and futures share recorded planning time; kinematic reference has no optimizer paths"
+  },
+  "validation": {
+    "unit_tests": "15 passed",
+    "negative_regressions": [
+      "Zeroing the head cost fails test_head_pose_objective_and_measurement",
+      "Ignoring torso rotation of the head offset fails test_head_graph_residuals_and_futures"
+    ],
+    "physical_checks": "All 13 final runs pass actuator count/range, unactuated base, single floor, excluded self-collision, finite-state checks. Zero MPC failures and torque ratios <= 1.",
+    "pre_commit": "Passed",
+    "graph": "head-graph.json",
+    "media": [
+      {
+        "file": "head_backflip.mp4",
+        "ffmpeg_version": "7.0.2-static https://johnvansickle.com/ffmpeg/ built with gcc 8 (Debian 8.3.0-6)",
+        "codec": "h264",
+        "pix_fmt": "yuv420p(progressive)",
+        "fps": 25.0,
+        "source_size": [
+          1280,
+          720
+        ],
+        "size": [
+          1280,
+          720
+        ],
+        "rotate": 0,
+        "duration": 6.0
+      },
+      {
+        "file": "head_dance.mp4",
+        "ffmpeg_version": "7.0.2-static https://johnvansickle.com/ffmpeg/ built with gcc 8 (Debian 8.3.0-6)",
+        "codec": "h264",
+        "pix_fmt": "yuv420p(progressive)",
+        "fps": 25.0,
+        "source_size": [
+          1280,
+          720
+        ],
+        "size": [
+          1280,
+          720
+        ],
+        "rotate": 0,
+        "duration": 5.0
+      },
+      {
+        "file": "head_high5.mp4",
+        "ffmpeg_version": "7.0.2-static https://johnvansickle.com/ffmpeg/ built with gcc 8 (Debian 8.3.0-6)",
+        "codec": "h264",
+        "pix_fmt": "yuv420p(progressive)",
+        "fps": 25.0,
+        "source_size": [
+          1280,
+          720
+        ],
+        "size": [
+          1280,
+          720
+        ],
+        "rotate": 0,
+        "duration": 5.0
+      },
+      {
+        "file": "head_jumpjack.mp4",
+        "ffmpeg_version": "7.0.2-static https://johnvansickle.com/ffmpeg/ built with gcc 8 (Debian 8.3.0-6)",
+        "codec": "h264",
+        "pix_fmt": "yuv420p(progressive)",
+        "fps": 25.0,
+        "source_size": [
+          1280,
+          720
+        ],
+        "size": [
+          1280,
+          720
+        ],
+        "rotate": 0,
+        "duration": 5.0
+      },
+      {
+        "file": "head_walk.mp4",
+        "ffmpeg_version": "7.0.2-static https://johnvansickle.com/ffmpeg/ built with gcc 8 (Debian 8.3.0-6)",
+        "codec": "h264",
+        "pix_fmt": "yuv420p(progressive)",
+        "fps": 25.0,
+        "source_size": [
+          1920,
+          720
+        ],
+        "size": [
+          1920,
+          720
+        ],
+        "rotate": 0,
+        "duration": 5.0
+      },
+      {
+        "file": "head_wave.mp4",
+        "ffmpeg_version": "7.0.2-static https://johnvansickle.com/ffmpeg/ built with gcc 8 (Debian 8.3.0-6)",
+        "codec": "h264",
+        "pix_fmt": "yuv420p(progressive)",
+        "fps": 25.0,
+        "source_size": [
+          1280,
+          720
+        ],
+        "size": [
+          1280,
+          720
+        ],
+        "rotate": 0,
+        "duration": 5.0
+      }
+    ],
+    "browser": {
+      "local": "Passed",
+      "layouts": [
+        {
+          "width": 1024,
+          "theme": "light",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 1024,
+          "theme": "dark",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 736,
+          "theme": "light",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 736,
+          "theme": "dark",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 360,
+          "theme": "light",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 360,
+          "theme": "dark",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 320,
+          "theme": "light",
+          "overflow": false,
+          "math": 27
+        },
+        {
+          "width": 320,
+          "theme": "dark",
+          "overflow": false,
+          "math": 27
+        }
+      ],
+      "interactions": "Plot selectors, keyboard/mouse legend, theme persistence, section navigation, six video play/seek/pause controls, both archived studies, overview navigation",
+      "tables": "Every best cell verified against displayed values and column direction; ties highlighted",
+      "artifacts": "All relative paths, anchors, 19 content hashes, no NPZ files"
+    }
+  },
+  "render_tool": "tools/render_tracking.py",
+  "render_examples": [
+    "python render_tracking.py local/final_walk_1.npz head_walk.mp4 --previous local/walk_p0_r0.npz --poster-time 0.49",
+    "python render_tracking.py local/final_dance_1.npz head_dance.mp4 --poster-time 1.3"
+  ],
+  "artifact_sha256": {
+    "assets/head_backflip.mp4": "4d34a27a9b227d25c6be33bad71919a3bed8cbb32a5af0fd0d49b7e86c5daeee",
+    "assets/head_dance.mp4": "2eaab583ef306d18585c5ffe247254205270dbf2cc680bc8476d1866d2714cd3",
+    "assets/head_high5.mp4": "2b842ce13e5630263d59f2f49b1d4b1ea744bf4d6ec5ad89ecc084f53570eb70",
+    "assets/head_jumpjack.mp4": "dac5faa14d13b3343db7f0a2245e19635b63e7221e2e96a2a0d06843e87678aa",
+    "assets/head_walk.mp4": "e18ca8f9c9f220198b016f0343de484165ace04a85f9a80035e1e3cf496835b1",
+    "assets/head_wave.mp4": "73e81acfbc587834e8d7a42f08b0a11e585899367f23e82571e3867901c61f8c",
+    "assets/head_backflip.jpg": "fa2e1c7e5de38aa7f149e3233a55655564190c1b7083ae6c714b78da70e3ec32",
+    "assets/head_dance.jpg": "07bc533bf23cdd0ccc2055c67e5dd03405cc822d513bf2fad844fc07ac8b7ee8",
+    "assets/head_high5.jpg": "62620d1e9b92ed24911edc10a62c11f254a9c830344c1b0fafe88c571b67d867",
+    "assets/head_jumpjack.jpg": "6f2cffeca858109371e1c30a956d4bd90a7fe935f38400a8d9aa4f9b147b0944",
+    "assets/head_walk.jpg": "be13bfff0b05bb1fcb3ebe46ddfe9f55a811a7e22c47fff88b5ad44c9af2ea7c",
+    "assets/head_wave.jpg": "2f820a7f367e00e790758b0df4aff9a35fd0b96090444dbf05426366c48ca92d",
+    "assets/head-evaluation.json": "86a87a5f0a0c792ff2ca75777b4c5626c82ed8d1ec408734f0cb6539c2d550c5",
+    "assets/head-exploration.json": "ce74645805b91966516813513023ffc5c9f383381a0a3d03da38139928bf874f",
+    "assets/head-graph.json": "32f968f2fa544858f724181b08fded9684d5b973c948ddf0a5aadb70b14149da",
+    "assets/head-plot-data.json": "e2df67c14b2acfbbf30e5ac7006383388039183eca27fbc646fb882e0b23cc66",
+    "tools/render_tracking.py": "5032530b2bdac2f0b85ad5b63af4f5c7bcaeedd95961af5b5217cbea9de2b622",
+    "report.js": "03cfb6aa2cac35c050ae89ce85b36ad1a5f4b094e811b447fd69feca731e8c0f",
+    "index.html": "486bea83b288149741f95d089bbe22b9294dded1db997c29fd7527cc2272dc53"
+  }
+}

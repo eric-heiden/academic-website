@@ -81,8 +81,15 @@ with wp.ScopedDevice("cpu"):
         draw.rectangle((0, 0, 960, 78), fill="white")
         draw.text((18, 10), f"Predicted futures: next {offsets[-1]:.2f} s", font=font, fill="#192531")
         draw.text((804, 10), f"t = {t:.2f} s", font=font, fill="#192531")
-        for body, label in enumerate(["Left foot", "Right foot", "Left hand", "Right hand", "Torso"][:visible.shape[2]]):
-            x = 18 + body * 174
+        labels = {
+            "left_ankle_roll_link": "Left foot", "right_ankle_roll_link": "Right foot",
+            "left_wrist_yaw_link": "Left hand", "right_wrist_yaw_link": "Right hand",
+            "head": "Head", "torso_link": "Torso",
+        }
+        spacing = min(174, 920 // visible.shape[2])
+        for body, name in enumerate(raw["trace_bodies"]):
+            label = labels.get(str(name), str(name))
+            x = 18 + body * spacing
             color = tuple((TRACE_COLORS[body] * 210).astype(int))
             draw.line((x, 57, x + 23, 57), fill=color, width=4)
             draw.text((x + 31, 47), label, font=small, fill="#192531")

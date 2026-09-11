@@ -32,22 +32,25 @@ function draw() {
   const clip = document.getElementById('clip-select').value;
   const foot = Number(document.getElementById('foot-select').value);
   const d = measurements[clip];
-  const hand = document.getElementById('quantity-select').value === 'hand';
+  const quantity = document.getElementById('quantity-select').value;
+  const hand = quantity === 'hand';
+  const head = quantity === 'head';
+  document.getElementById('foot-select').disabled = head;
   const style = getComputedStyle(root);
   const color = name => style.getPropertyValue(name).trim();
-  const keys = hand ? ['previous_hand', 'actual_hand'] : ['reference', 'previous', 'actual'];
-  const names = hand ? ['Previous MPC', 'Hand + velocity MPC'] : ['Reference', 'Previous MPC', 'Hand + velocity MPC'];
-  const colors = hand ? [color('--danger'), color('--accent')] : [color('--text'), color('--danger'), color('--accent')];
+  const keys = head ? ['previous_head', 'actual_head'] : hand ? ['previous_hand', 'actual_hand'] : ['reference', 'previous', 'actual'];
+  const names = (hand || head) ? ['Previous MPC', 'Head objective'] : ['Reference', 'Previous MPC', 'Head objective'];
+  const colors = (hand || head) ? [color('--danger'), color('--accent')] : [color('--text'), color('--danger'), color('--accent')];
   const traces = keys.map((key, i) => ({
-    x: d.time, y: d[key].map(pair => 100 * pair[foot]), type: 'scatter', mode: 'lines',
+    x: d.time, y: head ? d[key] : d[key].map(pair => 100 * pair[foot]), type: 'scatter', mode: 'lines',
     name: names[i], line: {color: colors[i], width: 2, dash: key === 'reference' ? 'dash' : 'solid'},
-    hovertemplate: '%{x:.2f} s<br>%{y:.2f} cm<extra>%{fullData.name}</extra>'
+    hovertemplate: '%{x:.2f} s<br>%{y:.2f} ' + (head ? 'deg' : 'cm') + '<extra>%{fullData.name}</extra>'
   }));
   Plotly.react('tracking-chart',traces,{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
     font:{family:'system-ui, sans-serif',size:11,color:color('--text')},
     margin:{l:57,r:12,t:55,b:52},legend:{orientation:'h',x:0,y:1.22,font:{size:10}},
     xaxis:{title:{text:'Simulation time (s)'},gridcolor:color('--line'),zeroline:false},
-    yaxis:{title:{text:hand ? 'Wrist position error (cm)' : 'Sole clearance (cm)'},gridcolor:color('--line'),rangemode:'tozero',zeroline:true,zerolinecolor:color('--muted')},
+    yaxis:{title:{text:head ? 'Head orientation error (deg)' : hand ? 'Wrist position error (cm)' : 'Sole clearance (cm)'},gridcolor:color('--line'),rangemode:'tozero',zeroline:true,zerolinecolor:color('--muted')},
     hovermode:'x unified'}, {responsive:true,displaylogo:false,displayModeBar:false}).then(() => {
       const graph = document.getElementById('tracking-chart');
       accessibleLegend();
@@ -62,4 +65,4 @@ document.getElementById('clip-select').addEventListener('change',draw);
 document.getElementById('foot-select').addEventListener('change',draw);
 document.getElementById('quantity-select').addEventListener('change', draw);
 updateThemeLabel();
-fetch('assets/hands-plot-data.json').then(r=>{if(!r.ok)throw new Error('Plot data unavailable');return r.json()}).then(d=>{measurements=d;draw()}).catch(()=>{document.getElementById('tracking-chart').textContent='The interactive plot could not load. Exact measurements remain available in the tables and downloadable results.'});
+fetch('assets/head-plot-data.json').then(r=>{if(!r.ok)throw new Error('Plot data unavailable');return r.json()}).then(d=>{measurements=d;draw()}).catch(()=>{document.getElementById('tracking-chart').textContent='The interactive plot could not load. Exact measurements remain available in the tables and downloadable results.'});
