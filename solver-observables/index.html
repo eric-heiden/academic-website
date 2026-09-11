@@ -131,7 +131,7 @@ figcaption strong { color: var(--text); }
     <p>Each observable declares its row frequency: the bodies, joint degrees of freedom, or contact slots that index its array. This metadata drives allocation dependencies and lets articulation views select supported static layouts without model field registration. The API is experimental; dynamic contact selection and soft-contact force sensing remain future work. The diagrams describe ownership and call sequence, not a measured performance result.</p>
   </div>
   <details class="contents"><summary>Contents</summary><ol>
-    <li><a href="#motivation">What changes</a></li><li><a href="#architecture">Allocation and runtime flow</a></li><li><a href="#contracts">Data contracts</a></li><li><a href="#usage">Application usage</a></li><li><a href="#extension">Custom solvers</a></li><li><a href="#sensors">Sensor consumption</a></li><li><a href="#selection">Selection and row frequencies</a></li><li><a href="#migration">Migration</a></li><li><a href="#benefits">Benefits and limitations</a></li>
+    <li><a href="#motivation">What changes</a></li><li><a href="#architecture">Allocation and runtime flow</a></li><li><a href="#contracts">Data contracts</a></li><li><a href="#usage">Application usage</a></li><li><a href="#extension">Custom solvers</a></li><li><a href="#sensors">Sensor consumption</a></li><li><a href="#selection">Selection and row frequencies</a></li><li><a href="#scheduling">Substep scheduling</a></li><li><a href="#migration">Migration</a></li><li><a href="#benefits">Benefits and limitations</a></li>
   </ol></details>
 </header>
 <section class="report-section" id="motivation">
@@ -184,10 +184,12 @@ figcaption strong { color: var(--text); }
     <dd>Each container belongs to the solver instance that allocated it. The solver checks its concrete type and ownership before using it. <code>supported_observable_flags</code> reports supported requests.</dd>
     <dt><code>None</code> means unrequested, not pending.</dt>
     <dd>Every requested array exists when <code>observables()</code> returns. A valid zero-capacity request produces an empty array; it does not leave the field as <code>None</code>.</dd>
+    <dt>Selection controls requests without reallocating storage.</dt>
+    <dd><code>observables.select(flags)</code> returns a same-type subset sharing selected arrays and gradients. Omitted fields are <code>None</code> only in the subset; the source is unchanged. Its read-only <code>flags</code> and <code>is_requested(flag)</code> identify requested fields, not fresh values. The existing <code>flag in observables</code> syntax is equivalent.</dd>
     <dt>Contact arrays use resolved capacity.</dt>
     <dd><code>contact_f</code> has <code>rigid_contact_max + soft_contact_max</code> entries: rigid slots first, then soft-rigid slots. The soft segment begins at the rigid <em>capacity</em>, not the live rigid count. Each segment's live count, clamped to its capacity, identifies active slots; force availability remains solver-dependent. Before pipeline initialization, the model capacities are <code>None</code>.</dd>
     <dt>Contact allocation freezes capacity; the first step binds storage.</dt>
-    <dd>Changing the model's capacities after contact-observable allocation is rejected. The first step verifies the contacts' device and both capacities, then binds that exact <code>Contacts</code> instance. Subsequent steps and sensors must use it.</dd>
+    <dd>Changing the model's capacities after contact-observable allocation is rejected. The first step requesting a contact-indexed field verifies the contacts' device and both capacities, then binds that exact <code>Contacts</code> instance for the source and all contact-indexed subsets. Subsequent steps and sensors must use it. Body-only subsets need no contact binding.</dd>
     <dt>Allocate before graph capture.</dt>
     <dd>The observable arrays are reusable in ordinary and conditional CUDA graphs. There is no deferred observable allocation. Other solver scratch storage may still require its usual warmup.</dd>
   </dl>
@@ -300,7 +302,7 @@ solver<span class="tok-operator">.</span>step(state_in, state_out, control, cont
     <span class="tok-keyword">def</span> <span class="tok-name">_allocate_observables</span>(<span class="tok-name">self</span>, observables, <span class="tok-operator">*</span>, requires_grad):
         <span class="tok-name">super</span>()<span class="tok-operator">.</span>_allocate_observables(observables, requires_grad<span class="tok-operator">=</span>requires_grad)
 
-        <span class="tok-keyword">if</span> ThermalObservableFlags<span class="tok-operator">.</span>BODY_TEMPERATURE <span class="tok-operator">in</span> observables:
+        <span class="tok-keyword">if</span> observables.is_requested(ThermalObservableFlags.BODY_TEMPERATURE):
             observables<span class="tok-operator">.</span>body_temperature <span class="tok-operator">=</span> wp<span class="tok-operator">.</span>zeros(
                 <span class="tok-name">self</span><span class="tok-operator">.</span>model<span class="tok-operator">.</span>body_count,
                 dtype<span class="tok-operator">=</span>wp<span class="tok-operator">.</span>float32,
@@ -324,7 +326,7 @@ solver<span class="tok-operator">.</span>step(state_in, state_out, control, cont
 
         <span class="tok-comment"># ...advance simulation and populate standard observables...</span>
 
-        <span class="tok-keyword">if</span> observables <span class="tok-operator">is</span> <span class="tok-operator">not</span> <span class="tok-keyword">None</span> <span class="tok-operator">and</span> observables<span class="tok-operator">.</span>body_temperature <span class="tok-operator">is</span> <span class="tok-operator">not</span> <span class="tok-keyword">None</span>:
+        <span class="tok-keyword">if</span> observables <span class="tok-keyword">is not None and</span> observables.is_requested(ThermalObservableFlags.BODY_TEMPERATURE):
             wp<span class="tok-operator">.</span>launch(
                 compute_body_temperature,
                 dim<span class="tok-operator">=</span><span class="tok-name">self</span><span class="tok-operator">.</span>model<span class="tok-operator">.</span>body_count,
@@ -343,6 +345,7 @@ observables <span class="tok-operator">=</span> solver<span class="tok-operator"
 solver<span class="tok-operator">.</span>step(state_in, state_out, control, contacts, dt, observables<span class="tok-operator">=</span>observables)
 
 temperature <span class="tok-operator">=</span> observables<span class="tok-operator">.</span>body_temperature</code></pre>
+  <p>Use <code>is_requested()</code> in allocation and stepping code, including for standard fields. It remains true for requested zero-length arrays. Simple derived containers inherit <code>select()</code> unchanged: custom fields are selected by the same enum values that name their arrays. Containers with nested observable containers should override <code>select()</code>, call <code>super()</code>, and select their children in the returned object. <code>SolverCoupled.Observables</code> does this for entry-local containers. Other custom metadata is shallow-copied.</p>
   <h3>Contact-indexed custom fields</h3>
   <p>Declare a contact frequency on the <em>container</em>, just as temperature declares <code>BODY</code>. A solver advertises the flag only in <code>SUPPORTED_OBSERVABLE_FLAGS</code>. The base solver derives pipeline initialization, capacity freezing, and storage binding from the frequency, even when the standard force array is not requested.</p>
   <pre tabindex="0"><code class="language-python"><span class="tok-keyword">class</span> <span class="tok-name">ContactObservableFlags</span>(Enum):
@@ -426,8 +429,54 @@ temperature <span class="tok-operator">=</span> view.get_attribute(<span class="
   <p>Contact rows can change after every collision pass, have variable counts, and connect two different articulations. There is no unique, stable rectangular articulation layout. The current view rejects all three contact frequencies with an explicit error.</p>
   <p><strong>Recommended next step:</strong> define endpoint-based filtering with an explicit choice of either endpoint, both endpoints, or signed force on a selected body. For rectangular articulation data, reduce contact forces to a <code>BODY</code>-frequency observable first. Automatic filtering and reduction are not implemented here. A future schema could reuse <code>Model.AttributeSpec</code> when row widths, reference domains, or compaction policies are needed; the present declaration contains only the shared frequency contract.</p>
 </section>
+<section class="report-section" id="scheduling">
+  <h2><span class="section-number">8.</span> Substep scheduling</h2>
+  <p>Allocation specifies which diagnostics can be produced; a selection specifies which are requested on one solver call. For example, an IMU can sample acceleration every substep while a contact sensor samples forces only on the last substep. This update rate is independent of <code>AttributeFrequency</code>, which describes row indexing.</p>
+  <figure id="scheduling-figure" class="diagram-panel">
+    <div class="mermaid-shell" data-mermaid-source="flowchart TB
+      A[&quot;Allocate all arrays once&quot;] --> B[&quot;Earlier substeps: select acceleration&quot;]
+      B --> C[&quot;Read IMU after each substep&quot;]
+      A --> D[&quot;Last substep: pass full container&quot;]
+      C --> D
+      D --> E[&quot;Read IMU and contact sensor&quot;]" role="img" aria-label="Shared observable storage supports different per-field sampling rates">
+      <p class="diagram-fallback">Allocate both arrays once. A shared acceleration subset is passed to earlier substeps and consumed by the IMU. The final substep receives the full container and supplies both sensors.</p>
+    </div>
+    <figcaption><strong>Figure 6.</strong> Subsets share the original arrays. Passing a different subset changes the request, not the storage or the <code>solver.step()</code> signature.</figcaption>
+  </figure>
+  <p>After configuring the solver, collision pipeline, and sensors, allocate and select before the loop or graph capture. Here <code>frame_dt</code> is the frame duration in seconds, <code>num_substeps</code> is a positive integer, and <code>substep_dt</code> is each solver step's duration.</p>
+  <pre tabindex="0"><code class="language-python">flags = imu.solver_observable_flags | contact_sensor.solver_observable_flags
+observables = solver.observables(flags)
+every_substep = observables.select(imu.solver_observable_flags)
+substep_dt = frame_dt / num_substeps
+
+<span class="tok-keyword">for</span> substep <span class="tok-keyword">in</span> range(num_substeps):
+    is_last = substep == num_substeps - 1
+    requested = observables <span class="tok-keyword">if</span> is_last <span class="tok-keyword">else</span> every_substep
+    <span class="tok-comment"># Update collisions here when using external collision detection.</span>
+    solver.step(
+        state_in, state_out, control, contacts, substep_dt,
+        observables=requested,
+    )
+    state_in, state_out = state_out, state_in
+    imu.update(state_in, solver_observables=every_substep)
+
+contact_sensor.update(state_in, contacts, solver_observables=observables)</code></pre>
+  <p>If all diagnostics are needed only at the end, pass <code>observables=None</code> on earlier substeps. An empty selection, <code>observables.select(set())</code>, also requests none. The full container still owns all allocated buffers.</p>
+  <h3>Selection contract</h3>
+  <ul>
+    <li><code>select(flags)</code> creates a lightweight Python container of the same concrete type. It neither allocates nor copies observable arrays, including for custom fields.</li>
+    <li>Selected fields reference the exact source arrays and gradients. Omitted fields are <code>None</code> in the subset. Do not temporarily clear and restore fields on the source.</li>
+    <li><code>is_requested(flag)</code> checks the subset's request. It does not test array length, completed computation, or freshness.</li>
+    <li>Flags absent from the source are rejected. Selecting a selection can only narrow it; create another combination from the original container.</li>
+    <li>Contact-indexed subsets share one storage binding, even when created before the first step. Coupled solvers propagate selections into their child containers.</li>
+  </ul>
+  <h3>Sampling and execution limits</h3>
+  <p>Skipped arrays retain their previous values. A mixed-rate container is not a synchronized snapshot: update each sensor only after its required fields have been produced, using the matching state and contact geometry. Collision detection may overwrite or reorder contact rows, so old contact forces must not be consumed against new geometry. Last-substep forces are not frame averages; averaging or integration requires samples from the relevant substeps.</p>
+  <p>Create selections before graph capture and reuse them. A fixed Python substep schedule is captured with the graph; changing Python selections afterward does not change an existing graph. Device-driven choices require the desired selections to be captured in graph-control-flow branches.</p>
+  <p>Selection controls observable writes and optional diagnostic work. It does not remove calculations needed by the dynamics, other requested fields, or legacy extended attributes. MuJoCo currently retains its post-constraint RNE computation once enabled, so skipping those observables does not necessarily skip that internal stage on later steps.</p>
+</section>
 <section class="report-section" id="migration">
-  <h2><span class="section-number">8.</span> Migration from extended attributes</h2>
+  <h2><span class="section-number">9.</span> Migration from extended attributes</h2>
   <p>The existing paths are deprecated in Newton 1.7 and remain available during migration. New code should request diagnostics on the solver and pass the resulting container explicitly.</p>
   <div class="table-wrap"><table><thead><tr><th>Deprecated path</th><th>Replacement</th></tr></thead><tbody>
     <tr><td><code>State.body_qdd</code></td><td><code>observables.body_qdd</code></td></tr>
@@ -465,13 +514,14 @@ contact_force <span class="tok-operator">=</span> observables<span class="tok-op
   <p>During migration, sensors can opt into their automatic request behavior with <code>request_state_attributes=True</code> or <code>request_contact_attributes=True</code>. These options are deprecated in Newton 1.7 and each emits one sensor-specific warning at the caller's location. Both default to <code>False</code>, which neither warns nor requests legacy fields. New sensor code should use the flag sets and explicit input shown above.</p>
 </section>
 <section class="report-section" id="benefits">
-  <h2><span class="section-number">9.</span> Benefits and limitations</h2>
+  <h2><span class="section-number">10.</span> Benefits and limitations</h2>
   <ul>
     <li><strong>Ownership follows computation.</strong> Capability checks and allocation are attached to the solver that produces the data.</li>
     <li><strong>Allocation follows demand.</strong> Unrequested diagnostic arrays stay absent. This can avoid storage and computation, but the report makes no measured speedup claim.</li>
     <li><strong>Extensions remain local.</strong> A custom solver can add flags and arrays without editing the global state schema or reserving flag bits.</li>
     <li><strong>Consumers compose requirements.</strong> Applications can union sensor requirements and share one container across sensors, viewers, and logging code.</li>
     <li><strong>Row semantics are declared once.</strong> Custom fields participate in dependency checks and supported articulation layouts through the same frequency metadata.</li>
+    <li><strong>Sampling does not change storage.</strong> Reusable selections schedule different fields across substeps while sensors retain access to the same buffers.</li>
   </ul>
   <p>The tradeoff is explicit lifecycle management: applications must keep the container with its owning solver and keep contact-indexed results with the bound storage. A replacement pipeline with different capacity requires rebuilding the relevant allocation setup. The API does not permit a caller to silently resize contact buffers in the middle of a captured loop.</p>
   <p>Availability and physical interpretation remain solver-dependent. Kamino reports discrete step-average acceleration, including impact impulse divided by the step duration. XPBD's reaction wrenches are approximate applied constraint reactions. The coupled solver wrapper exposes a body observable only when all body-owning entries support it; contact observables require an explicit index-remapping contract and are not exposed by that wrapper.</p>
@@ -531,7 +581,12 @@ const mobileSources = {
     M --> V["Storage validation"]
     M --> S["ArticulationView<br/>layout"]
     A ~~~ V
-    V ~~~ S`
+    V ~~~ S`,
+  "scheduling-figure": `flowchart TB
+    A["Allocate all<br/>arrays once"] --> B["Earlier substeps:<br/>select acceleration"]
+    B --> C["Read IMU<br/>after each substep"]
+    C --> D["Last substep:<br/>pass full container"]
+    D --> E["Read IMU and<br/>contact sensor"]`
 };
 async function renderDiagrams() {
   requested = true;
@@ -555,7 +610,7 @@ async function renderDiagrams() {
       });
       for (const node of document.querySelectorAll("[data-mermaid-source]")) {
         const source = node.clientWidth < 500
-          ? mobileSources[node.closest("figure").id]
+          ? (mobileSources[node.closest("figure").id] ?? node.dataset.mermaidSource.replace("flowchart LR", "flowchart TB"))
           : node.clientWidth < 680
             ? node.dataset.mermaidSource.replace("flowchart LR", "flowchart TB")
             : node.dataset.mermaidSource;
