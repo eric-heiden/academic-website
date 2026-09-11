@@ -17,10 +17,20 @@ from pygments.lexers import PythonLexer
 ROOT = Path(__file__).resolve().parent
 TITLE = "USD scene preservation for Newton RTX"
 ABSTRACT = (
-    "Source-scene rendering through ovstage, measured appearance and publication costs, "
-    "and a proposed OVRTX upgrade and shared physics importer for Newton and ovnewton."
+    "Current Newton and ovnewton workflows, duplicated physics import rules, and a "
+    "proposed shared importer with source-scene RTX rendering; appearance comparisons "
+    "and measured publication costs."
 )
-SECTIONS = ["architecture", "upgrade", "ownership", "evidence", "performance"]
+SECTION_LABELS = {
+    "motivation": "Motivation and components",
+    "current": "Current ovnewton workflow",
+    "architecture": "Scene and viewer ownership",
+    "ownership": "Shared import and future usage",
+    "upgrade": "OVRTX upgrade",
+    "evidence": "Visual comparison",
+    "performance": "Performance and qualification",
+}
+SECTIONS = list(SECTION_LABELS)
 SCENES = [
     ("anymal_1", "ANYmal / terrain", "ANYmal on an Isaac Lab heightfield",
      "Subdivision and surface appearance differ after visual reconstruction."),
@@ -62,7 +72,7 @@ def comparisons():
 <div class="after"><span class="image-label">Preserved source in ovstage</span><img src="assets/{scene}-source.png" width="640" height="480" loading="lazy" alt="{title}: original scene rendered through ovstage"></div>
 </div>
 <label class="slider-control" hidden>Reveal source image <input type="range" min="0" max="100" value="50" aria-label="Reveal source image for {title}"></label>
-<figcaption class="figure-caption"><span class="caption-label">Figure {i+3}.</span> {title}. {observation}{note}</figcaption>
+<figcaption class="figure-caption"><span class="caption-label">Figure {i+4}.</span> {title}. {observation}{note}</figcaption>
 </figure>''')
     return "\n".join(parts) + "</div>"
 
@@ -83,14 +93,19 @@ def measurements():
 
 def main():
     source = (ROOT / "report.md").read_text(encoding="utf-8")
+    source = source.replace("<!-- CURRENT_FLOW -->", diagram(
+        'flowchart LR\nUSD[Composed USD] --> PXR[Newton OpenUSD importer]\nPXR -->|Physics policy A| MODEL[Newton Model]\nUSD --> POP[ovpopulation]\nPOP --> STAGE[ovstage]\nSTAGE --> OV[ovnewton importer]\nOV -->|Physics policy B| MODEL',
+        '<span class="caption-label">Figure 1.</span> Current alternative import routes. USD composition is handled by OpenUSD; Newton-specific physics interpretation exists in both importers. The duplication is maintained code, not necessarily two imports in one application.',
+        "Two alternative routes build a Newton model: Newton's OpenUSD importer applies physics policy A, while ovpopulation loads ovstage and ovnewton applies a separate physics policy B."
+    ))
     source = source.replace("<!-- RUNTIME_FLOW -->", diagram(
         'flowchart LR\nUSD[Composed USD] -->|ovpopulation| STAGE[ovstage]\nSTAGE --> RTX[OVRTX]\nRTX --> VIEW[ViewerRTX]\nSTATE[Newton state] --> POSE[Newton pose transport]\nPOSE --> STAGE',
-        '<span class="caption-label">Figure 1.</span> Proposed runtime ownership. Appearance stays in ovstage; Newton writes poses. ovnewton would reuse the optional pose transport.',
+        '<span class="caption-label">Figure 2.</span> Proposed runtime ownership. Appearance stays in ovstage; Newton writes poses. ovnewton would reuse the optional pose transport.',
         "Composed USD is loaded by ovpopulation into ovstage. Newton state reaches the same stage through pose transport. OVRTX renders that stage and ViewerRTX displays its outputs."
     ))
     source = source.replace("<!-- IMPORT_FLOW -->", diagram(
         'flowchart LR\nPXR[OpenUSD reader in Newton] --> IMPORT[Shared Newton physics importer]\nSTAGE[ovstage reader in ovnewton] --> IMPORT\nIMPORT --> MODEL[Newton Model]',
-        '<span class="caption-label">Figure 2.</span> Proposed import ownership. Two source readers supply facts to one Newton implementation of physics interpretation.',
+        '<span class="caption-label">Figure 3.</span> Proposed import ownership. Two source readers supply facts to one Newton implementation of physics interpretation. This shared importer is not implemented by the rendering prototype.',
         "The OpenUSD reader in Newton and the ovstage reader in ovnewton both feed one shared Newton physics importer, which builds the Newton model."
     ))
     source = source.replace("<!-- COMPARISONS -->", comparisons())
@@ -101,12 +116,15 @@ def main():
 
     table_captions = [
         "Component responsibilities and the proposed integration boundary.",
+        "How the inspected ovnewton implementation reads and interprets ovstage.",
         "Scene ownership in the two ViewerRTX modes.",
-        "Required changes for the OVRTX 0.5 migration.",
+        "Proposed workflows preserve application entry points while sharing physics policy.",
         "Implementation order, repository ownership and acceptance criteria.",
+        "Required changes for the OVRTX 0.5 migration.",
         "Measured costs and their implications for workload qualification.",
         "All 13 OVRTX 0.5 research runs; p95 is the 95th percentile of frame time.",
     ]
+    assert len(content.find_all("table")) == len(table_captions)
     for i, table in enumerate(content.find_all("table")):
         figure = content.new_tag("figure", attrs={"class": "table-figure"})
         table.wrap(figure)
@@ -154,7 +172,7 @@ def main():
     nav = BeautifulSoup('''<a class="skip-link" href="#main-content">Skip to report</a>
 <header class="site-nav"><div class="nav-inner">
 <a class="brand" href="../" aria-label="All research reports"><span class="brand-mark" aria-hidden="true">N</span><span>Newton / USD scene preservation</span></a>
-<nav class="nav-links" aria-label="Report sections"><a href="#architecture" data-section-link>Architecture</a><a href="#upgrade" data-section-link>Upgrade</a><a href="#ownership" data-section-link>Next steps</a><a href="#evidence" data-section-link>Evidence</a><a href="#performance" data-section-link>Costs</a></nav>
+<nav class="nav-links" aria-label="Report sections"><a href="#motivation" data-section-link>Motivation</a><a href="#current" data-section-link>Current use</a><a href="#ownership" data-section-link>Design</a><a href="#upgrade" data-section-link>Upgrade</a><a href="#evidence" data-section-link>Evidence</a></nav>
 <div class="nav-actions"><button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false" aria-label="Switch to dark theme"><span class="theme-icon" aria-hidden="true">☀</span><span class="theme-label">Bright</span></button></div>
 </div></header>''', "html.parser")
     template.body.append(nav)
@@ -170,8 +188,8 @@ def main():
     abstract.append(BeautifulSoup("<h2>Abstract</h2>", "html.parser"))
     abstract.append(content.p.extract())
     hero.append(abstract)
-    toc = BeautifulSoup('<details class="mobile-toc"><summary>Contents</summary><nav aria-label="Report sections on mobile"></nav></details>', "html.parser")
-    for identifier, label in zip(SECTIONS, ("Architecture", "OVRTX upgrade", "Next steps", "Visual comparison", "Performance")):
+    toc = BeautifulSoup('<details class="mobile-toc"><summary>Contents</summary><nav aria-label="All report sections"></nav></details>', "html.parser")
+    for identifier, label in SECTION_LABELS.items():
         toc.nav.append(BeautifulSoup(f'<a href="#{identifier}" data-section-link>{label}</a>', "html.parser"))
     hero.append(toc)
     article.append(hero)
@@ -188,7 +206,7 @@ def main():
             node.decompose()
         else:
             current.append(node.extract())
-    assert count == 5
+    assert count == len(SECTIONS)
     article.append(BeautifulSoup('<footer class="report-footer"><span>Measured scene comparisons and proposed integration design.</span><a href="../">All research reports</a></footer>', "html.parser"))
     template.body.append(template.new_tag("script", src="report.js", defer=True))
     template.body.append(template.new_tag("script", src="mermaid.js", type="module"))

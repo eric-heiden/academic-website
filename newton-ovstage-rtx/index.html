@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
-<meta content="Source-scene rendering through ovstage, measured appearance and publication costs, and a proposed OVRTX upgrade and shared physics importer for Newton and ovnewton." name="description"/>
+<meta content="Current Newton and ovnewton workflows, duplicated physics import rules, and a proposed shared importer with source-scene RTX rendering; appearance comparisons and measured publication costs." name="description"/>
 <title>USD scene preservation for Newton RTX</title>
 
 
@@ -16,15 +16,16 @@
 <body><a class="skip-link" href="#main-content">Skip to report</a>
 <header class="site-nav"><div class="nav-inner">
 <a aria-label="All research reports" class="brand" href="../"><span aria-hidden="true" class="brand-mark">N</span><span>Newton / USD scene preservation</span></a>
-<nav aria-label="Report sections" class="nav-links"><a data-section-link="" href="#architecture">Architecture</a><a data-section-link="" href="#upgrade">Upgrade</a><a data-section-link="" href="#ownership">Next steps</a><a data-section-link="" href="#evidence">Evidence</a><a data-section-link="" href="#performance">Costs</a></nav>
+<nav aria-label="Report sections" class="nav-links"><a data-section-link="" href="#motivation">Motivation</a><a data-section-link="" href="#current">Current use</a><a data-section-link="" href="#ownership">Design</a><a data-section-link="" href="#upgrade">Upgrade</a><a data-section-link="" href="#evidence">Evidence</a></nav>
 <div class="nav-actions"><button aria-label="Switch to dark theme" aria-pressed="false" class="theme-toggle" id="theme-toggle" type="button"><span aria-hidden="true" class="theme-icon">☀</span><span class="theme-label">Bright</span></button></div>
 </div></header><div class="report-shell"><main class="report" id="main-content"><section class="report-hero" id="overview"><div aria-label="Report dates" class="report-dates"><span>Created <time datetime="2026-09-10">2026-09-10</time></span><span>Modified <time datetime="2026-09-11">2026-09-11</time></span></div>
 <p class="paper-series">Technical report</p><h1>USD scene preservation for Newton RTX</h1>
-<dl class="paper-meta"><div><dt>Software</dt><dd>Newton 1.7 development · OVRTX 0.5 · ovstage 0.2</dd></div><div><dt>Evidence</dt><dd>13 research runs · RTX 4090 / Windows</dd></div></dl><div class="abstract-block"><h2>Abstract</h2><p>Newton’s USD importer reconstructs a limited visual scene, which can discard authored appearance. This study compares that path with rendering the composed source scene through ovstage and OVRTX, using Isaac Lab assets and synthetic pose replay. Source preservation retains visual information without adding renderer-specific shader parsing to Newton. The proposed migration keeps ViewerRTX, centralizes physics interpretation in Newton and uses ovnewton as an optional adapter. Publication overhead remains substantial for 64 moving robots.</p></div><details class="mobile-toc"><summary>Contents</summary><nav aria-label="Report sections on mobile"><a data-section-link="" href="#architecture">Architecture</a><a data-section-link="" href="#upgrade">OVRTX upgrade</a><a data-section-link="" href="#ownership">Next steps</a><a data-section-link="" href="#evidence">Visual comparison</a><a data-section-link="" href="#performance">Performance</a></nav></details>
+<dl class="paper-meta"><div><dt>Software</dt><dd>Newton 1.7 development · OVRTX 0.5 · ovstage 0.2</dd></div><div><dt>Evidence</dt><dd>13 research runs · RTX 4090 / Windows</dd></div></dl><div class="abstract-block"><h2>Abstract</h2><p>Newton’s USD importer reconstructs a limited visual scene, which can discard authored appearance. Meanwhile, ovnewton imports physics from ovstage through a second implementation of many of Newton’s import rules. This report explains the two workflows and proposes separate ownership for scene preservation and physics interpretation: retain the composed scene for OVRTX, centralize physics policy in Newton, and keep ovnewton as an optional adapter. Isaac Lab asset comparisons and synthetic pose replay support the rendering approach; complete task compatibility and the shared importer remain unproven. Publication overhead is substantial for 64 moving robots.</p></div><details class="mobile-toc"><summary>Contents</summary><nav aria-label="All report sections"><a data-section-link="" href="#motivation">Motivation and components</a><a data-section-link="" href="#current">Current ovnewton workflow</a><a data-section-link="" href="#architecture">Scene and viewer ownership</a><a data-section-link="" href="#ownership">Shared import and future usage</a><a data-section-link="" href="#upgrade">OVRTX upgrade</a><a data-section-link="" href="#evidence">Visual comparison</a><a data-section-link="" href="#performance">Performance and qualification</a></nav></details>
 
 <p class="prototype-note"><a href="https://github.com/eric-heiden/newton/tree/prototype/ovstage-viewer">Newton prototype branch</a> · <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/docs/prototypes/ovstage-viewer.md">API and reproduction</a>.<br/><strong>Implemented:</strong> external-scene rendering and CPU/CUDA pose transport. <strong>Proposed:</strong> the complete viewer upgrade, dependency changes and shared physics importer.</p>
-</section><section class="report-section" id="architecture"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">1.</span> Proposed architecture</h2></div></div>
-<p>USD (Universal Scene Description) composes geometry, materials, lights and environment into a scene. Preserve this scene; Newton imports physics and publishes motion through a body-to-prim mapping, which associates simulated bodies with scene objects. <strong>Keep scene ownership and live USD prims outside <code>Model</code>; retain portable visuals for other viewers.</strong></p>
+</section><section class="report-section" id="motivation"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">1.</span> Motivation and component roles</h2></div></div>
+<p>USD (Universal Scene Description) combines referenced assets, overrides, materials, lights and physics into a composed scene. Newton converts that scene into a simulation model and portable visual shapes. Reconstructing an RTX scene from those shapes can lose material networks, subdivision settings or environment content. <a href="https://github.com/newton-physics/newton/issues/4051">Issue #4051</a> requests visual and lighting parity with Omniverse Kit; extending Newton’s material parser addresses individual losses but also gives the physics engine more rendering semantics to maintain.</p>
+<p><strong>The proposal addresses two separate problems:</strong> preserve authored appearance for rendering, and eliminate duplicated physics interpretation. ovstage enables the first; adopting it does not automatically solve the second.</p>
 <figure class="table-figure"><div aria-label="Table 1" class="table-wrap" role="region" tabindex="0"><table>
 <thead>
 <tr>
@@ -35,26 +36,88 @@
 <tbody>
 <tr>
 <td><strong>ovpopulation — load</strong></td>
-<td>Uses OpenUSD to populate rendering and/or physics data in ovstage. Python: <code>ovstage.population.open_usd(...)</code>.</td>
+<td>Population component that uses OpenUSD to load composed rendering and/or physics data into ovstage. Python entry point: <code>ovstage.population.open_usd(...)</code>.</td>
 </tr>
 <tr>
 <td><strong>ovstage — share</strong></td>
-<td>Runtime scene store: prims, hierarchy, attributes and tensor access. Publication ordinals are increasing update identifiers that coordinate when changes become readable.</td>
+<td>Runtime scene store for prims (scene objects), hierarchy, attributes and tensor access. Increasing publication ordinals identify updates and coordinate when consumers may read them. It is neither a physics solver nor a Newton model builder.</td>
 </tr>
 <tr>
 <td><strong>ovnewton — connect</strong></td>
-<td>Currently imports ovstage physics and synchronizes state. Proposed: a source reader plus bindings that reuse Newton’s import policy and pose transport.</td>
+<td>Imports ovstage physics into Newton and synchronizes simulation state with the stage. It currently contains its own physics interpretation; the proposal replaces that policy with a shared Newton implementation.</td>
+</tr>
+<tr>
+<td><strong>OVRTX / ViewerRTX — render / display</strong></td>
+<td>OVRTX renders an attached ovstage. Newton’s ViewerRTX provides the viewer interface and displays render outputs. Neither requires ovnewton merely to render a stage.</td>
 </tr>
 </tbody>
 </table></div><figcaption class="figure-caption"><span class="caption-label">Table 1.</span> Component responsibilities and the proposed integration boundary.</figcaption></figure>
+<p>The intended division follows OVRTX’s <a href="https://nvidia-omniverse.github.io/ovrtx/core/ovstage_integration.html">external-stage architecture</a>. OpenUSD still handles USD composition through <a href="https://github.com/NVIDIA-Omniverse/ovstage/blob/71f917ad449d104fb062c6149221cda13417814b/docs/scene/population.rst">population</a>; Newton should interpret the physics needed for simulation, while the rendering backend interprets supported visual schemas.</p>
+</section><section class="report-section" id="current"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">2.</span> Current workflows and duplicated parsing</h2></div></div>
+<p><strong>Ordinary Newton application:</strong> call <code>ModelBuilder.add_usd(...)</code>, finalize the model, then run a solver and viewer. Newton’s OpenUSD importer reads physics and extracts portable visuals. The existing generated-scene ViewerRTX path builds a new render scene from those visuals.</p>
+<p><strong>Application using ovnewton:</strong> populate an ovstage, import it with <code>ovnewton.add_ovstage(...)</code>, finalize a Newton model, and attach a state binding. The application runs the solver and publishes its results to the same stage that OVRTX renders. These are alternative import routes; an application need not run both physics importers.</p>
+<figure class="diagram-panel"><div aria-label="Two alternative routes build a Newton model: Newton's OpenUSD importer applies physics policy A, while ovpopulation loads ovstage and ovnewton applies a separate physics policy B." class="mermaid-shell" data-mermaid-source="flowchart LR
+USD[Composed USD] --&gt; PXR[Newton OpenUSD importer]
+PXR --&gt;|Physics policy A| MODEL[Newton Model]
+USD --&gt; POP[ovpopulation]
+POP --&gt; STAGE[ovstage]
+STAGE --&gt; OV[ovnewton importer]
+OV --&gt;|Physics policy B| MODEL" role="img">Two alternative routes build a Newton model: Newton's OpenUSD importer applies physics policy A, while ovpopulation loads ovstage and ovnewton applies a separate physics policy B.</div><figcaption class="figure-caption"><span class="caption-label">Figure 1.</span> Current alternative import routes. USD composition is handled by OpenUSD; Newton-specific physics interpretation exists in both importers. The duplication is maintained code, not necessarily two imports in one application.</figcaption></figure>
+<h3>How an application uses ovnewton today</h3>
+<div class="code-shell"><div class="code-header"><span>Listing 1 · Python</span><button aria-label="Copy Python listing 1" class="copy-button" data-copy-target="listing-1" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-1"><span class="n">builder</span> <span class="o">=</span> <span class="n">newton</span><span class="o">.</span><span class="n">ModelBuilder</span><span class="p">()</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">ovnewton</span><span class="o">.</span><span class="n">add_ovstage</span><span class="p">(</span><span class="n">builder</span><span class="p">,</span> <span class="n">stage</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="n">ordinal</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">finalize</span><span class="p">(</span>
+    <span class="n">skip_validation_joints</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">has_orphan_joints</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">binding</span> <span class="o">=</span> <span class="n">ovnewton</span><span class="o">.</span><span class="n">attach_ovstage</span><span class="p">(</span>
+    <span class="n">stage</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="n">ordinal</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># After the solver advances state for a frame:</span>
+<span class="n">ordinal</span> <span class="o">+=</span> <span class="mi">1</span>
+<span class="n">binding</span><span class="o">.</span><span class="n">update_to_ovstage</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="n">ordinal</span><span class="p">)</span>
+<span class="n">stage</span><span class="o">.</span><span class="n">advance_write_floor</span><span class="p">(</span><span class="n">ordinal</span><span class="p">)</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+<span class="n">renderer</span><span class="o">.</span><span class="n">step</span><span class="p">(</span>
+    <span class="n">render_products</span><span class="o">=</span><span class="p">{</span><span class="n">product</span><span class="p">},</span> <span class="n">delta_time</span><span class="o">=</span><span class="n">dt</span><span class="p">,</span> <span class="n">ordinal</span><span class="o">=</span><span class="n">ordinal</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p class="caption">Current API excerpt from the inspected <a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/examples/example_ovnewton_basic.py">ovnewton example</a> (repository access required). Assumes a populated, published stage, renderer, render product, solver state and frame duration <code>dt</code>. Register solver-specific attributes before import. <code>add_ovstage</code> currently requires an otherwise empty builder; <code>attach_ovstage(model=...)</code> binds an existing model, while omitting <code>model</code> imports and finalizes one for convenience.</p>
+<p>“Parsing ovstage” means querying runtime attributes and interpreting their physics meaning, rather than opening USD files again in Python. The inspected implementation separates this work into three layers:</p>
+<figure class="table-figure"><div aria-label="Table 2" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What ovnewton does today</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Read — <code>_stage.py</code></strong></td>
+<td>Queries prim paths and fixed-length or variable-length attribute columns at a published ordinal; fetches groups and copies values into CPU arrays. This is a source reader, not a second USD composition engine.</td>
+</tr>
+<tr>
+<td><strong>Interpret — <code>_parse.py</code></strong></td>
+<td>Extracts units, gravity, bodies, materials, colliders, joints and hierarchy; derives relationships and some converted values.</td>
+</tr>
+<tr>
+<td><strong>Build — <code>_build.py</code></strong></td>
+<td>Chooses Newton geometry, resolves mass/inertia and material defaults, creates bodies and joints, and applies initial state. These decisions overlap with Newton’s OpenUSD importer.</td>
+</tr>
+</tbody>
+</table></div><figcaption class="figure-caption"><span class="caption-label">Table 2.</span> How the inspected ovnewton implementation reads and interprets ovstage.</figcaption></figure>
+<p>For example, both paths decide how authored mass interacts with density-derived mass and missing inertia, how units and joint angles are converted, and how colliders and joints become Newton objects. A policy change can therefore require two fixes and two sets of coverage. The duplication is <strong>physics semantics across two implementations</strong>, even if each reads its own source efficiently. <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/newton/_src/utils/import_usd.py">Newton importer</a>, <a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/_src/_parse.py">ovnewton interpretation</a>, <a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/_src/_build.py">model construction</a>.</p>
+<p>Per-frame synchronization is separate from import. ovnewton publishes body poses, velocities and supported joint state, and can read supported stage state and drive targets back into Newton. It does not rebuild the physics model each frame. The current binding uses body/joint labels as prim paths and must be recreated after incompatible topology changes. <a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/_src/ovnewton.py">Binding contract</a>.</p>
+</section><section class="report-section" id="architecture"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">3.</span> Proposed scene and viewer ownership</h2></div></div>
+<p>Preserve the composed render scene. Newton imports physics and publishes motion through a body-to-prim mapping, which associates simulated bodies with scene objects. <strong>Keep scene ownership and live USD prims outside <code>Model</code>; retain portable visuals for other viewers.</strong></p>
+<p>A source prim path on each visual shape is useful provenance but insufficient as the scene contract: it can omit lights, environment and material-binding context. Storing live <code>UsdPrim</code> handles also ties their validity to the source stage’s lifetime. Simulation bodies and render prims need not correspond one-to-one, especially after body collapse or instancing. An application-owned stage plus explicit bindings preserves that distinction.</p>
 <figure class="diagram-panel"><div aria-label="Composed USD is loaded by ovpopulation into ovstage. Newton state reaches the same stage through pose transport. OVRTX renders that stage and ViewerRTX displays its outputs." class="mermaid-shell" data-mermaid-source="flowchart LR
 USD[Composed USD] --&gt;|ovpopulation| STAGE[ovstage]
 STAGE --&gt; RTX[OVRTX]
 RTX --&gt; VIEW[ViewerRTX]
 STATE[Newton state] --&gt; POSE[Newton pose transport]
-POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstage. Newton state reaches the same stage through pose transport. OVRTX renders that stage and ViewerRTX displays its outputs.</div><figcaption class="figure-caption"><span class="caption-label">Figure 1.</span> Proposed runtime ownership. Appearance stays in ovstage; Newton writes poses. ovnewton would reuse the optional pose transport.</figcaption></figure>
+POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstage. Newton state reaches the same stage through pose transport. OVRTX renders that stage and ViewerRTX displays its outputs.</div><figcaption class="figure-caption"><span class="caption-label">Figure 2.</span> Proposed runtime ownership. Appearance stays in ovstage; Newton writes poses. ovnewton would reuse the optional pose transport.</figcaption></figure>
 <p><strong>ViewerRTX can remain independent of ovnewton.</strong> Put shared pose transport in Newton’s optional ovstage integration; ovnewton delegates pose writes to it. OVRTX renders; ViewerRTX presents the result.</p>
-<figure class="table-figure"><div aria-label="Table 2" class="table-wrap" role="region" tabindex="0"><table>
+<figure class="table-figure"><div aria-label="Table 3" class="table-wrap" role="region" tabindex="0"><table>
 <thead>
 <tr>
 <th>Viewer mode</th>
@@ -71,10 +134,69 @@ POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstag
 <td>Viewer creates its stage, geometry, camera and lights; uses the same transport and render path.</td>
 </tr>
 </tbody>
-</table></div><figcaption class="figure-caption"><span class="caption-label">Table 2.</span> Scene ownership in the two ViewerRTX modes.</figcaption></figure>
-</section><section class="report-section" id="upgrade"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">2.</span> OVRTX upgrade in Newton</h2></div></div>
+</table></div><figcaption class="figure-caption"><span class="caption-label">Table 3.</span> Scene ownership in the two ViewerRTX modes.</figcaption></figure>
+<p>The prototype implements borrowed-scene rendering and explicit CPU/CUDA pose bindings. Its ordinary physics import can still use Newton’s existing OpenUSD importer while population loads the render scene. <strong>This proves the rendering boundary, not unified import or a single startup traversal.</strong></p>
+</section><section class="report-section" id="ownership"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">4.</span> Shared physics import and future usage</h2></div></div>
+<p><strong>One physics interpretation, two source readers.</strong> Newton owns units, mass/inertia, collision geometry and joint construction. The OpenUSD reader and ovnewton’s ovstage reader supply source facts to that implementation. Moving ovnewton’s parser into Newton while retaining the old parser would preserve the duplication.</p>
+<figure class="diagram-panel"><div aria-label="The OpenUSD reader in Newton and the ovstage reader in ovnewton both feed one shared Newton physics importer, which builds the Newton model." class="mermaid-shell" data-mermaid-source="flowchart LR
+PXR[OpenUSD reader in Newton] --&gt; IMPORT[Shared Newton physics importer]
+STAGE[ovstage reader in ovnewton] --&gt; IMPORT
+IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and the ovstage reader in ovnewton both feed one shared Newton physics importer, which builds the Newton model.</div><figcaption class="figure-caption"><span class="caption-label">Figure 3.</span> Proposed import ownership. Two source readers supply facts to one Newton implementation of physics interpretation. This shared importer is not implemented by the rendering prototype.</figcaption></figure>
+<p>The reader contract must carry values, units, hierarchy, stable source identities and whether a value was authored, inherited/defaulted or blocked. A resolved number alone can lose information needed to choose a Newton default. Readers also need a common representation of instances and their transforms. ovstage does not need to acquire Newton-specific model-building policy.</p>
+<figure class="table-figure"><div aria-label="Table 4" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr>
+<th>Application</th>
+<th>Proposed user-facing workflow</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>USD file → Newton</strong></td>
+<td>Keep <code>builder.add_usd(...)</code> as the convenience entry point. It delegates physics construction to the shared importer; portable viewers remain available. An RTX application additionally preserves the source scene.</td>
+</tr>
+<tr>
+<td><strong>Existing ovstage → Newton</strong></td>
+<td>Keep the <code>ovnewton.add_ovstage(...)</code> / finalize / attach lifecycle above. Internally, the adapter reads ovstage facts and calls the same Newton importer instead of its own physics policy.</td>
+</tr>
+<tr>
+<td><strong>Procedural Newton model → RTX</strong></td>
+<td>ViewerRTX creates an ovstage and uses shared pose transport. No ovnewton import is needed.</td>
+</tr>
+</tbody>
+</table></div><figcaption class="figure-caption"><span class="caption-label">Table 4.</span> Proposed workflows preserve application entry points while sharing physics policy.</figcaption></figure>
+<p><strong>Dependency direction:</strong> ovnewton depends on Newton; Newton’s optional RTX integration depends on ovstage/OVRTX. Newton does not depend on ovnewton. ovnewton retains its useful state/control synchronization and convenience API, delegating common pose writes to Newton’s transport. Sharing pose transport alone does not unify the physics importers.</p>
+<p><strong>Mapping contract:</strong> keep a binding object beside the model with prim paths, stable body identities and rest transforms. Resolve final body indices after construction, and remap bindings when models are cloned, bodies are collapsed or arrays are reordered. The prototype requires final indices explicitly; automatic remapping is proposed work. The application owns stage lifetime and publication.</p>
+<figure class="table-figure"><div aria-label="Table 5" class="table-wrap" role="region" tabindex="0"><table class="table-wide">
+<thead>
+<tr>
+<th>Order / owner</th>
+<th>Deliverable</th>
+<th>Done when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1 · Newton</strong></td>
+<td>Complete the viewer upgrade in §5; keep the existing USD importer during transition.</td>
+<td>Both viewer modes pass headless/window, camera, overlay, deformation and cleanup checks on the qualified runtime pair.</td>
+</tr>
+<tr>
+<td><strong>2 · Newton + ovnewton</strong></td>
+<td>Define source facts and remappable bindings; extract one physics importer in Newton and replace both existing policy paths with calls to it. ovnewton reuses pose transport.</td>
+<td>The two readers produce equivalent models for mass/density/inertia, units, joints and defaults; mapping tests cover cloning, collapse and reordering.</td>
+</tr>
+<tr>
+<td><strong>3 · ovstage + ovnewton</strong></td>
+<td>Close value-provenance and instanced-collider gaps; align supported Newton and ovstage versions.</td>
+<td>ANYmal, Franka and Cartpole import correctly with one jointly tested dependency set.</td>
+</tr>
+</tbody>
+</table></div><figcaption class="figure-caption"><span class="caption-label">Table 5.</span> Implementation order, repository ownership and acceptance criteria.</figcaption></figure>
+<p class="caption">Steps 2–3 proceed together. Inspected ovnewton pins Newton <code>&gt;=1.5,&lt;1.6</code> and ovstage <code>0.2.0.378985</code>; it cannot simply be added to Newton 1.7 development. That alignment is separate from the viewer-only runtime pair below. These are findings at the linked source revision, not claims about every later release.</p>
+</section><section class="report-section" id="upgrade"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">5.</span> OVRTX upgrade in Newton</h2></div></div>
 <p><strong>Migrate the viewer before unifying the importers.</strong> Newton’s <code>rtx</code> extra allows <code>ovrtx&gt;=0.3</code>; its generated-scene path still calls deprecated renderer scene APIs. A version bump alone leaves that migration unfinished. <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/newton/_src/viewer/viewer_rtx.py">Current code</a>, <a href="https://nvidia-omniverse.github.io/ovrtx/core/ovstage_integration.html">OVRTX architecture</a>.</p>
-<figure class="table-figure"><div aria-label="Table 3" class="table-wrap" role="region" tabindex="0"><table>
+<figure class="table-figure"><div aria-label="Table 6" class="table-wrap" role="region" tabindex="0"><table>
 <thead>
 <tr>
 <th>Change in Newton</th>
@@ -99,10 +221,10 @@ POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstag
 <td>Use DLPack tensor interchange, Boolean reset flags and full RenderVar output paths; remove <code>.tensor</code> wrappers and raw <code>DLTensor</code> construction.</td>
 </tr>
 </tbody>
-</table></div><figcaption class="figure-caption"><span class="caption-label">Table 3.</span> Required changes for the OVRTX 0.5 migration.</figcaption></figure>
+</table></div><figcaption class="figure-caption"><span class="caption-label">Table 6.</span> Required changes for the OVRTX 0.5 migration.</figcaption></figure>
 <div class="code-pair">
 <h3>Load once — current APIs</h3>
-<div class="code-shell"><div class="code-header"><span>Listing 1 · Python</span><button aria-label="Copy Python listing 1" class="copy-button" data-copy-target="listing-1" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-1"><span class="n">ovrtx</span><span class="o">.</span><span class="n">register_schema_paths</span><span class="p">()</span>
+<div class="code-shell"><div class="code-header"><span>Listing 2 · Python</span><button aria-label="Copy Python listing 2" class="copy-button" data-copy-target="listing-2" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-2"><span class="n">ovrtx</span><span class="o">.</span><span class="n">register_schema_paths</span><span class="p">()</span>
 <span class="n">renderer</span> <span class="o">=</span> <span class="n">ovrtx</span><span class="o">.</span><span class="n">Renderer</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">ovrtx</span><span class="o">.</span><span class="n">RendererConfig</span><span class="p">(</span><span class="n">sync_mode</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 <span class="n">stage</span> <span class="o">=</span> <span class="n">ovstage</span><span class="o">.</span><span class="n">Stage</span><span class="p">(</span><span class="s2">"scene"</span><span class="p">)</span>
 
@@ -116,7 +238,7 @@ POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstag
 <span class="n">stage</span><span class="o">.</span><span class="n">advance_write_floor</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
 </code></pre></div>
 <h3>Publish, then render — prototype API</h3>
-<div class="code-shell"><div class="code-header"><span>Listing 2 · Python</span><button aria-label="Copy Python listing 2" class="copy-button" data-copy-target="listing-2" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-2"><span class="n">binding</span> <span class="o">=</span> <span class="n">OvstageBodyBinding</span><span class="p">(</span>
+<div class="code-shell"><div class="code-header"><span>Listing 3 · Python</span><button aria-label="Copy Python listing 3" class="copy-button" data-copy-target="listing-3" type="button">Copy code</button></div><pre><code class="code-block language-python" id="listing-3"><span class="n">binding</span> <span class="o">=</span> <span class="n">OvstageBodyBinding</span><span class="p">(</span>
     <span class="n">stage</span><span class="p">,</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">ordinal</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
@@ -137,41 +259,7 @@ POSE --&gt; STAGE" role="img">Composed USD is loaded by ovpopulation into ovstag
 </code></pre></div>
 </div>
 <p class="caption">Excerpts assume an authored camera/RenderProduct and final-model mappings. Register additional physics schemas before population. See <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/docs/prototypes/ovstage-viewer.md">imports and cleanup</a> and <a href="https://github.com/NVIDIA-Omniverse/ovrtx/blob/e3ebb35a6024d070fe21125f3806d6152ed3c753/CHANGELOG.md">0.5 API changes</a>. The prototype window is a fixed-camera preview; full interaction still needs porting.</p>
-</section><section class="report-section" id="ownership"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">3.</span> Shared physics import and ownership</h2></div></div>
-<p><strong>One physics interpretation, two source readers.</strong> Newton owns units, mass/inertia, collision geometry and joints. Readers supply resolved facts. Moving ovnewton’s parser while retaining Newton’s old parser would preserve the duplication.</p>
-<figure class="diagram-panel"><div aria-label="The OpenUSD reader in Newton and the ovstage reader in ovnewton both feed one shared Newton physics importer, which builds the Newton model." class="mermaid-shell" data-mermaid-source="flowchart LR
-PXR[OpenUSD reader in Newton] --&gt; IMPORT[Shared Newton physics importer]
-STAGE[ovstage reader in ovnewton] --&gt; IMPORT
-IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and the ovstage reader in ovnewton both feed one shared Newton physics importer, which builds the Newton model.</div><figcaption class="figure-caption"><span class="caption-label">Figure 2.</span> Proposed import ownership. Two source readers supply facts to one Newton implementation of physics interpretation.</figcaption></figure>
-<figure class="table-figure"><div aria-label="Table 4" class="table-wrap" role="region" tabindex="0"><table class="table-wide">
-<thead>
-<tr>
-<th>Order / owner</th>
-<th>Deliverable</th>
-<th>Done when</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>1 · Newton</strong></td>
-<td>Complete the viewer upgrade above; use the existing USD importer during transition.</td>
-<td>Both viewer modes pass headless/window, camera, overlay, deformation and cleanup checks on the qualified runtime pair.</td>
-</tr>
-<tr>
-<td><strong>2 · Newton + ovnewton</strong></td>
-<td>Newton exposes a source-neutral physics importer and remappable bindings. ovnewton supplies the ovstage reader, replaces its separate physics policy and reuses pose transport.</td>
-<td>Readers produce equivalent models; bindings survive cloning, body collapse and reordering with correct affine offsets.</td>
-</tr>
-<tr>
-<td><strong>3 · ovstage + ovnewton</strong></td>
-<td>Expose authored/fallback/blocked distinctions; handle instanced colliders; align supported Newton and ovstage versions.</td>
-<td>ANYmal, Franka and Cartpole import correctly with one jointly tested dependency set.</td>
-</tr>
-</tbody>
-</table></div><figcaption class="figure-caption"><span class="caption-label">Table 4.</span> Implementation order, repository ownership and acceptance criteria.</figcaption></figure>
-<p class="caption">Steps 2–3 proceed together. Inspected ovnewton pins Newton <code>&gt;=1.5,&lt;1.6</code> and ovstage <code>0.2.0.378985</code>; it cannot simply be added to Newton 1.7 development. That alignment is separate from the viewer-only runtime pair above.</p>
-<p><strong>Mapping contract:</strong> import bindings retain prim paths, stable body identities and rest offsets; resolve final indices after model construction. The prototype requires those indices explicitly. The application owns scene lifetime and publication.</p>
-</section><section class="report-section" id="evidence"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">4.</span> Visual comparison</h2></div></div>
+</section><section class="report-section" id="evidence"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">6.</span> Visual comparison</h2></div></div>
 <p>Both sides use OVRTX 0.5 with matched camera, lighting and authored settings. These are Isaac Lab asset-derived scenes, including a generated heightfield; <strong>complete reinforcement-learning (RL) tasks and parity with Omniverse Kit rendering remain untested</strong>. Select a scene and compare the overlay.</p>
 <div class="scene-control"><label for="scene-select">Comparison scene</label>
 <select aria-controls="comparison-panels" id="scene-select">
@@ -190,7 +278,7 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <div class="after"><span class="image-label">Preserved source in ovstage</span><img alt="ANYmal on an Isaac Lab heightfield: original scene rendered through ovstage" height="480" loading="lazy" src="assets/anymal_1-source.png" width="640"/></div>
 </div>
 <label class="slider-control" hidden="">Reveal source image <input aria-label="Reveal source image for ANYmal on an Isaac Lab heightfield" max="100" min="0" type="range" value="50"/></label>
-<figcaption class="figure-caption"><span class="caption-label">Figure 3.</span> ANYmal on an Isaac Lab heightfield. Subdivision and surface appearance differ after visual reconstruction. The source side uses the Newton prototype’s external-scene API.</figcaption>
+<figcaption class="figure-caption"><span class="caption-label">Figure 4.</span> ANYmal on an Isaac Lab heightfield. Subdivision and surface appearance differ after visual reconstruction. The source side uses the Newton prototype’s external-scene API.</figcaption>
 </figure>
 <figure class="comparison" hidden="" id="compare-anymal_marble_1">
 <h3>ANYmal with the task’s marble MDL material</h3>
@@ -200,7 +288,7 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <div class="after"><span class="image-label">Preserved source in ovstage</span><img alt="ANYmal with the task’s marble MDL material: original scene rendered through ovstage" height="480" loading="lazy" src="assets/anymal_marble_1-source.png" width="640"/></div>
 </div>
 <label class="slider-control" hidden="">Reveal source image <input aria-label="Reveal source image for ANYmal with the task’s marble MDL material" max="100" min="0" type="range" value="50"/></label>
-<figcaption class="figure-caption"><span class="caption-label">Figure 4.</span> ANYmal with the task’s marble MDL material. The preserved source retains the material module and texture dependencies.</figcaption>
+<figcaption class="figure-caption"><span class="caption-label">Figure 5.</span> ANYmal with the task’s marble MDL material. The preserved source retains the material module and texture dependencies.</figcaption>
 </figure>
 <figure class="comparison" hidden="" id="compare-franka_1">
 <h3>Franka with Isaac checker ground</h3>
@@ -210,7 +298,7 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <div class="after"><span class="image-label">Preserved source in ovstage</span><img alt="Franka with Isaac checker ground: original scene rendered through ovstage" height="480" loading="lazy" src="assets/franka_1-source.png" width="640"/></div>
 </div>
 <label class="slider-control" hidden="">Reveal source image <input aria-label="Reveal source image for Franka with Isaac checker ground" max="100" min="0" type="range" value="50"/></label>
-<figcaption class="figure-caption"><span class="caption-label">Figure 5.</span> Franka with Isaac checker ground. The robot appearance and full ground material remain in the source scene. The source side uses the Newton prototype’s external-scene API.</figcaption>
+<figcaption class="figure-caption"><span class="caption-label">Figure 6.</span> Franka with Isaac checker ground. The robot appearance and full ground material remain in the source scene. The source side uses the Newton prototype’s external-scene API.</figcaption>
 </figure>
 <figure class="comparison" hidden="" id="compare-cartpole_1">
 <h3>Cartpole with Isaac checker ground</h3>
@@ -220,7 +308,7 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <div class="after"><span class="image-label">Preserved source in ovstage</span><img alt="Cartpole with Isaac checker ground: original scene rendered through ovstage" height="480" loading="lazy" src="assets/cartpole_1-source.png" width="640"/></div>
 </div>
 <label class="slider-control" hidden="">Reveal source image <input aria-label="Reveal source image for Cartpole with Isaac checker ground" max="100" min="0" type="range" value="50"/></label>
-<figcaption class="figure-caption"><span class="caption-label">Figure 6.</span> Cartpole with Isaac checker ground. A second articulated asset tests the same scene-preservation path.</figcaption>
+<figcaption class="figure-caption"><span class="caption-label">Figure 7.</span> Cartpole with Isaac checker ground. A second articulated asset tests the same scene-preservation path.</figcaption>
 </figure>
 <figure class="comparison" hidden="" id="compare-anymal_64">
 <h3>64 referenced ANYmals</h3>
@@ -230,11 +318,11 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <div class="after"><span class="image-label">Preserved source in ovstage</span><img alt="64 referenced ANYmals: original scene rendered through ovstage" height="480" loading="lazy" src="assets/anymal_64-source.png" width="640"/></div>
 </div>
 <label class="slider-control" hidden="">Reveal source image <input aria-label="Reveal source image for 64 referenced ANYmals" max="100" min="0" type="range" value="50"/></label>
-<figcaption class="figure-caption"><span class="caption-label">Figure 7.</span> 64 referenced ANYmals. Both images show the initial pose; only part of the 64-robot scene is visible. The source side uses the Newton prototype’s external-scene API.</figcaption>
+<figcaption class="figure-caption"><span class="caption-label">Figure 8.</span> 64 referenced ANYmals. Both images show the initial pose; only part of the 64-robot scene is visible. The source side uses the Newton prototype’s external-scene API.</figcaption>
 </figure></div>
 <p>Preserving the source addresses appearance discarded during import in <a href="https://github.com/newton-physics/newton/issues/4051">#4051</a>. Exact Kit matching still depends on backend features, exposure, color management and temporal settings.</p>
-</section><section class="report-section" id="performance"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">5.</span> Performance and qualification</h2></div></div>
-<figure class="table-figure"><div aria-label="Table 5" class="table-wrap" role="region" tabindex="0"><table>
+</section><section class="report-section" id="performance"><div class="section-heading"><div class="section-title-wrap"><h2><span class="section-number">7.</span> Performance and qualification</h2></div></div>
+<figure class="table-figure"><div aria-label="Table 7" class="table-wrap" role="region" tabindex="0"><table>
 <thead>
 <tr>
 <th>Measured result</th>
@@ -259,10 +347,10 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <td>Promising duplicate-work reduction; separate OVRTX 0.3 experiment, not a clone-pipeline comparison.</td>
 </tr>
 </tbody>
-</table></div><figcaption class="figure-caption"><span class="caption-label">Table 5.</span> Measured costs and their implications for workload qualification.</figcaption></figure>
-<p class="caption">13 research runs · RTX 4090 / Windows · 640 × 480 · ≥30 s warmup + 60 frames. Synthetic pose replay, not solver execution; mostly one process repetition. GPU figures are allocation snapshots. Prototype: 64 robots at 41.4 ms/frame, including 22.5 ms encoding/writes/publication, without importing PXR or ovnewton.</p>
+</table></div><figcaption class="figure-caption"><span class="caption-label">Table 7.</span> Measured costs and their implications for workload qualification.</figcaption></figure>
+<p class="caption">13 research runs · RTX 4090 / Windows · 640 × 480 · ≥30 s warmup + 60 frames. Synthetic pose replay, not solver execution; mostly one process repetition. GPU figures are allocation snapshots. Prototype: 64 robots at 41.4 ms/frame, including 22.5 ms encoding/writes/publication, without importing PXR or ovnewton in the replay’s Python process. Population still uses OpenUSD internally.</p>
 <details class="evidence"><summary>Inspect all 13 runs and measurement definitions</summary>
-<figure class="table-figure"><div aria-label="Table 6" class="table-wrap" role="region" tabindex="0"><table class="measurements table-wide"><thead><tr><th>Scene / input / stage</th><th>Workload</th><th>Populate (s)</th><th>Frame median (ms)</th><th>Frame p95 (ms)</th><th>Publish median (ms)</th><th>CPU (MiB)</th><th>GPU (MiB)</th></tr></thead><tbody><tr><td>anymal_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.517</td><td>2.56</td><td>3.13</td><td>—</td><td>3424</td><td>2771</td></tr><tr><td>anymal_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.108</td><td>2.57</td><td>3.44</td><td>—</td><td>3956</td><td>3583</td></tr><tr><td>anymal_64<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.993</td><td>2.94</td><td>3.32</td><td>—</td><td>3524</td><td>2754</td></tr><tr><td>anymal_64<small>source · all · 0.2.0.377349</small></td><td>Moving / CUDA</td><td>0.790</td><td>41.07</td><td>53.78</td><td>21.92</td><td>3505</td><td>3238</td></tr><tr><td>anymal_64<small>source · rendering · 0.2.0.377349</small></td><td>Moving / CUDA</td><td>0.214</td><td>41.38</td><td>49.77</td><td>22.56</td><td>3520</td><td>3237</td></tr><tr><td>anymal_marble_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.482</td><td>2.70</td><td>3.60</td><td>—</td><td>3400</td><td>2706</td></tr><tr><td>anymal_marble_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.188</td><td>2.79</td><td>3.43</td><td>—</td><td>3590</td><td>2870</td></tr><tr><td>cartpole_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.031</td><td>3.16</td><td>3.71</td><td>—</td><td>3386</td><td>2642</td></tr><tr><td>cartpole_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.052</td><td>2.77</td><td>3.51</td><td>—</td><td>3460</td><td>3173</td></tr><tr><td>franka_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.478</td><td>2.86</td><td>3.96</td><td>—</td><td>3395</td><td>2644</td></tr><tr><td>franka_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.084</td><td>3.85</td><td>4.52</td><td>—</td><td>3471</td><td>3174</td></tr><tr><td>anymal_64<small>source · all · 0.2.0.378985</small></td><td>Moving / CUDA</td><td>0.494</td><td>45.93</td><td>60.01</td><td>24.38</td><td>6536</td><td>3518</td></tr><tr><td>anymal_64<small>source · all · 0.2.0.378985</small></td><td>Moving / CPU</td><td>0.507</td><td>42.48</td><td>51.22</td><td>21.90</td><td>3510</td><td>3237</td></tr></tbody></table></div><figcaption class="figure-caption"><span class="caption-label">Table 6.</span> All 13 OVRTX 0.5 research runs; p95 is the 95th percentile of frame time.</figcaption></figure><p class="caption">Static rows reuse a committed update. Moving rows write 1,088 transforms each frame; frame time includes publication. A static reconstructed scene is not a moving-scene baseline. Population excludes renderer creation and Newton import. CPU is resident process memory; GPU is a dedicated-allocation snapshot. MiB denotes 2²⁰ bytes. <a download="" href="assets/measurements.csv">Download measurement data (CSV)</a>.</p>
+<figure class="table-figure"><div aria-label="Table 8" class="table-wrap" role="region" tabindex="0"><table class="measurements table-wide"><thead><tr><th>Scene / input / stage</th><th>Workload</th><th>Populate (s)</th><th>Frame median (ms)</th><th>Frame p95 (ms)</th><th>Publish median (ms)</th><th>CPU (MiB)</th><th>GPU (MiB)</th></tr></thead><tbody><tr><td>anymal_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.517</td><td>2.56</td><td>3.13</td><td>—</td><td>3424</td><td>2771</td></tr><tr><td>anymal_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.108</td><td>2.57</td><td>3.44</td><td>—</td><td>3956</td><td>3583</td></tr><tr><td>anymal_64<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.993</td><td>2.94</td><td>3.32</td><td>—</td><td>3524</td><td>2754</td></tr><tr><td>anymal_64<small>source · all · 0.2.0.377349</small></td><td>Moving / CUDA</td><td>0.790</td><td>41.07</td><td>53.78</td><td>21.92</td><td>3505</td><td>3238</td></tr><tr><td>anymal_64<small>source · rendering · 0.2.0.377349</small></td><td>Moving / CUDA</td><td>0.214</td><td>41.38</td><td>49.77</td><td>22.56</td><td>3520</td><td>3237</td></tr><tr><td>anymal_marble_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.482</td><td>2.70</td><td>3.60</td><td>—</td><td>3400</td><td>2706</td></tr><tr><td>anymal_marble_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.188</td><td>2.79</td><td>3.43</td><td>—</td><td>3590</td><td>2870</td></tr><tr><td>cartpole_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.031</td><td>3.16</td><td>3.71</td><td>—</td><td>3386</td><td>2642</td></tr><tr><td>cartpole_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.052</td><td>2.77</td><td>3.51</td><td>—</td><td>3460</td><td>3173</td></tr><tr><td>franka_1<small>generated · all · 0.2.0.377349</small></td><td>Static</td><td>0.478</td><td>2.86</td><td>3.96</td><td>—</td><td>3395</td><td>2644</td></tr><tr><td>franka_1<small>source · all · 0.2.0.377349</small></td><td>Static</td><td>0.084</td><td>3.85</td><td>4.52</td><td>—</td><td>3471</td><td>3174</td></tr><tr><td>anymal_64<small>source · all · 0.2.0.378985</small></td><td>Moving / CUDA</td><td>0.494</td><td>45.93</td><td>60.01</td><td>24.38</td><td>6536</td><td>3518</td></tr><tr><td>anymal_64<small>source · all · 0.2.0.378985</small></td><td>Moving / CPU</td><td>0.507</td><td>42.48</td><td>51.22</td><td>21.90</td><td>3510</td><td>3237</td></tr></tbody></table></div><figcaption class="figure-caption"><span class="caption-label">Table 8.</span> All 13 OVRTX 0.5 research runs; p95 is the 95th percentile of frame time.</figcaption></figure><p class="caption">Static rows reuse a committed update. Moving rows write 1,088 transforms each frame; frame time includes publication. A static reconstructed scene is not a moving-scene baseline. Population excludes renderer creation and Newton import. CPU is resident process memory; GPU is a dedicated-allocation snapshot. MiB denotes 2²⁰ bytes. <a download="" href="assets/measurements.csv">Download measurement data (CSV)</a>.</p>
 </details>
 <p><strong>Release the viewer upgrade after its functional checks. Qualify Isaac Lab separately:</strong> repeated timing with physics, peak CPU/GPU memory, cloning, multiple cameras and matched Kit captures. These establish the workload limits.</p>
 <details class="evidence"><summary>Sources, prototype code and reproduction</summary>
@@ -271,6 +359,7 @@ IMPORT --&gt; MODEL[Newton Model]" role="img">The OpenUSD reader in Newton and t
 <li><a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/newton/_src/viewer/ovstage.py">Pose bridge</a> · <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/newton/_src/viewer/rtx_scene.py">Render-product consumer</a> · <a href="https://github.com/eric-heiden/newton/blob/prototype/ovstage-viewer/scripts/prototypes/rtx_ovstage.py">Scene replay script</a>.</li>
 <li><a href="https://github.com/NVIDIA-Omniverse/ovstage/blob/71f917ad449d104fb062c6149221cda13417814b/README.md">ovstage overview</a> · <a href="https://github.com/NVIDIA-Omniverse/ovstage/blob/71f917ad449d104fb062c6149221cda13417814b/docs/scene/population.rst">Population API</a> · <a href="https://github.com/NVIDIA-Omniverse/ovstage/blob/71f917ad449d104fb062c6149221cda13417814b/CHANGELOG.md">ovstage 0.2 changes</a>.</li>
 <li><a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/_src/ovnewton.py">Inspected ovnewton entry points</a> · <a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/pyproject.toml">ovnewton dependency pins</a> (repository access required).</li>
+<li><a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/_src/_stage.py">ovnewton column reader</a> · <a href="https://github.com/NVIDIA-Omniverse/ovnewton-internal/blob/fe5dcfe9e017e2e462ede0ab7dea73120dd0b46d/ovnewton/_src/_runtime.py">State transport</a> (repository access required).</li>
 <li><a href="https://github.com/newton-physics/newton/pull/4170">PR #4170</a> and <a href="https://github.com/newton-physics/newton/pull/4177">PR #4177</a> can still benefit portable viewers; native RTX appearance should come from the source scene.</li>
 </ul>
 </details></section><footer class="report-footer"><span>Measured scene comparisons and proposed integration design.</span><a href="../">All research reports</a></footer></main></div><script defer="True" src="report.js"></script><script src="mermaid.js" type="module"></script></body>
