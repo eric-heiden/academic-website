@@ -1,0 +1,83 @@
+{
+  "validation_date": "2026-09-19",
+  "status": "success",
+  "repository": "eric-heiden/newton",
+  "branch": "eric-heiden/newton-live-mcp",
+  "commit_sha": "0c814b59772c9cf6bae41f6c77404fa78f299596",
+  "implementation_commit_sha": "7ece441c6888d86360a117520a5582ee0ddf780d",
+  "workflow_path": ".github/workflows/mcp_windows.yml",
+  "workflow_run_id": 35434465266,
+  "workflow_run_attempt": 1,
+  "workflow_run_url": "https://github.com/eric-heiden/newton/actions/runs/35434465266",
+  "workflow_job_id": 105874677715,
+  "workflow_job_url": "https://github.com/eric-heiden/newton/actions/runs/35434465266/job/105874677715",
+  "started_at": "2026-09-19T09:21:22Z",
+  "completed_at": "2026-09-19T09:22:57Z",
+  "job_duration_seconds": 95,
+  "runner": {
+    "label": "windows-latest",
+    "operating_system": "Microsoft Windows Server 2025 Datacenter",
+    "os_version": "10.0.26100",
+    "architecture": "X64",
+    "platform_string": "Windows-2025Server-10.0.26100-SP0",
+    "image": "windows-2025-vs2026",
+    "image_version": "20260907.229.1"
+  },
+  "uv_version": "0.11.26",
+  "python_version": "3.12.10",
+  "packages": {
+    "newton": "1.7.0.dev0",
+    "warp-lang": "1.17.0",
+    "numpy": "2.5.0",
+    "mujoco": "3.12.0",
+    "mujoco-warp": "3.12.0",
+    "mcp": "1.26.0"
+  },
+  "command": "uv run --locked --python 3.12 --extra dev --extra sim --with mcp==1.26.0 python -m unittest -v newton.tests.test_mcp newton.tests.test_mcp_observation",
+  "tests": {
+    "total": 45,
+    "passed": 43,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 2,
+    "duration_seconds": 50.059,
+    "skips": [
+      {
+        "test": "newton.tests.test_mcp.TestMcp.test_cuda_edit_step_and_observe",
+        "reason": "Requires CUDA"
+      },
+      {
+        "test": "newton.tests.test_mcp_observation.TestMcpObservation.test_attached_viewer_framing_and_restoration",
+        "reason": "Set NEWTON_MCP_TEST_GL=1 for attached GL capture"
+      }
+    ]
+  },
+  "validated": [
+    "Windows CPU MCP runtime",
+    "Both official MCP SDK profiles over stdio",
+    "Authenticated loopback transport and owner-thread dispatch",
+    "Live edits, recovery, and checkpoint behavior",
+    "MuJoCo CPU parameter notifications",
+    "Actual CPU sensor rendering, textures, depth, normals, and picking",
+    "World selection, contact overlays, recording, and BVH refitting"
+  ],
+  "not_validated": [
+    "Windows CUDA execution",
+    "Windows attached ViewerGL capture",
+    "Windows execution of the full evaluation harness"
+  ],
+  "windows_source_fixes_required": false,
+  "artifact": {
+    "name": "mcp-windows-cpu",
+    "id": 10581377509,
+    "url": "https://github.com/eric-heiden/newton/actions/runs/35434465266/artifacts/10581377509",
+    "sha256": "688ab377022dfd2ec0c8f9f20355f06540e9295894ed4ef7512bc3610c14f477"
+  },
+  "local_evidence": [
+    "mcp-windows-cpu.log",
+    "github-run.log",
+    "run.json",
+    "jobs.json",
+    "pre-commit.log"
+  ]
+}

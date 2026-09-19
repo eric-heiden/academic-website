@@ -1,0 +1,47 @@
+F
+======================================================================
+FAIL: test_recording_targets_preserve_reset_defaults (tools.mcp_evaluation.test_scenarios.TestRecording.test_recording_targets_preserve_reset_defaults)
+Keep model defaults unchanged and reproduce recorded rollouts after reset.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<newton>/tools/mcp_evaluation/test_scenarios.py", line 164, in test_recording_targets_preserve_reset_defaults
+    np.testing.assert_array_equal(scenario.model.joint_q.numpy(), defaults)
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1128, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 67 / 74 (90.5%)
+First 5 mismatches are at indices:
+ [0]: 0.08232700824737549 (ACTUAL), 0.30072855949401855 (DESIRED)
+ [1]: 0.06401187181472778 (ACTUAL), 0.006511781830340624 (DESIRED)
+ [2]: 0.11299598217010498 (ACTUAL), 0.05125436186790466 (DESIRED)
+ [3]: 0.6274911165237427 (ACTUAL), 0.4528275430202484 (DESIRED)
+ [4]: 0.16198521852493286 (ACTUAL), 0.16691502928733826 (DESIRED)
+Max absolute difference among violations: 0.21840155
+Max relative difference among violations: 40.112602
+ ACTUAL: array([ 8.232701e-02,  6.401187e-02,  1.129960e-01,  6.274911e-01,
+        1.619852e-01,  2.062998e-01,  7.331139e-01,  6.282565e-02,
+       -5.516383e-04,  2.206208e-01,  9.733340e-01,  1.429315e-02,...
+ DESIRED: array([ 3.007286e-01,  6.511782e-03,  5.125436e-02,  4.528275e-01,
+        1.669150e-01,  8.270451e-02,  8.719212e-01,  7.946490e-02,
+       -5.469310e-02,  2.597291e-01,  9.608511e-01,  1.515683e-02,...
+
+----------------------------------------------------------------------
+Ran 1 test in 2.757s
+
+FAILED (failures=1)
+Warp 1.17.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "x86_64"
+     "cuda:0"   : "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb" (24 GiB, sm_120, mempool enabled)
+   Kernel cache:
+     <home>/.cache/warp/1.17.0
+Module newton._src.geometry.inertia f6b4bd8 load on device 'cpu' took 1.40 ms  (cached)
+Module validate_and_correct_inertia_kernel_1ff2ac62 6ad45b8 load on device 'cpu' took 0.26 ms  (cached)
+Module newton._src.geometry.bvh 4a1c07f load on device 'cpu' took 0.24 ms  (cached)
+Module newton._src.solvers.mujoco.kernels e67ffee load on device 'cpu' took 0.41 ms  (cached)
+Module newton._src.sim.articulation 2e73608 load on device 'cpu' took 0.35 ms  (cached)

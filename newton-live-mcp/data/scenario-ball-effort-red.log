@@ -1,0 +1,80 @@
+FF
+======================================================================
+FAIL: test_ball_effort_edit_matches_fresh_solver (newton.tests.test_mcp.TestMcpMuJoCoNotification.test_ball_effort_edit_matches_fresh_solver) (use_mujoco_cpu=True, authored_limit=False)
+Update ball-joint axis force limits and preserve authored actuator ranges.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<newton>/newton/tests/test_mcp.py", line 598, in test_ball_effort_edit_matches_fresh_solver
+    np.testing.assert_allclose(solver.mjw_model.actuator_forcerange.numpy(), fresh.mjw_model.actuator_forcerange.numpy())
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1780, in assert_allclose
+    assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Not equal to tolerance rtol=1e-07, atol=0
+
+Mismatched elements: 6 / 6 (100%)
+First 5 mismatches are at indices:
+ [0, 0, 0]: -0.800000011920929 (ACTUAL), -0.20000000298023224 (DESIRED)
+ [0, 0, 1]: 0.800000011920929 (ACTUAL), 0.20000000298023224 (DESIRED)
+ [0, 1, 0]: -0.800000011920929 (ACTUAL), -0.4000000059604645 (DESIRED)
+ [0, 1, 1]: 0.800000011920929 (ACTUAL), 0.4000000059604645 (DESIRED)
+ [0, 2, 0]: -0.800000011920929 (ACTUAL), -0.6000000238418579 (DESIRED)
+Max absolute difference among violations: 0.6
+Max relative difference among violations: 3.
+ ACTUAL: array([[[-0.8,  0.8],
+        [-0.8,  0.8],
+        [-0.8,  0.8]]], dtype=float32)
+ DESIRED: array([[[-0.2,  0.2],
+        [-0.4,  0.4],
+        [-0.6,  0.6]]], dtype=float32)
+
+======================================================================
+FAIL: test_ball_effort_edit_matches_fresh_solver (newton.tests.test_mcp.TestMcpMuJoCoNotification.test_ball_effort_edit_matches_fresh_solver) (use_mujoco_cpu=False, authored_limit=False)
+Update ball-joint axis force limits and preserve authored actuator ranges.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<newton>/newton/tests/test_mcp.py", line 598, in test_ball_effort_edit_matches_fresh_solver
+    np.testing.assert_allclose(solver.mjw_model.actuator_forcerange.numpy(), fresh.mjw_model.actuator_forcerange.numpy())
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1780, in assert_allclose
+    assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Not equal to tolerance rtol=1e-07, atol=0
+
+Mismatched elements: 6 / 6 (100%)
+First 5 mismatches are at indices:
+ [0, 0, 0]: -0.800000011920929 (ACTUAL), -0.20000000298023224 (DESIRED)
+ [0, 0, 1]: 0.800000011920929 (ACTUAL), 0.20000000298023224 (DESIRED)
+ [0, 1, 0]: -0.800000011920929 (ACTUAL), -0.4000000059604645 (DESIRED)
+ [0, 1, 1]: 0.800000011920929 (ACTUAL), 0.4000000059604645 (DESIRED)
+ [0, 2, 0]: -0.800000011920929 (ACTUAL), -0.6000000238418579 (DESIRED)
+Max absolute difference among violations: 0.6
+Max relative difference among violations: 3.
+ ACTUAL: array([[[-0.8,  0.8],
+        [-0.8,  0.8],
+        [-0.8,  0.8]]], dtype=float32)
+ DESIRED: array([[[-0.2,  0.2],
+        [-0.4,  0.4],
+        [-0.6,  0.6]]], dtype=float32)
+
+----------------------------------------------------------------------
+Ran 1 test in 5.721s
+
+FAILED (failures=2)
+Warp 1.17.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "x86_64"
+     "cuda:0"   : "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb" (24 GiB, sm_120, mempool enabled)
+   Kernel cache:
+     <home>/.cache/warp/1.17.0
+Module validate_and_correct_inertia_kernel_1ff2ac62 6ad45b8 load on device 'cpu' took 1.38 ms  (cached)
+Module newton._src.geometry.bvh 4a1c07f load on device 'cpu' took 0.17 ms  (cached)
+Module newton._src.solvers.mujoco.kernels 0fa59c5 load on device 'cpu' took 0.38 ms  (cached)
+Module newton._src.sim.articulation 2e73608 load on device 'cpu' took 0.23 ms  (cached)
+Module mujoco_warp._src.io 66a94ae load on device 'cpu' took 2431.86 ms  (compiled)
+Module mujoco_warp._src.smooth 15aab42 load on device 'cpu' took 2180.89 ms  (compiled)
+Module _small_cholesky_factorize_block__locals__kernel_2be2811a 45529b6 load on device 'cpu' took 101.71 ms  (compiled)
+Module _small_cholesky_solve_block__locals__kernel_402d9c6f e7318e3 load on device 'cpu' took 94.02 ms  (compiled)

@@ -1,0 +1,112 @@
+{
+  "study": "additional prospective synthetic Panda dynamics identification",
+  "frozen_before_independent_agents": true,
+  "model": "gpt-6-astra",
+  "reasoning_effort": "xhigh",
+  "spec": {
+    "description": "Identify payload mass, viscous joint damping, and Coulomb joint friction from two synthetic Newton-generated Panda response traces, using fixed controls. Final verification tests a third response withheld from the agent.",
+    "initial": {
+      "payload_mass": 0.3,
+      "damping_multiplier": 0.6,
+      "joint_friction": 0.02
+    },
+    "bounds": {
+      "payload_mass": [
+        0.2,
+        2.0
+      ],
+      "damping_multiplier": [
+        0.5,
+        2.0
+      ],
+      "joint_friction": [
+        0.0,
+        0.3
+      ]
+    },
+    "thresholds": {
+      "trajectory_rmse_rad": 0.00035,
+      "trajectory_p95_rad": 0.0008,
+      "max_joint_speed_rad_s": 5.0
+    },
+    "duration_s": 6.0,
+    "dt_s": 0.002,
+    "expected_frames": 3000,
+    "episode_steps": 1500,
+    "synthetic_position_noise_sd_rad": 0.0002
+  },
+  "instances": 3,
+  "conditions": [
+    "live",
+    "restart"
+  ],
+  "agent_budget_seconds": 600,
+  "candidate_ceiling": 12,
+  "minimum_candidates": 0,
+  "sampling": "NumPy default_rng / PCG64; independent uniform draws over each declared bound",
+  "seed_commitment_sha256": "4f0231c72e739938b5db51f5cdee54ee53e4cc77b2fff1a412dc982f726a4305",
+  "truth_file_sha256": "b149ecc7536915707a4c832fe3344607469ac29f737a4610c465f815eaf90039",
+  "source_sha256": {
+    "tools/mcp_evaluation/calibration.py": "a731ae41afa8d51e388818549ddc5436e1bd01d1b81c956aaefe95785fa4b06b",
+    "tools/mcp_evaluation/scenarios.py": "b0723a0610d542209f529ed9fc109beeb1c5e7c50799a1984023e1d28b527b89",
+    "tools/mcp_evaluation/rollout.py": "d2ab44c5b361d9afa2c8a40087547ce64a0446c100125366e698a6b0bfc5fea7",
+    "tools/mcp_evaluation/run_agents.py": "4a8f79480860c9b5ff15ea3721000793669929886ad1b5c77009ea6ca99d6b5a"
+  },
+  "records": [
+    {
+      "variant": 0,
+      "training_file": "variant-0/training.npz",
+      "training_sha256": "3a8eac05ec1c02340b1ef293cf1d23637b90f540a281371bfd7f00879f11142a",
+      "heldout_sha256": "284564c67fde4dc6002092099e566a220ca68607c08c8616dd6e53648756003a",
+      "config_sha256": "43b3c80a2c47e48025dddffe205b5888db86364ce03e9c97060308cede0fd1cb",
+      "reference_max_joint_speed_rad_s": 1.9979760646820068,
+      "noise_rmse_rad_per_episode": [
+        0.00019985465472734595,
+        0.00020092608842248774,
+        0.000201511215538312
+      ],
+      "noise_p95_rad_per_episode": [
+        0.0003956364970607514,
+        0.0003935318843718655,
+        0.00039210630586629375
+      ]
+    },
+    {
+      "variant": 1,
+      "training_file": "variant-1/training.npz",
+      "training_sha256": "c62c99ca485059e09818ba6eda6aa7bfc9806aa30f6b7a20ce0d18c7167d0174",
+      "heldout_sha256": "8459eb7fcd7a1fc670818cf1ae5a3d6f541fb05451ad3b7e7ce47dd6af0c67c0",
+      "config_sha256": "02e8c34cca50800de121e876f6994ad517899a84059f89cfe3ceb60ff4ea6a32",
+      "reference_max_joint_speed_rad_s": 2.095759630203247,
+      "noise_rmse_rad_per_episode": [
+        0.00019978863110339766,
+        0.0001998109878228575,
+        0.00020121673889102285
+      ],
+      "noise_p95_rad_per_episode": [
+        0.00039380439663730545,
+        0.00038842457895118225,
+        0.0003931490038368193
+      ]
+    },
+    {
+      "variant": 2,
+      "training_file": "variant-2/training.npz",
+      "training_sha256": "b6a4d76895cda0633a1e7c41436ff0410792b7040c2245af263714719f4c5d49",
+      "heldout_sha256": "8ef160624a0fcc508e6b8d5893c248ae3e6229eda8a04d6b102bcee25b735451",
+      "config_sha256": "72fc93be2abde68c8e9049fb817dd63bf52d4f54339a9e98372b19dcde0544a2",
+      "reference_max_joint_speed_rad_s": 2.0081417560577393,
+      "noise_rmse_rad_per_episode": [
+        0.00019992485832624735,
+        0.00019933781475499788,
+        0.0002004263457394883
+      ],
+      "noise_p95_rad_per_episode": [
+        0.0003923292825031861,
+        0.0003905379025969037,
+        0.00039450229039285925
+      ]
+    }
+  ],
+  "publication": "Truth and seed are committed here by digest and retained outside agent workspaces/common source. Reveal truth.json after every independent trial finishes."
+}

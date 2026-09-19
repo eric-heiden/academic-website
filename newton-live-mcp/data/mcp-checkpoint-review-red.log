@@ -1,0 +1,85 @@
+FFF.
+======================================================================
+FAIL: test_mujoco_checkpoint_preserves_public_state (newton.tests.test_mcp.TestMcpCheckpoint.test_mujoco_checkpoint_preserves_public_state) (update_data_interval=1)
+Restore reduced coordinates with ordinary and disabled per-step synchronization.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<newton>/newton/tests/test_mcp.py", line 702, in test_mujoco_checkpoint_preserves_public_state
+    self._check_checkpoint(
+  File "<newton>/newton/tests/test_mcp.py", line 684, in _check_checkpoint
+    np.testing.assert_array_equal(getattr(session.state, field).numpy(), data, err_msg=field)
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1128, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+joint_q
+Mismatched elements: 1 / 7 (14.3%)
+Mismatch at index:
+ [2]: 1.0 (ACTUAL), 0.9852850437164307 (DESIRED)
+Max absolute difference among violations: 0.01471496
+Max relative difference among violations: 0.01493472
+ ACTUAL: array([0., 0., 1., 0., 0., 0., 1.], dtype=float32)
+ DESIRED: array([0.      , 0.      , 0.985285, 0.      , 0.      , 0.      ,
+       1.      ], dtype=float32)
+
+======================================================================
+FAIL: test_mujoco_checkpoint_preserves_public_state (newton.tests.test_mcp.TestMcpCheckpoint.test_mujoco_checkpoint_preserves_public_state) (update_data_interval=0)
+Restore reduced coordinates with ordinary and disabled per-step synchronization.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<newton>/newton/tests/test_mcp.py", line 702, in test_mujoco_checkpoint_preserves_public_state
+    self._check_checkpoint(
+  File "<newton>/newton/tests/test_mcp.py", line 684, in _check_checkpoint
+    np.testing.assert_array_equal(getattr(session.state, field).numpy(), data, err_msg=field)
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 1128, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "<newton>/.venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py", line 988, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+joint_q
+Mismatched elements: 1 / 7 (14.3%)
+Mismatch at index:
+ [2]: 1.0 (ACTUAL), 0.9852849841117859 (DESIRED)
+Max absolute difference among violations: 0.01471502
+Max relative difference among violations: 0.01493478
+ ACTUAL: array([0., 0., 1., 0., 0., 0., 1.], dtype=float32)
+ DESIRED: array([0.      , 0.      , 0.985285, 0.      , 0.      , 0.      ,
+       1.      ], dtype=float32)
+
+======================================================================
+FAIL: test_reset_clears_contacts_until_explicit_refresh (newton.tests.test_mcp.TestMcpCheckpoint.test_reset_clears_contacts_until_explicit_refresh)
+Clear contact counts and freshness without eagerly regenerating collisions.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<newton>/newton/tests/test_mcp.py", line 724, in test_reset_clears_contacts_until_explicit_refresh
+    collide.assert_not_called()
+  File "<home>/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/unittest/mock.py", line 910, in assert_not_called
+    raise AssertionError(msg)
+AssertionError: Expected 'collide' to not have been called. Called 1 times.
+Calls: [call(<newton._src.sim.state.State object at 0x7fd0f0cf7dd0>, <newton._src.sim.contacts.Contacts object at 0x7fd0f32f65d0>)].
+
+----------------------------------------------------------------------
+Ran 3 tests in 1.040s
+
+FAILED (failures=3)
+Warp 1.17.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "x86_64"
+     "cuda:0"   : "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb" (24 GiB, sm_120, mempool enabled)
+   Kernel cache:
+     <home>/.cache/warp/1.17.0
+Module validate_and_correct_inertia_kernel_1ff2ac62 6ad45b8 load on device 'cpu' took 1.43 ms  (cached)
+Module newton._src.geometry.bvh 4a1c07f load on device 'cpu' took 0.21 ms  (cached)
+Module newton._src.solvers.mujoco.kernels e67ffee load on device 'cpu' took 0.36 ms  (cached)
+Module newton._src.sim.collide 65832b3 load on device 'cpu' took 0.18 ms  (cached)
+Module narrow_phase_primitive_write_contact_False_False_False b8baf6c load on device 'cpu' took 0.16 ms  (cached)
+Module newton._src.geometry.narrow_phase 81632d4 load on device 'cpu' took 0.15 ms  (cached)
+Module newton._src.sim.articulation 2e73608 load on device 'cpu' took 0.18 ms  (cached)
+Module newton._src.solvers.solver 5e8bff5 load on device 'cpu' took 0.18 ms  (cached)
+Module newton._src.geometry.broad_phase_nxn fb0ade4 load on device 'cpu' took 0.15 ms  (cached)
+Module newton._src.geometry.differentiable_contacts bbe90ee load on device 'cpu' took 0.14 ms  (cached)
+Module newton._src.solvers.xpbd.kernels 279a51d load on device 'cpu' took 0.23 ms  (cached)
