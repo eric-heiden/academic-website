@@ -137,20 +137,33 @@ def plot(data, output):
             plt.close(fig)
 
 
-def video(data, input_dir, output, ffmpeg):
-    methods = list(LABELS)
-    archives = [np.load(input_dir / f"{m}-n16-k500-hz240-r0.npz") for m in methods]
-    rows = [
-        next(r for r in data["runs"] if r["id"] == f"{m}-n16-k500-hz240-r0")
-        for m in methods
-    ]
+def video(data, input_dir, output, ffmpeg, *, selections=None):
+    if selections is None:
+        selections = [
+            (
+                method,
+                input_dir,
+                next(
+                    r for r in data["runs"] if r["id"] == f"{method}-n16-k500-hz240-r0"
+                ),
+            )
+            for method in LABELS
+        ]
+    methods = [selection[0] for selection in selections]
+    archives = [np.load(root / f"{row['id']}.npz") for _, root, row in selections]
+    rows = [selection[2] for selection in selections]
+    lower = np.min([a["positions"].min(axis=(0, 1)) for a in archives], axis=0) - 0.015
+    upper = np.max([a["positions"].max(axis=(0, 1)) for a in archives], axis=0) + 0.015
+    xlim = (min(-0.06, lower[0]), max(0.70, upper[0]))
+    ylim = (min(-0.04, lower[1]), max(0.44, upper[1]))
+    zlim = (min(-0.01, lower[2]), max(0.25, upper[2]))
     fig = plt.figure(figsize=(12.8, 6.8), dpi=100, facecolor="white")
     axes3d, axes2d, surfaces, lines, texts = [], [], [], [], []
     for col, (method, archive) in enumerate(zip(methods, archives, strict=True)):
         ax = fig.add_subplot(2, 3, col + 1, projection="3d")
         ax.set_title(LABELS[method], color=COLORS[method], fontsize=13, pad=4)
-        ax.set(xlim=(-0.06, 0.70), ylim=(-0.04, 0.44), zlim=(-0.01, 0.25))
-        ax.set_box_aspect((0.76, 0.48, 0.26))
+        ax.set(xlim=xlim, ylim=ylim, zlim=zlim)
+        ax.set_box_aspect((xlim[1] - xlim[0], ylim[1] - ylim[0], zlim[1] - zlim[0]))
         ax.view_init(elev=18, azim=-70)
         ax.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
         ax.tick_params(labelsize=7, pad=0)
@@ -171,7 +184,7 @@ def video(data, input_dir, output, ffmpeg):
         )
         midrow = np.isclose(archive["rest"][:, 1], 0.2)
         (line,) = bx.plot([], [], color=COLORS[method], lw=2, marker=".", ms=3)
-        bx.set(xlim=(-0.06, 0.70), ylim=(-0.01, 0.25), xlabel="x [m]", ylabel="z [m]")
+        bx.set(xlim=xlim, ylim=zlim, xlabel="x [m]", ylabel="z [m]")
         bx.set_title("Midline cross-section (y ≈ 0.20 m)", fontsize=10)
         bx.grid(color="#ddd", linewidth=0.5)
         bx.spines[["top", "right"]].set_visible(False)
@@ -245,7 +258,11 @@ def video(data, input_dir, output, ffmpeg):
                         len(samples) - 1,
                     )
                 ]
-                status = "IPC converged" if index == 0 else "VBD: fixed 20 iterations"
+                status = (
+                    "IPC converged"
+                    if rows[index]["method"] == "ipc"
+                    else "VBD: fixed 20 iterations"
+                )
                 cuts = sample["triangles_cutting_panel"] if sim_time else 0
                 first_crossing = rows[index]["first_crossing_s"]
                 crossed = first_crossing is not None and sim_time >= first_crossing

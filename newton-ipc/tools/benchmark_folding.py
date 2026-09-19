@@ -28,7 +28,7 @@ FOLD_RADIUS = 0.04
 THICKNESS = 0.008
 
 
-def make_case(method, nx, stiffness, dt, device):
+def make_case(method, nx, stiffness, dt, device, *, ipc_config=None):
     """Use identical topology, lumped masses, flat rest shape and folded state."""
     ny = nx // 2
     builder = newton.ModelBuilder(gravity=(0.0, 0.0, -9.81))
@@ -63,20 +63,25 @@ def make_case(method, nx, stiffness, dt, device):
     model.soft_contact_kd = 0.0
     model.soft_contact_mu = 0.0
     if method == "ipc":
+        config_values = {
+            "minimum_separation": THICKNESS / 2.0,
+            "contact_distance": 0.05,
+            "barrier_stiffness": 0.005,
+            "max_newton_iterations": 128,
+            "max_pcg_iterations": 32,
+            "max_line_search_iterations": 24,
+            "absolute_tolerance": 1.0e-2,
+            "relative_tolerance": 2.0e-3,
+            "energy_tolerance": 1.0e-5,
+            "velocity_damping": 1.0,
+        }
+        # Preserve the original plane-only experiment when run on the new branch.
+        if hasattr(SolverIPC.Config, "enable_self_contact"):
+            config_values.update(enable_self_contact=False, use_projective_hessian=True)
+        config_values.update(ipc_config or {})
         solver = SolverIPC(
             model,
-            config=SolverIPC.Config(
-                minimum_separation=THICKNESS / 2.0,
-                contact_distance=0.05,
-                barrier_stiffness=0.005,
-                max_newton_iterations=128,
-                max_pcg_iterations=32,
-                max_line_search_iterations=24,
-                absolute_tolerance=1.0e-2,
-                relative_tolerance=2.0e-3,
-                energy_tolerance=1.0e-5,
-                velocity_damping=1.0,
-            ),
+            config=SolverIPC.Config(**config_values),
         )
         pipeline, contacts = None, None
     else:
@@ -184,9 +189,11 @@ def intersected_panel(q, free_triangles):
     return count
 
 
-def run_case(method, nx, stiffness, dt, duration, repeat, device, output):
+def run_case(
+    method, nx, stiffness, dt, duration, repeat, device, output, *, ipc_config=None
+):
     model, solver, states, graphs, rest, q, pinned, edges = make_case(
-        method, nx, stiffness, dt, device
+        method, nx, stiffness, dt, device, ipc_config=ipc_config
     )
     initial = q.copy()
     triangles = model.tri_indices.numpy()
@@ -231,9 +238,17 @@ def run_case(method, nx, stiffness, dt, duration, repeat, device, output):
         )
         gap = float(np.min(q[inside, 2] - BASE_HEIGHT)) if inside.any() else None
         status, residual = "not_exposed", None
+        newton_iterations, candidate_count = None, None
         if method == "ipc":
             status = solver.Status(int(solver.diagnostics.status.numpy()[0])).name
             residual = float(solver.diagnostics.residual.numpy()[0])
+            newton_iterations = int(solver.diagnostics.newton_iterations.numpy()[0])
+            surface = getattr(solver, "_self_contact", None)
+            if surface is not None:
+                candidate_count = int(surface.swept.count.numpy()[0])
+                overflows += int(surface.current.overflow.numpy()[0]) + int(
+                    surface.swept.overflow.numpy()[0]
+                )
             if status != "CONVERGED":
                 failures.append(
                     {"step": step, "reason": status, "residual_n": residual}
@@ -260,6 +275,8 @@ def run_case(method, nx, stiffness, dt, duration, repeat, device, output):
                 "edge_strain_max": float(strain.max()),
                 "status": status,
                 "residual_n": residual,
+                "newton_iterations": newton_iterations,
+                "swept_candidate_count": candidate_count,
             }
         )
         if (step + 1) % frame_stride == 0:
