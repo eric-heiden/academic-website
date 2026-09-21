@@ -1,0 +1,62 @@
+{
+  "frozen_utc": "2026-09-20T22:11:16.449381+00:00",
+  "status": "Quality criteria and dataset split fixed before any held-out response is deserialized or scored",
+  "task": "Real measured Panda effective-dynamics identification from sanitized geometry and homogeneous dynamic placeholders",
+  "dataset_doi": "10.5281/zenodo.12516500",
+  "archive_md5": "d3e29fbd280fc4cf08d008eb50559338",
+  "training_seeds": [
+    2,
+    3,
+    4
+  ],
+  "heldout_seeds": [
+    21,
+    22,
+    23,
+    25,
+    26,
+    27,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38
+  ],
+  "selection": "Three lowest numbered published training seeds; entire published test fold; no response-based selection",
+  "thresholds": {
+    "max_joint_torque_rmse_nm": 0.5,
+    "max_joint_torque_normalized_rmse": 0.5,
+    "max_joint_position_rmse_rad": 0.025,
+    "max_joint_velocity_rmse_rad_s": 0.5,
+    "position_p95_rad": 0.05,
+    "max_joint_speed_rad_s": 5.0
+  },
+  "torque_normalization": "Per episode/joint standard deviation, floored at 0.5 N*m",
+  "gates": "All thresholds pooled and for every episode; every expected sample and step; finite dynamics; valid physically consistent parameters; no source/reference edits",
+  "torque_sampling": "150 equally spaced integer row indices from 30 through n-31 per episode",
+  "forward_sampling": "12 equally spaced integer row indices from 30 through n-37 per episode; reset to measured q and qd; 0.1 s horizon at 0.002 s fixed steps; linearly interpolate publisher-filtered q/qd/tau by measured timestamps; torque evaluated at step midpoint",
+  "forward_feasibility_predecessor": "Training prototype used six consecutive measured intervals per window (roughly 0.1 s) with <=2 ms substeps; final fixed 0.1 s horizon will be checked before agents without changing these criteria",
+  "fields": {
+    "q": "q_1..q_7 [rad]",
+    "qd": "dq_1..dq_7 [rad/s]",
+    "qdd": "ddq_1..ddq_7 [rad/s^2]",
+    "tau": "tau_interp_1..tau_interp_7 [N*m]",
+    "time": "t [s]"
+  },
+  "filtering": "Publisher 4 Hz low-pass positions/velocities/torques; acausal velocity differentiation for acceleration. No extra filtering in conversion. tau_interp is the field used by the publisher real-data estimator; raw ROS topic and torque-command reconstruction are not provided.",
+  "initial": "Each moving link mass=1 kg, COM=(0,0,0) in its own frame, COM inertia=0.01 I kg*m^2. All viscous/Coulomb/bias/armature parameters zero. No authored dynamic values or multiplicative nominal corrections.",
+  "unknowns": "Seven full physical link inertias/masses/COMs plus seven viscous, Coulomb, bias, and armature terms (98 independent coefficients; not uniquely identifiable)",
+  "fair_preprocessing": "Immutable Newton-derived training regressor and construction source supplied equally; one shared preparation cost outside agent timers; no fitted parameters or fitting implementation supplied.",
+  "private_feasibility_artifacts": [
+    "real-panda-prototype/probe.log",
+    "real-panda-prototype/physical-fit.log",
+    "real-panda-prototype/forward.log",
+    "real-panda-prototype/sensitivity.log"
+  ],
+  "future_amendments": "Any changes after this freeze require explicit amendment preserving this original record; do not tune criteria after held-out checks."
+}

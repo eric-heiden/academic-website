@@ -1,0 +1,78 @@
+test_automatic_display_never_calls_user_representation (newton.tests.test_mcp_executor.TestMcpExecutor.test_automatic_display_never_calls_user_representation)
+Summarize user objects without running noisy or mutating representation callbacks. ... ERROR
+test_large_array_display_is_bounded_and_explicit_result_fails_early (newton.tests.test_mcp_executor.TestMcpExecutor.test_large_array_display_is_bounded_and_explicit_result_fails_early)
+Summarize large arrays and reject oversized explicit results before dense conversion. ... FAIL
+test_result_serialization_never_calls_custom_dictionary_keys (newton.tests.test_mcp_executor.TestMcpExecutor.test_result_serialization_never_calls_custom_dictionary_keys)
+Reject custom JSON keys without calling arbitrary user string conversion. ... FAIL
+
+======================================================================
+ERROR: test_automatic_display_never_calls_user_representation (newton.tests.test_mcp_executor.TestMcpExecutor.test_automatic_display_never_calls_user_representation)
+Summarize user objects without running noisy or mutating representation callbacks.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 793, in _execute
+    result = _json(value)
+             ^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 77, in _json
+    raise ValueError(f"Unsupported result type {type(value).__name__}; return JSON-compatible data")
+ValueError: Unsupported result type Noisy; return JSON-compatible data
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 798, in _execute
+    representation = repr(value)[:16384]
+                     ^^^^^^^^^^^
+  File "<_newton_mcp_7cb63d0bfdd0:cell-1>", line 5, in __repr__
+    raise ValueError('representation ran')
+ValueError: representation ran
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 176, in test_automatic_display_never_calls_user_representation
+    result = self.execute("""class Noisy:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 40, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 554, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 802, in _execute
+    raise RuntimeError(
+RuntimeError: Python completed; result cannot be returned: representation ran. Validity is unchanged; do not retry the mutation. Query a smaller result from _ or saved variables.
+
+======================================================================
+FAIL: test_large_array_display_is_bounded_and_explicit_result_fails_early (newton.tests.test_mcp_executor.TestMcpExecutor.test_large_array_display_is_bounded_and_explicit_result_fails_early)
+Summarize large arrays and reject oversized explicit results before dense conversion.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 195, in test_large_array_display_is_bounded_and_explicit_result_fails_early
+    self.assertIn("complex128", result["result_repr"])
+AssertionError: 'complex128' not found in 'array([0.+0.j, 0.+0.j, 0.+0.j, ..., 0.+0.j, 0.+0.j, 0.+0.j],\n      shape=(1000000,))'
+
+======================================================================
+FAIL: test_result_serialization_never_calls_custom_dictionary_keys (newton.tests.test_mcp_executor.TestMcpExecutor.test_result_serialization_never_calls_custom_dictionary_keys)
+Reject custom JSON keys without calling arbitrary user string conversion.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 216, in test_result_serialization_never_calls_custom_dictionary_keys
+    with contextlib.redirect_stdout(escaped), self.assertRaisesRegex(RuntimeError, "Python completed"):
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.672s
+
+FAILED (failures=2, errors=1)
+Warp 1.17.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "x86_64"
+     "cuda:0"   : "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb" (24 GiB, sm_120, mempool enabled)
+   Kernel cache:
+     /home/horde/.cache/warp/1.17.0
+Module validate_and_correct_inertia_kernel_1ff2ac62 6ad45b8 load on device 'cpu' took 1.45 ms  (cached)
+Module newton._src.geometry.bvh 4a1c07f load on device 'cpu' took 0.21 ms  (cached)
+Module newton._src.solvers.solver 5e8bff5 load on device 'cpu' took 0.20 ms  (cached)

@@ -1,0 +1,16 @@
+{
+  "reference_sha256": "96643faeda84ef9b64c630b697fb276cfc7a56ccc66a4eb55e11bc19f1e66091",
+  "geometry_sha256": "5a458e8bb322a58ac001986f01e2c20685562a49fdd548352cffae97d17a63d3",
+  "regressor_sha256": "438bc214d7cf06ecec5944970a4bf555c7b7cb10f4243a648db2e83dafee4a0a",
+  "preparation_seconds": 1.0261422242037952,
+  "shape": [
+    3150,
+    98
+  ],
+  "construction": "Newton public inverse-dynamics unit basis; no fitting; identical immutable preparation outside every agent timer",
+  "basis": "Link1..7 each [mass, mass*com_x, mass*com_y, mass*com_z, I_origin_xx, I_origin_yy, I_origin_zz, I_origin_xy, I_origin_xz, I_origin_yz]; then viscous1..7, Coulomb1..7, torque_bias1..7, armature1..7",
+  "mapping": "I_origin=I_com+mass*(dot(com,com)*identity-outer(com,com)); joint columns are qd, sign(qd), 1, qdd",
+  "rows": "C order: one 7-joint torque vector per sample; 150 fixed row samples per episode",
+  "dtype": "float64 storage; Newton float32 inverse-dynamics basis evaluations",
+  "data_license": "CC-BY-SA-4.0"
+}

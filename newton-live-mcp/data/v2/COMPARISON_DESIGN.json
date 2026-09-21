@@ -1,0 +1,83 @@
+{
+  "created_utc": "2026-09-20T22:36:21.646427+00:00",
+  "status": "Design fixed before scored agents; exact source/data/prompts/order will be committed in final registration after development",
+  "model": "gpt-6-astra",
+  "reasoning_effort": "xhigh",
+  "primary_conditions": [
+    "live",
+    "restart",
+    "ipython"
+  ],
+  "existing_cases": {
+    "panda": [
+      0,
+      1
+    ],
+    "allegro": [
+      0,
+      1
+    ],
+    "hug": [
+      0,
+      1
+    ],
+    "panda_calibration": [
+      0,
+      1,
+      2
+    ]
+  },
+  "real_replicates": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "real_replicates_share_identical_initial_parameters_and_recordings": true,
+  "sensitivity_condition": "ipython_fixed",
+  "sensitivity_cases": {
+    "panda": [
+      0
+    ],
+    "allegro": [
+      0
+    ],
+    "hug": [
+      0
+    ],
+    "panda_calibration": [
+      0
+    ],
+    "panda_real": [
+      0,
+      1,
+      2
+    ]
+  },
+  "total_primary_trials": 54,
+  "total_sensitivity_trials": 7,
+  "budgets": {
+    "existing": {
+      "seconds": 600,
+      "candidates": 12
+    },
+    "real": {
+      "seconds": 1200,
+      "candidates": 60
+    }
+  },
+  "run_policy": "Serial isolated Astra contexts, no source/prompt/threshold changes or heavy competing jobs during timed confirmation; recorded order, all outcomes retained",
+  "endpoints": [
+    "Eligibility and fresh verified quality first",
+    "Actual startup-inclusive elapsed and total input+output tokens for every run, labeled by success",
+    "Uncached input+output and cached input reported separately",
+    "Paired performance on matched successful cases, with explicit exclusions and uncertainty; no failed run labeled fastest eligible",
+    "Candidate evaluations, process starts, errors, usage and raw artifact hashes independently recomputed"
+  ],
+  "inference": "Real replicates measure independent agent variation on one physical dataset/asset, not nine independent robots; existing-case results cover differing tasks. Corrected IPython sensitivity is exploratory and separately labeled. No guarantee or forced claim of a Newton win."
+}

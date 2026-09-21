@@ -1,0 +1,58 @@
+{
+  "scenario": "panda_calibration",
+  "variant": 1,
+  "condition": "live",
+  "phase": "confirmation",
+  "budget_seconds": 600,
+  "description": "Identify payload mass, viscous joint damping, and Coulomb joint friction from two synthetic Newton-generated Panda response traces, using fixed controls. Final verification tests a third response withheld from the agent.",
+  "initial": {
+    "payload_mass": 0.3,
+    "damping_multiplier": 0.6,
+    "joint_friction": 0.02
+  },
+  "bounds": {
+    "payload_mass": [
+      0.2,
+      2.0
+    ],
+    "damping_multiplier": [
+      0.5,
+      2.0
+    ],
+    "joint_friction": [
+      0.0,
+      0.3
+    ]
+  },
+  "thresholds": {
+    "trajectory_rmse_rad": 0.00035,
+    "trajectory_p95_rad": 0.0008,
+    "max_joint_speed_rad_s": 5.0
+  },
+  "duration_s": 6.0,
+  "dt_s": 0.002,
+  "expected_frames": 3000,
+  "episode_steps": 1500,
+  "synthetic_position_noise_sd_rad": 0.0002,
+  "camera": {
+    "eye": [
+      1.2,
+      -1.2,
+      0.85
+    ],
+    "target": [
+      0,
+      0,
+      0.45
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ]
+  },
+  "reference_sha256": "c62c99ca485059e09818ba6eda6aa7bfc9806aa30f6b7a20ce0d18c7167d0174",
+  "verification_reference_sha256": "8459eb7fcd7a1fc670818cf1ae5a3d6f541fb05451ad3b7e7ce47dd6af0c67c0",
+  "integrity_manifest_sha256": "310746e85c5cf38eb5d84bda36eabf6ceff4f8d3ed4a70416dbdd2719216f6a0",
+  "integrity_manifest": "integrity-manifest.json"
+}

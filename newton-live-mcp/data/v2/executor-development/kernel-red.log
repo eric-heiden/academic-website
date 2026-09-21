@@ -1,0 +1,71 @@
+test_dataclass_and_warp_kernel_definitions_span_cells (newton.tests.test_mcp_executor.TestMcpExecutor.test_dataclass_and_warp_kernel_definitions_span_cells)
+Define normal dataclasses, Warp functions and kernels once and launch them in later cells. ... ERROR
+
+======================================================================
+ERROR: test_dataclass_and_warp_kernel_definitions_span_cells (newton.tests.test_mcp_executor.TestMcpExecutor.test_dataclass_and_warp_kernel_definitions_span_cells)
+Define normal dataclasses, Warp functions and kernels once and launch them in later cells.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/codegen.py", line 2061, in _inspect_extract_function_source
+    source_lines, fun_lineno = inspect.getsourcelines(func)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/inspect.py", line 1267, in getsourcelines
+    lines, lnum = findsource(object)
+                  ^^^^^^^^^^^^^^^^^^
+  File "/home/horde/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/inspect.py", line 1096, in findsource
+    raise OSError('could not get source code')
+OSError: could not get source code
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 611, in _execute
+    exec(compiled, scope)
+  File "<newton-mcp>", line 5, in <module>
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/context.py", line 1351, in func
+    return wrapper(f)
+           ^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/context.py", line 1332, in wrapper
+    Function(
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/context.py", line 333, in __init__
+    self.adj = warp._src.codegen.Adjoint(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/codegen.py", line 1839, in __init__
+    adj.source, adj.fun_lineno, adj.tree = adj.extract_function_source(func)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/codegen.py", line 2050, in extract_function_source
+    source, fun_lineno = Adjoint._inspect_extract_function_source(func)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/warp/_src/codegen.py", line 2063, in _inspect_extract_function_source
+    raise RuntimeError(
+RuntimeError: Directly evaluating Warp code defined as a string using `exec()` is not supported, please save it to a file and use `importlib` if needed.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 164, in test_dataclass_and_warp_kernel_definitions_span_cells
+    self.execute("""from dataclasses import dataclass
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 614, in _execute
+    raise RuntimeError(
+RuntimeError: Execution failed and may have mutated the scene: Directly evaluating Warp code defined as a string using `exec()` is not supported, please save it to a file and use `importlib` if needed.; stdout=''
+
+----------------------------------------------------------------------
+Ran 1 test in 0.485s
+
+FAILED (errors=1)
+Warp 1.17.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "x86_64"
+     "cuda:0"   : "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb" (24 GiB, sm_120, mempool enabled)
+   Kernel cache:
+     /home/horde/.cache/warp/1.17.0
+Module validate_and_correct_inertia_kernel_1ff2ac62 6ad45b8 load on device 'cpu' took 1.38 ms  (cached)
+Module newton._src.geometry.bvh 4a1c07f load on device 'cpu' took 0.18 ms  (cached)
+Module newton._src.solvers.solver 5e8bff5 load on device 'cpu' took 0.16 ms  (cached)

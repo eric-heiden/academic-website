@@ -1,0 +1,72 @@
+{
+  "scenario": "hug",
+  "variant": 0,
+  "condition": "live",
+  "phase": "confirmation",
+  "budget_seconds": 600,
+  "description": "Reconstruct a recorded HUG MANO approach to a scanned softball, then tune dynamic replay stability and wrist tracking.",
+  "initial": {
+    "wrist_kp": 80.0,
+    "wrist_kd": 1.0,
+    "finger_kp": 12.0,
+    "finger_kd": 0.005,
+    "finger_effort": 0.8,
+    "recording_fps": 30.0
+  },
+  "bounds": {
+    "wrist_kp": [
+      20.0,
+      4000.0
+    ],
+    "wrist_kd": [
+      0.0,
+      150.0
+    ],
+    "finger_kp": [
+      0.1,
+      40.0
+    ],
+    "finger_kd": [
+      0.0,
+      3.0
+    ],
+    "finger_effort": [
+      0.02,
+      1.0
+    ],
+    "recording_fps": [
+      5.0,
+      60.0
+    ]
+  },
+  "thresholds": {
+    "wrist_rmse_m": 0.03,
+    "wrist_p95_m": 0.055,
+    "finger_rmse_rad": 0.25,
+    "max_joint_speed_rad_s": 40.0,
+    "max_wrist_speed_m_s": 2.0,
+    "max_object_speed_m_s": 4.0,
+    "recording_timing_error_s": 0.001
+  },
+  "duration_s": 3.0,
+  "dt_s": 0.002,
+  "camera": {
+    "eye": [
+      0.45,
+      -0.4,
+      0.38
+    ],
+    "target": [
+      0,
+      0,
+      0.07
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ]
+  },
+  "integrity_manifest_sha256": "310746e85c5cf38eb5d84bda36eabf6ceff4f8d3ed4a70416dbdd2719216f6a0",
+  "integrity_manifest": "integrity-manifest.json"
+}

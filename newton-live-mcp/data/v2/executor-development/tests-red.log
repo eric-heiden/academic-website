@@ -1,0 +1,341 @@
+test_automatic_expression_repr_and_strict_explicit_result (newton.tests.test_mcp_executor.TestMcpExecutor.test_automatic_expression_repr_and_strict_explicit_result)
+Display opaque expression values while retaining strict explicit JSON result validation. ... ERROR
+test_compile_error_preserves_state_and_namespace (newton.tests.test_mcp_executor.TestMcpExecutor.test_compile_error_preserves_state_and_namespace)
+Keep a valid scene and existing variables when compilation fails before execution. ... ERROR
+test_failure_preserves_workspace_and_requires_explicit_recovery (newton.tests.test_mcp_executor.TestMcpExecutor.test_failure_preserves_workspace_and_requires_explicit_recovery)
+Preserve partial Python work without treating exploration errors as proof of safety. ... FAIL
+test_function_source_and_error_stack_lines_remain_available (newton.tests.test_mcp_executor.TestMcpExecutor.test_function_source_and_error_stack_lines_remain_available)
+Retain source for persistent functions and identify errors across cell boundaries. ... ERROR
+test_imports_functions_and_live_state_persist (newton.tests.test_mcp_executor.TestMcpExecutor.test_imports_functions_and_live_state_persist)
+Keep imported functions while refreshing their global state after odd buffer swaps. ... ERROR
+test_last_expression_and_explicit_result_do_not_leak (newton.tests.test_mcp_executor.TestMcpExecutor.test_last_expression_and_explicit_result_do_not_leak)
+Return the last expression and preserve explicit result precedence without stale output. ... FAIL
+test_official_sdk_workspace_and_recovery (newton.tests.test_mcp_executor.TestMcpExecutor.test_official_sdk_workspace_and_recovery)
+Exercise persistent Python cells and explicit recovery through the real stdio MCP bridge. ... ERROR
+test_rebuild_and_explicit_namespace_reset_clear_user_variables (newton.tests.test_mcp_executor.TestMcpExecutor.test_rebuild_and_explicit_namespace_reset_clear_user_variables)
+Discard scene aliases and closures on replacement and explicit workspace reset. ... ERROR
+test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated)
+Reject invalid recovery choices and preserve the trusted-execution opt-in. ... 
+  test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated) (options={'recovery': 'guess'})
+Reject invalid recovery choices and preserve the trusted-execution opt-in. ... ERROR
+  test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated) (options={'recovery': []})
+Reject invalid recovery choices and preserve the trusted-execution opt-in. ... ERROR
+  test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated) (options={'reset_namespace': 1})
+Reject invalid recovery choices and preserve the trusted-execution opt-in. ... ERROR
+test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated)
+Reject invalid recovery choices and preserve the trusted-execution opt-in. ... ERROR
+test_recovery_never_rolls_back_and_failed_acknowledgement_stays_invalid (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_never_rolls_back_and_failed_acknowledgement_stays_invalid)
+Keep partial mutations visible and require successful explicit acknowledgement. ... ERROR
+test_reset_preserves_workspace_and_refreshes_bindings (newton.tests.test_mcp_executor.TestMcpExecutor.test_reset_preserves_workspace_and_refreshes_bindings)
+Retain analysis variables through physical resets and update live function globals. ... ERROR
+test_result_budget_does_not_destroy_saved_work (newton.tests.test_mcp_executor.TestMcpExecutor.test_result_budget_does_not_destroy_saved_work)
+Inspect a smaller slice of an already computed result without repeating the computation. ... ERROR
+
+======================================================================
+ERROR: test_automatic_expression_repr_and_strict_explicit_result (newton.tests.test_mcp_executor.TestMcpExecutor.test_automatic_expression_repr_and_strict_explicit_result)
+Display opaque expression values while retaining strict explicit JSON result validation.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 155, in test_automatic_expression_repr_and_strict_explicit_result
+    self.assertIn("object object", result["result_repr"])
+                                   ~~~~~~^^^^^^^^^^^^^^^
+KeyError: 'result_repr'
+
+======================================================================
+ERROR: test_compile_error_preserves_state_and_namespace (newton.tests.test_mcp_executor.TestMcpExecutor.test_compile_error_preserves_state_and_namespace)
+Keep a valid scene and existing variables when compilation fails before execution.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 86, in test_compile_error_preserves_state_and_namespace
+    self.execute("value = 99\nif :\n    pass", reset_namespace=True)
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SimulationSession._execute() got an unexpected keyword argument 'reset_namespace'
+
+======================================================================
+ERROR: test_function_source_and_error_stack_lines_remain_available (newton.tests.test_mcp_executor.TestMcpExecutor.test_function_source_and_error_stack_lines_remain_available)
+Retain source for persistent functions and identify errors across cell boundaries.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 611, in _execute
+    exec(compiled, scope)
+  File "<newton-mcp>", line 1, in <module>
+NameError: name 'inspect' is not defined. Did you forget to import 'inspect'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 143, in test_function_source_and_error_stack_lines_remain_available
+    source = self.execute("inspect.getsource(sample)")["result"]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 614, in _execute
+    raise RuntimeError(
+RuntimeError: Execution failed and may have mutated the scene: name 'inspect' is not defined; stdout=''
+
+======================================================================
+ERROR: test_imports_functions_and_live_state_persist (newton.tests.test_mcp_executor.TestMcpExecutor.test_imports_functions_and_live_state_persist)
+Keep imported functions while refreshing their global state after odd buffer swaps.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 611, in _execute
+    exec(compiled, scope)
+  File "<newton-mcp>", line 1, in <module>
+NameError: name 'sample' is not defined
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 43, in test_imports_functions_and_live_state_persist
+    result = self.execute("sample()")
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 614, in _execute
+    raise RuntimeError(
+RuntimeError: Execution failed and may have mutated the scene: name 'sample' is not defined; stdout=''
+
+======================================================================
+ERROR: test_official_sdk_workspace_and_recovery (newton.tests.test_mcp_executor.TestMcpExecutor.test_official_sdk_workspace_and_recovery)
+Exercise persistent Python cells and explicit recovery through the real stdio MCP bridge.
+----------------------------------------------------------------------
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 228, in test_official_sdk_workspace_and_recovery
+  |     raise errors[0]
+  |   File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 212, in worker
+  |     asyncio.run(conversation())
+  |   File "/home/horde/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py", line 195, in run
+  |     return runner.run(main)
+  |            ^^^^^^^^^^^^^^^^
+  |   File "/home/horde/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py", line 118, in run
+  |     return self._loop.run_until_complete(task)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/horde/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+  |     return future.result()
+  |            ^^^^^^^^^^^^^^^
+  |   File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 188, in conversation
+  |     async with stdio_client(parameters) as (read, write), ClientSession(read, write) as client:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/horde/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/mcp/client/stdio/__init__.py", line 183, in stdio_client
+  |     anyio.create_task_group() as tg,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 847, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Exception Group Traceback (most recent call last):
+    |   File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/mcp/client/stdio/__init__.py", line 189, in stdio_client
+    |     yield read_stream, write_stream
+    |   File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 188, in conversation
+    |     async with stdio_client(parameters) as (read, write), ClientSession(read, write) as client:
+    |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/mcp/shared/session.py", line 238, in __aexit__
+    |     return await self._task_group.__aexit__(exc_type, exc_val, exc_tb)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/horde/apps/newton-live-mcp/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 847, in __aexit__
+    |     raise BaseExceptionGroup(
+    | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+    +-+---------------- 1 ----------------
+      | Traceback (most recent call last):
+      |   File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 192, in conversation
+      |     self.assertEqual(tool.inputSchema["properties"]["recovery"]["enum"], ["none", "inspect", "acknowledge"])
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+      | KeyError: 'recovery'
+      +------------------------------------
+
+======================================================================
+ERROR: test_rebuild_and_explicit_namespace_reset_clear_user_variables (newton.tests.test_mcp_executor.TestMcpExecutor.test_rebuild_and_explicit_namespace_reset_clear_user_variables)
+Discard scene aliases and closures on replacement and explicit workspace reset.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 72, in test_rebuild_and_explicit_namespace_reset_clear_user_variables
+    generation = result["workspace"]["generation"]
+                 ~~~~~~^^^^^^^^^^^^^
+KeyError: 'workspace'
+
+======================================================================
+ERROR: test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated) (options={'recovery': 'guess'})
+Reject invalid recovery choices and preserve the trusted-execution opt-in.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 167, in test_recovery_arguments_and_execution_permission_are_validated
+    self.execute("value = 1", **options)
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SimulationSession._execute() got an unexpected keyword argument 'recovery'
+
+======================================================================
+ERROR: test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated) (options={'recovery': []})
+Reject invalid recovery choices and preserve the trusted-execution opt-in.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 167, in test_recovery_arguments_and_execution_permission_are_validated
+    self.execute("value = 1", **options)
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SimulationSession._execute() got an unexpected keyword argument 'recovery'
+
+======================================================================
+ERROR: test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated) (options={'reset_namespace': 1})
+Reject invalid recovery choices and preserve the trusted-execution opt-in.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 167, in test_recovery_arguments_and_execution_permission_are_validated
+    self.execute("value = 1", **options)
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SimulationSession._execute() got an unexpected keyword argument 'reset_namespace'
+
+======================================================================
+ERROR: test_recovery_arguments_and_execution_permission_are_validated (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_arguments_and_execution_permission_are_validated)
+Reject invalid recovery choices and preserve the trusted-execution opt-in.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 171, in test_recovery_arguments_and_execution_permission_are_validated
+    self.execute("value = 1", recovery="acknowledge")
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SimulationSession._execute() got an unexpected keyword argument 'recovery'
+
+======================================================================
+ERROR: test_recovery_never_rolls_back_and_failed_acknowledgement_stays_invalid (newton.tests.test_mcp_executor.TestMcpExecutor.test_recovery_never_rolls_back_and_failed_acknowledgement_stays_invalid)
+Keep partial mutations visible and require successful explicit acknowledgement.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 127, in test_recovery_never_rolls_back_and_failed_acknowledgement_stays_invalid
+    self.assertTrue(self.session.dispatch("describe")["requires_rebuild"])
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'requires_rebuild'
+
+======================================================================
+ERROR: test_reset_preserves_workspace_and_refreshes_bindings (newton.tests.test_mcp_executor.TestMcpExecutor.test_reset_preserves_workspace_and_refreshes_bindings)
+Retain analysis variables through physical resets and update live function globals.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 611, in _execute
+    exec(compiled, scope)
+  File "<newton-mcp>", line 1, in <module>
+NameError: name 'observations' is not defined
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 63, in test_reset_preserves_workspace_and_refreshes_bindings
+    generation = self.execute("observations.append(session.frame)")["workspace"]["generation"]
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 614, in _execute
+    raise RuntimeError(
+RuntimeError: Execution failed and may have mutated the scene: name 'observations' is not defined; stdout=''
+
+======================================================================
+ERROR: test_result_budget_does_not_destroy_saved_work (newton.tests.test_mcp_executor.TestMcpExecutor.test_result_budget_does_not_destroy_saved_work)
+Inspect a smaller slice of an already computed result without repeating the computation.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 611, in _execute
+    exec(compiled, scope)
+  File "<newton-mcp>", line 1, in <module>
+NameError: name '_' is not defined
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 137, in test_result_budget_does_not_destroy_saved_work
+    self.assertEqual(self.execute("_[:3].tolist()")["result"], [0, 1, 2])
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 35, in execute
+    return self.session.dispatch("execute", {"code": code, **kwargs})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 517, in dispatch
+    return operations[operation](**args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 614, in _execute
+    raise RuntimeError(
+RuntimeError: Execution failed and may have mutated the scene: name '_' is not defined; stdout=''
+
+======================================================================
+FAIL: test_failure_preserves_workspace_and_requires_explicit_recovery (newton.tests.test_mcp_executor.TestMcpExecutor.test_failure_preserves_workspace_and_requires_explicit_recovery)
+Preserve partial Python work without treating exploration errors as proof of safety.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/_src/mcp/session.py", line 611, in _execute
+    exec(compiled, scope)
+  File "<newton-mcp>", line 3, in <module>
+NameError: name 'missing_name' is not defined
+
+The above exception was the direct cause of the following exception:
+
+RuntimeError: Execution failed and may have mutated the scene: name 'missing_name' is not defined; stdout='before failure\n'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 96, in test_failure_preserves_workspace_and_requires_explicit_recovery
+    with self.assertRaisesRegex(RuntimeError, "line 3"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "line 3" does not match "Execution failed and may have mutated the scene: name 'missing_name' is not defined; stdout='before failure\n'"
+
+======================================================================
+FAIL: test_last_expression_and_explicit_result_do_not_leak (newton.tests.test_mcp_executor.TestMcpExecutor.test_last_expression_and_explicit_result_do_not_leak)
+Return the last expression and preserve explicit result precedence without stale output.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/horde/apps/newton-live-mcp/newton/tests/test_mcp_executor.py", line 52, in test_last_expression_and_explicit_result_do_not_leak
+    self.assertEqual(self.execute("2 + 3")["result"], 5)
+AssertionError: None != 5
+
+----------------------------------------------------------------------
+Ran 12 tests in 2.784s
+
+FAILED (failures=2, errors=13)
+Warp 1.17.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "x86_64"
+     "cuda:0"   : "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 1g.24gb" (24 GiB, sm_120, mempool enabled)
+   Kernel cache:
+     /home/horde/.cache/warp/1.17.0
+Module validate_and_correct_inertia_kernel_1ff2ac62 6ad45b8 load on device 'cpu' took 1.37 ms  (cached)
+Module newton._src.geometry.bvh 4a1c07f load on device 'cpu' took 0.20 ms  (cached)
+Module newton._src.solvers.solver 5e8bff5 load on device 'cpu' took 0.16 ms  (cached)
+Module newton._src.sim.collide 65832b3 load on device 'cpu' took 0.22 ms  (cached)
+Module narrow_phase_primitive_write_contact_False_False_False b8baf6c load on device 'cpu' took 0.19 ms  (cached)
+Module newton._src.geometry.narrow_phase 81632d4 load on device 'cpu' took 0.16 ms  (cached)
+Module newton._src.solvers.xpbd.kernels 279a51d load on device 'cpu' took 0.22 ms  (cached)

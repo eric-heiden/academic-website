@@ -1,0 +1,84 @@
+{
+  "selected_candidate": 2,
+  "complete_physical_evaluations": 5,
+  "selected_config_sha256": "a7fc5392e97a98bf6a69e9ddaa831f8a4bfea9680dbbbb2630034d15f041ee59",
+  "estimator": "Weighted linear least squares with seven positive-semidefinite 4x4 pseudo-inertia constraints, mass/COM/second-moment and joint coefficient bounds; weak scaled ridge (lambda=1e-4) toward homogeneous placeholders. Joint armature floor 0.03 kg*m^2 chosen by comparing torque and prescribed forward motion checks.",
+  "training_samples_for_torque": 450,
+  "training_forward_windows": 36,
+  "steps": 1800,
+  "approximate_regressor_rank_at_absolute_tolerance_1e-3": 69,
+  "checks": {
+    "max_joint_torque_rmse_nm": {
+      "limit": 0.5,
+      "pooled": 0.19605537170634224,
+      "worst_recording": 0.2100501683592269
+    },
+    "max_joint_torque_normalized_rmse": {
+      "limit": 0.5,
+      "pooled": 0.25515616121590695,
+      "worst_recording": 0.2851735726361737
+    },
+    "max_joint_position_rmse_rad": {
+      "limit": 0.025,
+      "pooled": 0.009755094216740874,
+      "worst_recording": 0.011775383928774773
+    },
+    "max_joint_velocity_rmse_rad_s": {
+      "limit": 0.5,
+      "pooled": 0.22803841457180693,
+      "worst_recording": 0.2783941038499036
+    },
+    "position_p95_rad": {
+      "limit": 0.05,
+      "pooled": 0.010675048108548999,
+      "worst_recording": 0.012729837011509414
+    },
+    "max_joint_speed_rad_s": {
+      "limit": 5.0,
+      "pooled": 2.211428642272949,
+      "worst_recording": 2.211428642272949
+    }
+  },
+  "leave_one_recording_out_torque_rmse_per_joint_nm": {
+    "2": [
+      0.14863385305751733,
+      0.17830132520956524,
+      0.19588733696051913,
+      0.1266349507027613,
+      0.1859034823295349,
+      0.12499222119102513,
+      0.12891244401661978
+    ],
+    "3": [
+      0.18843508487952176,
+      0.15349146896877966,
+      0.19341485214450801,
+      0.12731163537027698,
+      0.17604137573148876,
+      0.11855842173941027,
+      0.1275652142852214
+    ],
+    "4": [
+      0.19857422722641202,
+      0.16737997361352322,
+      0.21591159710792696,
+      0.15929653551662834,
+      0.17949476481813875,
+      0.14004568151741628,
+      0.1255487140564914
+    ]
+  },
+  "min_COM_inertia_eigenvalue": 2.000000484428457e-05,
+  "input_hashes_verified": {
+    "training.npz": "96643faeda84ef9b64c630b697fb276cfc7a56ccc66a4eb55e11bc19f1e66091",
+    "training-regressor.npz": "438bc214d7cf06ecec5944970a4bf555c7b7cb10f4243a648db2e83dafee4a0a",
+    "training-regressor.manifest.json": "4d47a5740417368f7af3ecb10c2f5edeb44461e4314a4d45e218a968cb933ff5"
+  },
+  "trace_path": "/home/horde/artifacts/newton-live-mcp-v2/confirmation/panda_real-restart-1/candidate-002/metrics.npz",
+  "limitations": [
+    "Effective dynamics for filtered measured torque; individual link parameters are not uniquely identified.",
+    "Only the supplied three recordings were used. Independent held-out evaluation is pending and was not accessed.",
+    "The positive armature floor trades torque residual against sensitivity of forward motion to residual torque."
+  ],
+  "data_attribution": "LIP4RobotInverseDynamics, MERL (Giacomuzzo, Carli, Romeres, Dalla Libera), 2024, DOI 10.5281/zenodo.12516500; CC-BY-SA-4.0."
+}

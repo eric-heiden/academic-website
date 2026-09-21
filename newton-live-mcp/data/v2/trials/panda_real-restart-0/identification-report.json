@@ -1,0 +1,58 @@
+{
+  "final_config": "config.json",
+  "final_config_sha256": "31f9def258782a3a95c98684ff7cd9f239420d1bdc40553cca4cb14031503c2e",
+  "final_measurement": "candidate-009/metrics.json",
+  "trace": "/home/horde/artifacts/newton-live-mcp-v2/confirmation/panda_real-restart-0/candidate-009/metrics.npz",
+  "complete_physical_evaluations": 9,
+  "method": "Constrained least squares over all 98 physical coefficients with PSD pseudo-inertia constraints, broad task bounds, weak scaled ridge regularization, and a 0.03 kg*m^2 armature floor selected using forward measurements and checked by leave-one-recording-out fitting.",
+  "fit_arguments": {
+    "output": "fit-002.json",
+    "reg": 1e-05,
+    "weights": "1,1,1,1,1,1,1",
+    "exclude": -1,
+    "armature_min": 0.03,
+    "robust": 0.0
+  },
+  "training": {
+    "success": true,
+    "frames": 1800,
+    "max_joint_torque_rmse_nm": 0.19554572342733342,
+    "max_joint_torque_normalized_rmse": 0.26076558838326813,
+    "max_joint_position_rmse_rad": 0.009787340009529345,
+    "max_joint_velocity_rmse_rad_s": 0.22903603355212304,
+    "position_p95_rad": 0.010619967377704357,
+    "max_joint_speed_rad_s": 2.2113687992095947
+  },
+  "worst_per_episode": {
+    "max_joint_torque_rmse_nm": 0.2105384298136005,
+    "max_joint_torque_normalized_rmse": 0.29475874732193713,
+    "max_joint_position_rmse_rad": 0.011651220444121565,
+    "max_joint_velocity_rmse_rad_s": 0.27624057349693054,
+    "position_p95_rad": 0.01277665424373698,
+    "max_joint_speed_rad_s": 2.2113687992095947
+  },
+  "cross_validation": [
+    {
+      "excluded_episode": 2,
+      "candidate": 6,
+      "success": true
+    },
+    {
+      "excluded_episode": 3,
+      "candidate": 7,
+      "success": true
+    },
+    {
+      "excluded_episode": 4,
+      "candidate": 8,
+      "success": true
+    }
+  ],
+  "limitations": [
+    "Individual link parameters are not uniquely identifiable; about 69 combinations are resolved by the supplied regressor.",
+    "Filtered/interpolated measured torque identifies effective dynamics, not raw motor commands.",
+    "The independent 16-recording test fold was neither accessed nor evaluated."
+  ],
+  "input_integrity": "All task-provided input hashes and the geometry hash match.",
+  "dataset": "LIP4RobotInverseDynamics, DOI 10.5281/zenodo.12516500, CC-BY-SA-4.0; MERL (Giacomuzzo, Carli, Romeres, Dalla Libera), 2024."
+}

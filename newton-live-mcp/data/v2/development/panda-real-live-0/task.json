@@ -1,0 +1,374 @@
+{
+  "description": "Identify seven full physical link inertias, masses, centers of mass and joint losses from real measured Panda recordings, starting from geometry and homogeneous placeholders. Fit measured torque and Newton short-horizon forward trajectories. Final verification uses every recording in the independent published test fold.",
+  "initial": {
+    "mass": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "com": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "inertia": [
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ]
+    ],
+    "viscous": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "coulomb": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "torque_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "armature": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "bounds": {
+    "mass": [
+      0.05,
+      10.0
+    ],
+    "com": [
+      -0.4,
+      0.4
+    ],
+    "inertia": "Symmetric COM tensor; eigenvalues >=1e-8 kg*m^2 and physical triangle inequalities",
+    "second_moment": "trace(0.5*trace(I_origin)*identity-I_origin) <= mass*(0.5 m)^2",
+    "viscous": [
+      0.0,
+      5.0
+    ],
+    "coulomb": [
+      0.0,
+      5.0
+    ],
+    "torque_bias": [
+      -2.0,
+      2.0
+    ],
+    "armature": [
+      0.0,
+      1.0
+    ]
+  },
+  "thresholds": {
+    "max_joint_torque_rmse_nm": 0.5,
+    "max_joint_torque_normalized_rmse": 0.5,
+    "max_joint_position_rmse_rad": 0.025,
+    "max_joint_velocity_rmse_rad_s": 0.5,
+    "position_p95_rad": 0.05,
+    "max_joint_speed_rad_s": 5.0
+  },
+  "dt_s": 0.002,
+  "duration_s": 3.6,
+  "expected_frames": 1800,
+  "window_steps": 50,
+  "windows_per_episode": 12,
+  "training_episodes": 3,
+  "heldout_episodes": 16,
+  "synthetic": false,
+  "scenario": "panda_real",
+  "condition": "live",
+  "variant": 0,
+  "phase": "development",
+  "budget_seconds": 1200,
+  "candidate_budget": 60,
+  "camera": {
+    "eye": [
+      1.2,
+      -1.2,
+      0.85
+    ],
+    "target": [
+      0,
+      0,
+      0.45
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ]
+  },
+  "geometry_file": "/home/horde/artifacts/newton-live-mcp-v2/real-robot/public/geometry/panda_geometry.xml",
+  "source_hashes": {
+    "newton/_src/mcp/__init__.py": "77213179fe8afbb5634efc958ed4d76a0affa9016e9ee97f6275a018a159750a",
+    "newton/_src/mcp/observation.py": "4153e675ef611dc9936c551e046dc64ed672aa0631f7f8eef8ae971b040fd830",
+    "newton/_src/mcp/protocol.py": "ac9853cbd00dd2457e8adf58ad5955f098a6e24736a5df6eea8abd083bb7d2c7",
+    "newton/_src/mcp/session.py": "98f49694c863fc32b12c80780cf62642982387babe031f0c0c3f2b3ca714b523",
+    "newton/_src/mcp/transport.py": "73d11136ec360fe8e6950312e08740d66424fad4ecac1d92c9737d2f552b9b53",
+    "newton/_src/solvers/mujoco/kernels.py": "3b0bfecbf1bb9bf5895b5e3937ade6466c167ea801aab9dfb7fc3de253ca9261",
+    "newton/_src/solvers/mujoco/solver_mujoco.py": "e975b8f90ecb299d607b52ea18da70fa714f6f3ce4f9f459af8a9406c27e0057",
+    "newton/mcp.py": "5dbff87e96bd449efb8f3e469d4e74e49701808746d33e920efb62b56297e965",
+    "tools/mcp_evaluation/__init__.py": "ea68a479ec031992e47b3c552529ec4b5197ae18970bc6c7ee9d96e8f47aa97e",
+    "tools/mcp_evaluation/calibration.py": "a731ae41afa8d51e388818549ddc5436e1bd01d1b81c956aaefe95785fa4b06b",
+    "tools/mcp_evaluation/ipython_session.py": "e95cbbc7d8eebb0f2fac807c3eae1dc58a1680d9a88fc8e44f4286add3d632ba",
+    "tools/mcp_evaluation/microbenchmark.py": "6a2d0b8bbabdf74dcfa0b939d0a20f709f7794cdbb77c08038e631180d31cd06",
+    "tools/mcp_evaluation/real_robot.py": "0813be82b501be45043253b59f479455960a5f7ba17df861e02b6f16b1900065",
+    "tools/mcp_evaluation/real_robot_data.py": "f952a03918b9b87d6a0ed6334dc3c8481986532379e1aca1fac9281de40035a8",
+    "tools/mcp_evaluation/real_robot_model.py": "cc537e66c34706a3eb69c25f2b2fe8b2cc07644f454b6cd8c662b385b7152740",
+    "tools/mcp_evaluation/real_robot_regressor.py": "9eb98a8d667526aa890bf294c9ac9b7d528728b107e0eb5230226beaca811879",
+    "tools/mcp_evaluation/real_rollout.py": "fc674343389392c9b6e2382b5cfd30bb24edb56e09e11c134d9048506b162f6b",
+    "tools/mcp_evaluation/recording.py": "ce100b452c2866c6af326c29232fbf59b9c703ad8fd9390f085f5c024984bf89",
+    "tools/mcp_evaluation/render_trace.py": "e8962fa4ca6832fcf099cc51dc22b9c47d996514aa94ec09422d836cba1f6dc1",
+    "tools/mcp_evaluation/rollout.py": "ea375d9e104a9bcba7f5f4da616b7d58c585f19222227ad017eaf6c44dbccb54",
+    "tools/mcp_evaluation/run_agents.py": "e78ddbc5abd04e84823cff287f52f8f22cf48dc57bac10b001ce050fa7abf6de",
+    "tools/mcp_evaluation/run_real_agents.py": "362093055c97f9bccb6c779acfc41918dc1826513190dd745a6d6337f52201f5",
+    "tools/mcp_evaluation/scenarios.py": "b0723a0610d542209f529ed9fc109beeb1c5e7c50799a1984023e1d28b527b89",
+    "tools/mcp_evaluation/test_calibration.py": "cc7bd79c606869986cc2408b99b21326de9c0b5fb680b7e191ecbcd686430c3c",
+    "tools/mcp_evaluation/test_ipython.py": "51febfe2bf44e553471fe4faec2ca699a039989f4d92fc2718bbd720f14c840e",
+    "tools/mcp_evaluation/test_real_robot.py": "bfed2cdb9747cdf22c67dd29ee9c21438b8060c0c1f92e44f14d478ab9f405e7",
+    "tools/mcp_evaluation/test_scenarios.py": "2ef79d95ff0999453507c039bc9352407f9b1dec6a3d09cde0f1c9b7bfd107e5"
+  },
+  "input_hashes": {
+    "training.npz": "96643faeda84ef9b64c630b697fb276cfc7a56ccc66a4eb55e11bc19f1e66091",
+    "training-regressor.npz": "438bc214d7cf06ecec5944970a4bf555c7b7cb10f4243a648db2e83dafee4a0a",
+    "training-regressor.manifest.json": "0de1700725fe0263837a5f5051d2f3060349c6b8d8634b026df326fcade71214"
+  },
+  "geometry_hashes": {
+    "geometry/ASSET_LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+    "geometry/assets/link0.stl": "dfc6d94330de8ddb005b311bfdba9f3b8e1aa7c256b71592ee7ff32cb9a9a5aa",
+    "geometry/assets/link0_0.obj": "6b9f41a4c203540daaeb7a33cc3d0d6c6a32dc8bba187074eeaf97b3e36b3f9c",
+    "geometry/assets/link0_1.obj": "57673d2ee2a9db2e10c8986ae57c56a7c39c012b60fd26d7d8549553b664a5ed",
+    "geometry/assets/link0_10.obj": "c9198b9d8534d628d097b0f2b239bb30343353182df098ce0d9db6bc13326848",
+    "geometry/assets/link0_11.obj": "f0adec78d6677b7799d25121981270e8bfe119b5c18d08a91ee37a54ad75f65c",
+    "geometry/assets/link0_2.obj": "1ca435a2a87a9608a146a47955724d43dd7ce10fc3dd3018800aa98f8ba86e05",
+    "geometry/assets/link0_3.obj": "3e9c6334d2b3b47944af3458ee5f20519abc20fe7ee23063bb53405ccab28046",
+    "geometry/assets/link0_4.obj": "215d25789704936120f119c0bc1cc7f68516dd3f8f1df61457b71acac3873f26",
+    "geometry/assets/link0_5.obj": "9361b104e93743045107aa5b15fb1a0835ba9c1f355aae71f56403cf6a9c33f6",
+    "geometry/assets/link0_7.obj": "2dc0b8ebbbc80e4c065d71e195adbc384f673438641fac82b07b801b4d2837cb",
+    "geometry/assets/link0_8.obj": "3b8c436999db5586b8eb47bed2b0aa7de6993868b2681b4c04246eeac42fdb7a",
+    "geometry/assets/link0_9.obj": "45178f97d2b5da6bce11f610212c4ef7d08c73db33a4fc38e1b7f66b93d023f5",
+    "geometry/assets/link1.obj": "51091e776b16babdbe2f3849b5c041f921d1f11dd94ac19a0f1c81abf496fbae",
+    "geometry/assets/link1.stl": "e41a39a94108fcf56aacff603fc91ec80541f4c1af17b51a0de5617f5566e6d2",
+    "geometry/assets/link2.obj": "5c9f8e715de52c3eb71b475de35993b3b96081e02abea9f28c414768877fc59b",
+    "geometry/assets/link2.stl": "370f7605a0fae3529db169ded50f52f171024aa792d4d773bc84197301f6a039",
+    "geometry/assets/link3.stl": "0a8d638b9349c6c0eefc4e888636ac4838c4b27170f18a51699321118af709c1",
+    "geometry/assets/link3_0.obj": "ce2da87f51708e11b189249d41401065dabe89a06e251185a06cef4d5ff27178",
+    "geometry/assets/link3_1.obj": "2880b7753a7173f38fa87ee21da4dfc7fa7be46fbe07bac5aef9e128513cb118",
+    "geometry/assets/link3_2.obj": "670cff81ae84693769ca4ae658c154cf909d81167e7c8d22b70ea977f2504efa",
+    "geometry/assets/link3_3.obj": "30ede0c812efd0e0b767d134a4eae0b84e0fa407bb6325a5a555e0569b3a3ffd",
+    "geometry/assets/link4.stl": "0180ebb5772ec9840cb049750cffb29a9ddc90311752a16ea34757782ef9e48d",
+    "geometry/assets/link4_0.obj": "443bf6d178177cf347951ecf107ccd10ca444e605e375b67304579e5f948806f",
+    "geometry/assets/link4_1.obj": "ca935ec7cc8b3f0e86aa079c76b0b3bf593b1e9830bab0fa7131ac51577c74f0",
+    "geometry/assets/link4_2.obj": "c89caf26d379c35bb9e191ee2d91d09ab29ecc792b48d8bc10b39e5b38222175",
+    "geometry/assets/link4_3.obj": "1495d17f45bdb230cf58b0beef9da4e8c9cfe76a3d2d38da89017efe5e093136",
+    "geometry/assets/link5_0.obj": "a3238b8f2af0f2eb66d9fe63dc5d41ac52d5d38507241b5ed10e3cb019ab3e71",
+    "geometry/assets/link5_1.obj": "9d994bbf83ec241e301b5197a6846da13f2a4a0582edb2c0f76962c5549649d6",
+    "geometry/assets/link5_2.obj": "83b4ffe9f772cd7fe182e98640650eebc899aaf01842656574b0416c90dd40a4",
+    "geometry/assets/link5_collision_0.obj": "3e5aa75fb13f193555c3dfb999df91d81df25006a5c3af5338297d78137c129b",
+    "geometry/assets/link5_collision_1.obj": "87cd8f621071df010f774cbde789282b8463840dfe704f8bdfa2e29be0142e15",
+    "geometry/assets/link5_collision_2.obj": "823ab6c8f7b1d79e0844fa071d82a03499ff68e34fddb1ba3451032c22736040",
+    "geometry/assets/link6.stl": "20b768e99a0e0440b5754dcca108016434e57937cc356acd9c352ccd3cb27f77",
+    "geometry/assets/link6_0.obj": "0504c70ebf1b284ee8faae7dcb896b8830bc672a6552015dd5dbd121fa031fb9",
+    "geometry/assets/link6_1.obj": "45f7ca77695198b6d86ec2417ad4e42e6275044f0f96266699ee8e1057757ac1",
+    "geometry/assets/link6_10.obj": "365f26c21d10332cab8d8704645cb46930c30b3085956f2d097498c793f24db4",
+    "geometry/assets/link6_11.obj": "8ae61e08b3ad064f25bbf03b22e59cc15d65883b5a7ce92711aff29df2493901",
+    "geometry/assets/link6_12.obj": "f28d1bfd62b0244ffd19fb35fe9edefdf583d3c9167db944e87185d919e1d021",
+    "geometry/assets/link6_13.obj": "0a55fa92dccb261d07200e6565fca4c850fd17f0c1ecf38821c0b97d51796c7d",
+    "geometry/assets/link6_14.obj": "750ae3ee4781e62e3a045c662195247b03f6642b05aa93104f08258e5f6eba26",
+    "geometry/assets/link6_15.obj": "5999c1c2497a004a7c4bbe034cdf13744f839d85ae7a11b1bc386c48a3e642e6",
+    "geometry/assets/link6_16.obj": "551d7a8b37c53e7a152d008b4e36992e5b5abe74a4be18b57ee6319c27def09f",
+    "geometry/assets/link6_2.obj": "e54eee4d8232947ee8af65afd5a067e09dac2da6e7e585cb1dccb65496457da0",
+    "geometry/assets/link6_3.obj": "d4f6a25ef32fa1fa4734146981994ee760232cb077c80fea6487d78a077c7f27",
+    "geometry/assets/link6_4.obj": "be353480fe71d46f7a96f0a3cbb7e112caaf8d88368826f321a36a253c8749b2",
+    "geometry/assets/link6_5.obj": "7c87664623c3e1a6cb330db273227a69626dc5e53b4caff1d4ee7911eb3340c6",
+    "geometry/assets/link6_6.obj": "8fbc031e0d07b795ebf99115c75223141caaba317cab569159f3d477a7821681",
+    "geometry/assets/link6_7.obj": "7dc5ebb799fe281aab27d6e84e7a4efa0a8e42da2369ec83de3ea3f206f62d73",
+    "geometry/assets/link6_8.obj": "e3f77381817a341030f9dcc4c4aa7c559f80411b453fd87eb0fefecca82151bf",
+    "geometry/assets/link6_9.obj": "25a56ea9b02a03b6cb5a81f31c54f54d0185e1a0b3937c37e4289d896e50215a",
+    "geometry/assets/link7.stl": "92ac6afcf7574c034d3170d8a68e95ac9048ab9d0dd5bbd8311b86e551b9ab1c",
+    "geometry/assets/link7_0.obj": "04586b0bde011715cfc22072ac72fe0717eb4d4817bcf665987ce6cd88eb2b93",
+    "geometry/assets/link7_1.obj": "c3f72289f394c9d6749a4a327fb11f05b203c37c95032c92f28019b40ebe7e00",
+    "geometry/assets/link7_2.obj": "d2faecedb304d0989040d082410378dc949dbbda23bd18c05134f08aae984db5",
+    "geometry/assets/link7_3.obj": "b62d87c4d4bdb7b281ed341d347c39dad0e50bf36aed8ac11d050073701d5f70",
+    "geometry/assets/link7_4.obj": "cb78ccb61fd4ad6c7bff4c4d2e6cb41e1964a5a3e1a28e67c0c6202371cfc018",
+    "geometry/assets/link7_5.obj": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491",
+    "geometry/assets/link7_6.obj": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb",
+    "geometry/assets/link7_7.obj": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54",
+    "geometry/geometry-manifest.json": "a97adec6f85ab33541544d0ced41d703a3b4f00171eebca3bbd2e75b07e339c5",
+    "geometry/panda_geometry.xml": "ab53182da482d5cffa21ead400d5e0c6f28c0b41a3f3ceb8cc6e615ac15284c4"
+  }
+}

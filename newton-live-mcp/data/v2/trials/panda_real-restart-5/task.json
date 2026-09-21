@@ -1,0 +1,283 @@
+{
+  "description": "Identify seven full physical link inertias, masses, centers of mass and joint losses from real measured Panda recordings, starting from geometry and homogeneous placeholders. Fit measured torque and Newton short-horizon forward trajectories. Final verification uses every recording in the independent published test fold.",
+  "initial": {
+    "mass": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "com": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "inertia": [
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ],
+      [
+        [
+          0.01,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.01,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.01
+        ]
+      ]
+    ],
+    "viscous": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "coulomb": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "torque_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "armature": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "bounds": {
+    "mass": [
+      0.05,
+      10.0
+    ],
+    "com": [
+      -0.4,
+      0.4
+    ],
+    "inertia": "Symmetric COM tensor; eigenvalues >=1e-8 kg*m^2 and physical triangle inequalities",
+    "second_moment": "trace(0.5*trace(I_origin)*identity-I_origin) <= mass*(0.5 m)^2",
+    "viscous": [
+      0.0,
+      5.0
+    ],
+    "coulomb": [
+      0.0,
+      5.0
+    ],
+    "torque_bias": [
+      -2.0,
+      2.0
+    ],
+    "armature": [
+      0.0,
+      1.0
+    ]
+  },
+  "thresholds": {
+    "max_joint_torque_rmse_nm": 0.5,
+    "max_joint_torque_normalized_rmse": 0.5,
+    "max_joint_position_rmse_rad": 0.025,
+    "max_joint_velocity_rmse_rad_s": 0.5,
+    "position_p95_rad": 0.05,
+    "max_joint_speed_rad_s": 5.0
+  },
+  "dt_s": 0.002,
+  "duration_s": 3.6,
+  "expected_frames": 1800,
+  "window_steps": 50,
+  "windows_per_episode": 12,
+  "training_episodes": 3,
+  "heldout_episodes": 16,
+  "synthetic": false,
+  "scenario": "panda_real",
+  "condition": "restart",
+  "variant": 5,
+  "phase": "confirmation",
+  "budget_seconds": 1200,
+  "candidate_budget": 60,
+  "camera": {
+    "eye": [
+      1.2,
+      -1.2,
+      0.85
+    ],
+    "target": [
+      0,
+      0,
+      0.45
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ]
+  },
+  "geometry_file": "/home/horde/artifacts/newton-live-mcp-v2/real-robot/public/geometry/panda_geometry.xml",
+  "input_hashes": {
+    "training.npz": "96643faeda84ef9b64c630b697fb276cfc7a56ccc66a4eb55e11bc19f1e66091",
+    "training-regressor.npz": "438bc214d7cf06ecec5944970a4bf555c7b7cb10f4243a648db2e83dafee4a0a",
+    "training-regressor.manifest.json": "4d47a5740417368f7af3ecb10c2f5edeb44461e4314a4d45e218a968cb933ff5"
+  },
+  "integrity_manifest_sha256": "69215c8beb1b36721e254beed03f531c6f3dd7dfd2a15f71769e61ae9b90c4fd",
+  "integrity_manifest": "integrity-manifest.json"
+}

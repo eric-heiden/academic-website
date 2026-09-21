@@ -1,0 +1,46 @@
+{
+  "method": "Weighted constrained least squares on all 98 physical coefficients; semidefinite pseudo-inertia constraints; weak dimension-scaled ridge regularization; joint armature floors chosen using complete measured forward candidates.",
+  "data": "Only supplied training recordings, immutable regressor and sanitized geometry; no nominal robot dynamics.",
+  "ridge_lambda": 0.001,
+  "joint_torque_weights": [
+    1,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2
+  ],
+  "minimum_armature": [
+    0.025,
+    0.005,
+    0.025,
+    0.015,
+    0.035,
+    0.025,
+    0.02
+  ],
+  "complete_physical_candidates": 16,
+  "all_training_thresholds_pass": true,
+  "all_leave_one_recording_out_checks_pass": true,
+  "input_hash_checks": {
+    "training.npz": true,
+    "training-regressor.npz": true,
+    "training-regressor.manifest.json": true
+  },
+  "final_trace_path": "/home/horde/artifacts/newton-live-mcp-v2/confirmation/panda_real-ipython_fixed-0/candidate-016.npz",
+  "worst_recording_metrics": {
+    "max_joint_torque_rmse_nm": 0.21003622999495736,
+    "max_joint_torque_normalized_rmse": 0.29853682657187613,
+    "max_joint_position_rmse_rad": 0.011124183607879761,
+    "max_joint_velocity_rmse_rad_s": 0.2646632318706303,
+    "position_p95_rad": 0.01307042503022756,
+    "max_joint_speed_rad_s": 2.2082011699676514
+  },
+  "limitations": [
+    "Effective dynamics identified from publisher-filtered measurements; measured torque is not a recovered raw motor command.",
+    "Individual link inertial parameters are not uniquely identifiable; several fitted COM inertias lie close to physical boundaries.",
+    "The independent 16-recording test fold remains inaccessible and unverified in this session."
+  ],
+  "final_configuration_sha256": "4df316879dada1b5355112e4730d31dd224627968add931835fb9c10c21e217b"
+}

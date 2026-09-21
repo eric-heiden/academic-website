@@ -1,0 +1,87 @@
+{
+  "dataset": "Human Universal Grasping / HUG-Bench",
+  "primary_sources": [
+    "https://grasping.io/",
+    "https://github.com/KevinyWu/aria2mesh"
+  ],
+  "scene": "medium_2",
+  "object": "softball",
+  "recording_path": "/home/horde/repos/manosim-newton/data/scenes/medium_2/aria_data.pkl",
+  "recording_sha256": "e8447750d401b97f2616a183d03ca02a87a48842172f240737ec613488be9545",
+  "frame_indices": [
+    289,
+    290,
+    291,
+    292,
+    293,
+    294,
+    295,
+    296,
+    297,
+    298,
+    299,
+    300,
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312,
+    313,
+    314,
+    315,
+    316,
+    317,
+    318,
+    319
+  ],
+  "sample_rate_hz": 10.0,
+  "window_selection": "minimum landmark/object distance with contiguous 3 s tracking",
+  "world_transform": "T_world_wrist = T_world_device @ T_device_wrist; Z-up; meters; xyzw",
+  "recenter_translation_m": [
+    0.23896837788914893,
+    -0.08959266610510604,
+    0.4710448874749898
+  ],
+  "assets": {
+    "collision/part_000.obj": "c173e6e86164b5c875a759fcceac90046a522f90aa4988e7210cb4a620f66200",
+    "object.urdf": "ef558c57ed27ff4cd9e0f3f27e4c1262002a4691d681e4099f5d3587046021f1",
+    "object.xml": "97786b26f69d28607b54353f645bb89f5224f40d1dc65284973f57fa8ee055b8",
+    "properties.json": "4c7772f8890406dd00d7abcd0f8391796d068aa40d5dab3e17f96d3b6779adb6",
+    "visual.obj": "827d69e1e0ad38ff7a9df22a0771154b0682634ef4403bea72757b63d01b5a8c"
+  },
+  "limitations": "Recorded MANO fits and authored object initial pose; no tracked object trajectory or success labels. Fixed supplied hand morphology, not subject-specific MANO shape fitting.",
+  "hand_asset": {
+    "path": "/home/horde/repos/manosim/assets/myhand/mano_rhand/capsule_hand.xml",
+    "sha256": "b9c446df6018bbe7ff9b938f2c5243bc220609df4931efd3d20189bbbe9b5880",
+    "revision": "75c77c065c6979a6b251362fc2fe344d77737291"
+  },
+  "wrist_normalization": {
+    "source": "Three unlimited slides plus an unlimited ball joint",
+    "import": "One equivalent free joint to avoid current importer solreflimit DOF-index failure",
+    "damping": [
+      5.0,
+      5.0,
+      5.0,
+      5.0,
+      5.0,
+      5.0
+    ],
+    "armature": [
+      0.0,
+      0.0,
+      0.0,
+      0.01,
+      0.01,
+      0.01
+    ],
+    "drive": "Explicit world-space PD wrench because MuJoCo free joints cannot have position actuators; translational gains tunable, rotational kp=30 N m/rad and kd=2 N m s/rad; force cap100 N and torque cap10 N m."
+  },
+  "scene_setup": "Dynamic free MANO wrist, ball-joint fingers, scanned convex object collision, source mass/friction, inferred planar support, no hand self-collision or hand/plane contact. Object is passive."
+}

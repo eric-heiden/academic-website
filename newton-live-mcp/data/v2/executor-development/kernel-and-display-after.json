@@ -1,0 +1,210 @@
+[
+  {
+    "code": "from dataclasses import dataclass\n@dataclass\nclass Settings:\n    scale: float = 2.0\n@wp.func\ndef scaled(value: float, scale: float):\n    return value * scale\n@wp.kernel\ndef apply(values: wp.array[float], scale: float):\n    i = wp.tid()\n    values[i] = scaled(values[i], scale)\nsettings = Settings()\nvalues = wp.array([1.0, 2.0, 3.0], dtype=float, device='cpu')",
+    "response": {
+      "time": 0.0,
+      "frame": 0,
+      "revision": 2,
+      "paused": true,
+      "valid": true,
+      "closed": false,
+      "last_error": null,
+      "requires_rebuild": false,
+      "result": null,
+      "result_repr": null,
+      "stdout": "",
+      "truncated": false,
+      "workspace": {
+        "generation": 1,
+        "cell_count": 1,
+        "variables": [
+          "Settings",
+          "apply",
+          "dataclass",
+          "scaled",
+          "settings",
+          "values"
+        ],
+        "variable_count": 6,
+        "variables_truncated": false,
+        "source_cells": 1,
+        "last_error": null
+      }
+    }
+  },
+  {
+    "code": "wp.launch(apply, dim=3, inputs=[values, settings.scale], device='cpu')\nvalues.numpy().tolist()",
+    "response": {
+      "time": 0.0,
+      "frame": 0,
+      "revision": 3,
+      "paused": true,
+      "valid": true,
+      "closed": false,
+      "last_error": null,
+      "requires_rebuild": false,
+      "result": [
+        2.0,
+        4.0,
+        6.0
+      ],
+      "result_repr": null,
+      "stdout": "Module _newton_mcp_76e337740890 93ed0e3 load on device 'cpu' took 1170.92 ms  (compiled)\n",
+      "truncated": false,
+      "workspace": {
+        "generation": 1,
+        "cell_count": 2,
+        "variables": [
+          "Settings",
+          "apply",
+          "dataclass",
+          "scaled",
+          "settings",
+          "values"
+        ],
+        "variable_count": 6,
+        "variables_truncated": false,
+        "source_cells": 2,
+        "last_error": null
+      }
+    }
+  },
+  {
+    "code": "samples = np.zeros(1_000_000, dtype=np.complex128)\nsamples",
+    "response": {
+      "time": 0.0,
+      "frame": 0,
+      "revision": 4,
+      "paused": true,
+      "valid": true,
+      "closed": false,
+      "last_error": null,
+      "requires_rebuild": false,
+      "result": null,
+      "result_repr": "<numpy.ndarray shape=(1000000,) dtype=complex128; inspect a slice of _>",
+      "stdout": "",
+      "truncated": false,
+      "workspace": {
+        "generation": 1,
+        "cell_count": 3,
+        "variables": [
+          "Settings",
+          "apply",
+          "dataclass",
+          "samples",
+          "scaled",
+          "settings",
+          "values"
+        ],
+        "variable_count": 7,
+        "variables_truncated": false,
+        "source_cells": 3,
+        "last_error": null
+      }
+    }
+  },
+  {
+    "code": "_.shape",
+    "response": {
+      "time": 0.0,
+      "frame": 0,
+      "revision": 5,
+      "paused": true,
+      "valid": true,
+      "closed": false,
+      "last_error": null,
+      "requires_rebuild": false,
+      "result": [
+        1000000
+      ],
+      "result_repr": null,
+      "stdout": "",
+      "truncated": false,
+      "workspace": {
+        "generation": 1,
+        "cell_count": 4,
+        "variables": [
+          "Settings",
+          "apply",
+          "dataclass",
+          "samples",
+          "scaled",
+          "settings",
+          "values"
+        ],
+        "variable_count": 7,
+        "variables_truncated": false,
+        "source_cells": 4,
+        "last_error": null
+      }
+    }
+  },
+  {
+    "code": "settings",
+    "response": {
+      "time": 0.0,
+      "frame": 0,
+      "revision": 6,
+      "paused": true,
+      "valid": true,
+      "closed": false,
+      "last_error": null,
+      "requires_rebuild": false,
+      "result": null,
+      "result_repr": "<Settings object; inspect selected attributes of _>",
+      "stdout": "",
+      "truncated": false,
+      "workspace": {
+        "generation": 1,
+        "cell_count": 5,
+        "variables": [
+          "Settings",
+          "apply",
+          "dataclass",
+          "samples",
+          "scaled",
+          "settings",
+          "values"
+        ],
+        "variable_count": 7,
+        "variables_truncated": false,
+        "source_cells": 5,
+        "last_error": null
+      }
+    }
+  },
+  {
+    "code": "_.scale",
+    "response": {
+      "time": 0.0,
+      "frame": 0,
+      "revision": 7,
+      "paused": true,
+      "valid": true,
+      "closed": false,
+      "last_error": null,
+      "requires_rebuild": false,
+      "result": 2.0,
+      "result_repr": null,
+      "stdout": "",
+      "truncated": false,
+      "workspace": {
+        "generation": 1,
+        "cell_count": 6,
+        "variables": [
+          "Settings",
+          "apply",
+          "dataclass",
+          "samples",
+          "scaled",
+          "settings",
+          "values"
+        ],
+        "variable_count": 7,
+        "variables_truncated": false,
+        "source_cells": 6,
+        "last_error": null
+      }
+    }
+  }
+]
