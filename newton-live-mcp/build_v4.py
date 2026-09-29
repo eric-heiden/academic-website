@@ -127,7 +127,9 @@ def build() -> str:
                 + f'<details class="development-detail"><summary>All {len(rows)} trials</summary>{trial_table(rows)}</details>'),
         section("harness", 3, "What each iteration changed", paragraphs("harness")
                 + table("Table 4. Harness versions. Each version is a commit on the Newton branch; trials record the version they ran.",
-                        ["Version", "Commit", "Changes"], n["harness_rows"], prose=True, label="Harness versions")),
+                        ["Version", "Commit", "Changes"], n["harness_rows"], prose=True, label="Harness versions")
+                + figure("assets/v4/grinding-overlay.jpg", "Two observation panels of the grinding scene: an isometric view and a top view in which a groove is visible in the workpiece.", 1,
+                         "An h5 observation of a solved grinding scene (iso and top views). The ground workpiece surface is drawn by the example's own <code>render()</code>; before h5, observations showed only the wheel.", 964, 320)),
         section("real", 4, "Real-robot calibration data", paragraphs("real")
                 + table("Table 5. Held-out window error of reference parameter sets for the DFKI double pendulum (mean joint-angle RMSE over 0.5 s open-loop windows).",
                         ["Parameters", "20 s excitation [rad]", "75 s full swings [rad]"], n["dp_reference_rows"], numeric={1, 2}, label="Double pendulum reference errors")
