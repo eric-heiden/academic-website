@@ -8,7 +8,13 @@ import math
 from charts_v3 import _fmt, _log_ticks, ratio_chart  # noqa: F401
 
 CONDITIONS = {"mcp": "Newton MCP", "restart": "No MCP (edit/restart)"}
-TASKS = {"dp_real": "Real pendulum", "g1_track": "G1 tracking", "grasp_drift": "Grasp drift"}
+TASKS = {
+    "cube_toss": "Cube toss",
+    "dp_real": "Real pendulum",
+    "g1_track": "G1 tracking",
+    "grasp_drift": "Grasp drift",
+    "sdf_grind": "SDF grinding",
+}
 MODELS = {"opus": "Opus 5.5", "astra": "GPT-6 Astra"}
 
 
@@ -40,7 +46,8 @@ def dumbbell(pairs: list[dict], metric: str, unit: str, title: str, label: str) 
         if previous is not None and previous != pair["iteration"]:
             parts.append(f'<line class="grid" x1="0" x2="{width}" y1="{y - row / 2:.1f}" y2="{y - row / 2:.1f}"/>')
         previous = pair["iteration"]
-        name = f'{pair["iteration"]} · {TASKS[pair["task"]]} · {MODELS[pair["model"]]}'
+        replicate = "" if pair["replicate"] == "p0" else f' · {pair["replicate"]}'
+        name = f'{pair["iteration"]} · {TASKS[pair["task"]]} · {MODELS[pair["model"]]}{replicate}'
         parts.append(f'<text x="0" y="{y + 4}">{html.escape(name)}</text>')
         xs = {c: scale(pair[c][metric]) for c in CONDITIONS if pair.get(c) and pair[c].get(metric)}
         if len(xs) == 2:
