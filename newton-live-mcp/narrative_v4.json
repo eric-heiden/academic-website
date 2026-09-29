@@ -1,0 +1,111 @@
+{
+ "modified": "2026-09-29",
+ "abstract": "Can Newton's live MCP harness be tuned until agents set up and tune simulations more efficiently with it than without it? This page tracks an ongoing improvement loop on three tasks drawn from earlier reports. The tasks are tuning a humanoid tracking controller, fixing a grasp that slips, and calibrating a model of a real double pendulum from measured torques. Each iteration runs Claude Opus 5.5 and GPT-6 Astra in concurrent pairs. The same agent solves the same task either with the live MCP or by editing and rerunning scripts. Every submission is verified in a fresh process. The transcripts are then mined for friction, and the harness is changed. After two iterations (8 pairs), both conditions solved every task. With the MCP, agents were slightly faster (time ratio 0.93) but used more input tokens (ratio 1.22, 95% interval 1.06–1.41). Opus gained most on the scenes that are slow to restart, taking 246 s instead of 531 s on G1 tracking. Astra was slower with the MCP on two of three tasks. The extra tokens do not come from tool output, which is smaller than the script workflow's shell output. They come from about 2.4k tokens of tool schemas and instructions resent on every turn, plus about 10% more turns. Iteration 2, now running, cuts that fixed context to about 0.8k tokens and adds parallel worker copies of the live scene. Earlier iterations fixed two ways live edits could silently fail. One was a shake amplitude baked into a captured CUDA graph; the other was stale bytecode after a quick script edit. They also added one-call rollouts and a contact report that names the parameters the solver actually uses.",
+ "harness_names": {
+  "i0": "h0",
+  "i1": "h1",
+  "i2": "h2"
+ },
+ "loop": [
+  "The previous study showed that a live MCP makes photo-based calibration cheaper in tokens. This loop asks a broader question. Can the harness be tuned until it reliably helps on the setup and tuning work that earlier coding agents often failed at? The three tasks are rebuilt from earlier reports. One tunes a controller for reference-motion following (from the <a href=\"../g1-whole-body-control/\">G1 whole-body-control report</a>). One debugs a slipping grasp (from <a href=\"../grasp-shake-drift/\">grasp-shake-drift</a> and <a href=\"../featherpgs-issues/\">FeatherPGS</a>). One calibrates a model against measurements from a real robot.",
+  "Each task starts from a runnable Newton example script with a realistic defect, together with a goal checked by a hidden verifier. The same agent (Claude Opus 5.5 in Claude Code, or GPT-6 Astra in Codex, both at xhigh effort) receives the same task in two conditions. In the <em>MCP</em> condition the script is already running live under <code>python -m newton.mcp host</code>. The agent can execute Python inside it, observe it, and reload the edited file, and it keeps its shell. In the <em>no-MCP</em> baseline it edits files and reruns scripts, so every run starts a fresh simulator process. Both trials of a pair start together on the same machine and get a 30-minute budget.",
+  "One iteration runs the pairs, reads the transcripts for friction (wasted turns, errors, source-code spelunking, redundant checks), and changes the harness. The change is committed as a new harness version, and the next iteration reruns the pairs. We report success, elapsed time (split into model and tool time), input and output tokens, API cost, and tool calls. Paired ratios below 1 favor the MCP."
+ ],
+ "task_rows": [
+  [
+   "Grasp drift",
+   "Debug a contact setup",
+   "Franka FR3 grasps a 4 cm cube and shakes it (scene from the grasp-shake-drift report). A robot-wide soft contact default (ke = 250) is imposed on the cube through the fingers' higher MuJoCo geom priority, so a 10 cm shake drops the cube.",
+   "Cube drift in the hand frame below 1 mm over 11.5 s of 3 cm shaking and below 5 mm over 6 s of 10 cm shaking. Motion, gains, grip, timestep, and cube are unchanged."
+  ],
+  [
+   "G1 tracking",
+   "Tune a controller",
+   "Unitree G1 (29 DoF, SolverMuJoCo) follows a Kimodo wave clip with joint PD servos at 10 Hz bandwidth and falls within about a second.",
+   "Robot stays upright, with root RMSE ≤ 4 cm and joint RMSE ≤ 0.05 rad on the clip and on an unseen 1.4× faster playback. No forces on the floating base; robot model unchanged. A harder clip (high5) is reported but not required."
+  ],
+  [
+   "Real pendulum",
+   "Identify a system from real data",
+   "Model of the DFKI torque-controlled double pendulum (design C.0) built from nominal CAD point masses without friction, armature, or damping. Ten real recordings (measured joint angles, velocities, and motor torques at about 500 Hz) are provided.",
+   "Multiple-shooting error on two held-out recordings, using 0.5 s open-loop windows started from measured states and driven by measured torques. It must be ≤ 0.060 rad on a 20 s excitation run and ≤ 0.150 rad on a 75 s run with full swings."
+  ]
+ ],
+ "results": [
+  "Every trial so far solved its task in both conditions, including tasks that earlier coding agents did not always finish. Success therefore does not separate the conditions, and efficiency does. Across the eight completed pairs, the MCP reduced elapsed time slightly (geometric-mean ratio 0.93) but increased input tokens (1.22). Output tokens and API cost were at parity. The effect depends on agent and task. Opus finished G1 tracking in 246 s with the MCP instead of 531 s, and grasp drift in 472 s instead of 631 s. On the pendulum the two conditions were tied at about 280 s. Astra was faster with the MCP on G1 (420 s vs 523 s) but slower on grasp drift (292 s vs 173 s) and on the pendulum (1,177 s vs 845 s).",
+  "Iteration 2 (harness h2) is running. Its pairs will appear here as they complete, with a second Opus replicate for each task."
+ ],
+ "harness": [
+  "Each version is a commit on the Newton branch <code>eric-heiden/newton-live-mcp</code>. Changes are driven by what the previous iteration's transcripts showed.",
+  "<strong>h0 → h1.</strong> The iteration-0 agents wrote the same frame-by-frame evaluation loops in almost every call. They grepped the MuJoCo solver source to learn which contact parameters were actually in effect. A missing <code>import newton</code> invalidated the scene and cost a recovery turn. Worst, one Opus agent set <code>example.shake_amplitude = 0.1</code> live, but the amplitude is an argument baked into the example's captured IK graph. Its live “10 cm” tests therefore silently ran the 3 cm shake. h1 added <code>rollout()</code>, <code>solver_contacts()</code>, <code>health()</code>, a preloaded <code>newton</code>, and non-invalidating errors for hosted scripts. It also recaptures the example's CUDA graphs automatically whenever a cell changes an example attribute, and says so in the result. Writing a regression test exposed a second silent failure: reloading a script edited within the same second could run stale bytecode. The host now compiles from source.",
+  "<strong>h1 → h2.</strong> In iteration 1, Astra's first call to <code>solver_contacts()</code> found the grasp's root cause directly. The fingers' higher geom priority imposes a soft material with a 0.2 s solref time constant on the cube. Opus still read solver source for the same fact; in h1 the helper was listed only in the server instructions, not in the task's host guide. The token analysis showed that MCP tool results are smaller than the no-MCP shell output (72k vs 110k characters on grasp drift). The extra tokens instead come from about 2.4k tokens of tool schemas and instructions resent on every turn, and from about 10% more turns. Those turns include a tool-search round trip, a mandatory describe call, and final fresh-process checks that repeat live verification. h2 advertises only <code>newton_execute</code> and <code>newton_rebuild</code> with short instructions (about 0.8k tokens), removes the extra calls, and lists the helpers in the task's host guide. It names the deciding material in the contact report and hosts two worker copies of the scene, so sweeps can run in parallel or in the background."
+ ],
+ "harness_rows": [
+  [
+   "h0",
+   "working tree before 46dfe56d",
+   "ExampleHost serves an unmodified example script live. Checkpoints include the example's own arrays and scalars, and rebuild reloads the script in-process. Code profile with five tools."
+  ],
+  [
+   "h1",
+   "<a href=\"https://github.com/eric-heiden/newton/commit/46dfe56d\">46dfe56d</a>",
+   "rollout(), solver_contacts(), and health() helpers; newton preloaded; Python errors keep hosted scenes valid; automatic CUDA-graph recapture after live attribute edits; quiet Warp logs; rebuild compiles from source."
+  ],
+  [
+   "h2",
+   "<a href=\"https://github.com/eric-heiden/newton/commit/d7058ca9\">d7058ca9</a>",
+   "Lean profile (execute + rebuild; per-turn schema and instructions about 0.8k instead of 2.4k tokens), no tool-search round trip or mandatory describe; contact report names the deciding material; two worker copies for parallel and background sweeps; zero-argument rollout probes."
+  ]
+ ],
+ "real": [
+  "The system-identification task uses public measurements from the <a href=\"https://github.com/dfki-ric-underactuated-lab/double_pendulum\">DFKI underactuated double pendulum</a> (BSD-3-Clause). The robot has two quasi-direct-drive AK80-6 motors with 6:1 gearing, a 0.2 m first link, and a 0.3 m second link. Its fourteen design C.0 system-identification runs record measured joint angles, velocities, and motor torques. Runs 00–09 are given to the agent, while runs 10 (20 s excitation) and 11 (75 s, full swings, 300 Hz) are held out. The model replicates one pendulum per evaluation window as a separate Newton world, so a whole recording is evaluated in one batched SolverMuJoCo rollout (about 0.5 s on the study GPU).",
+  "The thresholds were set before any agent trial, from three reference parameter sets. The nominal starter misses badly. The published DFKI identification, mapped to a physically valid Newton model, roughly halves the error but does not pass. A direct Nelder–Mead fit of all twelve Newton parameters to runs 07–09 passes with margin. So the gates reward calibrating the simulator itself, beyond copying published numbers.",
+  "The agents solved this task quickly and in the same way in both conditions. They fitted the identifiable base parameters by linear least squares on inverse dynamics, then refined them with their own NumPy (Opus) or C++ (Astra) forward models under the multiple-shooting objective, and used Newton only to confirm. On a two-link system the simulator is not needed in the inner loop, so the live MCP has little to offer here. Its value should show on systems where the simulator is the only practical forward model, with contact or many degrees of freedom."
+ ],
+ "dp_reference_rows": [
+  [
+   "Starter (nominal CAD point masses)",
+   "0.143",
+   "0.336"
+  ],
+  [
+   "DFKI published identification (model 3.0, mapped to Newton)",
+   "0.070",
+   "0.176"
+  ],
+  [
+   "Reference Nelder–Mead fit through Newton (runs 07–09)",
+   "0.038",
+   "0.131"
+  ],
+  [
+   "Verification threshold",
+   "0.060",
+   "0.150"
+  ],
+  [
+   "Iteration 1, Opus: MCP / no MCP",
+   "0.040 / 0.040",
+   "0.133 / 0.113"
+  ],
+  [
+   "Iteration 1, Astra: MCP / no MCP",
+   "0.037 / 0.040",
+   "0.131 / 0.127"
+  ]
+ ],
+ "findings": [
+  "<strong>Frontier agents now solve these setup and tuning tasks with or without the MCP.</strong> Every one of the 16 verified trials passed, so the harness has to earn its place through efficiency and reliability.",
+  "<strong>The MCP saves time where restarts are expensive and the agent works synchronously.</strong> For Opus it halved the time on G1 tracking and cut grasp drift by a quarter, but it tied on the pendulum, whose fresh runs are cheap. Astra overlaps background scripts with its reasoning in the no-MCP condition, and blocking MCP calls took that away on two of three tasks. The parallel workers in h2 are meant to restore it.",
+  "<strong>Per-turn fixed context, not tool output, drives the token overhead.</strong> Tool schemas and instructions are resent on every API call. At about 2.4k tokens over 20–40 calls, that alone accounts for most of the 20% gap. Iteration 2 tests whether trimming them closes it.",
+  "<strong>A live session needs guards that a restart workflow gets for free.</strong> Captured CUDA graphs, cached bytecode, and baked kernel arguments can make a live edit silently ineffective, which is worse than a slow restart. h1's automatic recapture and source compilation remove the two cases seen so far.",
+  "<strong>Explaining effective solver parameters saves investigation.</strong> Where an agent used the contact report, it found the grasp's root cause (finger priority overriding the cube's material) in its first call. Agents without it read solver kernels to reconstruct the same fact."
+ ],
+ "limits": [
+  "This is an exploratory loop, not a registered study. The harness changes between iterations, one pair per task and model is not enough to separate small effects from noise, and the task set was fixed only when the loop started. All pairs ran on one shared 4-CPU machine with a MIG GPU slice. Concurrent pairs control for load between conditions but not across iterations.",
+  "Iteration 0 has no Astra trials. One iteration-1 Astra G1 pair was excluded because the operator accidentally terminated its live host while testing workers, and it was rerun with the same harness. Codex does not report API cost. Because every task is solvable in both conditions, these results say nothing about whether the MCP raises success on harder problems."
+ ],
+ "source": [
+  "Newton branch <a href=\"https://github.com/eric-heiden/newton/tree/eric-heiden/newton-live-mcp\">eric-heiden/newton-live-mcp</a>: the MCP host and helpers are in <code>newton/_src/mcp</code>, and the loop harness, tasks, and verifiers in <code>tools/mcp_evaluation/v4</code> (<code>run_v4.py</code>; <code>dp_real/prepare_data.py</code> rebuilds the pendulum CSVs from the DFKI repository). Trial data: <a href=\"data/v4/loop.json\">loop.json</a> (every trial's metrics and paired ratios) and <a href=\"data/v4/loop-transcripts.zip\">loop-transcripts.zip</a> (prompts, specs, summaries, verifications, submitted scripts, agent transcripts, and host logs, with loopback tokens redacted)."
+ ]
+}

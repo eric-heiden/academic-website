@@ -210,12 +210,12 @@ def build() -> str:
     ]
     footer = (
         '<footer class="report-footer"><span>Newton live simulation · experimental research</span>'
-        '<a href="study2.html">Three-way study (v2)</a><a href="historical.html">Original study</a><a href="../">All reports</a></footer>'
+        '<a href="index.html">Harness improvement loop (v4, latest)</a><a href="study2.html">Three-way study (v2)</a><a href="historical.html">Original study</a><a href="../">All reports</a></footer>'
         "</main></div></body></html>"
     )
     return "".join(body) + footer
 
 
 if __name__ == "__main__":
-    (HERE / "index.html").write_text(build())
-    print("wrote index.html")
+    (HERE / "study3.html").write_text(build())
+    print("wrote study3.html")
