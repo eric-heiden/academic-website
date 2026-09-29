@@ -1,0 +1,91 @@
+{
+  "task": "arm_offsets",
+  "condition": "mcp",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "development",
+  "budget_seconds": 1800,
+  "prompt_sha256": "18edde67afdeaa3cb5f0ab088c8bc8e7fcc6f1fcf781d5230f5d4cca5ebd249c",
+  "reference_sha256": {
+    "pose_0_front_t0.00.png": "3fda3e8faf0021965bba288559d899f829ee7ad2b5519ed1237b56a7cf8bbd5a",
+    "pose_0_side_t0.00.png": "86af99a4ef13ab189a8dcbe20c68b747cf988e0855c254b6c4449c42f0df7b8e",
+    "pose_0_top_t0.00.png": "2bfcce848a27f7706363d6e99935bac7ed058a7ab67896f2ce51230278d3733d",
+    "pose_1_front_t0.00.png": "02becb7f86b027a206d0d7b52a92561c2d4f725a95c4adae27eff9deed1244a0",
+    "pose_1_side_t0.00.png": "77c9076abe2c0580348272af0d6d83373b4e780a000e3db9906b3389dbbc30fa",
+    "pose_1_top_t0.00.png": "b6ba304e01e04cc909f58a56558463d20e111cc6e93e020e81400711ed3880f8",
+    "pose_2_front_t0.00.png": "951020fb350983943b74a1b9a02689aaaa182109cbdf74dd9572be9a6be5690a",
+    "pose_2_side_t0.00.png": "06b28e544180f2e17f58970a4bb8af00ec8b9afbfdda8be96decaaff28bdb5ea",
+    "pose_2_top_t0.00.png": "b05a618ce5a1de9aaf04a6f39cb5f3359d78044a3dee560e4ee3a43ef28d6efb",
+    "pose_3_front_t0.00.png": "8a6b5c82cd775215afb3870b67c7edfaebecde899b7776d44fce0ccd6e11f0dd",
+    "pose_3_side_t0.00.png": "40fc394078d3a47f0f0a6560b879c0dbdf0fd4667c3ae1a7a0d5059c27193f91",
+    "pose_3_top_t0.00.png": "b9e08e3b290e44e6f10e8d23c6cf204d19786e45436869fc2088ee4e554864be",
+    "reference.json": "88d1054b976553a4515cf0db204829f19cb8c3f590ad1a215e7641ea528cb357",
+    "sheet_pose_0.png": "287b6545ee82fa507548d0bb7f71daf3a0d1d653c52532408d007dc6ec3a4218",
+    "sheet_pose_1.png": "90d5c502cd320eeb0953bddfa0b9fe9bc72d750f7252cf695844d68e8c7088af",
+    "sheet_pose_2.png": "251dbc022ae7a0d3f111430148dd2d6fb654efe48785b5f0f7c0e2547a21365a",
+    "sheet_pose_3.png": "70a0734a1f19c8ad8991768d3d2ecdde097e154df897b84c9b80a6c5e8dfbdf0"
+  },
+  "started_unix": 1790642326.8604496,
+  "application_startup_seconds": 4.659255990001839,
+  "agent_seconds": 400.97199590699165,
+  "total_seconds": 405.6312518969935,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    5.90234375,
+    4.74560546875,
+    5.3525390625
+  ],
+  "usage": {
+    "input_tokens": 402568,
+    "cached_input_tokens": 376254,
+    "cache_write_tokens": 26286,
+    "output_tokens": 4696,
+    "uncached_input_plus_output": 31010
+  },
+  "cost_usd": 0.4194808800000001,
+  "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__newton__newton_describe": 1,
+    "Bash": 4,
+    "mcp__newton__newton_execute": 8
+  },
+  "tool_call_total": 14,
+  "tool_errors": 0,
+  "mcp_images_returned": 1,
+  "agent_turns": 15,
+  "final_message": "I've calibrated the seven joint offsets, and with them the simulation reproduces all 12 reference photos pixel for pixel. The values are saved in `params.json`:\n\n| Offset | Value (rad) |\n|---|---|\n| offset_1 | 0.14 |\n| offset_2 | \u22120.18 |\n| offset_3 | 0.22 |\n| offset_4 | 0.16 |\n| offset_5 | \u22120.24 |\n| offset_6 | 0.20 |\n| offset_7 | \u22120.30 |\n\n**How I found them**\n- **Error measure:** the average pixel difference between the simulated and reference images, summed over all 4 training poses and 3 cameras. Each evaluation takes about 0.34 s because changing the offsets doesn't require a rebuild.\n- **Coarse search:** I stepped each joint across its full range of \u00b10.4 rad in turn, then narrowed in. I blurred the images heavily for this step so the search wouldn't get stuck on a wrong answer.\n- **Fine search:** I refined with an optimizer (Powell's method), first with less blur and then with almost none.\n- **Joints 1 and 3:** these two partly substitute for each other when joint 2 is near zero. The coarse search first put offset_1 near 0.35 and offset_3 near 0.0; the fine search corrected them to 0.14 and 0.22.\n- **Final values:** the optimizer ended within about 0.001 rad of round numbers. Rounded to two decimals, the pixel difference is exactly 0 on all 12 images; the unrounded optimizer result left a small residual.\n\n**Held-out scoring:** the offsets are properties of the joints, not of any one pose. Four fairly different training poses pinned down all seven, so they should carry over to the held-out poses.\n\nThe live scene is also set to these values.",
+  "event_count": 71,
+  "mcp_available": true,
+  "parameter_sets_applied": 1066,
+  "unique_parameter_sets": 1029,
+  "simulated_seconds": 0,
+  "simulator_processes": 1,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "link_position_error_m": 0.0,
+      "hand_rotation_error_deg": 0.0
+    },
+    "training_worst": {
+      "link_position_error_m": 0.0,
+      "hand_rotation_error_deg": 0.0
+    },
+    "normalized_worst": {
+      "link_position_error_m": 0.0,
+      "hand_rotation_error_deg": 0.0
+    },
+    "params": {
+      "offset_1": 0.14,
+      "offset_2": -0.18,
+      "offset_3": 0.22,
+      "offset_4": 0.16,
+      "offset_5": -0.24,
+      "offset_6": 0.2,
+      "offset_7": -0.3
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

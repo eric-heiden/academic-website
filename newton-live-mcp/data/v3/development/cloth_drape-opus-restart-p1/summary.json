@@ -1,0 +1,84 @@
+{
+  "task": "cloth_drape",
+  "condition": "restart",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "development",
+  "budget_seconds": 1200,
+  "prompt_sha256": "0838aa5e920e96dfff94b5fcfb8a88d7abe4908a86ed8c5184bf9560e22b5e9a",
+  "reference_sha256": {
+    "center_front_t0.50.png": "97b3e6aa29d6266363012991143704f83a96247c767d06c57c9841c996776cc6",
+    "center_front_t1.00.png": "a5f161d8ec497945ac059269f38949db215e5109bdb399299629d0262b8f4e1f",
+    "center_front_t2.00.png": "69643be3f1b9b56b746ea394b07532bc18b4f923f97fdb1ea28dfc399726d1cd",
+    "center_top_t0.50.png": "a2f29f61c31c8725189cc1534d591ce36f9b41aa0a4528a6f09075f403bfbc95",
+    "center_top_t1.00.png": "b9923a3229c219228e34c9c28990fd005f38c4e3229c717785c30692f36fe9ce",
+    "center_top_t2.00.png": "d79f271fee5a17046fba2331449c192aa1fe30019a5e20ea2092d978959be56a",
+    "corner_front_t0.50.png": "1e0d5c1650f365f0a99a44b37510c9a5efec0bc68bf03ac1daa043ed0e1a2b70",
+    "corner_front_t1.00.png": "cf85ab4c49f794829738a62bcf7687fc90949235ddfb7bf338a870fcd54e3642",
+    "corner_front_t2.00.png": "23d758b42327557081363f9517b7401106206dedd4072d1ec97527c9133b5c1e",
+    "corner_top_t0.50.png": "27023502e6956ec2a11a52678c036aff28874aebaa1bb12f36d49beecaa29549",
+    "corner_top_t1.00.png": "236507f6002e1b2b52cbf1de6af899d1f2da8249cc3ceafc6ac4ff227d404fa8",
+    "corner_top_t2.00.png": "ab1324fc4e4a2f894a456a813650e8f65c26e726a0edeaac3ed0e1473f84784c",
+    "reference.json": "70f80dd039c133fcc637bc6bc8aa24c08b32d70d7cf846621027a5cfafd83023",
+    "sheet_center.png": "11211cb3024b7e084f7b95206dc0ac446f089600d65f58bceb63ee3978ed68b6",
+    "sheet_corner.png": "7c5602f338e9d4a4cfdc700e9fec180579520ec9835d245ccf67fbe0024f4900"
+  },
+  "started_unix": 1790640927.4502,
+  "application_startup_seconds": 0.0,
+  "agent_seconds": 483.20075229198847,
+  "total_seconds": 483.20075229198847,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    9.20751953125,
+    8.04541015625,
+    6.42431640625
+  ],
+  "usage": {
+    "input_tokens": 605361,
+    "cached_input_tokens": 560706,
+    "cache_write_tokens": 44621,
+    "output_tokens": 8220,
+    "uncached_input_plus_output": 52875
+  },
+  "cost_usd": 0.6985167200000001,
+  "tool_calls": {
+    "Bash": 13,
+    "Read": 5,
+    "ToolSearch": 1
+  },
+  "tool_call_total": 19,
+  "tool_errors": 1,
+  "mcp_images_returned": 5,
+  "agent_turns": 23,
+  "final_message": "I've written the final parameters to `params.json`. Pixel mismatch fell from 5.6% with the defaults to about 1.5% on both training episodes.\n\n| Parameter | Start | Final |\n|---|---|---|\n| stretch_stiffness | 100 N/m | **10000 N/m** |\n| bend_stiffness | 100 N\u00b7m/rad | **0.01 N\u00b7m/rad** |\n| areal_density | 1.0 kg/m\u00b2 | **0.3 kg/m\u00b2** |\n| friction | 0.5 | **1.0** |\n\n| Episode | Start mismatch | Final mismatch |\n|---|---|---|\n| center | 5.7% | 1.48% |\n| corner | 5.5% | 1.64% |\n\n**How I got there:** I wrote `sweep.py`, which scores many parameter sets in one process, and ran three coarse-to-fine grids of about 30 sets in total, several processes in parallel.\n\n1. **Stiffness:** the photos show a cloth that barely stretches but folds sharply. The defaults gave the opposite: a stretchy cloth that bulged into a dome. Stretch stiffness of 3e3\u20131e4 N/m with bending of 0.01 or lower matched best. 1e5 was worse, and bending of 0.1 or more gave rounded folds that don't match.\n2. **Friction** mattered most, and mostly through the corner episode, where the cloth hangs off one side of the box. Values of 0.2\u20130.5 let it slide off too far. 1.0 gave the best match; 1.25 and 1.5 held it back too much.\n3. **Density** made little difference in the 0.1\u20131.0 range. 0.3 was slightly best.\n\n**Caveats:**\n- The cloth folding isn't deterministic (the source notes about 1 cm average variation between identical runs), so mismatch differences of a few tenths of a percent between candidates are noise. That makes density and the exact bend value (0.003\u20130.03 scored about the same) the least certain parameters.\n- In the final images the simulated cloth on the corner episode slides slightly less than in the photos. The true friction might be a little under 1.0 (for example 0.9), but I didn't test that before time ran out.\n- These values come only from the box episodes; the held-out box and sphere episodes were not run.",
+  "event_count": 106,
+  "parameter_sets_applied": 34,
+  "unique_parameter_sets": 33,
+  "simulated_seconds": 136.0,
+  "simulator_processes": 13,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "mean_particle_error_m": 0.023413363844156265,
+      "p95_particle_error_m": 0.06536101549863815
+    },
+    "training_worst": {
+      "mean_particle_error_m": 0.03623982518911362,
+      "p95_particle_error_m": 0.07256066799163818
+    },
+    "normalized_worst": {
+      "mean_particle_error_m": 0.5853340961039066,
+      "p95_particle_error_m": 0.32680507749319077
+    },
+    "params": {
+      "stretch_stiffness": 10000.0,
+      "bend_stiffness": 0.01,
+      "areal_density": 0.3,
+      "friction": 1.0
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

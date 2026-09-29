@@ -1,0 +1,92 @@
+{
+  "task": "arm_offsets",
+  "condition": "mcp",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "confirmation",
+  "budget_seconds": 1800,
+  "prompt_sha256": "d6517ab3f663bc2f3df99c2acb8d8e4b956673a670260929584203605c670cc0",
+  "reference_sha256": {
+    "pose_0_front_t0.00.png": "3d12f0a22f42bdbd5aaff33ff8ce8814e1ae1c3422d680749aff4c45d2d2e787",
+    "pose_0_side_t0.00.png": "ae96f634b5902d882bd827411a5333c40cb3b165f0e2bb4aa1303b69bbefee57",
+    "pose_0_top_t0.00.png": "2a417616d108361cf80bb3e21da0dd0665fbc1406e64d4ac927a02dcaed31606",
+    "pose_1_front_t0.00.png": "39f1a47cd085552bb44d6532261850f9eb18eea126d4c24c3488a9dbfbbca541",
+    "pose_1_side_t0.00.png": "1ab1e9150d84ed6011c00549df0afff2c27e792389480ecbb88b2150bc92de43",
+    "pose_1_top_t0.00.png": "f8ea0f79f7f9c36bf23186a492334e9b45b3d94176b86f459bf0df7af2383739",
+    "pose_2_front_t0.00.png": "8f88a5bfadc1dae7a04eeec478170452ffd6a41c85815be4c6a8f96677959bae",
+    "pose_2_side_t0.00.png": "6cc5293e9da30b1ab3f257c3b279b34c58250167cf3c71dd3f1b38387bd7406f",
+    "pose_2_top_t0.00.png": "8dce69f3656926f89217cc6a2784d493472ae856ebec61727b2bd9f5d01f5c56",
+    "pose_3_front_t0.00.png": "9e11009b8a5a70c5ea524dda1a64099e836563688fda910fd7a744f37f137e72",
+    "pose_3_side_t0.00.png": "50f141050e86acfb4a1ca15ae1b94a5696a429487b4d3a0825de3f41772cabf7",
+    "pose_3_top_t0.00.png": "06e1eb40bd30f068a6e5d3714ba05ca16516444c17bbe649e10b816fa3a25253",
+    "reference.json": "152a9d275d0368623d78479c82d75b26caaa5e791be89a9fba365e39a5673044",
+    "sheet_pose_0.png": "2b2d30caed0d1cfc37d70f9f48aff2945f2a108d9fa08ad2658b126df1e1a706",
+    "sheet_pose_1.png": "66eb9eab75db56179129d8e12bb42dd9457752282ff1c1227b33438a4227a5d6",
+    "sheet_pose_2.png": "1d7b281533e45e8e1401c430113b152ed63a23dd63e13f36780d1beb8f225e42",
+    "sheet_pose_3.png": "bdb5d093b5e7529edf60eaea775806b441878a368e577526c71f7f6776d1d580"
+  },
+  "started_unix": 1790651289.2557962,
+  "application_startup_seconds": 6.763090578009724,
+  "agent_seconds": 283.3779613820079,
+  "total_seconds": 290.14105196001765,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    1.3076171875,
+    3.8896484375,
+    4.33984375
+  ],
+  "usage": {
+    "input_tokens": 341112,
+    "cached_input_tokens": 317798,
+    "cache_write_tokens": 23288,
+    "output_tokens": 4817,
+    "uncached_input_plus_output": 28131
+  },
+  "cost_usd": 0.38288636000000004,
+  "tool_calls": {
+    "ToolSearch": 1,
+    "mcp__newton__newton_describe": 1,
+    "Bash": 2,
+    "mcp__newton__newton_execute": 9,
+    "mcp__newton__newton_rebuild": 1
+  },
+  "tool_call_total": 14,
+  "tool_errors": 1,
+  "mcp_images_returned": 1,
+  "agent_turns": 15,
+  "final_message": "The simulation now matches the reference photos down to the level of the camera noise. The seven calibrated offsets are written to `params.json`.\n\n| Joint | Offset (rad) |\n|---|---|\n| 1 | +0.1437 |\n| 2 | \u22120.1768 |\n| 3 | +0.2231 |\n| 4 | +0.1573 |\n| 5 | \u22120.2419 |\n| 6 | +0.2044 |\n| 7 | \u22120.2970 |\n\n**How I got there:** every reference photo is taken at t=0, so this is purely a pose-matching problem with no dynamics involved. I compared the simulated and reference images from all three cameras for all four training poses (12 images) and minimised the pixel difference. First I stepped through each joint's full \u00b10.4 rad range, comparing slightly blurred images so the error changes smoothly. I then refined all seven offsets together with a Nelder\u2013Mead search, restarted once.\n\n**Fit quality:**\n- **Pixel error:** the mean squared error per image dropped from 280\u2013990 with all offsets at zero to 5.0\u20136.9. The photos carry noise with \u03c3 = 2.5, which alone gives about 6.25, so what's left is essentially noise.\n- **Visual check:** side-by-side renders of `pose_2` line up with the photos.\n- **Each offset is pinned down:** moving any one offset by \u00b10.01 rad raises the error on both sides. The increase is about 37\u201361 for joints 1\u20134, about 8 for joints 5\u20136, and about 1.2\u20131.6 for joint 7. Joint 7 is the least tightly determined but still has a clear minimum.\n- **Joints 1 and 3 are separated:** these two can partly stand in for each other in a single pose. The joint-by-joint pass put joint 1 at about 0.35 and joint 3 at 0.05, and the joint search moved them to 0.14 and 0.22. All four poses, which bend joint 2 differently, now fit at the noise level together. That suggests the split is real rather than a pixel-level coincidence, so it should carry over to the held-out poses.",
+  "event_count": 66,
+  "mcp_available": true,
+  "parameter_sets_applied": 2879,
+  "unique_parameter_sets": 697,
+  "simulated_seconds": 0,
+  "simulator_processes": 1,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "link_position_error_m": 7.221566920634359e-05,
+      "hand_rotation_error_deg": 0.03956468205889273
+    },
+    "training_worst": {
+      "link_position_error_m": 6.44977917545475e-05,
+      "hand_rotation_error_deg": 0.03956468205889273
+    },
+    "normalized_worst": {
+      "link_position_error_m": 0.0024071889735447867,
+      "hand_rotation_error_deg": 0.009891170514723182
+    },
+    "params": {
+      "offset_1": 0.1437,
+      "offset_2": -0.1768,
+      "offset_3": 0.2231,
+      "offset_4": 0.1573,
+      "offset_5": -0.2419,
+      "offset_6": 0.2044,
+      "offset_7": -0.297
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

@@ -1,0 +1,84 @@
+{
+  "task": "cloth_drape",
+  "condition": "restart",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "confirmation",
+  "budget_seconds": 1800,
+  "prompt_sha256": "4b35a2c690ae2d0e371357ee0c8ca0e64b83de04f1ce3c8bce22552e09166a8d",
+  "reference_sha256": {
+    "center_front_t0.50.png": "1576a5869303ad27f5a221c4e0c29b7e60e6845909c43a330c507d8601794326",
+    "center_front_t1.00.png": "d158b864fcf9337d7921531f0327cd2bb2921011c0b67282fe4f9e2444f331d6",
+    "center_front_t2.00.png": "3a95e893e17f9ce2e87613014c8576428f631c8f07327c382780ba1497d669a8",
+    "center_top_t0.50.png": "0af0d6896c0ebade30839623cc6a86329f94e4ac828e15940afc253be0ded021",
+    "center_top_t1.00.png": "b478620f3c6983f19abb8cf6a75e4a4d7150d65e8729d60659d46c787e12c8ab",
+    "center_top_t2.00.png": "4c6226e566357914c2726e9b235456e552a6e8b5135bcc118d9ca59527ad926e",
+    "corner_front_t0.50.png": "5b6155b75a34c1cf25b7b09618b5b090048a2892c24589c3891ab464ae07054f",
+    "corner_front_t1.00.png": "da5a4f684701c0a7ed6018b89b783f274d566e274fd0867d80401df1267eb66c",
+    "corner_front_t2.00.png": "daf047454ba42de6fbba314be7e5558e99bde909f5e072280066a3390de7bd29",
+    "corner_top_t0.50.png": "44797a2a57b167302a67fd399499b9f20882ab7b7e77adec34b9025fb7377084",
+    "corner_top_t1.00.png": "4f3505226801e2495856321996a8f894dbc268610a69583ae6d0c47d89db4364",
+    "corner_top_t2.00.png": "48539466fc7b0210acf5032f218af7eca6ceb6d382974c6856dd0b4db099049c",
+    "reference.json": "376e4e216fa26b9daf2104714a9f0a3476e550ce8004c373a9b03d3e808afa4d",
+    "sheet_center.png": "35fc5374bb7da5f993cd3fc6fb9e0ef1e16145e7fdf2f328b7a310d4ebbb69b5",
+    "sheet_corner.png": "a7b3cee15cc949eeac070f33cb7174f03144ac675c602ce875e820e562942709"
+  },
+  "started_unix": 1790644377.5892067,
+  "application_startup_seconds": 0.0,
+  "agent_seconds": 756.4111663520016,
+  "total_seconds": 756.4111663520016,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    1.611328125,
+    4.685546875,
+    5.84619140625
+  ],
+  "usage": {
+    "input_tokens": 1075885,
+    "cached_input_tokens": 1011632,
+    "cache_write_tokens": 64207,
+    "output_tokens": 11870,
+    "uncached_input_plus_output": 76123
+  },
+  "cost_usd": 1.0504280400000001,
+  "tool_calls": {
+    "Bash": 18,
+    "Read": 9
+  },
+  "tool_call_total": 27,
+  "tool_errors": 1,
+  "mcp_images_returned": 9,
+  "agent_turns": 35,
+  "final_message": "I've written the final parameters to `params.json`. In the training episodes the simulated cloth now slides, drapes and settles almost the same way as in the photos. Mean pixel mismatch went from 6.0% with the starting parameters to 1.36%. I haven't checked how well this carries over to the held-out episodes.\n\n**Final parameters**\n\n| Parameter | Start | Final |\n|---|---|---|\n| stretch_stiffness | 100 N/m | **1500 N/m** |\n| bend_stiffness | 100 N\u00b7m/rad | **0.01 N\u00b7m/rad** |\n| areal_density | 1.0 kg/m\u00b2 | **0.5 kg/m\u00b2** |\n| friction | 0.5 | **0.8** |\n\n**How each was pinned down**\n- **Bending:** the starting cloth was nearly rigid and formed a dome over the box. The photos show a limp cloth with sharp folds and wrinkles, so bending stiffness had to drop by about 10\u2074. Anything from 0.001 to 0.03 matches about equally well, and 0.01 scored best.\n- **Friction:** this was the most sensitive parameter, and the corner episode (cloth dropped off-centre, mostly off the box) fixed it. At 0.3 and 0.7 the cloth slides right off the box, which is clearly wrong. At 0.95 and 1.1 it sticks too firmly and covers too much of the box top. At 0.8 it slides partway and stops, as in the photos.\n- **Stretch:** at 100 the cloth was far too stretchy. Scores improved going down from 20000 to 1500, then got worse again at 1000. Stretch mainly controls how much cloth hangs over the edge and how far it slides before stopping.\n- **Density:** only weakly identifiable. The cloth's settled shape depends mostly on stiffness divided by weight, so density and stiffness partly trade off. 0.5 was consistently a bit better than 0.2 and fit the corner episode better than 1.0.\n\n**Scores in the training episodes**\n- Pixel mismatch fell from 5.9% to 1.26% in the centre episode and from 6.2% to 1.46% in the corner episode.\n- Cloth silhouette overlap with the photos (1 = identical) averaged 0.88 overall. The corner episode was the hard case and scored 0.79\u20130.82 at t = 1 and 2 s.\n\n**Caveats**\n- The wrinkle patterns are chaotic: a rerun of an identical parameter set came out 1.84% one time and 1.89% another. Differences under about 0.1% between candidates aren't meaningful, so the exact values of stretch (1500 vs 2500) and density are less certain than friction and bending.\n- I added `batch.py` to the workspace. It runs several parameter sets in one process and reports both the pixel mismatch and the silhouette overlap. I used the overlap because the pixel mismatch is dominated by wrinkle shading, while the silhouette shows how far the cloth slid.",
+  "event_count": 181,
+  "mcp_available": null,
+  "parameter_sets_applied": 26,
+  "unique_parameter_sets": 24,
+  "simulated_seconds": 104.0,
+  "simulator_processes": 5,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "mean_particle_error_m": 0.019948583096265793,
+      "p95_particle_error_m": 0.08159725368022919
+    },
+    "training_worst": {
+      "mean_particle_error_m": 0.025694113224744797,
+      "p95_particle_error_m": 0.08098578453063965
+    },
+    "normalized_worst": {
+      "mean_particle_error_m": 0.4987145774066448,
+      "p95_particle_error_m": 0.40798626840114594
+    },
+    "params": {
+      "stretch_stiffness": 1500.0,
+      "bend_stiffness": 0.01,
+      "areal_density": 0.5,
+      "friction": 0.8
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

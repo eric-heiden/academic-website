@@ -1,0 +1,22 @@
+[
+  {
+    "name": "newton_describe",
+    "description": "Inspect live scene time/revision, solver entries, editable fields, capabilities and budgets."
+  },
+  {
+    "name": "newton_observe",
+    "description": "Render the current state as an inline PNG. Omit the camera to auto-frame the scene (view preset, default iso). views=[...] renders several cameras into one labeled grid. reference='photo.png' (or a list aligned with views) renders with the same size and returns simulated | reference | mismatch panels plus pixel statistics. Sensor backend needs no GL; optional raw depth/IDs and pixel picking preserve numeric values."
+  },
+  {
+    "name": "newton_filmstrip",
+    "description": "Advance the simulation and return ONE labeled image grid (columns = times, rows = views): the fastest way to see a motion. Give absolute times [s] (use reset=true to start from t=0, or restore='checkpoint'), or count frames every_steps apart. references=[[paths per time] per view] adds reference and mismatch rows. Default tiles 320x240; state stays at the last time."
+  },
+  {
+    "name": "newton_execute",
+    "description": "Run trusted Python in the live application process. Variables, imports and functions persist across calls (and across reset/rebuild). Globals: session, model, state, control, solver, contacts, np, wp, show, plus application objects listed in the server instructions. The last expression is returned (large/opaque values are summarized; _ keeps the value). show(img, label) returns images inline: numpy arrays, matplotlib figures, PNG paths, or observe/filmstrip results. Batch many evaluations per call and print compact numbers. session.dispatch(op, args) runs structured operations (observe, filmstrip, step, reset, checkpoint, restore, query, edit). Runtime errors keep variables but pause/invalidate the scene: fix with recovery='inspect' then 'acknowledge', or rebuild. Not a sandbox."
+  },
+  {
+    "name": "newton_rebuild",
+    "description": "Invoke the application rebuild callback for topology/solver changes within the same process. Callback arguments are application-specific and new bindings replace the scene, contacts, render caches and checkpoints. Python variables survive unless reset_namespace=true."
+  }
+]

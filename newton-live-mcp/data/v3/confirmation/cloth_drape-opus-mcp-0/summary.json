@@ -1,0 +1,87 @@
+{
+  "task": "cloth_drape",
+  "condition": "mcp",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "confirmation",
+  "budget_seconds": 1800,
+  "prompt_sha256": "6b87067a2198d6da0c0f20aee30ed3411a2d88e84ef28482f925d50f91f97ea6",
+  "reference_sha256": {
+    "center_front_t0.50.png": "1576a5869303ad27f5a221c4e0c29b7e60e6845909c43a330c507d8601794326",
+    "center_front_t1.00.png": "d158b864fcf9337d7921531f0327cd2bb2921011c0b67282fe4f9e2444f331d6",
+    "center_front_t2.00.png": "3a95e893e17f9ce2e87613014c8576428f631c8f07327c382780ba1497d669a8",
+    "center_top_t0.50.png": "0af0d6896c0ebade30839623cc6a86329f94e4ac828e15940afc253be0ded021",
+    "center_top_t1.00.png": "b478620f3c6983f19abb8cf6a75e4a4d7150d65e8729d60659d46c787e12c8ab",
+    "center_top_t2.00.png": "4c6226e566357914c2726e9b235456e552a6e8b5135bcc118d9ca59527ad926e",
+    "corner_front_t0.50.png": "5b6155b75a34c1cf25b7b09618b5b090048a2892c24589c3891ab464ae07054f",
+    "corner_front_t1.00.png": "da5a4f684701c0a7ed6018b89b783f274d566e274fd0867d80401df1267eb66c",
+    "corner_front_t2.00.png": "daf047454ba42de6fbba314be7e5558e99bde909f5e072280066a3390de7bd29",
+    "corner_top_t0.50.png": "44797a2a57b167302a67fd399499b9f20882ab7b7e77adec34b9025fb7377084",
+    "corner_top_t1.00.png": "4f3505226801e2495856321996a8f894dbc268610a69583ae6d0c47d89db4364",
+    "corner_top_t2.00.png": "48539466fc7b0210acf5032f218af7eca6ceb6d382974c6856dd0b4db099049c",
+    "reference.json": "376e4e216fa26b9daf2104714a9f0a3476e550ce8004c373a9b03d3e808afa4d",
+    "sheet_center.png": "35fc5374bb7da5f993cd3fc6fb9e0ef1e16145e7fdf2f328b7a310d4ebbb69b5",
+    "sheet_corner.png": "a7b3cee15cc949eeac070f33cb7174f03144ac675c602ce875e820e562942709"
+  },
+  "started_unix": 1790644377.5888064,
+  "application_startup_seconds": 3.2569995210069465,
+  "agent_seconds": 585.7121082579979,
+  "total_seconds": 588.9691077790048,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    5.52197265625,
+    7.09375,
+    6.71142578125
+  ],
+  "usage": {
+    "input_tokens": 600389,
+    "cached_input_tokens": 561975,
+    "cache_write_tokens": 38380,
+    "output_tokens": 7270,
+    "uncached_input_plus_output": 45684
+  },
+  "cost_usd": 0.6234871,
+  "tool_calls": {
+    "ToolSearch": 1,
+    "Bash": 6,
+    "mcp__newton__newton_describe": 1,
+    "Read": 2,
+    "mcp__newton__newton_execute": 9
+  },
+  "tool_call_total": 19,
+  "tool_errors": 0,
+  "mcp_images_returned": 4,
+  "agent_turns": 20,
+  "final_message": "I've written the final parameters to `params.json`. On both training episodes the simulation now matches the photos much better than the defaults did, though the corner episode is still only about 80% matched.\n\n| Parameter | Start | Final |\n|---|---|---|\n| stretch_stiffness | 100 N/m | **1000 N/m** |\n| bend_stiffness | 100 N\u00b7m/rad | **0.01 N\u00b7m/rad** |\n| areal_density | 1.0 kg/m\u00b2 | **0.3 kg/m\u00b2** |\n| friction | 0.5 | **0.72** |\n\n**Fit.** I scored each run by how well the white cloth area overlaps between the simulated image and the photo (1.0 is a perfect match), averaged over both cameras and all three times:\n\n| Episode | Start | Final |\n|---|---|---|\n| center | 0.70 | 0.92 |\n| corner | 0.42 | 0.83 |\n\nThe average pixel difference fell from about 6.5 to about 3.0 out of 255.\n\n**What each parameter showed:**\n- **Stretch and bending:** the starting values made a stretchy, stiff dome. The photos show cloth that barely stretches, bends easily and wrinkles a lot, so I raised stretch stiffness and cut bending by four orders of magnitude. Within that range, stretch 1e3 fit better than 3e2 or 3e3, and bending 3e-3 to 1e-2 fit better than 3e-4 to 1e-3.\n- **Friction:** the corner episode pins this down. The cloth hangs mostly off one corner of the box and slides slowly without falling off. At 0.5 it slides off completely, and at 0.9 or more it stays put. Only a narrow band around 0.70\u20130.75 matches the photos at 1 s and 2 s.\n- **Density:** its effect doesn't come only from its ratio with stiffness. The contact stiffness is fixed, so density changes how the cloth sits on the box. With the same ratios, 1.0 kg/m\u00b2 slid off in the corner episode and 0.15 kg/m\u00b2 was worse than 0.3 kg/m\u00b2.\n\n**Caveats:**\n- The corner result sits close to a point where the cloth either holds or slides off, so small changes in friction or density shift that score noticeably (0.65 to 0.83 across nearby settings).\n- Density is the least certain value. I only tested it at 0.15, 0.3 and 1.0, each with the stiffnesses scaled to match.\n- I stopped at a coarse search and didn't fine-tune further, to avoid fitting chance details of these two episodes. The score is on different starting setups: a rotated, offset box and a sphere.",
+  "event_count": 100,
+  "mcp_available": true,
+  "parameter_sets_applied": 27,
+  "unique_parameter_sets": 25,
+  "simulated_seconds": 84.0,
+  "simulator_processes": 1,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "mean_particle_error_m": 0.02266543172299862,
+      "p95_particle_error_m": 0.07159677147865295
+    },
+    "training_worst": {
+      "mean_particle_error_m": 0.03253844752907753,
+      "p95_particle_error_m": 0.06941445916891098
+    },
+    "normalized_worst": {
+      "mean_particle_error_m": 0.5666357930749655,
+      "p95_particle_error_m": 0.35798385739326477
+    },
+    "params": {
+      "stretch_stiffness": 1000.0,
+      "bend_stiffness": 0.01,
+      "areal_density": 0.3,
+      "friction": 0.72
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

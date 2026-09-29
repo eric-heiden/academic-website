@@ -1,0 +1,89 @@
+{
+  "task": "arm_offsets",
+  "condition": "restart",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "confirmation",
+  "budget_seconds": 1800,
+  "prompt_sha256": "9edd35b3cee3e0afbdf4b948ed09ef4a520dda427375f4487ed6d0f6c765f468",
+  "reference_sha256": {
+    "pose_0_front_t0.00.png": "3d12f0a22f42bdbd5aaff33ff8ce8814e1ae1c3422d680749aff4c45d2d2e787",
+    "pose_0_side_t0.00.png": "ae96f634b5902d882bd827411a5333c40cb3b165f0e2bb4aa1303b69bbefee57",
+    "pose_0_top_t0.00.png": "2a417616d108361cf80bb3e21da0dd0665fbc1406e64d4ac927a02dcaed31606",
+    "pose_1_front_t0.00.png": "39f1a47cd085552bb44d6532261850f9eb18eea126d4c24c3488a9dbfbbca541",
+    "pose_1_side_t0.00.png": "1ab1e9150d84ed6011c00549df0afff2c27e792389480ecbb88b2150bc92de43",
+    "pose_1_top_t0.00.png": "f8ea0f79f7f9c36bf23186a492334e9b45b3d94176b86f459bf0df7af2383739",
+    "pose_2_front_t0.00.png": "8f88a5bfadc1dae7a04eeec478170452ffd6a41c85815be4c6a8f96677959bae",
+    "pose_2_side_t0.00.png": "6cc5293e9da30b1ab3f257c3b279b34c58250167cf3c71dd3f1b38387bd7406f",
+    "pose_2_top_t0.00.png": "8dce69f3656926f89217cc6a2784d493472ae856ebec61727b2bd9f5d01f5c56",
+    "pose_3_front_t0.00.png": "9e11009b8a5a70c5ea524dda1a64099e836563688fda910fd7a744f37f137e72",
+    "pose_3_side_t0.00.png": "50f141050e86acfb4a1ca15ae1b94a5696a429487b4d3a0825de3f41772cabf7",
+    "pose_3_top_t0.00.png": "06e1eb40bd30f068a6e5d3714ba05ca16516444c17bbe649e10b816fa3a25253",
+    "reference.json": "152a9d275d0368623d78479c82d75b26caaa5e791be89a9fba365e39a5673044",
+    "sheet_pose_0.png": "2b2d30caed0d1cfc37d70f9f48aff2945f2a108d9fa08ad2658b126df1e1a706",
+    "sheet_pose_1.png": "66eb9eab75db56179129d8e12bb42dd9457752282ff1c1227b33438a4227a5d6",
+    "sheet_pose_2.png": "1d7b281533e45e8e1401c430113b152ed63a23dd63e13f36780d1beb8f225e42",
+    "sheet_pose_3.png": "bdb5d093b5e7529edf60eaea775806b441878a368e577526c71f7f6776d1d580"
+  },
+  "started_unix": 1790651697.3705194,
+  "application_startup_seconds": 0.0,
+  "agent_seconds": 829.1625959269877,
+  "total_seconds": 829.1625959269877,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    1.58447265625,
+    5.34619140625,
+    5.2060546875
+  ],
+  "usage": {
+    "input_tokens": 403223,
+    "cached_input_tokens": 373058,
+    "cache_write_tokens": 30137,
+    "output_tokens": 6881,
+    "uncached_input_plus_output": 37046
+  },
+  "cost_usd": 0.5003025600000001,
+  "tool_calls": {
+    "Bash": 13,
+    "Read": 2
+  },
+  "tool_call_total": 15,
+  "tool_errors": 0,
+  "mcp_images_returned": 2,
+  "agent_turns": 18,
+  "final_message": "I've calibrated all seven joint offsets and saved them to `params.json`. With them, the simulation matches every training photo almost pixel for pixel.\n\n| Joint | Offset (rad) |\n|---|---|\n| offset_1 | +0.1431 |\n| offset_2 | \u22120.1769 |\n| offset_3 | +0.2238 |\n| offset_4 | +0.1570 |\n| offset_5 | \u22120.2425 |\n| offset_6 | +0.2047 |\n| offset_7 | \u22120.2955 |\n\n**Result:** at the starting all-zero offsets, 6\u20137.5% of pixels per pose differed from the photos. Now 0.013\u20130.022% do, and no single view is above 0.05%. The comparison images show no visible difference. What's left is scattered single pixels along edges, which looks like normal rendering jaggedness rather than a pose error. The photo noise is far too small to be counted as a mismatch.\n\n**Method:** I wrote a script (`opt.py`) that keeps one simulator running, renders all 12 views (4 poses \u00d7 3 cameras) and scores how far they are from the photos after blurring both. The offsets are just joint angles, so no dynamics were involved.\n1. **Coarse search:** I adjusted one joint at a time at reduced resolution. This got close but got stuck, because joints 1 and 3 affect the image in similar ways.\n2. **Joint search:** a simplex search over all seven offsets together (`run_nm.py`) broke that tie. It moved joint 1 from 0.23 to 0.14 and joint 3 from 0.15 to 0.22.\n3. **Final pass:** the same search at full resolution with less blur. The only real change was joint 7, from \u22120.25 to \u22120.30.\n\n**Confidence:**\n- **Joints 1\u20136** are pinned down well, because each pose moves them differently across three cameras.\n- **Joint 7** (the wrist rotation) is the least certain, since only the small gripper shows it. When I stepped it \u00b10.06 rad from the final value, the score was clearly best at \u22120.295 at both blur levels, so it is still well determined.\n\nThese are fixed zero-offsets identified from four different poses, so they should carry over to the held-out poses.",
+  "event_count": 107,
+  "mcp_available": null,
+  "parameter_sets_applied": 1103,
+  "unique_parameter_sets": 1026,
+  "simulated_seconds": 0,
+  "simulator_processes": 9,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "link_position_error_m": 0.00023153821530286223,
+      "hand_rotation_error_deg": 0.07912936529690494
+    },
+    "training_worst": {
+      "link_position_error_m": 0.00022123975213617086,
+      "hand_rotation_error_deg": 0.03956468205889273
+    },
+    "normalized_worst": {
+      "link_position_error_m": 0.007717940510095408,
+      "hand_rotation_error_deg": 0.019782341324226235
+    },
+    "params": {
+      "offset_1": 0.14311,
+      "offset_2": -0.17692,
+      "offset_3": 0.22378,
+      "offset_4": 0.15699,
+      "offset_5": -0.24253,
+      "offset_6": 0.20473,
+      "offset_7": -0.29547
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

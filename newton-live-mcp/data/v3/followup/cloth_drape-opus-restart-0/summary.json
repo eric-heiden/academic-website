@@ -1,0 +1,85 @@
+{
+  "task": "cloth_drape",
+  "condition": "restart",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "confirmation",
+  "budget_seconds": 1800,
+  "prompt_sha256": "734e7f153016c627d4741483167ae8e3d3e7a4b4acaaf4384e8e39b045abab8e",
+  "reference_sha256": {
+    "center_front_t0.50.png": "1576a5869303ad27f5a221c4e0c29b7e60e6845909c43a330c507d8601794326",
+    "center_front_t1.00.png": "d158b864fcf9337d7921531f0327cd2bb2921011c0b67282fe4f9e2444f331d6",
+    "center_front_t2.00.png": "3a95e893e17f9ce2e87613014c8576428f631c8f07327c382780ba1497d669a8",
+    "center_top_t0.50.png": "0af0d6896c0ebade30839623cc6a86329f94e4ac828e15940afc253be0ded021",
+    "center_top_t1.00.png": "b478620f3c6983f19abb8cf6a75e4a4d7150d65e8729d60659d46c787e12c8ab",
+    "center_top_t2.00.png": "4c6226e566357914c2726e9b235456e552a6e8b5135bcc118d9ca59527ad926e",
+    "corner_front_t0.50.png": "5b6155b75a34c1cf25b7b09618b5b090048a2892c24589c3891ab464ae07054f",
+    "corner_front_t1.00.png": "da5a4f684701c0a7ed6018b89b783f274d566e274fd0867d80401df1267eb66c",
+    "corner_front_t2.00.png": "daf047454ba42de6fbba314be7e5558e99bde909f5e072280066a3390de7bd29",
+    "corner_top_t0.50.png": "44797a2a57b167302a67fd399499b9f20882ab7b7e77adec34b9025fb7377084",
+    "corner_top_t1.00.png": "4f3505226801e2495856321996a8f894dbc268610a69583ae6d0c47d89db4364",
+    "corner_top_t2.00.png": "48539466fc7b0210acf5032f218af7eca6ceb6d382974c6856dd0b4db099049c",
+    "reference.json": "376e4e216fa26b9daf2104714a9f0a3476e550ce8004c373a9b03d3e808afa4d",
+    "sheet_center.png": "35fc5374bb7da5f993cd3fc6fb9e0ef1e16145e7fdf2f328b7a310d4ebbb69b5",
+    "sheet_corner.png": "a7b3cee15cc949eeac070f33cb7174f03144ac675c602ce875e820e562942709"
+  },
+  "started_unix": 1790651691.7579165,
+  "application_startup_seconds": 0.0,
+  "agent_seconds": 649.0369699889998,
+  "total_seconds": 649.0369699889998,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    12.9833984375,
+    8.19921875,
+    5.85791015625
+  ],
+  "usage": {
+    "input_tokens": 765617,
+    "cached_input_tokens": 711159,
+    "cache_write_tokens": 54420,
+    "output_tokens": 11507,
+    "uncached_input_plus_output": 65965
+  },
+  "cost_usd": 0.89017418,
+  "tool_calls": {
+    "Bash": 13,
+    "Read": 8,
+    "Write": 1
+  },
+  "tool_call_total": 22,
+  "tool_errors": 1,
+  "mcp_images_returned": 7,
+  "agent_turns": 26,
+  "final_message": "I've written the calibrated parameters to `params.json`, and the simulation now closely matches the reference photos in both training episodes. Mean pixel mismatch dropped from about 6% with the starting values to about 1.4%.\n\n| Parameter | Start | Final |\n|---|---|---|\n| stretch_stiffness | 100 N/m | **8000 N/m** |\n| bend_stiffness | 100 N\u00b7m/rad | **0.04 N\u00b7m/rad** |\n| areal_density | 1.0 kg/m\u00b2 | **0.25 kg/m\u00b2** |\n| friction | 0.5 | **0.9** |\n\n**How I got there:** I ran 36 candidates in four rounds of sweeps. I scored each one by the overlap between the simulated and photographed cloth outlines in all 12 photos (1.0 is a perfect overlap), plus the pixel mismatch that `sim.py` reports. The helper scripts are `sweep.py` and `show.sh`, and their results are in `sweep_out/`.\n\n**What the photos pin down:**\n- **Bending was far too stiff at the start.** With 100, the cloth sat on the box like a dome. The photos show a soft drape with sharp folds, which needs bending around 0.01\u20130.1.\n- **Stretch was far too soft.** At 100 N/m the cloth visibly sagged and spread. 3e3\u20133e4 all fit well. Higher values (1e5) made the corner episode worse, and so did 1e3.\n- **Friction is the parameter the data pins down best, through the corner episode.** There, how far the cloth slides off the box between 0.5 s and 2 s depends on friction. Overlap scores were 0.45\u20130.55 at 0.5\u20130.6, 0.75 at 0.8, 0.83 at 0.85, 0.86\u20130.87 at 0.9, 0.80\u20130.84 at 0.95\u20131.0, and 0.69 at 1.2.\n- **Density is only weakly identifiable.** The drape shape depends mostly on stiffness divided by density. I checked this by scaling density while keeping those ratios fixed. The fit was flat for density 0.1\u20130.5 and got worse at 1.0 (overlap 0.81) and at 0.05 (0.82), probably because the cloth-to-box contact stiffness is fixed. I chose 0.25 from the middle of that range.\n\n**Remaining error:**\n- The simulation isn't fully repeatable: the same parameters rerun gave overlap scores 0.857 and 0.862. Because of that, all the good candidates were within noise of each other (0.855\u20130.87), and I picked a central value rather than the single best-scoring run.\n- In the corner episode at 1\u20132 s, the simulation leaves slightly more cloth on top of the box than the photos show. This is small and within that noise level.\n- I only tested the two training episodes. The held-out ones (a rotated offset box and a sphere) weren't run, so the transfer is untested.",
+  "event_count": 209,
+  "mcp_available": null,
+  "parameter_sets_applied": 50,
+  "unique_parameter_sets": 36,
+  "simulated_seconds": 152.0,
+  "simulator_processes": 14,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "mean_particle_error_m": 0.021647969260811806,
+      "p95_particle_error_m": 0.08984099328517914
+    },
+    "training_worst": {
+      "mean_particle_error_m": 0.03173227608203888,
+      "p95_particle_error_m": 0.06354910880327225
+    },
+    "normalized_worst": {
+      "mean_particle_error_m": 0.5411992315202951,
+      "p95_particle_error_m": 0.4492049664258957
+    },
+    "params": {
+      "stretch_stiffness": 8000.0,
+      "bend_stiffness": 0.04,
+      "areal_density": 0.25,
+      "friction": 0.9
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

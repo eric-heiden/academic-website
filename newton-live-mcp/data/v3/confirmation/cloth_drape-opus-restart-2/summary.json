@@ -1,0 +1,84 @@
+{
+  "task": "cloth_drape",
+  "condition": "restart",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "confirmation",
+  "budget_seconds": 1800,
+  "prompt_sha256": "ec7ea44aa7f0a7360126ca3cef7a2899d481a4aa8d5fe821250926b03b4a3e5a",
+  "reference_sha256": {
+    "center_front_t0.50.png": "1576a5869303ad27f5a221c4e0c29b7e60e6845909c43a330c507d8601794326",
+    "center_front_t1.00.png": "d158b864fcf9337d7921531f0327cd2bb2921011c0b67282fe4f9e2444f331d6",
+    "center_front_t2.00.png": "3a95e893e17f9ce2e87613014c8576428f631c8f07327c382780ba1497d669a8",
+    "center_top_t0.50.png": "0af0d6896c0ebade30839623cc6a86329f94e4ac828e15940afc253be0ded021",
+    "center_top_t1.00.png": "b478620f3c6983f19abb8cf6a75e4a4d7150d65e8729d60659d46c787e12c8ab",
+    "center_top_t2.00.png": "4c6226e566357914c2726e9b235456e552a6e8b5135bcc118d9ca59527ad926e",
+    "corner_front_t0.50.png": "5b6155b75a34c1cf25b7b09618b5b090048a2892c24589c3891ab464ae07054f",
+    "corner_front_t1.00.png": "da5a4f684701c0a7ed6018b89b783f274d566e274fd0867d80401df1267eb66c",
+    "corner_front_t2.00.png": "daf047454ba42de6fbba314be7e5558e99bde909f5e072280066a3390de7bd29",
+    "corner_top_t0.50.png": "44797a2a57b167302a67fd399499b9f20882ab7b7e77adec34b9025fb7377084",
+    "corner_top_t1.00.png": "4f3505226801e2495856321996a8f894dbc268610a69583ae6d0c47d89db4364",
+    "corner_top_t2.00.png": "48539466fc7b0210acf5032f218af7eca6ceb6d382974c6856dd0b4db099049c",
+    "reference.json": "376e4e216fa26b9daf2104714a9f0a3476e550ce8004c373a9b03d3e808afa4d",
+    "sheet_center.png": "35fc5374bb7da5f993cd3fc6fb9e0ef1e16145e7fdf2f328b7a310d4ebbb69b5",
+    "sheet_corner.png": "a7b3cee15cc949eeac070f33cb7174f03144ac675c602ce875e820e562942709"
+  },
+  "started_unix": 1790648974.4944663,
+  "application_startup_seconds": 0.0,
+  "agent_seconds": 592.5918585129984,
+  "total_seconds": 592.5918585129984,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    1.80419921875,
+    4.333984375,
+    4.80029296875
+  ],
+  "usage": {
+    "input_tokens": 860384,
+    "cached_input_tokens": 818407,
+    "cache_write_tokens": 41929,
+    "output_tokens": 11790,
+    "uncached_input_plus_output": 53767
+  },
+  "cost_usd": 0.8101209400000001,
+  "tool_calls": {
+    "Bash": 22,
+    "Read": 4
+  },
+  "tool_call_total": 26,
+  "tool_errors": 2,
+  "mcp_images_returned": 4,
+  "agent_turns": 29,
+  "final_message": "I've written the final parameters to `params.json`. With them, the simulation matches the reference photos well on both training episodes: pixel mismatch fell from about 6% with the starting defaults to 0.9% on the `center` episode and 1.7% on `corner`.\n\n| parameter | start | final |\n|---|---|---|\n| stretch_stiffness | 100 N/m | **1000 N/m** |\n| bend_stiffness | 100 N\u00b7m/rad | **0.003 N\u00b7m/rad** |\n| areal_density | 1.0 kg/m\u00b2 | **0.3 kg/m\u00b2** |\n| friction | 0.5 | **0.75** |\n\n**How each value was found** (about 35 parameter sets swept, one parameter at a time):\n- **Bending stiffness** was the biggest error. The default made the cloth drape like a stiff sheet with no wrinkles. The photos show a soft, wrinkled cloth, and the best values were between 0.001 and 0.005, with 0.003 best.\n- **Stretch stiffness:** 100 N/m let the cloth stretch visibly. 1000 fit clearly better than 300, 700, 1500 or 3000.\n- **Friction** controls the `corner` drop: whether the cloth stays hooked on the box's top edge or slides off. At 0.5 it slid fully off by t=1 s, but in the photos it stays on the top edge. At 0.9 or more it grips too much. The best range was 0.7\u20130.75.\n- **Areal density** is the least certain value. Results were nearly the same anywhere from 0.2 to 1.0 kg/m\u00b2, because the photos mostly constrain stiffness and friction relative to weight. 0.3 fit the `center` episode best.\n\n**Remaining error:** the `corner` episode is the weak point. Whether the cloth slides off depends sharply on the exact values, so nearby friction settings give noticeably different scores there. Most of what's left is small differences in the wrinkles on the part of the cloth lying on the floor. Friction and density are therefore less certain than the two stiffnesses.",
+  "event_count": 139,
+  "mcp_available": null,
+  "parameter_sets_applied": 52,
+  "unique_parameter_sets": 38,
+  "simulated_seconds": 152.0,
+  "simulator_processes": 15,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "mean_particle_error_m": 0.021872078999876976,
+      "p95_particle_error_m": 0.07608821988105774
+    },
+    "training_worst": {
+      "mean_particle_error_m": 0.03612619638442993,
+      "p95_particle_error_m": 0.0712103620171547
+    },
+    "normalized_worst": {
+      "mean_particle_error_m": 0.5468019749969244,
+      "p95_particle_error_m": 0.3804410994052887
+    },
+    "params": {
+      "stretch_stiffness": 1000.0,
+      "bend_stiffness": 0.003,
+      "areal_density": 0.3,
+      "friction": 0.75
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}

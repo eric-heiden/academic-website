@@ -1,0 +1,19 @@
+Live Newton simulation running in another process; its Python state persists between calls.
+Efficient workflow:
+- newton_observe() returns an inline image; omit the camera to auto-frame (view='iso'|'front'|'left'|'right'|'top'). views=[...] gives a multi-view grid in one image. reference='photo.png' renders at the photo's size with the same camera and adds reference and mismatch panels plus pixel statistics.
+- newton_filmstrip(times=[...], reset=true) runs forward and returns one labeled grid of frames; references=[[...]] compares each frame with reference images.
+- newton_execute runs Python in the app: batch several parameter candidates in one call, compute numeric comparisons, and call show(image_or_figure, label) to see custom plots or composites inline. Prefer one larger call over many small ones.
+- session.dispatch('checkpoint', {'name': ...}) / ('restore', ...) branches from a saved state instead of re-simulating.
+Runtime Python errors pause and invalidate the scene; use execute(recovery='inspect') to diagnose and 'acknowledge' after repair, or rebuild.
+
+Application guide:
+Calibration task 'arm_offsets'. Global `task` controls the scene (same API as the restart workflow):
+- task.params; task.set_params({...}) rebuilds with new parameters and resets to t=0 (bounds: task.PARAMS).
+- task.set_episode(name); training episodes ['pose_0', 'pose_1', 'pose_2', 'pose_3'].
+- task.reset(); task.step(frames); task.simulate_to(t_seconds); frame dt 0.0166667 s.
+- task.render(['front', 'side', 'top']) -> {camera: RGB uint8 array} from the reference cameras; task.rollout() renders all reference times.
+- task.camera('front').observe_arguments() gives eye/target/up/fov_y/width/height for newton_observe/newton_filmstrip.
+Reference photos: /tmp/showcase-arm_offsets/reference/<episode>_<camera>_t<time>.png at times [0.0]; sheet_<episode>.png shows each episode.
+Example comparison of the current parameters with the reference, one image:
+newton_filmstrip(reset=true, times=[0.0], views=[<task.camera('front').observe_arguments()>], references=[["/tmp/showcase-arm_offsets/reference/pose_0_front_t0.00.png"]])
+(call task.set_episode(...) first for another episode). Write final parameters to /tmp/showcase-arm_offsets/params.json.

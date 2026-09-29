@@ -1,0 +1,85 @@
+{
+  "task": "cloth_drape",
+  "condition": "mcp",
+  "model": "claude-opus-5-5",
+  "cli": "claude",
+  "effort": "xhigh",
+  "phase": "development",
+  "budget_seconds": 1200,
+  "prompt_sha256": "cd40aa9573a440467bf62f7ed67b3bb85ce1732d10a9711d1ac83a5a8c2e1c5d",
+  "reference_sha256": {
+    "center_front_t0.50.png": "97b3e6aa29d6266363012991143704f83a96247c767d06c57c9841c996776cc6",
+    "center_front_t1.00.png": "a5f161d8ec497945ac059269f38949db215e5109bdb399299629d0262b8f4e1f",
+    "center_front_t2.00.png": "69643be3f1b9b56b746ea394b07532bc18b4f923f97fdb1ea28dfc399726d1cd",
+    "center_top_t0.50.png": "a2f29f61c31c8725189cc1534d591ce36f9b41aa0a4528a6f09075f403bfbc95",
+    "center_top_t1.00.png": "b9923a3229c219228e34c9c28990fd005f38c4e3229c717785c30692f36fe9ce",
+    "center_top_t2.00.png": "d79f271fee5a17046fba2331449c192aa1fe30019a5e20ea2092d978959be56a",
+    "corner_front_t0.50.png": "1e0d5c1650f365f0a99a44b37510c9a5efec0bc68bf03ac1daa043ed0e1a2b70",
+    "corner_front_t1.00.png": "cf85ab4c49f794829738a62bcf7687fc90949235ddfb7bf338a870fcd54e3642",
+    "corner_front_t2.00.png": "23d758b42327557081363f9517b7401106206dedd4072d1ec97527c9133b5c1e",
+    "corner_top_t0.50.png": "27023502e6956ec2a11a52678c036aff28874aebaa1bb12f36d49beecaa29549",
+    "corner_top_t1.00.png": "236507f6002e1b2b52cbf1de6af899d1f2da8249cc3ceafc6ac4ff227d404fa8",
+    "corner_top_t2.00.png": "ab1324fc4e4a2f894a456a813650e8f65c26e726a0edeaac3ed0e1473f84784c",
+    "reference.json": "70f80dd039c133fcc637bc6bc8aa24c08b32d70d7cf846621027a5cfafd83023",
+    "sheet_center.png": "11211cb3024b7e084f7b95206dc0ac446f089600d65f58bceb63ee3978ed68b6",
+    "sheet_corner.png": "7c5602f338e9d4a4cfdc700e9fec180579520ec9835d245ccf67fbe0024f4900"
+  },
+  "started_unix": 1790640927.4531639,
+  "application_startup_seconds": 2.856119239993859,
+  "agent_seconds": 346.4408131749951,
+  "total_seconds": 349.296932414989,
+  "timed_out": false,
+  "agent_exit_code": 0,
+  "load_average_end": [
+    11.7451171875,
+    7.138671875,
+    5.90185546875
+  ],
+  "usage": {
+    "input_tokens": 469000,
+    "cached_input_tokens": 440737,
+    "cache_write_tokens": 28231,
+    "output_tokens": 6914,
+    "uncached_input_plus_output": 35177
+  },
+  "cost_usd": 0.49963273999999996,
+  "tool_calls": {
+    "Bash": 5,
+    "ToolSearch": 1,
+    "Read": 2,
+    "mcp__newton__newton_execute": 9
+  },
+  "tool_call_total": 17,
+  "tool_errors": 1,
+  "mcp_images_returned": 5,
+  "agent_turns": 18,
+  "final_message": "I've written the final parameters to `params.json`:\n\n| parameter | start | final |\n|---|---|---|\n| stretch_stiffness | 100 N/m | **1.0e4 N/m** |\n| bend_stiffness | 100 N\u00b7m/rad | **0.1 N\u00b7m/rad** |\n| areal_density | 1.0 kg/m\u00b2 | **1.0 kg/m\u00b2** |\n| friction | 0.5 | **1.0** |\n\n**How I scored it:** I sorted every pixel into cloth, box, shadow or background, then took the share of pixels whose class differs from the reference. That was averaged over both cameras at t = 0.5, 1.0 and 2.0 s. Each episode took about 15 s to simulate, so I ran 11 runs across 8 parameter sets.\n\n**What each parameter does to the result:**\n- **Bending stiffness** controls how the cloth hangs over the box. At the default of 100 the cloth stays a stiff dome. At 0.001\u20130.01 it folds too loosely. About 0.1 gives the reference's crisp overhangs and corner folds (center mismatch 0.98% at 0.1, versus 1.21% at 0.001 and 1.36% at 1.0; 0.3 scored 1.10%).\n- **Stretch stiffness:** at 100 the box corners poke through the cloth. At 5e4 the center drape got worse (1.56% vs 0.77%), and 3e3 was worse on both episodes (1.24% / 2.51%). 1e4 was the best.\n- **Friction** decides the corner episode. At 0.5 the cloth slides off the box, while in the reference it stays on part of the top. At 1.0 the covered area and the fold on the ground match the photos (3.63% \u2192 1.51% mismatch). At 1.5 the cloth drags too far across the top (3.71%).\n- **Density:** dropping it to 0.3 was slightly worse (1.18% vs 1.14% averaged over both episodes).\n\n**Final fit:** 0.77% mismatch on center and 1.51% on corner, against about 3.6% for the corner episode with the starting friction.\n\n**Limitations:**\n- Density is poorly constrained by these photos. Its effect is mostly tied to the stiffness-to-weight ratios, so I left it at 1.0 and tuned the stiffnesses around it.\n- The sweep was coarse because of the 20-minute limit. The values are probably only accurate to within a factor of 2\u20133 for the stiffnesses and about \u00b10.2 for friction.\n- The corner outcome jumps around rather than changing smoothly with friction (0.5 and 1.5 both failed), so there may be a better friction value between those that I didn't test.",
+  "event_count": 116,
+  "parameter_sets_applied": 13,
+  "unique_parameter_sets": 11,
+  "simulated_seconds": 30.0,
+  "simulator_processes": 1,
+  "verification": {
+    "success": true,
+    "heldout_worst": {
+      "mean_particle_error_m": 0.02293788269162178,
+      "p95_particle_error_m": 0.07266572117805481
+    },
+    "training_worst": {
+      "mean_particle_error_m": 0.05778434872627258,
+      "p95_particle_error_m": 0.08387463539838791
+    },
+    "normalized_worst": {
+      "mean_particle_error_m": 0.5734470672905445,
+      "p95_particle_error_m": 0.36332860589027405
+    },
+    "params": {
+      "stretch_stiffness": 10000.0,
+      "bend_stiffness": 0.1,
+      "areal_density": 1.0,
+      "friction": 1.0
+    }
+  },
+  "success": true,
+  "references_unchanged": true
+}
