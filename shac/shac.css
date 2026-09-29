@@ -1,0 +1,57 @@
+/* Report-specific additions to the Aperture template. */
+
+/* Series colours. The physics timestep is ordered, so implicit runs use one
+   sequential teal ramp (light = small step, dark = large step); the explicit
+   Euler baseline uses a separate amber hue. */
+:root {
+  --series-explicit: #b0660f;
+  --series-dt2: #3a9e8f;
+  --series-dt5: #1f7a86;
+  --series-dt10: #2c4f8f;
+  --series-dt20: #2a1f5c;
+}
+:root[data-theme="dark"] {
+  --series-explicit: #e8a64e;
+  --series-dt2: #2c7a70;
+  --series-dt5: #3fae9f;
+  --series-dt10: #7cc9e0;
+  --series-dt20: #c9d2ff;
+}
+
+.choice-row { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0 0 6px; }
+.choice-row .choice-label { color: var(--muted); font-size: 11px; align-self: center; margin-right: 2px; }
+.choice-button {
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.choice-button[aria-pressed="true"] { border-color: var(--accent); color: var(--text); }
+
+.series-key { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 2px 0 4px; color: var(--muted); font-size: 11px; }
+.series-key span { display: inline-flex; align-items: center; gap: 5px; }
+.series-key i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--c); }
+.series-key i.dotted { border-top-style: dotted; }
+.series-key i.dashed { border-top-style: dashed; }
+
+.plotly-chart { min-height: 260px; }
+.status-fail { color: var(--warning); font-weight: 650; }
+.num { font-variant-numeric: tabular-nums; }
+
+.skip-link { position: absolute; left: 12px; top: -48px; z-index: 50; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 12px; }
+.skip-link:focus { top: 8px; }
+table caption { caption-side: bottom; margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: left; }
+.article-contents { padding: 0 0 26px; font-size: 13px; }
+.article-contents ol { margin: 6px 0 0; padding-left: 22px; }
+.video-grid.two-up { grid-template-columns: repeat(2, 1fr); margin-top: 8px; }
+.video-card.wide { margin-top: 14px; }
+.video-card.wide video { aspect-ratio: 8 / 3; object-fit: contain; }
+.video-card.narrow { max-width: 480px; margin: 8px 0 18px; }
+.comparison-table .survival { color: var(--muted); }
+@media (max-width: 640px) { .video-grid.two-up { grid-template-columns: 1fr; } }
+.comparison-table th { text-transform: none; letter-spacing: normal; }
+.table-caption { margin: 6px 0 18px; }

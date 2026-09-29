@@ -1,0 +1,116 @@
+{
+ "args": {
+  "robot": "humanoid",
+  "integrator": "implicitfast",
+  "dt": 0.002,
+  "control_dt": 0.02,
+  "num_envs": 256,
+  "horizons": [
+   1,
+   2,
+   4,
+   8,
+   16,
+   32
+  ],
+  "warmup": 10,
+  "seed": 101,
+  "checkpoint": "runs/humanoid_long/HA_ref_2ms_T16.pt",
+  "no_contact": false,
+  "no_gravity": false,
+  "no_limit": false,
+  "solref_timeconst": null,
+  "iterations": 100,
+  "cone": "elliptic",
+  "state_grad_clip": null,
+  "ls_iterations": 50,
+  "no_damper": false,
+  "out": "/home/horde/repos/shac-implicit/results/e3/humanoid_implicit_2ms_s1.json"
+ },
+ "rows": [
+  {
+   "horizon": 1,
+   "objective": 2.2364368438720703,
+   "grad_norm": 0.6776790022850037,
+   "analytic_slope": 0.6776790618896484,
+   "fd_slope": {
+    "0.01": 0.6680607795715332,
+    "0.001": 0.6568431854248047,
+    "0.0001": 0.5304813385009766
+   },
+   "half_batch_cosine": 0.9428478479385376,
+   "grad_seconds": 0.35004281997680664,
+   "nonfinite_grad_events": 0
+  },
+  {
+   "horizon": 2,
+   "objective": 4.377947807312012,
+   "grad_norm": 2.100029706954956,
+   "analytic_slope": 2.100029945373535,
+   "fd_slope": {
+    "0.01": 1.860976219177246,
+    "0.001": 2.025127410888672,
+    "0.0001": 1.8262863159179688
+   },
+   "half_batch_cosine": 0.9711024761199951,
+   "grad_seconds": 0.7868728637695312,
+   "nonfinite_grad_events": 0
+  },
+  {
+   "horizon": 4,
+   "objective": 8.926342010498047,
+   "grad_norm": 3.7750730514526367,
+   "analytic_slope": 3.7750730514526367,
+   "fd_slope": {
+    "0.01": 3.3318519592285156,
+    "0.001": 3.387928009033203,
+    "0.0001": 3.3521652221679688
+   },
+   "half_batch_cosine": 0.8323373794555664,
+   "grad_seconds": 1.5848474502563477,
+   "nonfinite_grad_events": 0
+  },
+  {
+   "horizon": 8,
+   "objective": 18.788368225097656,
+   "grad_norm": 7.992990493774414,
+   "analytic_slope": 7.992990016937256,
+   "fd_slope": {
+    "0.01": 4.9312591552734375,
+    "0.001": 3.5085678100585938,
+    "0.0001": 4.7779083251953125
+   },
+   "half_batch_cosine": 0.2707384526729584,
+   "grad_seconds": 2.6334030628204346,
+   "nonfinite_grad_events": 0
+  },
+  {
+   "horizon": 16,
+   "objective": 36.300254821777344,
+   "grad_norm": 212.627197265625,
+   "analytic_slope": 212.627197265625,
+   "fd_slope": {
+    "0.01": 0.989532470703125,
+    "0.001": 12.241363525390625,
+    "0.0001": -3.833770751953125
+   },
+   "half_batch_cosine": 0.17351648211479187,
+   "grad_seconds": 5.990222692489624,
+   "nonfinite_grad_events": 0
+  },
+  {
+   "horizon": 32,
+   "objective": 57.66532516479492,
+   "grad_norm": 6807.490234375,
+   "analytic_slope": 6807.490234375,
+   "fd_slope": {
+    "0.01": 4.0042877197265625,
+    "0.001": 15.962600708007812,
+    "0.0001": 119.36187744140625
+   },
+   "half_batch_cosine": -0.088419608771801,
+   "grad_seconds": 12.366195440292358,
+   "nonfinite_grad_events": 0
+  }
+ ]
+}
