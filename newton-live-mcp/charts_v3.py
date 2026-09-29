@@ -96,15 +96,15 @@ def dumbbell(pairs: list[dict], metric: str, unit: str, title: str, label: str) 
     return '<div class="viz-root">' + "".join(parts) + "</div>"
 
 
-def ratio_chart(groups: list[tuple[str, dict]], title: str, label: str) -> str:
+def ratio_chart(groups: list[tuple[str, dict]], title: str, label: str, hi: float = 2.0) -> str:
     """Geometric-mean MCP/restart ratios with bootstrap intervals on a log axis; 1 = parity."""
-    lo, hi = 0.35, 2.0
+    lo = 0.35
     width, left, right, row, top = 760, 150, 60, 26, 44
     height = top + row * len(groups) + 36
     scale = lambda v: left + (math.log(v) - math.log(lo)) / (math.log(hi) - math.log(lo)) * (width - left - right)  # noqa: E731
     parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(label)}">']
     parts.append(f'<text class="viz-title" x="0" y="16">{html.escape(title)}</text>')
-    for tick in (0.4, 0.5, 0.7, 1, 1.4, 2):
+    for tick in [t for t in (0.4, 0.5, 0.7, 1, 1.4, 2, 2.5) if t <= hi]:
         x = scale(tick)
         parts.append(f'<line class="{"ref" if tick == 1 else "grid"}" x1="{x:.1f}" x2="{x:.1f}" y1="{top - 10}" y2="{height - 30}"/>')
         parts.append(f'<text x="{x:.1f}" y="{height - 12}" text-anchor="middle">{tick:g}×</text>')

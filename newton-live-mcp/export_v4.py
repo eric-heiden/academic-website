@@ -92,7 +92,7 @@ def summarize(rows: list[dict]) -> dict:
     for pair in pairs(rows):
         if "mcp" not in pair or "restart" not in pair:
             continue
-        for scope in (pair["iteration"], "all"):
+        for scope in (pair["iteration"], f'{pair["iteration"]}:{pair["model"]}', "all", f'all:{pair["model"]}'):
             group = groups.setdefault(scope, {"pairs": 0, "mcp_pass": 0, "restart_pass": 0, "values": {}})
             group["pairs"] += 1
             group["mcp_pass"] += pair["mcp"]["success"]
@@ -104,7 +104,7 @@ def summarize(rows: list[dict]) -> dict:
             **{k: v for k, v in group.items() if k != "values"},
             "ratios": {metric: paired_ratio(values) for metric, values in group["values"].items()},
         }
-        for scope, group in sorted(groups.items(), key=lambda item: (item[0] == "all", item[0]))
+        for scope, group in sorted(groups.items(), key=lambda item: (item[0].startswith("all"), item[0]))
     }
 
 

@@ -55,13 +55,19 @@ def trial_table(rows: list[dict]) -> str:
     )
 
 
+def scope_name(scope: str) -> str:
+    iteration, _, model = scope.partition(":")
+    name = "All iterations" if iteration == "all" else f"{iteration} ({NARRATIVE['harness_names'].get(iteration, iteration)})"
+    return f"{name} · {MODELS[model]}" if model else name
+
+
 def iteration_table(summary: dict) -> str:
     rows = []
     for scope, group in summary.items():
         r = group["ratios"]
         rows.append(
             [
-                "All iterations" if scope == "all" else f"{scope} ({NARRATIVE['harness_names'].get(scope, scope)})",
+                scope_name(scope),
                 f'{group["mcp_pass"]}/{group["pairs"]} · {group["restart_pass"]}/{group["pairs"]}',
                 ratio_text(r["seconds"]),
                 ratio_text(r["input_tokens"]),
@@ -83,16 +89,27 @@ def build() -> str:
     loop = json.loads((DATA / "loop.json").read_text())
     rows, summary = loop["trials"], loop["summary"]
     grouped = [p for p in pairs(rows) if "mcp" in p and "restart" in p]
-    iterations = [scope for scope in summary if scope != "all"]
-    token_groups = [(f"{s} tokens", summary[s]["ratios"]["input_tokens"]) for s in iterations]
-    time_groups = [(f"{s} time", summary[s]["ratios"]["seconds"]) for s in iterations]
+    scopes = [scope for scope in summary if ":" in scope]
+    short = {"opus": "Opus", "astra": "Astra"}
+
+    def label(scope):
+        iteration, _, model = scope.partition(":")
+        return f"{'all' if iteration == 'all' else iteration} · {short[model]}"
+
     charts = (
         '<div id="loop-charts">'
         + STYLE
         + ratio_chart(
-            [g for pair in zip(token_groups, time_groups, strict=True) for g in pair],
-            "MCP / no-MCP ratio per harness iteration (geometric mean, 95% interval)",
-            "Paired input-token and time ratios per harness iteration",
+            [(label(s), summary[s]["ratios"]["input_tokens"]) for s in scopes],
+            "Input-token ratio MCP / no MCP per iteration and agent (geometric mean, 95% interval)",
+            "Paired input-token ratios per iteration and agent",
+            hi=2.6,
+        )
+        + ratio_chart(
+            [(label(s), summary[s]["ratios"]["seconds"]) for s in scopes],
+            "Elapsed-time ratio MCP / no MCP per iteration and agent (geometric mean, 95% interval)",
+            "Paired time ratios per iteration and agent",
+            hi=2.6,
         )
         + legend()
         + dumbbell(grouped, "input_tokens", "tokens", "Input tokens per pair [log scale]", "Paired input tokens per trial pair")
@@ -113,7 +130,10 @@ def build() -> str:
                         ["Version", "Commit", "Changes"], n["harness_rows"], prose=True, label="Harness versions")),
         section("real", 4, "Real-robot calibration data", paragraphs("real")
                 + table("Table 5. Held-out window error of reference parameter sets for the DFKI double pendulum (mean joint-angle RMSE over 0.5 s open-loop windows).",
-                        ["Parameters", "20 s excitation [rad]", "75 s full swings [rad]"], n["dp_reference_rows"], numeric={1, 2}, label="Double pendulum reference errors")),
+                        ["Parameters", "20 s excitation [rad]", "75 s full swings [rad]"], n["dp_reference_rows"], numeric={1, 2}, label="Double pendulum reference errors")
+                + paragraphs("real_cube")
+                + table("Table 6. Held-out error of reference contact models for the ContactNets cube tosses (170 tosses; mean over tosses of the time-averaged error, full open-loop rollout from release).",
+                        ["Contact model", "Position [m]", "Orientation [rad]"], n["cube_reference_rows"], numeric={1, 2}, label="Cube toss reference errors")),
         section("findings", 5, "Findings so far", paragraphs("findings")),
         section("limits", 6, "Limits", paragraphs("limits")),
         section("source", 7, "Source and data", paragraphs("source")),
