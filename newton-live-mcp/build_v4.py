@@ -28,6 +28,8 @@ def trial_table(rows: list[dict]) -> str:
                 continue
             worst = r["normalized_worst"] or {}
             status = "Pass" if r["success"] else ("Timeout" if r["timed_out"] else "Fail")
+            if r.get("reverified_from") is not None and r["reverified_from"] != r["success"]:
+                status += " (re-verified)"
             body.append(
                 [
                     f'{pair["iteration"]} · {TASKS[pair["task"]]} · {MODELS[pair["model"]]} · {pair["replicate"]}',

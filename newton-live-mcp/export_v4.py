@@ -30,6 +30,13 @@ def trial_rows() -> list[dict]:
                 continue
             s = json.loads((workspace / "summary.json").read_text())
             v = s["verification"]
+            reverified = workspace / "verification_v2.json"
+            if reverified.exists():
+                # G1 submissions were re-verified after the time-scaled playback was fixed.
+                v2 = json.loads(reverified.read_text())
+                v = {k: v2.get(k) for k in ("success", "integrity", "failed_checks", "metrics", "normalized_worst")}
+                v["reverified_from"] = s["verification"].get("success")
+                s["success"] = bool(v["success"]) and not s["timed_out"]
             split = timing(workspace, s["cli"])
             usage = s.get("usage") or {}
             rows.append(
@@ -58,6 +65,7 @@ def trial_rows() -> list[dict]:
                     "tool_seconds": split.get("tool_union_seconds"),
                     "model_seconds": split.get("model_seconds"),
                     "infrastructure_retries": s.get("infrastructure_retries", 0),
+                    "reverified_from": v.get("reverified_from"),
                 }
             )
     return rows
