@@ -11,6 +11,7 @@ CONDITIONS = {"mcp": "Newton MCP", "restart": "No MCP (edit/restart)"}
 TASKS = {
     "cube_toss": "Cube toss",
     "dp_real": "Real pendulum",
+    "g1_hard": "G1 hard",
     "g1_track": "G1 tracking",
     "grasp_drift": "Grasp drift",
     "sdf_grind": "SDF grinding",
