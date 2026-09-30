@@ -141,7 +141,10 @@ def build() -> str:
         section("visual", 5, "Next phase: visual fidelity and real-world scenes", paragraphs("visual")
                 + figure("assets/v5/observation-before-after.jpg", "Two rows of images: the Franka grasp scene and the Unitree G1, each rendered by the h8 observation (left) and the improved observation (right).", 2,
                          "The same MCP <code>observe(view=\"iso\")</code> call before (left, h8) and after (right) the first visual-fidelity changes: 2×2 supersampling, a sky gradient, a ground checker of reported cell size, framing fitted to the scene's projected extent, and the G1's MJCF floor, which the importer used to hide.", 1288, 968)
-                + paragraphs("visual_after")),
+                + paragraphs("visual_after")
+                + paragraphs("visual_abc")
+                + figure("assets/v5/abc-twin-starter.jpg", "Three images of a bimanual robot station seen from above: the real camera frame with plates and an orange bin on a white table, the starter twin's render from the nominal camera with an empty gray table, and a blend of the two.", 3,
+                         "The ABC station-twin task at frame 24: the recorded top-camera frame (left), the starter twin rendered through the calibrated intrinsics from the nominal CAD camera mount (middle), and a 50/50 blend (right). The robot is posed from the recorded joint log.", 1936, 480)),
         section("findings", 6, "Findings so far", paragraphs("findings")),
         section("limits", 7, "Limits", paragraphs("limits")),
         section("source", 8, "Source and data", paragraphs("source")),
