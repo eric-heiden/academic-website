@@ -138,9 +138,13 @@ def build() -> str:
                 + paragraphs("real_cube")
                 + table("Table 6. Held-out error of reference contact models for the ContactNets cube tosses (170 tosses; mean over tosses of the time-averaged error, full open-loop rollout from release).",
                         ["Contact model", "Position [m]", "Orientation [rad]"], n["cube_reference_rows"], numeric={1, 2}, label="Cube toss reference errors")),
-        section("findings", 5, "Findings so far", paragraphs("findings")),
-        section("limits", 6, "Limits", paragraphs("limits")),
-        section("source", 7, "Source and data", paragraphs("source")),
+        section("visual", 5, "Next phase: visual fidelity and real-world scenes", paragraphs("visual")
+                + figure("assets/v5/observation-before-after.jpg", "Two rows of images: the Franka grasp scene and the Unitree G1, each rendered by the h8 observation (left) and the improved observation (right).", 2,
+                         "The same MCP <code>observe(view=\"iso\")</code> call before (left, h8) and after (right) the first visual-fidelity changes: 2×2 supersampling, a sky gradient, a ground checker of reported cell size, framing fitted to the scene's projected extent, and the G1's MJCF floor, which the importer used to hide.", 1288, 968)
+                + paragraphs("visual_after")),
+        section("findings", 6, "Findings so far", paragraphs("findings")),
+        section("limits", 7, "Limits", paragraphs("limits")),
+        section("source", 8, "Source and data", paragraphs("source")),
     ]
     footer = (
         '<footer class="report-footer"><span>Newton live simulation · experimental research</span>'

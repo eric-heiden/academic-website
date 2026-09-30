@@ -206,5 +206,13 @@
    "0.020",
    "0.450"
   ]
+ ],
+ "visual": [
+  "The loop so far measured tasks where a simulation is judged by numbers. The next phase targets tasks where the agent must also get the look right: modeling a real scene, such as the bimanual workcells of the <a href=\"https://abc.bot/#data\">ABC dataset</a>, so that renders from a calibrated camera match real video, and then tuning its behavior against the recording. That puts the MCP's images under scrutiny, since a frontier model can only dial in what it can see.",
+  "A first audit of the h8 observations found three problems beyond plain aesthetics. (1) The MJCF importer hid every collision shape of a model that also has visual meshes, including world floor planes, which have no visual twin. The Unitree G1 therefore floated on a black void in every viewer and camera sensor. (2) MuJoCo's procedural checker textures were not imported, so such floors got an arbitrary palette color. (3) <code>SensorTiledCamera</code> always rendered every world. The MCP had to budget world count × width × height pixels to show one world, so in the 400-world cube-toss task, any observation above about 100 × 100 pixels was refused. All three are fixed in Newton itself, with regression tests. The camera sensor gained a <code>world_ids</code> option that renders only selected worlds; the 400-world scene now renders a supersampled 640 × 480 view in about 20 ms.",
+  "The observations themselves now supersample color 2×2 and resolve it in linear light on the GPU. They draw a sky gradient behind the scene and a checker of a reported round cell size (for example 0.25 m) on ground planes, which gives the model scale and motion cues. They fit the camera to the scene's projected extent rather than a loose bounding sphere. <code>observe</code> also accepts calibrated OpenCV intrinsics (focal lengths, principal point, distortion), so renders can be compared pixel for pixel with frames from a real camera."
+ ],
+ "visual_after": [
+  "Two larger options are under evaluation: path-traced rendering through Newton's <code>ViewerRTX</code> (the OVRTX renderer), and a Blender bridge for modeling and rendering. Early tests show that OVRTX runs headless on the study machine's GPU slice and produces far more photographic images than the ray-cast camera sensor. Real ABC episodes can be replayed in Newton from the recorded joint angles and rendered from a calibrated top camera next to the real frames. The results of this phase and the paired trials that measure it will be added here."
  ]
 }
