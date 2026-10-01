@@ -853,18 +853,40 @@ r_\text{gait} = &-w_h \sum_i \big(p_{i,z} - z_0 - z_\text{sw} \sin(\pi \rho_i)\,
 <tr><th colspan="6" scope="rowgroup">Default contact</th></tr>
 <tr><th scope="row">512 environments, per-world clipping</th><td>512</td><td>–</td><td class="metric-best"><strong>4 of 4</strong></td><td>0.11 / 0.07 / 0.09 / 0.09</td><td>95.9%</td></tr>
 <tr><th scope="row">512 environments, no clipping</th><td>512</td><td>–</td><td>0 of 4</td><td>0.72 / 0.72 / 0.65 / 0.72</td><td>98.4%</td></tr>
-<tr><th scope="row">128 environments, no clipping</th><td>128</td><td>–</td><td class="metric-best"><strong>1 of 1</strong></td><td>0.22</td><td>97.3%</td></tr>
+<tr><th scope="row">128 environments, no clipping</th><td>128</td><td>–</td><td>1 of 2</td><td>0.22 / 0.72</td><td>97.7%</td></tr>
 <tr><th scope="row">64 environments, per-world clipping</th><td>64</td><td>–</td><td>0 of 2</td><td>0.71 / 0.73</td><td>95.7%</td></tr>
 <tr><th scope="row">128 environments × 4 branches, load trigger, no clipping</th><td>512</td><td>26%</td><td>0 of 4</td><td>0.73 / 0.41 / 0.72 / 0.72</td><td>90.0%</td></tr>
 <tr><th scope="row">128 environments × 4 unperturbed branches, no clipping</th><td>512</td><td>0%</td><td>0 of 2</td><td>0.73 / 0.72</td><td>100.0%</td></tr>
 <tr><th scope="row">64 environments × 8 branches, every step, no clipping</th><td>512</td><td>100%</td><td>0 of 2</td><td>0.73 / 0.73</td><td>99.6%</td></tr>
 <tr><th scope="row">64 environments × 8 branches, every step, per-world clipping</th><td>512</td><td>100%</td><td>0 of 2</td><td>0.74 / 0.72</td><td>100.0%</td></tr>
 <tr><th scope="row">64 environments × 8 branches, load trigger, per-world clipping</th><td>512</td><td>17%</td><td>0 of 1</td><td>0.74</td><td>82.8%</td></tr>
+<tr><th colspan="6" scope="rowgroup">Stiff contact onset (solimp 0, 0.95, 5 mm)</th></tr>
+<tr><th scope="row">512 environments, per-world clipping</th><td>512</td><td>–</td><td class="metric-best"><strong>2 of 2</strong></td><td>0.11 / 0.09</td><td>91.6%</td></tr>
+<tr><th scope="row">512 environments, no clipping</th><td>512</td><td>–</td><td class="metric-best"><strong>1 of 1</strong></td><td>0.08</td><td>90.2%</td></tr>
+<tr><th scope="row">128 environments, no clipping</th><td>128</td><td>–</td><td class="metric-best"><strong>1 of 1</strong></td><td>0.11</td><td>92.6%</td></tr>
+<tr><th scope="row">128 environments × 4 branches, load trigger, no clipping</th><td>512</td><td>43%</td><td class="metric-best"><strong>1 of 1</strong></td><td>0.10</td><td>91.4%</td></tr>
 </tbody>
 
 </table>
 </div>
 <p class="figure-caption table-caption" id="table-caption-18">Table 18. Go1 policies after 400 epochs on the forward-command variant of the Isaac Lab Go1 task (5 ms physics, 8-step window, Isaac-Lab-equivalent model), evaluated in the unbundled reference simulator (10 s, 256 starts). A seed walks when its tracking error is below 0.3 m/s. Per-world clipping caps each world's state adjoint and control gradient at 10 times the median; with branches, it acts on every branch before the average.</p>
+
+<h3>The source of the gradient spikes</h3>
+<p>The stiff-contact rows of Table 18 point to the cause of the single-world spikes. With a continuous contact onset and a maximum impedance of 0.95, the Go1 learned the forward-command task without per-world clipping and without branches, even with 128 environments, and the largest actor gradient norm of a run stayed between 8 and 15, against up to \(2 \cdot 10^7\) with the default contact. The Menagerie Go1 feet set MuJoCo's impedance parameters to <code>solimp</code> = (0.015, 1, 0.023): the impedance rises from 0.015 at contact onset to 1 at 23 mm of penetration. Table 19 repeats the spike measurement with only these parameters changed. Lowering the maximum impedance from 1 to 0.95, with onset and width unchanged, removed the spikes completely. MuJoCo regularizes each contact constraint in proportion to \((1 - d)/d\) for impedance \(d\); at \(d = 1\) the regularization vanishes and the constraint becomes rigid, which plausibly makes the linear systems of the analytic adjoint ill-conditioned. Per-world clipping, which made the forward-command task learnable, therefore compensated for a contact parameter of the robot model. Training on the full Go1 task with a maximum impedance of 0.95 is not yet complete.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = fewest spiked passes and smallest largest ratio.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Gradient spikes and contact impedance">
+<table aria-describedby="table-caption-19" class="comparison-table">
+<thead><tr><th scope="col">Go1 foot contact: <code>solimp</code> \(d_\text{min}\), \(d_\text{max}\), width</th><th scope="col">Passes with a spike ↓</th><th scope="col">Largest ratio over passes ↓</th><th scope="col">Batch gradient norm, median</th></tr></thead>
+<tbody>
+<tr><th scope="row">Menagerie foot contact: 0.015, 1, 23 mm</th><td>2 of 20</td><td>358.4</td><td>14.1</td></tr>
+<tr><th scope="row">Maximum impedance 0.95: 0.015, 0.95, 23 mm</th><td class="metric-best"><strong>0 of 20</strong></td><td class="metric-best"><strong>2.3</strong></td><td>14.0</td></tr>
+<tr><th scope="row">Continuous onset, narrow: 0, 0.95, 5 mm</th><td class="metric-best"><strong>0 of 20</strong></td><td>4.0</td><td>16.9</td></tr>
+<tr><th scope="row">Continuous onset: 0, 0.95, 23 mm</th><td class="metric-best"><strong>0 of 20</strong></td><td>2.4</td><td>14.1</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-19">Table 19. The spike measurement of Table 17 (Go1, 64 environments, 4-step window, 20 passes from the same state, no clipping, no branches) with the impedance parameters of all geoms set as stated; midpoint 0.5 and power 2. The ratio is the largest environment's action-gradient norm over the median. The impedance \(d\) of a contact rises from \(d_\text{min}\) at onset to \(d_\text{max}\) at the stated penetration width.</p>
 </section>
 
 <section class="report-section" id="limitations">
