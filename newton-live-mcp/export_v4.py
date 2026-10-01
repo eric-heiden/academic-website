@@ -10,7 +10,21 @@ import sys
 import zipfile
 from pathlib import Path
 
-from export_v3 import redact
+from export_v3 import redact as _redact_credentials
+
+# Held-out episode ids of the physical replay task stay private (agents have network access and could fetch the
+# public recordings); published records name them by position.
+_HELDOUT = Path.home() / ".newton-visual-private" / "abc_replay" / "heldout" / "scenes"
+HELDOUT_NAMES = {
+    path.stem: f"heldout_{k + 1}" for k, path in enumerate(sorted(_HELDOUT.glob("*.json")) if _HELDOUT.exists() else [])
+}
+
+
+def redact(text: str) -> str:
+    text = _redact_credentials(text)
+    for episode, name in HELDOUT_NAMES.items():
+        text = text.replace(episode, name)
+    return text
 
 HERE = Path(__file__).resolve().parent
 LOOP = Path("/home/horde/artifacts/newton-live-mcp-v4/loop")
@@ -83,6 +97,8 @@ def trial_rows() -> list[dict]:
                     "model_seconds": split.get("model_seconds"),
                     "infrastructure_retries": s.get("infrastructure_retries", 0),
                     "reverified_from": v.get("reverified_from"),
+                    # From h12: review flags (introspection in the submission, downloads, hidden-data paths).
+                    "flags": [k for k in ("introspection", "downloads", "private_reference") if s.get(k)],
                 }
             )
     return rows
@@ -159,7 +175,7 @@ def export() -> dict:
                 for script_name in script.get("starter_sha256", {}):
                     submitted = _record(workspace, script_name)
                     if script_name.endswith(".py") and submitted.exists():
-                        archive.writestr(f"{row['iteration']}/{row['trial']}/submitted_{script_name}", submitted.read_text())
+                        archive.writestr(f"{row['iteration']}/{row['trial']}/submitted_{script_name}", redact(submitted.read_text()))
         manifest[name] = hashlib.sha256((DATA / name).read_bytes()).hexdigest()
     result = {"trials": rows, "summary": summarize(rows), "manifest": manifest}
     (DATA / "loop.json").write_text(json.dumps(result, indent=1, default=float) + "\n")
