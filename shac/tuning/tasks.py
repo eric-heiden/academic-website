@@ -138,10 +138,16 @@ class Env:
     """Batched differentiable locomotion environment (no host synchronisation in ``step``)."""
 
     def __init__(self, task: TaskCfg, sim_cfg: SimConfig, num_envs: int, seed: int = 0, device: str = "cuda:0",
-                 stochastic_init: bool = True, backward: bool = True):
+                 stochastic_init: bool = True, backward: bool = True, bcg=None):
         self.task = task
         self.robot: Robot = ROBOTS[task.robot]
-        self.sim = DiffSim(sim_cfg, num_envs, device=device, backward=backward)
+        if bcg is not None and bcg.branches > 1:
+            # Bundled contact gradients (bcg.py): N environments x B branches averaged after every control step.
+            from bcg import BundledDiffSim
+            self.sim = BundledDiffSim(sim_cfg, num_envs, bcg, device=device, backward=backward)
+        else:
+            self.sim = DiffSim(sim_cfg, num_envs, device=device, backward=backward)
+        self.B = getattr(self.sim, "B", 1)
         self.sim.sync_free = True
         self.N = num_envs
         self.dev = self.sim.torch_device
@@ -184,6 +190,8 @@ class Env:
         else:
             self.pol_act = None
             self.pol_joint = torch.arange(m.njnt - 1, device=self.dev)
+        if self.B > 1:
+            self.sim.pjoints = self.pol_joint  # bundle perturbations act on the policy's joints
         # Map collision geoms to foot indices for contact features (-1: not a foot).
         foot_of_geom = np.full(m.ngeom + 1, -1, dtype=np.int64)
         for k, g in enumerate(task.foot_geoms):
@@ -378,6 +386,8 @@ class Env:
 
     def reset_all(self):
         self._feet_prev = None
+        if self.B > 1:
+            self.sim.trigger = torch.zeros_like(self.sim.trigger)
         self.q, self.v = self._sample_init(self.N)
         self.w = torch.zeros_like(self.v)
         self.prev_action.zero_()
@@ -699,27 +709,34 @@ class Env:
             return
         con, dist, cworld, nacon = self.sim.cur_contact
         n = dist.shape[0]
+        nw = self.N * self.B  # simulator worlds (env * B + branch with bundled contact gradients)
         valid = torch.arange(n, device=self.dev) < nacon[0]
         valid = valid & (dist < 0.0)
-        world = cworld.long().clamp(0, self.N - 1)
+        world = cworld.long().clamp(0, nw - 1)
         g = con.long().clamp(min=-1)
         if self.task.term_bodies:
             tc = valid & (self.term_geom[g[:, 0]] | self.term_geom[g[:, 1]])
-            hit_t = torch.zeros(self.N, device=self.dev)
+            hit_t = torch.zeros(nw, device=self.dev)
             hit_t.index_add_(0, world, tc.float())
-            self.term_contact = hit_t > 0
+            self.term_contact = self._branch_majority(hit_t > 0)
         if not self.nfeet:
             return
         foot = torch.maximum(self.foot_of_geom[g[:, 0]], self.foot_of_geom[g[:, 1]])
         valid = valid & (foot >= 0)
-        hit = torch.zeros(self.N * self.nfeet, device=self.dev)
+        hit = torch.zeros(nw * self.nfeet, device=self.dev)
         hit.index_add_(0, world * self.nfeet + foot.clamp(min=0), valid.float())
-        contact = hit.view(self.N, self.nfeet) > 0
+        contact = self._branch_majority(hit.view(nw, self.nfeet) > 0)
         self.first_contact = (self.air_time > 0) & contact
         self.last_air_time = self.air_time.clone()
         self.air_time = torch.where(contact, 0.0, self.air_time + self.dt)
         self.contact_time = torch.where(contact, self.contact_time + self.dt, 0.0)
         self.contact = contact
+
+    def _branch_majority(self, x):
+        """Reduces per-world booleans (N * B, ...) to per-environment booleans by majority over the branches."""
+        if self.B == 1:
+            return x
+        return 2 * x.view(self.N, self.B, *x.shape[1:]).sum(1) > self.B
 
     # ------------------------------------------------------------------ termination
     def terminated(self, f):
@@ -771,6 +788,8 @@ class Env:
         obs_before_reset = self.observe(q, v, action)
         trunc = (self.progress >= self.task.episode_length) & ~term
         done = term | trunc
+        if self.B > 1:
+            self.sim.mark_reset(done)
 
         # Episode statistics.
         rd = rew.detach()

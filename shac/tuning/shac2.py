@@ -80,6 +80,15 @@ class Config:
     state_grad_clip: float | None = None
     # ext: per-world cap on each control step's control-gradient norm (x median over worlds).
     ctrl_grad_clip: float | None = None
+    # ext: bundled contact gradients (bcg.py, after arXiv 2609.30951): each env is simulated as bcg_branches branches,
+    # perturbed in joint space when the previous step's vertical contact load exceeded bcg_tau_mg * m g (or always /
+    # never), and averaged after every control step. 1 = off. Evaluation scripts always build unbundled envs.
+    bcg_branches: int = 1
+    bcg_trigger: str = "force"
+    bcg_tau_mg: float = 1.2
+    bcg_sigma_q: float = 0.02
+    bcg_sigma_qd: float = 0.05
+    bcg_antithetic: bool = True
     # ext: warm start (actor, critic, target critic and observation statistics) from a checkpoint, e.g. for a
     # command curriculum; the optimiser state starts fresh.
     init_from: str | None = None
@@ -310,7 +319,7 @@ def parse():
     return cfg, Path(a.out)
 
 
-def build_env(cfg: Config, num_envs=None, seed=None, backward=True, **sim_over):
+def build_env(cfg: Config, num_envs=None, seed=None, backward=True, bundle=False, **sim_over):
     task = make_task(cfg.task, **cfg.task_overrides)
     r = ROBOTS[task.robot]
     substeps = round(cfg.control_dt / cfg.dt)
@@ -322,8 +331,14 @@ def build_env(cfg: Config, num_envs=None, seed=None, backward=True, **sim_over):
               model_edit=cfg.model_edit or r.model_edit,
               grad_solimp=tuple(cfg.grad_solimp) if cfg.grad_solimp else None, grad_margin=cfg.grad_margin)
     sc.update(sim_over)
+    bcg = None
+    if bundle and cfg.bcg_branches > 1:
+        from bcg import BCGConfig
+        bcg = BCGConfig(branches=cfg.bcg_branches, trigger=cfg.bcg_trigger, tau_mg=cfg.bcg_tau_mg,
+                        sigma_q=cfg.bcg_sigma_q, sigma_qd=cfg.bcg_sigma_qd, antithetic=cfg.bcg_antithetic,
+                        seed=cfg.seed + 1000003)
     env = Env(task, SimConfig(**sc), num_envs or cfg.num_envs, seed=cfg.seed if seed is None else seed,
-              backward=backward)
+              backward=backward, bcg=bcg)
     env.sim.state_grad_clip = cfg.state_grad_clip
     env.sim.ctrl_grad_clip = cfg.ctrl_grad_clip
     return env
@@ -332,7 +347,7 @@ def build_env(cfg: Config, num_envs=None, seed=None, backward=True, **sim_over):
 def train(cfg: Config, out: Path):
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
-    env = build_env(cfg)
+    env = build_env(cfg, bundle=True)
     dev = env.dev
     obs_dim, act_dim = env.num_obs, env.nu
     actor = Actor(obs_dim, act_dim, cfg.actor_units, cfg.logstd_init, cfg.layer_norm).to(dev)
@@ -551,7 +566,9 @@ def train(cfg: Config, out: Path):
                             actor.logstd.detach().mean(), lr_loss.detach(), log_alpha.detach().exp(),
                             logp_mean.detach(), ivw_alpha.mean(),
                             (env.sim.t_overflow & 15).ne(0).float().mean(),
-                            env.sim.state_grad_clip_worlds.float(), env.sim.ctrl_grad_clip_worlds.float())).cpu().tolist()
+                            env.sim.state_grad_clip_worlds.float(), env.sim.ctrl_grad_clip_worlds.float(),
+                            getattr(env.sim, "n_bundles", torch.zeros((), device=dev)).float(),
+                            getattr(env.sim, "n_bad_branches", torch.zeros((), device=dev)).float())).cpu().tolist()
         env.sim.clear_overflow()
         t_end = time.time()
         st = env.pop_stats()
@@ -563,6 +580,7 @@ def train(cfg: Config, out: Path):
                "nonfinite_resets": int(scal[6]), "logstd": scal[7], "lr_loss": scal[8], "alpha": scal[9],
                "logp": scal[10], "ivw_alpha": scal[11], "overflow_frac": scal[12],
                "state_clip_worlds_cum": int(scal[13]), "ctrl_clip_worlds_cum": int(scal[14]),
+               "bcg_bundles_cum": int(scal[15]), "bcg_bad_branches_cum": int(scal[16]),
                **{"ep_" + k: v for k, v in st.items()}}
         history.append(row)
         if epoch % cfg.log_every == 0 or epoch == cfg.epochs - 1:

@@ -823,6 +823,27 @@ r_\text{gait} = &-w_h \sum_i \big(p_{i,z} - z_0 - z_\text{sw} \sin(\pi \rho_i)\,
 </table>
 </div>
 <p class="figure-caption table-caption" id="table-caption-16">Table 16. Iterations of the retuning study in chronological order. Numbers are reference-simulator evaluations unless stated otherwise.</p>
+
+<h3>Bundled contact gradients</h3>
+<p>Bundled contact gradients (BCG) <a href="https://arxiv.org/abs/2609.30951">[Aditya et al. 2026]</a> stabilize SHAC with stiff contact by local randomized smoothing. When the contact force at a foot exceeds a threshold, the method simulates several branches whose leg joints are perturbed so that the foot moves by about 1 cm, runs them for two control steps with the same action, and continues the rollout from their average. Because the forward rollout continues from the average, the backward pass differentiates exactly the simulated map, and the per-branch sensitivities are averaged. This keeps forward and backward consistent, which the backward-only contact softening of the previous subsections did not. The authors trained SHAC on a Unitree G1 with a sigmoid-scaled compliant contact model and transferred the policies to hardware.</p>
+<p>The implementation here simulates \(N\) environments with \(B\) branches each as \(N B\) MuJoCo Warp worlds and averages the branches after every control step (one control step per bundle instead of two). The perturbations are Gaussian offsets of the policy's joint positions and velocities, in antithetic pairs, instead of Cartesian foot offsets mapped through the contact Jacobian. A bundle starts when the previous control step's total vertical contact load exceeded a multiple of the robot's weight, or at every step. Quaternions are sign-aligned before averaging and renormalized. Evaluation always uses the unbundled simulator. With unperturbed branches, the bundled rollout reproduces the unbundled one: on a 4-step Go1 window, the action gradients differ by \(1.2 \cdot 10^{-2}\), against \(1.5 \cdot 10^{-2}\) between two unbundled runs.</p>
+<p>The averaging does not remove the single-world spikes of the analytic adjoint (Table 17). With the protocol of Trainer and gradient-estimator variants (Go1, 64 environments, 4-step window, the same initial state in every pass), unperturbed branches raise the share of passes with a spike from 4 of 20 to 10 of 20, and perturbed branches raise it further. A spike of 10–300 times the median in one branch is reduced only by the factor \(B\) in the average, and more branches and perturbed states give more chances for a spike. With per-branch clipping before the average no pass contained a spike, but per-world clipping without branches achieves the same. On this measure, bundling adds nothing to clipping in MuJoCo Warp. Training comparisons at equal world count, with and without clipping, are not yet complete.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = fewest spiked passes and lowest median ratio.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Gradient spikes with bundled contact gradients">
+<table aria-describedby="table-caption-17" class="comparison-table">
+<thead><tr><th scope="col">Go1, 4-step window</th><th scope="col">Passes with a spike ↓</th><th scope="col">Largest / median environment gradient, median over passes ↓</th><th scope="col">Largest ratio</th></tr></thead>
+<tbody>
+<tr><th scope="row">Unbundled (64 environments)</th><td>4 of 20</td><td class="metric-best"><strong>2.3</strong></td><td>232</td></tr>
+<tr><th scope="row">Unbundled, per-world clipping</th><td class="metric-best"><strong>0 of 20</strong></td><td class="metric-best"><strong>2.3</strong></td><td>8</td></tr>
+<tr><th scope="row">4 branches, no perturbation</th><td>10 of 20</td><td>10.2</td><td>180</td></tr>
+<tr><th scope="row">4 branches, joint perturbation 0.005 rad</th><td>14 of 20</td><td>39.9</td><td>292</td></tr>
+<tr><th scope="row">4 branches, joint perturbation 0.01 rad</th><td>13 of 20</td><td>47.5</td><td>146</td></tr>
+<tr><th scope="row">4 branches, joint perturbation 0.02 rad, per-branch clipping</th><td class="metric-best"><strong>0 of 20</strong></td><td class="metric-best"><strong>2.3</strong></td><td>6</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-17">Table 17. Per-environment action-gradient norms for 20 backward passes from the same Go1 state (go1_vel, 64 environments, 4-step window, stored forward steps). A pass counts as spiked when one environment's gradient norm exceeds 10 times the median. Branch perturbations use joint-position offsets with the stated standard deviation and joint-velocity offsets 2.5 times as large (rad/s); clipping caps each world's state adjoint and control gradient at 10 times the median before the average.</p>
 </section>
 
 <section class="report-section" id="limitations">
