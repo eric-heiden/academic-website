@@ -32,7 +32,7 @@ for jf in sorted((ROOT / "jobs" / "done").glob("*.json")):
         continue
     ck = sorted((ROOT / run.parent).glob(f"{name}_ep*.pt"))
     ck = (ck[::a.stride] if a.stride else []) + [ROOT / run.with_suffix(".pt")]
-    args = ["python3", "jobqueue.py", "submit", "--name", f"eval_{name}", "--priority", "10", "--", "PY", "eval2.py",
+    args = ["python3", "jobqueue.py", "submit", "--name", f"eval_{name}", "--priority", "5", "--", "PY", "eval2.py",
             "--sim", "ref", "--steps", str(a.steps), "--out", str(res.relative_to(ROOT)), "--ckpt",
             *[str(c.relative_to(ROOT)) for c in ck]]
     print(" ".join(args[:6]), len(ck), "checkpoints")
