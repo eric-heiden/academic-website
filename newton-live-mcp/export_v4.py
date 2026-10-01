@@ -20,6 +20,10 @@ sys.path.insert(0, "/home/horde/apps/newton-live-mcp")
 from tools.mcp_evaluation.visual.analyze import timing  # noqa: E402
 
 MODEL_KEYS = {"claude-opus-5-5": "opus", "gpt-6-astra": "astra"}
+# Runs that the runner wrongly classified as infrastructure failures (the agent printed TASK.md,
+# whose "tools unavailable" token the old check matched). The original run is the pair's trial;
+# the automatic rerun is kept as an unpaired "-rerun" row.
+REINSTATED = {("i11", "abc_look-astra-mcp-p0.infra-failure-1"): "abc_look-astra-mcp-p0"}
 
 
 def _record(run_dir: Path, name: str) -> Path:
@@ -32,7 +36,13 @@ def trial_rows() -> list[dict]:
     rows = []
     for iteration in sorted(p for p in LOOP.iterdir() if p.is_dir() and p.name.startswith("i")):
         for workspace in sorted(p for p in iteration.iterdir() if p.is_dir() and (p / "summary.json").exists()):
-            if ".infra-failure" in workspace.name or workspace.parent.name.startswith("i2") and not (workspace / "summary.json").exists():
+            trial = REINSTATED.get((iteration.name, workspace.name), workspace.name)
+            replicate = trial.rsplit("-", 1)[-1]
+            if (iteration.name, workspace.name) not in REINSTATED and workspace.name in {
+                name for (it, _), name in REINSTATED.items() if it == iteration.name
+            }:
+                trial, replicate = f"{workspace.name}-rerun", f"{replicate}-rerun"
+            if ".infra-failure" in trial or workspace.parent.name.startswith("i2") and not (workspace / "summary.json").exists():
                 continue
             s = json.loads((workspace / "summary.json").read_text())
             v = s["verification"]
@@ -49,11 +59,12 @@ def trial_rows() -> list[dict]:
                 {
                     "iteration": iteration.name,
                     "harness": s.get("harness_version"),
-                    "trial": workspace.name,
+                    "trial": trial,
+                    "dir": workspace.name,
                     "task": s["task"],
                     "model": MODEL_KEYS.get(s["model"], s["model"]),
                     "condition": s["condition"],
-                    "replicate": workspace.name.rsplit("-", 1)[-1],
+                    "replicate": replicate,
                     "success": bool(s["success"]),
                     "timed_out": bool(s["timed_out"]),
                     "seconds": s["total_seconds"],
@@ -132,7 +143,7 @@ def export() -> dict:
         name = f"loop-transcripts-{iteration}.zip"
         with zipfile.ZipFile(DATA / name, "w", zipfile.ZIP_DEFLATED) as archive:
             for row in (r for r in rows if r["iteration"] == iteration):
-                workspace = LOOP / row["iteration"] / row["trial"]
+                workspace = LOOP / row["iteration"] / row.get("dir", row["trial"])
                 for filename in (*PUBLIC_FILES, "agent.jsonl", "agent.stderr", "host.log", "verification.log"):
                     path = _record(workspace, filename)
                     if path.exists():

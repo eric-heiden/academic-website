@@ -10,6 +10,7 @@ from charts_v3 import _fmt, _log_ticks, ratio_chart  # noqa: F401
 CONDITIONS = {"mcp": "Newton MCP", "restart": "No MCP (edit/restart)"}
 TASKS = {
     "abc_arm": "ABC arm replay",
+    "abc_look": "ABC look matching",
     "abc_twin": "ABC station twin",
     "cube_toss": "Cube toss",
     "dp_real": "Real pendulum",
