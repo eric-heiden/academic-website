@@ -13,24 +13,40 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 OUT = Path("/home/horde/repos/reports-shac-wt/shac/data/tuning.json")
 
-# Isolated epoch time (s) per configuration from results/loop/timing1.json (GPU otherwise idle).
-EPOCH_S = {"h1_vel": 0.1935, "h1_gait": 0.3736, "go1_vel": 0.0975, "g1_gait": 0.2887, "ppo_go1": 0.6929,
-           "ppo_h1": 1.2454}
+# Isolated epoch time (s) of the final trainer per configuration (results/loop/timing1-3.json, GPU otherwise idle).
+EPOCH_S = {"h1_vel": 0.1862, "h1_gait": 0.2320, "go1_vel": 0.1031, "g1_gait": 0.3305, "ppo_go1": 0.6929,
+           "ppo_h1": 1.2454, "hum_d10": 0.3703, "go1_gait": 0.1061}  # timing2 (current trainer) where available
 SERIES_TIMING = {"h1_vel": "h1_vel", "h1_gait": "h1_gait", "h1_gait_long": "h1_gait", "h1_gait_ppo": "ppo_h1",
-                 "go1_vel": "go1_vel", "go1_vel_s10": "go1_vel", "go1_vel_kp100": "go1_vel",
-                 "go1_ppo": "ppo_go1", "go1_ppo_s025": "ppo_go1",}
+                 "h1_gait_ta09": "h1_gait", "hum_d10_995": "hum_d10", "hum_d10_09": "hum_d10",
+                 "go1_vel": "go1_vel", "go1_vel_s10": "go1_vel", "go1_gait": "go1_gait", "go1_vel_kp100": "go1_vel",
+                 "go1_ppo": "ppo_go1", "go1_ppo_s025": "ppo_go1", "h1_gait_rpo": "h1_gait",
+                 "g1_il_gait": "g1_gait", "go1_fwd": "go1_vel", "go1_fwd_clip": "go1_vel", "g1_il_gait_ta09": "g1_gait", "g1_strong": "g1_gait"}
+NO_COMMAND = {"hum"}  # groups whose task has no velocity command (no tracking error)
 # (group, key, label, run names, style)
 SERIES = [
-    ("h1", "h1_vel", "Isaac Lab task", ["v1_h1vel_5ms_T16"], "base"),
-    ("h1", "h1_gait", "With gait prior, 600 epochs", ["v2_h1gait_5ms_T16"], "prior"),
-    ("h1", "h1_gait_long", "With gait prior, 1500 epochs", ["v3_h1gait_long", "v3_h1gait_long_s1",
+    ("h1", "h1_vel", "Isaac Lab task, α = 0.995", ["v1_h1vel_5ms_T16"], "base"),
+    ("h1", "h1_gait", "Gait prior, α = 0.995", ["v2_h1gait_5ms_T16"], "alt"),
+    ("h1", "h1_gait_long", "Gait prior, α = 0.995, 1500 epochs", ["v3_h1gait_long", "v3_h1gait_long_s1",
                                                           "v3_h1gait_long_s2"], "long"),
-    ("h1", "h1_gait_ppo", "With gait prior, PPO", ["ppo_h1gait_5ms"], "ppo"),
-    ("g1", "g1_gait", "Gait prior, mjlab gains", ["v2_g1gait_5ms_T16"], "base"),
-    ("g1", "g1_il_gait", "Gait prior, Isaac Lab gains", ["g2_g1ilgait"], "prior"),
-    ("g1", "g1_il_gait_ta09", "Gait prior, Isaac Lab gains, target critic alpha 0.9", ["g2_g1ilgait_ta09"], "long"),
+    ("h1", "h1_gait_ppo", "Gait prior, PPO", ["ppo_h1gait_5ms"], "ppo"),
+    ("h1", "h1_gait_ta09", "Gait prior, α = 0.9", ["a11_h1gait_ta09", "a11_h1gait_ta09_s1", "a11_h1gait_ta09_s2"], "prior"),
+    ("h1", "h1_gait_rpo", "Gait prior, α = 0.9, action-gradient reuse", ["a12_h1gait_rpo4", "a12_h1gait_rpo4_s1",
+                                                                             "a12_h1gait_rpo4_s2"], "extra"),
+    ("g1", "g1_gait", "Gait prior, mjlab gains, α = 0.995", ["v2_g1gait_5ms_T16"], "base"),
+    ("g1", "g1_il_gait", "Gait prior, Isaac Lab gains, α = 0.995", ["g2_g1ilgait"], "alt"),
+    ("g1", "g1_il_gait_ta09", "Gait prior, Isaac Lab gains, α = 0.9", ["g2_g1ilgait_ta09", "g3_g1ilgait_ta09_s1", "g3_g1ilgait_ta09_s2"], "long"),
+    ("g1", "g1_strong", "Stronger gait prior, Isaac Lab gains, α = 0.9", ["g5_g1_strongprior", "g5_g1_strongprior_s1",
+                                                                        "g5_g1_strongprior_s2"], "extra"),
+    ("hum", "hum_nod_995", "Model damping, α = 0.995", ["hd0_humref_nod_2ms_T16"], "base"),
+    ("hum", "hum_d10_995", "Damping 10 N·m·s/rad, α = 0.995", ["hd1_humref_d10_2ms_T16"], "alt"),
+    ("hum", "hum_nod_09", "Model damping, α = 0.9", ["hd4_humref_nod_2ms_T16_ta09"], "prior"),
+    ("hum", "hum_d10_09", "Damping 10 N·m·s/rad, α = 0.9", ["hd3_humref_d10_2ms_T16_ta09", "hd3_humref_d10_ta09_s1",
+                                                     "hd3_humref_d10_ta09_s2"], "long"),
     ("go1", "go1_vel", "Isaac Lab task, SHAC", ["v1_go1vel_5ms_T8"], "prior"),
     ("go1", "go1_gait", "Isaac Lab task with trot clock, SHAC", ["v4_go1gait_5ms_T8"], "alt"),
+    ("go1", "go1_fwd", "Forward commands, SHAC", ["v1_go1velfwd_5ms_T8", "y_go1_il_fwd_s1", "y_go1_il_fwd_s2",
+                                                 "y_go1_il_fwd_s3"], "long"),
+    ("go1", "go1_fwd_clip", "Forward commands, per-world clipping, SHAC", [f"z2_go1fwd_wclip_s{i}" for i in range(4)], "extra"),
     ("go1", "go1_ppo", "PPO, action scale 0.5", ["ppo_go1vel_5ms"], "base"),
     ("go1", "go1_ppo_s025", "PPO, Isaac Lab action scale 0.25", ["ppo_go1vel_5ms_s025"], "ppo"),
 ]
@@ -80,8 +96,9 @@ for group, key, label, runs, style in SERIES:
         "minutes": ([(b * BIN + BIN) * EPOCH_S[SERIES_TIMING[key]] / 60 for b in bins]
                     if key in SERIES_TIMING else None),
         "length": [statistics.mean(p[0][b] for p in per_run) for b in bins],
-        "track": [statistics.mean(p[1][b] for p in per_run) if all(b in p[1] for p in per_run) else None
-                  for b in bins],
+        "track": (None if group in NO_COMMAND else
+                  [statistics.mean(p[1][b] for p in per_run) if all(b in p[1] for p in per_run) else None
+                   for b in bins]),
     })
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps(data))

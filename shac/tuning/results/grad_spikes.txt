@@ -1,0 +1,15 @@
+# Per-world gradient spikes of the analytic adjoint (go1_vel, 64 envs, 4-step window, dt 5 ms, seed 3),
+# same initial state each pass (env state restored), action gradient of r.sum() + q[:,0].sum() + v[:,0].sum().
+# grad_spike_rate.py go1_vel: passes in which some world's action-gradient norm exceeds 10x the median.
+recompute passes with a world > 10x median: 5 of 40
+window passes with a world > 10x median: 11 of 40
+recompute passes with a world > 10x median: 6 of 40
+window passes with a world > 10x median: 8 of 40
+# total: recompute 11/80, stored-forward (window) 19/80. Spikes occur in worlds 45 and 59 only;
+# world 59 normal norm 1.9, spiked 36-290. grad_spike_paired.py go1_vel rr 30 (recompute vs recompute):
+1 rel 2.492 norms r 14.1 w 38.5 world59 r 1.9 w 35.9 worlds [59]
+15 rel 0.945 norms r 50.9 w 14.1 world59 r 49.0 w 1.9 worlds [59]
+17 rel 1.641 norms r 141.7 w 93.0 world59 r 141.0 w 92.0 worlds [59]
+18 rel 1.002 norms r 210.1 w 14.1 world59 r 208.0 w 1.9 worlds [45, 59]
+22 rel 20.624 norms r 14.1 w 291.0 world59 r 2.0 w 290.7 worlds [59]
+rr bad 5 of 30

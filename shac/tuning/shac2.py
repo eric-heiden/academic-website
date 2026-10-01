@@ -78,6 +78,11 @@ class Config:
     stored_forward: bool = True
     # ext: per-world cap on the state adjoint norm passed between control steps (x median).
     state_grad_clip: float | None = None
+    # ext: per-world cap on each control step's control-gradient norm (x median over worlds).
+    ctrl_grad_clip: float | None = None
+    # ext: warm start (actor, critic, target critic and observation statistics) from a checkpoint, e.g. for a
+    # command curriculum; the optimiser state starts fresh.
+    init_from: str | None = None
     # ext: entropy bonus weight on the Gaussian policy (SAPO-style max-entropy objective).
     entropy_coef: float = 0.0
     # ext: SAPO-style maximum-entropy return: reward + alpha * (-log pi(a|s)) of the tanh-squashed policy,
@@ -86,6 +91,14 @@ class Config:
     ent_alpha: float = 0.0
     ent_alpha_lr: float = 0.0
     target_entropy: float = -0.5
+    # ext: RPO-style reuse (Zhong et al. 2025): after the SHAC step, reuse the cached per-sample action
+    # gradients dL/du for reuse_epochs extra policy-only updates. Each update re-parameterises the stored
+    # pre-tanh actions under the new policy (noise recovered so the action is unchanged), weights each sample by
+    # the importance ratio (zeroed outside [rpo_clip_lo, rpo_clip_hi]) and adds rpo_kl * KL(old || new).
+    reuse_epochs: int = 0
+    rpo_clip_lo: float = 0.2
+    rpo_clip_hi: float = 2.0
+    rpo_kl: float = 0.5
     # ext: lambda-return actor objective: each window segment contributes
     # sum_k w_k [R_{0:k} + gamma^{k+1} V(s_{k+1})] with w_k = (1 - l) l^k and the remaining weight on the
     # segment's last step (actor_lambda = None: SHAC's terminal-only bootstrap).
@@ -114,10 +127,12 @@ PRESETS = {
 }
 for _k in ("humanoid_clean", "humanoid_surv", "humanoid_gait"):
     PRESETS[_k] = PRESETS["humanoid"]
+# Humanoid velocity tasks: a faster target critic (alpha 0.9 instead of DiffRL's 0.995) learned 2-3x faster on
+# H1 and was required for G1 balance (research/loop.md, iterations 7-9).
 PRESETS["h1_vel"] = dict(actor_units=(256, 128), critic_units=(128, 128), actor_lr=2e-3, critic_lr=5e-4,
-                         target_alpha=0.995)
+                         target_alpha=0.9)
 PRESETS["go1_vel"] = PRESETS["go1_vel_fwd"] = PRESETS["go1_gait"] = PRESETS["go1"]
-PRESETS["g1_vel"] = PRESETS["h1_gait"] = PRESETS["g1_gait"] = PRESETS["h1_vel"]
+PRESETS["g1_vel"] = PRESETS["h1_gait"] = PRESETS["g1_gait"] = PRESETS["g1_gait_strong"] = PRESETS["h1_vel"]
 
 # ----------------------------------------------------------------------------- networks
 
@@ -310,6 +325,7 @@ def build_env(cfg: Config, num_envs=None, seed=None, backward=True, **sim_over):
     env = Env(task, SimConfig(**sc), num_envs or cfg.num_envs, seed=cfg.seed if seed is None else seed,
               backward=backward)
     env.sim.state_grad_clip = cfg.state_grad_clip
+    env.sim.ctrl_grad_clip = cfg.ctrl_grad_clip
     return env
 
 
@@ -333,6 +349,15 @@ def train(cfg: Config, out: Path):
     alpha_opt = torch.optim.Adam([log_alpha], lr=cfg.ent_alpha_lr) if cfg.ent_alpha_lr > 0 else None
     logp_sum = torch.zeros((), device=dev)
     obs_rms = RunningMeanStd(obs_dim, dev)
+    if cfg.init_from:
+        ck = torch.load(cfg.init_from, map_location=dev, weights_only=False)
+        actor.load_state_dict(ck["actor"])
+        if "critic" in ck:
+            critic.load_state_dict(ck["critic"])
+            target.load_state_dict(ck["critic"])
+        r = ck["obs_rms"]
+        obs_rms.mean.copy_(r["mean"]), obs_rms.var.copy_(r["var"])
+        obs_rms.count = torch.full((), float(r["count"]), device=dev)
 
     obs_buf = torch.zeros(T, N, obs_dim, device=dev)
     rew_buf = torch.zeros(T, N, device=dev)
@@ -390,7 +415,7 @@ def train(cfg: Config, out: Path):
             u_buf[i] = u.detach()
             eps_buf[i] = eps
             gk_buf[i] = gamma_k
-            if cfg.ivw:
+            if cfg.ivw or cfg.reuse_epochs:
                 u_list.append(u)
             action = torch.tanh(u)
             obs, rew, done, info = env.step(action)
@@ -452,7 +477,15 @@ def train(cfg: Config, out: Path):
             loss = loss + cfg.lr_coef * lr_loss
 
         a_opt.zero_grad(set_to_none=True)
-        if cfg.ivw:
+        g_cache = None
+        if cfg.reuse_epochs and not cfg.ivw:
+            g1 = torch.stack(torch.autograd.grad(loss, u_list))
+            g_cache = g1
+            std0 = torch.exp(actor.logstd).detach()
+            u_re = actor.mu(obs_buf.reshape(T * N, obs_dim)).reshape(T, N, act_dim) + std0 * eps_buf
+            u_re = u_re + (torch.exp(actor.logstd) - std0) * eps_buf
+            torch.autograd.backward(u_re, g1)
+        elif cfg.ivw:
             # Per-sample analytic gradients w.r.t. the pre-tanh actions (runs the simulator backward).
             g1 = torch.stack(torch.autograd.grad(loss, u_list))
             with torch.no_grad():
@@ -476,6 +509,29 @@ def train(cfg: Config, out: Path):
         skipped += (~ok).float()
         if bool(ok):  # one host synchronisation per epoch; a non-finite or exploding gradient skips the step
             a_opt.step()
+            if g_cache is not None and cfg.reuse_epochs:
+                # ext: RPO reuse of the cached action gradients (policy-only updates, no simulator work).
+                with torch.no_grad():
+                    flat_obs = obs_buf.reshape(T * N, obs_dim)
+                    mu_old = mu_old_all = None
+                    old_std = std0
+                    mu_old = (u_buf - std0 * eps_buf)  # mean of the rollout policy
+                    logp_old = (-0.5 * eps_buf.square() - torch.log(old_std)).sum(-1)
+                for _ in range(cfg.reuse_epochs):
+                    mu_new = actor.mu(flat_obs).reshape(T, N, act_dim)
+                    std_new = torch.exp(actor.logstd)
+                    eps_new = ((u_buf - mu_new) / std_new).detach()
+                    u_new = mu_new + std_new * eps_new  # equals u_buf; gradient through the new policy
+                    logp_new = (-0.5 * eps_new.square() - torch.log(std_new)).sum(-1)
+                    ratio = torch.exp((logp_new - logp_old).detach())
+                    w = torch.where((ratio > cfg.rpo_clip_lo) & (ratio < cfg.rpo_clip_hi), ratio, 0.0)
+                    surrogate = (w[..., None] * g_cache * u_new).sum()
+                    kl = (torch.log(std_new / old_std) + (old_std.square() + (mu_old - mu_new).square())
+                          / (2 * std_new.square()) - 0.5).sum(-1).mean()
+                    a_opt.zero_grad(set_to_none=True)
+                    (surrogate + cfg.rpo_kl * kl).backward()
+                    torch.nn.utils.clip_grad_norm_(actor.parameters(), cfg.grad_norm)
+                    a_opt.step()
         if alpha_opt is not None:
             alpha_loss = -log_alpha * (logp_sum / T + cfg.target_entropy * act_dim).detach()
             alpha_opt.zero_grad(set_to_none=True)
@@ -494,7 +550,8 @@ def train(cfg: Config, out: Path):
                             env.sim.nonfinite_grad_worlds.float(), env.nonfinite_resets.float(),
                             actor.logstd.detach().mean(), lr_loss.detach(), log_alpha.detach().exp(),
                             logp_mean.detach(), ivw_alpha.mean(),
-                            (env.sim.t_overflow & 15).ne(0).float().mean())).cpu().tolist()
+                            (env.sim.t_overflow & 15).ne(0).float().mean(),
+                            env.sim.state_grad_clip_worlds.float(), env.sim.ctrl_grad_clip_worlds.float())).cpu().tolist()
         env.sim.clear_overflow()
         t_end = time.time()
         st = env.pop_stats()
@@ -505,6 +562,7 @@ def train(cfg: Config, out: Path):
                "skipped_updates": int(scal[4]), "nonfinite_grad_worlds": int(scal[5]),
                "nonfinite_resets": int(scal[6]), "logstd": scal[7], "lr_loss": scal[8], "alpha": scal[9],
                "logp": scal[10], "ivw_alpha": scal[11], "overflow_frac": scal[12],
+               "state_clip_worlds_cum": int(scal[13]), "ctrl_clip_worlds_cum": int(scal[14]),
                **{"ep_" + k: v for k, v in st.items()}}
         history.append(row)
         if epoch % cfg.log_every == 0 or epoch == cfg.epochs - 1:

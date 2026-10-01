@@ -18,6 +18,8 @@ a = ap.parse_args()
 out_dir = ROOT / "results" / "loop" / "eval"
 out_dir.mkdir(parents=True, exist_ok=True)
 for jf in sorted((ROOT / "jobs" / "done").glob("*.json")):
+    if "bugged" in jf.name:
+        continue
     job = json.loads(jf.read_text())
     cmd = job["cmd"]
     if not isinstance(cmd, list) or not any(c in ("shac2.py", "ppo.py") for c in cmd):

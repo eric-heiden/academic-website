@@ -179,22 +179,28 @@
     prior: { color: "--tune-prior", dash: "solid" },
     long: { color: "--tune-long", dash: "solid" },
     alt: { color: "--tune-alt", dash: "dash" },
-    ppo: { color: "--tune-ppo", dash: "dashdot" }
+    ppo: { color: "--tune-ppo", dash: "dashdot" },
+    extra: { color: "--tune-extra", dash: "longdash" }
   };
   const tuningFig = register("fig-tuning", function (width) {
     const group = tuningFig.state.group;
     const metric = tuningFig.state.metric || "length";
-    const axis = tuningFig.state.axis || "samples";
+    const series = (tuning ? tuning.series : []).filter(function (s) { return s.group === group; });
+    // Fall back to the environment-step axis when no series of this robot has an isolated epoch time.
+    const timed = series.some(function (s) { return s.minutes; });
+    const axis = (tuningFig.state.axis || "samples") === "minutes" && timed ? "minutes" : "samples";
+    const noTrack = metric === "track" && !series.some(function (s) { return s.track; });
     const traces = [];
-    (tuning ? tuning.series : []).filter(function (s) { return s.group === group; }).forEach(function (s) {
+    series.forEach(function (s) {
       const st = TUNE_STYLE[s.style];
       const color = css(st.color);
       const x = axis === "samples" ? s.samples_m : s.minutes;
-      if (!x) return;
+      if (!x || !s[metric]) return;
       const label = s.label + (s.seeds > 1 ? " (" + s.seeds + " seeds)" : "");
       traces.push({ x: x, y: s[metric], type: "scatter", mode: "lines", name: label,
                     line: { color: color, width: 2, dash: st.dash },
-                    hovertemplate: label + "<br>%{x:.1f}: %{y:.2f}<extra></extra>" });
+                    hovertemplate: label + "<br>" + (axis === "samples" ? "%{x:.2f} M steps" : "%{x:.1f} min") + ": " +
+                                   (metric === "length" ? "%{y:.1f} s" : "%{y:.2f} m/s") + "<extra></extra>" });
     });
     const layout = baseLayout(width, axis === "samples" ? "Environment steps (millions, log scale)" : "Training time (min, log scale)",
       metric === "length" ? "Mean training episode length (s)" : "Mean planar tracking error (m/s)");
@@ -207,6 +213,14 @@
                       font: { size: 11, color: css("--text") }, bgcolor: "rgba(0,0,0,0)" };
     layout.height = width < 520 ? 380 : 360;
     layout.margin.b = width < 520 ? 130 : 96;
+    const notes = [];
+    if (noTrack) notes.push("This task has no velocity command, so there is no tracking error.");
+    else if ((tuningFig.state.axis || "samples") === "minutes" && !timed) notes.push("No isolated epoch time for these runs; shown against environment steps.");
+    if (notes.length) {
+      layout.annotations = [{ text: notes.join(" "), xref: "paper", yref: "paper", x: 0.5, y: 0.5, showarrow: false,
+                              font: { size: 12, color: css("--muted") } }];
+      if (noTrack) { layout.xaxis.visible = false; layout.yaxis.visible = false; layout.showlegend = false; }
+    }
     return { traces: traces, layout: layout };
   }, { group: "h1", metric: "length", axis: "minutes" });
 

@@ -209,6 +209,10 @@ class DiffSim:
         self.sync_free = False
         self.nonfinite_grad_worlds = torch.zeros((), dtype=torch.long, device=self.torch_device)
         self.state_grad_clip_worlds = torch.zeros((), dtype=torch.long, device=self.torch_device)
+        # Per-world cap on the control-gradient norm of one control step (x median over worlds); rare
+        # contact configurations give single worlds adjoints 10-100x the median, which then dominate the batch.
+        self.ctrl_grad_clip: float | None = None
+        self.ctrl_grad_clip_worlds = torch.zeros((), dtype=torch.long, device=self.torch_device)
         if graph and self.device.is_cuda:
             self._capture()
 
@@ -453,6 +457,7 @@ class _ControlStep(torch.autograd.Function):
             else:
                 sim.state_grad_clip_events += int((scale < 1.0).sum())
             gq, gv = gq * scale[:, None], gv * scale[:, None]
+        g_ctrl = _clip_ctrl_grad(sim, g_ctrl)
         return gq, gv, g_ctrl, None, None
 
 
@@ -512,7 +517,19 @@ class _WindowControlStep(torch.autograd.Function):
             scale = (bound / norm.clamp(min=1e-30)).clamp(max=1.0)
             sim.state_grad_clip_worlds += (scale < 1.0).sum()
             gq, gv = gq * scale[:, None], gv * scale[:, None]
+        g_ctrl = _clip_ctrl_grad(sim, g_ctrl)
         return gq, gv, g_ctrl, None, None
+
+
+def _clip_ctrl_grad(sim, g_ctrl):
+    if sim.ctrl_grad_clip is None:
+        return g_ctrl
+    norm = g_ctrl.norm(dim=1)
+    active = norm[norm > 0]
+    bound = sim.ctrl_grad_clip * (active.median() if active.numel() else norm.new_tensor(0.0))
+    scale = (bound / norm.clamp(min=1e-30)).clamp(max=1.0)
+    sim.ctrl_grad_clip_worlds += (scale < 1.0).sum()
+    return g_ctrl * scale[:, None]
 
 
 def repo_path(*parts) -> Path:

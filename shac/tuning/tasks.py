@@ -907,6 +907,12 @@ TASKS["g1_gait"] = dataclasses.replace(
     foot_points=(("left_ankle_roll_link", (0.04, 0.0, -0.035)), ("right_ankle_roll_link", (0.04, 0.0, -0.035))),
     gait_offsets=(0.0, 0.5), gait_duty=0.6, gait_height=0.08)
 
+# G1 with stronger foot-height and placement terms and H1's command ranges (no lateral commands, 2% standing),
+# the configuration with which the G1 learned to walk (run g5_g1_strongprior; Isaac Lab gains via model_edit g1_il).
+TASKS["g1_gait_strong"] = dataclasses.replace(
+    TASKS["g1_gait"], rewards=TASKS["g1_vel"].rewards + (("gait_height", -120.0), ("gait_slip", -2.0), ("raibert", -20.0)),
+    cmd_vy=(0.0, 0.0), cmd_standing_frac=0.02)
+
 # Classic MuJoCo Humanoid (torque control) with the survival terms and the gait prior; the Raibert target uses
 # zero command (forward progress is rewarded by fwd_disp).
 TASKS["humanoid_gait"] = dataclasses.replace(

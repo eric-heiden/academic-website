@@ -52,13 +52,17 @@ p.add_argument("--solimp", type=float, nargs=5, default=None, help="solimp overr
 p.add_argument("--margin", type=float, default=None, help="margin override for all geoms (m)")
 p.add_argument("--grad-solimp", type=float, nargs=5, default=None, help="backward-only solimp")
 p.add_argument("--grad-margin", type=float, default=None, help="backward-only margin (m)")
+p.add_argument("--model-edit", default=None, help="'+'-separated robots.MODEL_EDITS applied to the model")
+p.add_argument("--nconmax", type=int, default=None)
+p.add_argument("--njmax", type=int, default=None)
 p.add_argument("--out", required=True)
 args = p.parse_args()
 
 r = ROBOTS[args.robot]
 K = round(args.control_dt / args.dt)
 cfg = SimConfig(xml=r.xml, integrator=args.integrator, timestep=args.dt, substeps=K, keyframe=r.keyframe,
-                nconmax=r.nconmax, njmax=r.njmax, solref_timeconst=args.solref_timeconst, cone=args.cone,
+                nconmax=args.nconmax or r.nconmax, njmax=args.njmax or r.njmax, solref_timeconst=args.solref_timeconst, cone=args.cone,
+                model_edit=args.model_edit,
                 iterations=args.iterations, ls_iterations=args.ls_iterations,
                 geom_solimp=tuple(args.solimp) if args.solimp else None, geom_margin=args.margin,
                 grad_solimp=tuple(args.grad_solimp) if args.grad_solimp else None, grad_margin=args.grad_margin,
