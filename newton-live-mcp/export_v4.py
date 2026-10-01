@@ -120,22 +120,22 @@ def export() -> dict:
     DATA.mkdir(parents=True, exist_ok=True)
     rows = trial_rows()
     manifest = {}
-    with zipfile.ZipFile(DATA / "loop-transcripts.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-        for row in rows:
-            workspace = LOOP / row["iteration"] / row["trial"]
-            for filename in PUBLIC_FILES:
-                path = workspace / filename
-                if path.exists():
-                    archive.writestr(f"{row['iteration']}/{row['trial']}/{filename}", redact(path.read_text(errors="replace")))
-            for filename in ("agent.jsonl", "agent.stderr", "host.log", "verification.log"):
-                path = workspace / filename
-                if path.exists():
-                    archive.writestr(f"{row['iteration']}/{row['trial']}/{filename}", redact(path.read_text(errors="replace")))
-            script = json.loads((workspace / "spec.json").read_text())
-            for name in script.get("starter_sha256", {}):
-                if name.endswith(".py") and (workspace / name).exists():
-                    archive.writestr(f"{row['iteration']}/{row['trial']}/submitted_{name}", (workspace / name).read_text())
-    manifest["loop-transcripts.zip"] = hashlib.sha256((DATA / "loop-transcripts.zip").read_bytes()).hexdigest()
+    # One archive per iteration keeps every file well below GitHub's size limits.
+    (DATA / "loop-transcripts.zip").unlink(missing_ok=True)
+    for iteration in sorted({row["iteration"] for row in rows}):
+        name = f"loop-transcripts-{iteration}.zip"
+        with zipfile.ZipFile(DATA / name, "w", zipfile.ZIP_DEFLATED) as archive:
+            for row in (r for r in rows if r["iteration"] == iteration):
+                workspace = LOOP / row["iteration"] / row["trial"]
+                for filename in (*PUBLIC_FILES, "agent.jsonl", "agent.stderr", "host.log", "verification.log"):
+                    path = workspace / filename
+                    if path.exists():
+                        archive.writestr(f"{row['iteration']}/{row['trial']}/{filename}", redact(path.read_text(errors="replace")))
+                script = json.loads((workspace / "spec.json").read_text())
+                for script_name in script.get("starter_sha256", {}):
+                    if script_name.endswith(".py") and (workspace / script_name).exists():
+                        archive.writestr(f"{row['iteration']}/{row['trial']}/submitted_{script_name}", (workspace / script_name).read_text())
+        manifest[name] = hashlib.sha256((DATA / name).read_bytes()).hexdigest()
     result = {"trials": rows, "summary": summarize(rows), "manifest": manifest}
     (DATA / "loop.json").write_text(json.dumps(result, indent=1, default=float) + "\n")
     return result
