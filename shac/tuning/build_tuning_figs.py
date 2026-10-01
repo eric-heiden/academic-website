@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parent
 OUT = Path("/home/horde/repos/reports-shac-wt/shac/data/tuning.json")
 
 # Isolated epoch time (s) of the final trainer per configuration (results/loop/timing1-3.json, GPU otherwise idle).
-EPOCH_S = {"h1_vel": 0.1862, "h1_gait": 0.2320, "go1_vel": 0.1031, "g1_gait": 0.3305, "ppo_go1": 0.6929,
-           "ppo_h1": 1.2454, "hum_d10": 0.3703, "go1_gait": 0.1061}  # timing2 (current trainer) where available
-SERIES_TIMING = {"h1_vel": "h1_vel", "h1_gait": "h1_gait", "h1_gait_long": "h1_gait", "h1_gait_ppo": "ppo_h1",
+EPOCH_S = {"h1_vel": 0.1862, "h1_gait": 0.2320, "go1_vel": 0.1031, "g1_gait": 0.3305, "ppo_go1": 0.4444,
+           "ppo_h1": 0.3513, "ppo_h1gait": 0.3827, "hum_d10": 0.3703, "go1_gait": 0.1061}  # timing2 (current trainer) where available
+SERIES_TIMING = {"h1_vel": "h1_vel", "h1_gait": "h1_gait", "h1_gait_long": "h1_gait", "h1_gait_ppo": "ppo_h1gait", "h1_vel_ppo": "ppo_h1",
                  "h1_gait_ta09": "h1_gait", "hum_d10_995": "hum_d10", "hum_d10_09": "hum_d10",
                  "go1_vel": "go1_vel", "go1_vel_s10": "go1_vel", "go1_gait": "go1_gait", "go1_vel_kp100": "go1_vel",
                  "go1_ppo": "ppo_go1", "go1_ppo_s025": "ppo_go1", "h1_gait_rpo": "h1_gait",
@@ -29,6 +29,7 @@ SERIES = [
     ("h1", "h1_gait_long", "Gait prior, α = 0.995, 1500 epochs", ["v3_h1gait_long", "v3_h1gait_long_s1",
                                                           "v3_h1gait_long_s2"], "long"),
     ("h1", "h1_gait_ppo", "Gait prior, PPO", ["ppo_h1gait_5ms"], "ppo"),
+    ("h1", "h1_vel_ppo", "Isaac Lab task, PPO", ["ppo_h1vel_5ms"], "ppo2"),
     ("h1", "h1_gait_ta09", "Gait prior, α = 0.9", ["a11_h1gait_ta09", "a11_h1gait_ta09_s1", "a11_h1gait_ta09_s2"], "prior"),
     ("h1", "h1_gait_rpo", "Gait prior, α = 0.9, action-gradient reuse", ["a12_h1gait_rpo4", "a12_h1gait_rpo4_s1",
                                                                              "a12_h1gait_rpo4_s2"], "extra"),

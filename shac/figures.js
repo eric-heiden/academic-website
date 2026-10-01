@@ -180,7 +180,8 @@
     long: { color: "--tune-long", dash: "solid" },
     alt: { color: "--tune-alt", dash: "dash" },
     ppo: { color: "--tune-ppo", dash: "dashdot" },
-    extra: { color: "--tune-extra", dash: "longdash" }
+    extra: { color: "--tune-extra", dash: "longdash" },
+    ppo2: { color: "--tune-ppo", dash: "dot" }
   };
   const tuningFig = register("fig-tuning", function (width) {
     const group = tuningFig.state.group;
