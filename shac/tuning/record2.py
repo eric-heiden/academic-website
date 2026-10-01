@@ -28,6 +28,8 @@ def main():
     ap.add_argument("--envs", type=int, default=16)
     ap.add_argument("--steps", type=int, default=500)
     ap.add_argument("--cmd", type=float, nargs=3, default=None)
+    # Command schedule: segments "seconds vx vy wz", applied in order (overrides --cmd).
+    ap.add_argument("--cmd-schedule", nargs="+", default=None)
     ap.add_argument("--sim", default="ref", choices=("ref", "train"))
     ap.add_argument("--seed", type=int, default=7)
     a = ap.parse_args()
@@ -42,13 +44,24 @@ def main():
     mean, var = ck["obs_rms"]["mean"].cuda(), ck["obs_rms"]["var"].cuda()
     squash = meta.get("action_squash", True)
     env.reset_all()
+    sched = None
+    if a.cmd_schedule:
+        sched = []
+        for seg in a.cmd_schedule:
+            sec, *c = (float(x) for x in seg.split())
+            sched += [c] * round(sec / env.dt)
+        a.steps = len(sched)
+        a.cmd = sched[0]
     if a.cmd is not None:
         env.cmd[:] = torch.tensor(a.cmd, device=env.dev)
         env.cmd_resample = 10 ** 9
     qs, alive = [env.q[:, :].cpu().numpy()], torch.ones(env.N, dtype=torch.bool, device=env.dev)
     life = torch.zeros(env.N, device=env.dev)
     obs = env.obs()
-    for _ in range(a.steps):
+    for t in range(a.steps):
+        if sched is not None:
+            a.cmd = sched[t]
+            env.cmd[:] = torch.tensor(a.cmd, device=env.dev)
         u = actor((obs - mean) / torch.sqrt(var + 1e-5), deterministic=True)
         obs, rew, done, info = env.step(torch.tanh(u) if squash else u, differentiable=False)
         if a.cmd is not None:
