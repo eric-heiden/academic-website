@@ -117,12 +117,19 @@ def summarize(rows: list[dict]) -> dict:
     for pair in pairs(rows):
         if "mcp" not in pair or "restart" not in pair:
             continue
+        if any((pair[c].get("infrastructure_retries") or 0) > 0 for c in ("mcp", "restart")):
+            # A retried trial ran without its partner, so the pair is not a paired comparison.
+            continue
         for scope in (pair["iteration"], f'{pair["iteration"]}:{pair["model"]}', "all", f'all:{pair["model"]}'):
             group = groups.setdefault(scope, {"pairs": 0, "mcp_pass": 0, "restart_pass": 0, "values": {}})
             group["pairs"] += 1
             group["mcp_pass"] += pair["mcp"]["success"]
             group["restart_pass"] += pair["restart"]["success"]
+            timed_out = pair["mcp"]["timed_out"] or pair["restart"]["timed_out"]
+            group["timed_out_pairs"] = group.get("timed_out_pairs", 0) + int(timed_out)
             for metric in ("seconds", "input_tokens", "uncached_tokens", "output_tokens", "tool_calls", "cost_usd"):
+                if metric == "seconds" and timed_out:
+                    continue  # a timeout censors the time at the budget, so it is not a measured duration
                 group["values"].setdefault(metric, []).append((pair["mcp"][metric], pair["restart"][metric]))
     return {
         scope: {
