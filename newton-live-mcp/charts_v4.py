@@ -11,6 +11,7 @@ CONDITIONS = {"mcp": "Newton MCP", "restart": "No MCP (edit/restart)"}
 TASKS = {
     "abc_arm": "ABC arm replay",
     "abc_look": "ABC look matching",
+    "abc_replay": "ABC physical replay",
     "abc_twin": "ABC station twin",
     "cube_toss": "Cube toss",
     "dp_real": "Real pendulum",
