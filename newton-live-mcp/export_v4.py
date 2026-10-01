@@ -22,6 +22,12 @@ from tools.mcp_evaluation.visual.analyze import timing  # noqa: E402
 MODEL_KEYS = {"claude-opus-5-5": "opus", "gpt-6-astra": "astra"}
 
 
+def _record(run_dir: Path, name: str) -> Path:
+    """A trial file: harness records sit in the run directory; from h12 on, the agent's files in its workspace/."""
+    path = run_dir / name
+    return path if path.exists() else run_dir / "workspace" / name
+
+
 def trial_rows() -> list[dict]:
     rows = []
     for iteration in sorted(p for p in LOOP.iterdir() if p.is_dir() and p.name.startswith("i")):
@@ -128,13 +134,14 @@ def export() -> dict:
             for row in (r for r in rows if r["iteration"] == iteration):
                 workspace = LOOP / row["iteration"] / row["trial"]
                 for filename in (*PUBLIC_FILES, "agent.jsonl", "agent.stderr", "host.log", "verification.log"):
-                    path = workspace / filename
+                    path = _record(workspace, filename)
                     if path.exists():
                         archive.writestr(f"{row['iteration']}/{row['trial']}/{filename}", redact(path.read_text(errors="replace")))
                 script = json.loads((workspace / "spec.json").read_text())
                 for script_name in script.get("starter_sha256", {}):
-                    if script_name.endswith(".py") and (workspace / script_name).exists():
-                        archive.writestr(f"{row['iteration']}/{row['trial']}/submitted_{script_name}", (workspace / script_name).read_text())
+                    submitted = _record(workspace, script_name)
+                    if script_name.endswith(".py") and submitted.exists():
+                        archive.writestr(f"{row['iteration']}/{row['trial']}/submitted_{script_name}", submitted.read_text())
         manifest[name] = hashlib.sha256((DATA / name).read_bytes()).hexdigest()
     result = {"trials": rows, "summary": summarize(rows), "manifest": manifest}
     (DATA / "loop.json").write_text(json.dumps(result, indent=1, default=float) + "\n")
