@@ -4,6 +4,7 @@
   const css = (token) => getComputedStyle(root).getPropertyValue(token).trim();
   const figures = [];
   let data = null;
+  let tuning = null;
 
   // Series colours are defined in shac.css so they follow the bright/dark theme.
   const CONFIG_STYLE = {
@@ -172,10 +173,51 @@
     return { traces: traces, layout: layout };
   }, { robot: "ant", axis: "epochs", metric: "speed" });
 
+  // Figure: training curves of the retuned tasks (data/tuning.json).
+  const TUNE_STYLE = {
+    base: { color: "--tune-base", dash: "dot" },
+    prior: { color: "--tune-prior", dash: "solid" },
+    long: { color: "--tune-long", dash: "solid" },
+    alt: { color: "--tune-alt", dash: "dash" },
+    ppo: { color: "--tune-ppo", dash: "dashdot" }
+  };
+  const tuningFig = register("fig-tuning", function (width) {
+    const group = tuningFig.state.group;
+    const metric = tuningFig.state.metric || "length";
+    const axis = tuningFig.state.axis || "samples";
+    const traces = [];
+    (tuning ? tuning.series : []).filter(function (s) { return s.group === group; }).forEach(function (s) {
+      const st = TUNE_STYLE[s.style];
+      const color = css(st.color);
+      const x = axis === "samples" ? s.samples_m : s.minutes;
+      if (!x) return;
+      const label = s.label + (s.seeds > 1 ? " (" + s.seeds + " seeds)" : "");
+      traces.push({ x: x, y: s[metric], type: "scatter", mode: "lines", name: label,
+                    line: { color: color, width: 2, dash: st.dash },
+                    hovertemplate: label + "<br>%{x:.1f}: %{y:.2f}<extra></extra>" });
+    });
+    const layout = baseLayout(width, axis === "samples" ? "Environment steps (millions, log scale)" : "Training time (min, log scale)",
+      metric === "length" ? "Mean training episode length (s)" : "Mean planar tracking error (m/s)");
+    layout.xaxis.type = "log";
+    layout.xaxis.tickvals = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100, 300];
+    layout.xaxis.ticktext = ["0.01", "0.03", "0.1", "0.3", "1", "3", "10", "30", "100", "300"];
+    if (metric === "length") layout.yaxis.range = [0, 21];
+    layout.showlegend = true;
+    layout.legend = { orientation: "h", x: 0, xanchor: "left", y: -0.28, yanchor: "top",
+                      font: { size: 11, color: css("--text") }, bgcolor: "rgba(0,0,0,0)" };
+    layout.height = width < 520 ? 380 : 360;
+    layout.margin.b = width < 520 ? 130 : 96;
+    return { traces: traces, layout: layout };
+  }, { group: "h1", metric: "length", axis: "minutes" });
+
   function drawAll() { figures.forEach(draw); }
 
   function start() {
-    fetch("data/figures.json").then(function (r) { return r.json(); }).then(function (json) {
+    Promise.all([fetch("data/figures.json").then(function (r) { return r.json(); }),
+                 fetch("data/tuning.json").then(function (r) { return r.json(); }).catch(function () { return null; })])
+      .then(function (both) {
+      const json = both[0];
+      tuning = both[1];
       data = json;
       if (typeof window.Plotly === "undefined") {
         figures.forEach(function (f) { f.element.textContent = "The interactive plot could not be loaded."; });
