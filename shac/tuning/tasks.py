@@ -107,6 +107,13 @@ class TaskCfg:
     height_cap: float = 0.1
     target_height: float = 0.0  # base_height_l2 target (m)
     track_std: float = 0.5  # std of the exponential velocity-tracking kernels (m/s, rad/s)
+    # mjlab / Rewarped velocity-task kernels: variance of the 3D angular-velocity kernel (rad^2/s^2), of the
+    # projected-gravity uprightness kernel, and per-joint stds of the nominal-pose kernel as (name substring, std)
+    # pairs with pose_std_default for unmatched joints.
+    ang_track_var: float = 0.5
+    upright_var: float = 0.2
+    pose_std: tuple = ()
+    pose_std_default: float = 0.3
     feet_air_threshold: float = 0.4  # s
     soft_limit_factor: float = 0.9  # joint_pos_limits: fraction of the range that is free
     deviation_joints: tuple = ()  # joint names for joint_deviation_l1
@@ -169,6 +176,8 @@ class Env:
         self.soft_hi = mid + task.soft_limit_factor * half
         names = [mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_JOINT, j) for j in range(1, m.njnt)]
         self.joint_names = names
+        pstd = [next((sd for sub, sd in task.pose_std if sub in n), task.pose_std_default) for n in names]
+        self.pose_std = torch.tensor(pstd, dtype=torch.float32, device=self.dev)
         self.dev_idx = torch.tensor([names.index(n) for n in task.deviation_joints], dtype=torch.long,
                                     device=self.dev)
         # Actuators: force = gain * ctrl + b0 + b1 * length + b2 * velocity, joint torque = gear * force.
@@ -585,6 +594,25 @@ class Env:
         err = (self.cmd[:, 0:2] - f.lin_vel_b[:, 0:2]).square().sum(-1)
         return torch.exp(-err / self.task.track_std ** 2)
 
+    def _r_track_lin_vel_3d_exp(self, f, a, pa):
+        """mjlab/Rewarped: planar base-velocity tracking with the vertical velocity folded into the error."""
+        vb = f.lin_vel_b
+        err = (self.cmd[:, 0:2] - vb[:, 0:2]).square().sum(-1) + vb[:, 2].square()
+        return torch.exp(-err / self.task.track_std ** 2)
+
+    def _r_track_ang_vel_3d_exp(self, f, a, pa):
+        """mjlab/Rewarped: yaw-rate tracking with roll and pitch rates folded into the error."""
+        w = f.ang_vel_b
+        err = (self.cmd[:, 2] - w[:, 2]).square() + w[:, 0].square() + w[:, 1].square()
+        return torch.exp(-err / self.task.ang_track_var)
+
+    def _r_upright_exp(self, f, a, pa):
+        g = f.gravity_b
+        return torch.exp(-(g[:, 0].square() + g[:, 1].square()) / self.task.upright_var)
+
+    def _r_pose_exp(self, f, a, pa):
+        return torch.exp(-((f.joint_pos - self.home) / self.pose_std).square().mean(-1))
+
     def _r_track_lin_vel_xy_yaw_exp(self, f, a, pa):
         err = (self.cmd[:, 0:2] - f.lin_vel_yaw[:, 0:2]).square().sum(-1)
         return torch.exp(-err / self.task.track_std ** 2)
@@ -961,6 +989,17 @@ TASKS["go1_gait"] = dataclasses.replace(
                  ("RR_calf", (0.0, 0.0, -0.213)), ("RL_calf", (0.0, 0.0, -0.213))))
 # Stage A: forward commands only (comparable with the forward-speed task of the earlier study).
 TASKS["go1_vel_fwd"] = dataclasses.replace(TASKS["go1_vel"], cmd_vx=(0.0, 1.5), cmd_vy=(0.0, 0.0), cmd_wz=(0.0, 0.0))
+# Rewarped / mjlab velocity-task reward (Rewarped Go2 port, newton-physics): track a fixed 1 m/s forward command with
+# lateral and vertical velocity folded into the error, track zero angular velocity (roll, pitch and yaw rates), reward
+# uprightness and the nominal pose, penalise action changes (-0.1) and soft joint-limit violations (-1).
+RW_REWARDS = (("track_lin_vel_3d_exp", 2.0), ("track_ang_vel_3d_exp", 2.0), ("upright_exp", 1.0), ("pose_exp", 1.0),
+              ("action_rate_l2", -0.1), ("joint_pos_limits", -1.0))
+TASKS["go1_rw"] = dataclasses.replace(TASKS["go1_vel"], rewards=RW_REWARDS, track_std=0.5, ang_track_var=0.5,
+                                      upright_var=0.2, pose_std=(("calf", 0.6),), pose_std_default=0.3,
+                                      cmd_vx=(1.0, 1.0), cmd_vy=(0.0, 0.0), cmd_wz=(0.0, 0.0), cmd_standing_frac=0.0)
+# The same reward with Isaac Lab's command distribution (forward, lateral and yaw rate in [-1, 1]).
+TASKS["go1_rw_full"] = dataclasses.replace(TASKS["go1_rw"], cmd_vx=(-1.0, 1.0), cmd_vy=(-1.0, 1.0), cmd_wz=(-1.0, 1.0),
+                                           cmd_standing_frac=0.02)
 
 
 def make_task(name: str, **overrides) -> TaskCfg:

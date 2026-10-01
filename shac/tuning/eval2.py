@@ -19,7 +19,7 @@ from pathlib import Path
 
 import torch
 
-from shac2 import Actor, Config, build_env
+from shac2 import Actor, Config, build_env, make_actor
 
 
 def load(path):
@@ -32,7 +32,7 @@ def load(path):
 @torch.no_grad()
 def evaluate(ck, cfg, env, steps):
     meta = ck["meta"]
-    actor = Actor(meta["obs_dim"], meta["act_dim"], cfg.actor_units, cfg.logstd_init, cfg.layer_norm).cuda()
+    actor = make_actor(cfg, meta["obs_dim"], meta["act_dim"]).cuda()
     actor.load_state_dict(ck["actor"])
     rms = ck["obs_rms"]
     mean, var = rms["mean"].cuda(), rms["var"].cuda()
@@ -46,10 +46,25 @@ def evaluate(ck, cfg, env, steps):
     ret = torch.zeros(N, device=env.dev)
     obs = env.obs()
     squash = meta.get("action_squash", True)
+    # Gait-quality statistics over alive steps: base vertical speed (bouncing), roll/pitch rate (rocking), yaw-rate
+    # error (yaw oscillation), action change (smoothness) and joint deviation from the default pose.
+    gq = {k: torch.zeros(N, device=env.dev) for k in ("vz", "w_rp", "w_yaw", "act_rate", "pose_dev", "vx")}
+    prev_a = None
     for _ in range(steps):
         a = actor((obs - mean) / torch.sqrt(var + 1e-5), deterministic=True)
         a = torch.tanh(a) if squash else a
         q_before = env.q[:, 0:2].clone()
+        fb = env.F(env, env.q, env.v)
+        vbf, wb = fb.lin_vel_b, fb.ang_vel_b
+        live = alive.float()
+        gq["vz"] += live * vbf[:, 2].abs()
+        gq["vx"] += live * vbf[:, 0]
+        gq["w_rp"] += live * wb[:, 0:2].norm(dim=-1)
+        gq["w_yaw"] += live * (wb[:, 2] - (env.cmd[:, 2] if env.has_cmd else 0.0)).square()
+        gq["pose_dev"] += live * (fb.joint_pos - env.home).square().mean(-1).sqrt()
+        if prev_a is not None:
+            gq["act_rate"] += live * (a - prev_a).square().sum(-1)
+        prev_a = a
         obs, rew, done, info = env.step(a, differentiable=False)
         term = info["terminated"]
         # Position before a possible reset: use the pre-reset observation path via q_before + velocity.
@@ -72,6 +87,11 @@ def evaluate(ck, cfg, env, steps):
     }
     if env.has_cmd:
         out["track_err"] = float((trk / (t / env.dt)).mean())
+    n_alive = (t / env.dt)
+    out["gait"] = {"vz_abs": float((gq["vz"] / n_alive).mean()), "w_rollpitch": float((gq["w_rp"] / n_alive).mean()),
+                   "yaw_rate_rms": float((gq["w_yaw"] / n_alive).sqrt().mean()),
+                   "action_rate": float((gq["act_rate"] / n_alive).mean()),
+                   "pose_rms": float((gq["pose_dev"] / n_alive).mean()), "vx_body": float((gq["vx"] / n_alive).mean())}
     return out
 
 

@@ -108,6 +108,17 @@ class Config:
     rpo_clip_lo: float = 0.2
     rpo_clip_hi: float = 2.0
     rpo_kl: float = 0.5
+    # ext: SAPO (Xing et al., ICLR 2025, arXiv 2412.12089) components. sapo=True applies the paper's settings:
+    # entropy-augmented returns in actor and critic targets with entropy normalised to ~[0, 1] (ent_norm),
+    # auto-tuned temperature (initial 1.0, lr 5e-3, target -dim(A)/2), state-dependent std (log std in [-5, 2]),
+    # two critics (mean for the actor's bootstrap, min for the TD targets), no target critic, SiLU, AdamW and
+    # gradient clipping at 0.5. Explicit --set values override the preset.
+    sapo: bool = False
+    ent_norm: bool = False
+    state_std: bool = False
+    critic_ensemble: int = 1
+    activation: str = "elu"
+    optimizer: str = "adam"
     # ext: lambda-return actor objective: each window segment contributes
     # sum_k w_k [R_{0:k} + gamma^{k+1} V(s_{k+1})] with w_k = (1 - l) l^k and the remaining weight on the
     # segment's last step (actor_lambda = None: SHAC's terminal-only bootstrap).
@@ -140,16 +151,16 @@ for _k in ("humanoid_clean", "humanoid_surv", "humanoid_gait"):
 # H1 and was required for G1 balance (research/loop.md, iterations 7-9).
 PRESETS["h1_vel"] = dict(actor_units=(256, 128), critic_units=(128, 128), actor_lr=2e-3, critic_lr=5e-4,
                          target_alpha=0.9)
-PRESETS["go1_vel"] = PRESETS["go1_vel_fwd"] = PRESETS["go1_gait"] = PRESETS["go1"]
+PRESETS["go1_vel"] = PRESETS["go1_vel_fwd"] = PRESETS["go1_gait"] = PRESETS["go1_rw"] = PRESETS["go1_rw_full"] = PRESETS["go1"]
 PRESETS["g1_vel"] = PRESETS["h1_gait"] = PRESETS["g1_gait"] = PRESETS["g1_gait_strong"] = PRESETS["h1_vel"]
 
 # ----------------------------------------------------------------------------- networks
 
 
-def mlp(sizes, out, layer_norm=True):
+def mlp(sizes, out, layer_norm=True, act="elu"):
     layers, d = [], sizes[0]
     for h in sizes[1:]:
-        layers += [nn.Linear(d, h), nn.ELU()]
+        layers += [nn.Linear(d, h), nn.SiLU() if act == "silu" else nn.ELU()]
         if layer_norm:
             layers.append(nn.LayerNorm(h))
         d = h
@@ -158,22 +169,44 @@ def mlp(sizes, out, layer_norm=True):
 
 
 class Actor(nn.Module):
-    def __init__(self, obs_dim, act_dim, units, logstd_init=-1.0, layer_norm=True):
+    LOGSTD_MIN, LOGSTD_MAX = -5.0, 2.0
+
+    def __init__(self, obs_dim, act_dim, units, logstd_init=-1.0, layer_norm=True, state_std=False, act="elu"):
         super().__init__()
-        self.mu = mlp([obs_dim, *units], act_dim, layer_norm)
-        self.logstd = nn.Parameter(torch.full((act_dim,), float(logstd_init)))
+        self.mu = mlp([obs_dim, *units], act_dim, layer_norm, act)
+        self.state_std = state_std
+        if state_std:
+            # State-dependent log std (SAPO): separate head, initialised to logstd_init.
+            self.std_net = mlp([obs_dim, *units], act_dim, layer_norm, act)
+            last = self.std_net[-1]
+            nn.init.zeros_(last.weight)
+            nn.init.constant_(last.bias, float(logstd_init))
+        else:
+            self.logstd = nn.Parameter(torch.full((act_dim,), float(logstd_init)))
+
+    def dist(self, obs):
+        """Mean and log std of the pre-tanh Gaussian."""
+        mu = self.mu(obs)
+        if self.state_std:
+            return mu, self.std_net(obs).clamp(self.LOGSTD_MIN, self.LOGSTD_MAX)
+        return mu, self.logstd.expand_as(mu)
 
     def forward(self, obs, deterministic=False):
-        mu = self.mu(obs)
+        mu, logstd = self.dist(obs)
         if deterministic:
             return mu
-        return mu + torch.exp(self.logstd) * torch.randn_like(mu)
+        return mu + torch.exp(logstd) * torch.randn_like(mu)
+
+
+def make_actor(cfg, obs_dim, act_dim):
+    return Actor(obs_dim, act_dim, cfg.actor_units, cfg.logstd_init, cfg.layer_norm,
+                 state_std=getattr(cfg, "state_std", False), act=getattr(cfg, "activation", "elu"))
 
 
 class Critic(nn.Module):
-    def __init__(self, obs_dim, units, layer_norm=True):
+    def __init__(self, obs_dim, units, layer_norm=True, act="elu"):
         super().__init__()
-        self.v = mlp([obs_dim, *units], 1, layer_norm)
+        self.v = mlp([obs_dim, *units], 1, layer_norm, act)
         for m in self.v.modules():
             if isinstance(m, nn.Linear):
                 nn.init.orthogonal_(m.weight, gain=math.sqrt(2.0))
@@ -181,6 +214,20 @@ class Critic(nn.Module):
 
     def forward(self, obs):
         return self.v(obs).squeeze(-1)
+
+
+class CriticEnsemble(nn.Module):
+    """C value networks (SAPO's clipped double critic): mean for the actor, min for TD targets."""
+
+    def __init__(self, n, obs_dim, units, layer_norm=True, act="elu"):
+        super().__init__()
+        self.members = nn.ModuleList([Critic(obs_dim, units, layer_norm, act) for _ in range(n)])
+
+    def all(self, obs):
+        return torch.stack([m(obs) for m in self.members])
+
+    def forward(self, obs):
+        return self.all(obs).mean(0)
 
 
 class RunningMeanStd:
@@ -224,12 +271,12 @@ class CriticUpdate:
         self.tgt = torch.zeros(n, device=dev)
         self.loss = torch.zeros((), device=dev)
         self.use_graph = cfg.critic_graph
+        Opt = torch.optim.AdamW if cfg.optimizer == "adamw" else torch.optim.Adam
         if self.use_graph:
             self.lr = torch.tensor(cfg.critic_lr, device=dev)
-            self.opt = torch.optim.Adam(critic.parameters(), lr=self.lr, betas=tuple(cfg.betas), capturable=True,
-                                        fused=True)
+            self.opt = Opt(critic.parameters(), lr=self.lr, betas=tuple(cfg.betas), capturable=True, fused=True)
         else:
-            self.opt = torch.optim.Adam(critic.parameters(), lr=cfg.critic_lr, betas=tuple(cfg.betas), fused=True)
+            self.opt = Opt(critic.parameters(), lr=cfg.critic_lr, betas=tuple(cfg.betas), fused=True)
 
     def set_lr(self, lr):
         if self.use_graph:
@@ -246,7 +293,10 @@ class CriticUpdate:
         for _ in range(c.critic_iterations):
             for b in range(c.critic_batches):
                 sl = slice(b * bs, (b + 1) * bs)
-                loss = (self.critic(self.obs[sl]) - self.tgt[sl]).square().mean()
+                if isinstance(self.critic, CriticEnsemble):
+                    loss = (self.critic.all(self.obs[sl]) - self.tgt[sl]).square().mean(-1).sum()
+                else:
+                    loss = (self.critic(self.obs[sl]) - self.tgt[sl]).square().mean()
                 self.opt.zero_grad(set_to_none=not self.use_graph)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.critic.parameters(), c.grad_norm)
@@ -290,6 +340,11 @@ class CriticUpdate:
 # ----------------------------------------------------------------------------- training
 
 
+SAPO_PRESET = dict(sapo=True, ent_alpha=1.0, ent_alpha_lr=5e-3, target_entropy=-0.5, ent_norm=True, state_std=True,
+                   critic_ensemble=2, target_alpha=0.0, activation="silu", optimizer="adamw", grad_norm=0.5,
+                   actor_lr=2e-3, critic_lr=5e-4)
+
+
 def parse():
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=sorted(TASKS))
@@ -301,6 +356,7 @@ def parse():
     robot = TASKS[a.task].robot
     for k, v in PRESETS.get(a.task, PRESETS.get(robot, {})).items():
         setattr(cfg, k, v)
+    sets = {}
     for kv in a.set:
         k, v = kv.split("=", 1)
         assert hasattr(cfg, k), f"unknown config key {k}"
@@ -308,7 +364,12 @@ def parse():
             v = json.loads(v)
         except json.JSONDecodeError:
             pass
-        setattr(cfg, k, tuple(v) if isinstance(v, list) else v)
+        sets[k] = tuple(v) if isinstance(v, list) else v
+    if sets.get("sapo"):
+        for k, v in SAPO_PRESET.items():
+            setattr(cfg, k, v)
+    for k, v in sets.items():
+        setattr(cfg, k, v)
     for kv in a.tset:
         k, v = kv.split("=", 1)
         try:
@@ -350,12 +411,19 @@ def train(cfg: Config, out: Path):
     env = build_env(cfg, bundle=True)
     dev = env.dev
     obs_dim, act_dim = env.num_obs, env.nu
-    actor = Actor(obs_dim, act_dim, cfg.actor_units, cfg.logstd_init, cfg.layer_norm).to(dev)
-    critic = Critic(obs_dim, cfg.critic_units, cfg.layer_norm).to(dev)
+    actor = make_actor(cfg, obs_dim, act_dim).to(dev)
+    if cfg.critic_ensemble > 1:
+        critic = CriticEnsemble(cfg.critic_ensemble, obs_dim, cfg.critic_units, cfg.layer_norm, cfg.activation).to(dev)
+    else:
+        critic = Critic(obs_dim, cfg.critic_units, cfg.layer_norm, cfg.activation).to(dev)
+    if cfg.state_std:
+        assert not (cfg.reuse_epochs or cfg.ivw or cfg.lr_coef or cfg.entropy_coef), \
+            "state-dependent std is not supported with reuse_epochs / ivw / lr_coef / entropy_coef"
     target = copy.deepcopy(critic)
     for prm in target.parameters():
         prm.requires_grad_(False)
-    a_opt = torch.optim.Adam(actor.parameters(), lr=cfg.actor_lr, betas=tuple(cfg.betas), fused=True)
+    a_opt = (torch.optim.AdamW if cfg.optimizer == "adamw" else torch.optim.Adam)(
+        actor.parameters(), lr=cfg.actor_lr, betas=tuple(cfg.betas), fused=True)
     T, N, gamma, lam = cfg.horizon, cfg.num_envs, cfg.gamma, cfg.lam
     c_update = CriticUpdate(critic, cfg, T * N, obs_dim, dev)
     if cfg.stored_forward:
@@ -417,6 +485,7 @@ def train(cfg: Config, out: Path):
         obs = env.obs()
         obs_rms.update(obs)
         rew_acc = torch.zeros(N, device=dev)
+        logstd_acc = torch.zeros((), device=dev)
         gamma_k = torch.ones(N, device=dev)
         lam_k = torch.ones(N, device=dev)
         loss = torch.zeros((), device=dev)
@@ -424,9 +493,10 @@ def train(cfg: Config, out: Path):
         for i in range(T):
             nobs = rms.normalize(obs)
             obs_buf[i] = nobs.detach()
-            mu = actor.mu(nobs)
+            mu, logstd = actor.dist(nobs)
             eps = torch.randn_like(mu)
-            u = mu + torch.exp(actor.logstd) * eps
+            u = mu + torch.exp(logstd) * eps
+            logstd_acc = logstd_acc + logstd.detach().mean()
             u_buf[i] = u.detach()
             eps_buf[i] = eps
             gk_buf[i] = gamma_k
@@ -436,15 +506,25 @@ def train(cfg: Config, out: Path):
             obs, rew, done, info = env.step(action)
             if cfg.ent_alpha > 0:
                 # log-density of the squashed sample; its negative is a one-sample entropy estimate.
-                logp = (-0.5 * eps.square() - actor.logstd - 0.5 * math.log(2 * math.pi)).sum(-1) \
+                logp = (-0.5 * eps.square() - logstd - 0.5 * math.log(2 * math.pi)).sum(-1) \
                     - torch.log(1.0 - action.square() + 1e-6).sum(-1)
                 logp_sum = logp_sum + logp.detach().mean()
-                rew = rew - log_alpha.detach().exp() * logp
+                if cfg.ent_norm:
+                    # SAPO: entropy offset and scaled by the target |H| = dim(A)/2 to lie roughly in [0, 1].
+                    rew = rew + log_alpha.detach().exp() * (-logp + 0.5 * act_dim) / act_dim
+                else:
+                    rew = rew - log_alpha.detach().exp() * logp
             obs_rms.update(obs)
             term, trunc = info["terminated"], info["truncated"]
             # One target evaluation: truncated worlds bootstrap from their pre-reset observation.
-            next_v = target(rms.normalize(torch.where(trunc[:, None], info["obs_before_reset"], obs)))
-            next_v = torch.where(term, 0.0, next_v)
+            nxt = rms.normalize(torch.where(trunc[:, None], info["obs_before_reset"], obs))
+            if cfg.critic_ensemble > 1:
+                vals = target.all(nxt)
+                next_v = torch.where(term, 0.0, vals.mean(0))       # actor bootstrap: mean of the critics
+                next_v_tgt = torch.where(term, 0.0, vals.min(0)[0])  # TD targets: min of the critics
+            else:
+                next_v = torch.where(term, 0.0, target(nxt))
+                next_v_tgt = next_v
             rew_acc = rew_acc + gamma_k * rew
             contrib = -(rew_acc + gamma * gamma_k * next_v)
             if cfg.actor_lambda is not None:
@@ -461,7 +541,7 @@ def train(cfg: Config, out: Path):
             rew_acc = torch.where(done, 0.0, rew_acc)
             rew_buf[i] = rew.detach()
             done_buf[i] = 1.0 if i == T - 1 else done.float()
-            nv_buf[i] = next_v.detach()
+            nv_buf[i] = next_v_tgt.detach()
         loss = loss / (T * N)
         if cfg.entropy_coef:
             # Gaussian entropy per action dimension (pre-tanh); ext.
@@ -563,7 +643,7 @@ def train(cfg: Config, out: Path):
         # ------------------------------------------------------------ logging (one sync per epoch)
         scal = torch.stack((loss.detach(), gnorm.detach(), c_loss.detach(), rew_buf.mean(), skipped,
                             env.sim.nonfinite_grad_worlds.float(), env.nonfinite_resets.float(),
-                            actor.logstd.detach().mean(), lr_loss.detach(), log_alpha.detach().exp(),
+                            logstd_acc / T, lr_loss.detach(), log_alpha.detach().exp(),
                             logp_mean.detach(), ivw_alpha.mean(),
                             (env.sim.t_overflow & 15).ne(0).float().mean(),
                             env.sim.state_grad_clip_worlds.float(), env.sim.ctrl_grad_clip_worlds.float(),

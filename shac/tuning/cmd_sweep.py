@@ -16,7 +16,7 @@ from pathlib import Path
 import torch
 
 from eval2 import load
-from shac2 import Actor, build_env
+from shac2 import Actor, build_env, make_actor
 
 
 @torch.no_grad()
@@ -34,7 +34,7 @@ def main():
                 ls_iterations=50, geom_solimp=None, geom_margin=None, solref_timeconst=None, cone="elliptic")
     env = build_env(cfg, num_envs=a.envs, seed=99, backward=False, **over)
     meta = ck["meta"]
-    actor = Actor(meta["obs_dim"], meta["act_dim"], cfg.actor_units, cfg.logstd_init, cfg.layer_norm).cuda()
+    actor = make_actor(cfg, meta["obs_dim"], meta["act_dim"]).cuda()
     actor.load_state_dict(ck["actor"])
     mean, var = ck["obs_rms"]["mean"].cuda(), ck["obs_rms"]["var"].cuda()
     squash = meta.get("action_squash", True)
