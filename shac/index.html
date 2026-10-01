@@ -844,6 +844,22 @@ r_\text{gait} = &-w_h \sum_i \big(p_{i,z} - z_0 - z_\text{sw} \sin(\pi \rho_i)\,
 </table>
 </div>
 <p class="figure-caption table-caption" id="table-caption-17">Table 17. Per-environment action-gradient norms for 20 backward passes from the same Go1 state (go1_vel, 64 environments, 4-step window, stored forward steps). A pass counts as spiked when one environment's gradient norm exceeds 10 times the median. Branch perturbations use joint-position offsets with the stated standard deviation and joint-velocity offsets 2.5 times as large (rad/s); clipping caps each world's state adjoint and control gradient at 10 times the median before the average.</p>
+<p>Table 18 compares training at an equal number of simulated worlds on the forward-command variant of the Isaac Lab Go1 task (400 epochs; bundles at every control step, joint perturbations of 0.01 rad). With 64 environments, neither the unbundled nor the bundled configurations walked, with or without clipping, whereas 512 independent environments with clipping walked with all four seeds. Eight perturbed copies of one environment did not replace eight independent environments. On the H1 gait task, 64 environments with 8 branches and per-branch clipping did not reach the threshold of Table 14 within 600 epochs; the training episodes lasted 13.4 s at the end, against 285–388 epochs to the threshold for 512 unbundled environments (reference simulator after 600 epochs: 73% survival, 0.57 m/s). In this simulator and with these settings, bundling did not improve training.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = highest fraction of seeds that walk.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Go1 training with bundled contact gradients">
+<table aria-describedby="table-caption-18" class="comparison-table">
+<thead><tr><th scope="col">Go1, forward commands</th><th scope="col">Simulated worlds</th><th scope="col">Seeds that walk ↑</th><th scope="col">Tracking error per seed (m/s) ↓</th><th scope="col">Survival, mean</th></tr></thead>
+<tbody>
+<tr><th scope="row">512 environments, per-world clipping</th><td>512</td><td class="metric-best"><strong>4 of 4</strong></td><td>0.11 / 0.07 / 0.09 / 0.09</td><td>95.9%</td></tr>
+<tr><th scope="row">512 environments, no clipping</th><td>512</td><td>0 of 4</td><td>0.72 / 0.72 / 0.65 / 0.72</td><td>98.4%</td></tr>
+<tr><th scope="row">64 environments, per-world clipping</th><td>64</td><td>0 of 2</td><td>0.71 / 0.73</td><td>95.7%</td></tr>
+<tr><th scope="row">64 environments × 8 branches, per-world clipping</th><td>512</td><td>0 of 2</td><td>0.74 / 0.72</td><td>100.0%</td></tr>
+<tr><th scope="row">64 environments × 8 branches, no clipping</th><td>512</td><td>0 of 2</td><td>0.73 / 0.73</td><td>99.6%</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-18">Table 18. Go1 policies after 400 epochs on the forward-command variant of the Isaac Lab Go1 task (5 ms physics, 8-step window, Isaac-Lab-equivalent model), evaluated in the unbundled reference simulator (10 s, 256 starts). A seed walks when its tracking error is below 0.3 m/s. Per-world clipping caps each world's state adjoint and control gradient at 10 times the median; with branches, it acts on every branch before the average.</p>
 </section>
 
 <section class="report-section" id="limitations">
