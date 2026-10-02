@@ -14,7 +14,8 @@
   "i9": "h9",
   "i10": "h10",
   "i11": "h11",
-  "i12": "h12"
+  "i12": "h12",
+  "i13": "h13"
  },
  "loop": [
   "The previous study showed that a live MCP makes photo-based calibration cheaper in tokens. This loop asks a broader question. Can the harness be tuned until it reliably helps on the setup and tuning work that earlier coding agents often failed at? The three tasks are rebuilt from earlier reports. One tunes a controller for reference-motion following (from the <a href=\"../g1-whole-body-control/\">G1 whole-body-control report</a>). One debugs a slipping grasp (from <a href=\"../grasp-shake-drift/\">grasp-shake-drift</a> and <a href=\"../featherpgs-issues/\">FeatherPGS</a>). One calibrates a model against measurements from a real robot.",
@@ -105,7 +106,8 @@
   "<strong>h5 → h6.</strong> The MuJoCo capture bug is now fixed where it originated. <a href=\"https://github.com/newton-physics/newton/pull/4377\">newton-physics/newton#4377</a> creates the solver's inverse shape mapping at construction instead of lazily inside the first (usually captured) step, with tests for discarded, retained, and replayed graphs. The loop branch merges that fix, drops the host's eager warm-up workaround, and goes back to re-recording an example's CUDA graphs after any cell that edits example attributes. As a result, kernel arguments baked into graphs pick up live changes again. With the fix, every earlier failing scenario (the one-box repro, and the grasp scene with its old graph dropped, retained, or replayed) now runs correctly.",
   "<strong>h6 → h7.</strong> Because Opus misjudged elapsed time on the hard task, h7 gives MCP sessions a deadline (<code>--deadline</code> on the host, set by the harness to the trial budget), and every status in a tool result then includes <code>time_left_s</code>. To keep the comparison fair, both conditions' prompts now also state the task's UTC start time, so a script-only agent can check the clock with <code>date</code>; the MCP only makes the remaining time passive and ever-present.",
   "<strong>h7 → h8.</strong> Profiling the long hard-task transcripts showed that <code>newton_rebuild</code> returned the full describe payload (application guide, operation list, limits; about 4.6k characters). One Opus run rebuilt 14 times, adding 65k characters that stayed in context for every later turn. Rebuild now returns a compact status of about 180 characters. h8 also carries the corrected G1 verifiers.",
-  "<strong>h11 → h12.</strong> Fair starts, a physical replay task, and new MCP camera tools. Both trials of a pair now start from the same per-task compile-cache seed (Warp, CUDA, GL, OptiX, and Mesa caches, built once by running the starter under every module name the conditions use) in fresh copies, inside a bubblewrap sandbox with a read-only home, private temporary directories, private CLI state, and the operator's histories, other trials, hidden data, and the study's harness code hidden; pairs run one trial at a time, and cleanup finds detached jobs through the sandbox's mount namespace. The MCP can mount a camera on a body (<code>camera_body</code>, e.g. a wrist camera with calibrated intrinsics) and project labeled markers of simulated points into simulated and recorded frames (<code>overlay</code>); contact markers now honor calibrated intrinsics. Newton fixes: MJCF fixed-joint chains are filtered like MuJoCo weld bodies (the YAM finger pads collided with their own wrist), and <code>SensorTiledCamera</code> renders convex hulls."
+  "<strong>h11 → h12.</strong> Fair starts, a physical replay task, and new MCP camera tools. Both trials of a pair now start from the same per-task compile-cache seed (Warp, CUDA, GL, OptiX, and Mesa caches, built once by running the starter under every module name the conditions use) in fresh copies, inside a bubblewrap sandbox with a read-only home, private temporary directories, private CLI state, and the operator's histories, other trials, hidden data, and the study's harness code hidden; pairs run one trial at a time, and cleanup finds detached jobs through the sandbox's mount namespace. The MCP can mount a camera on a body (<code>camera_body</code>, e.g. a wrist camera with calibrated intrinsics) and project labeled markers of simulated points into simulated and recorded frames (<code>overlay</code>); contact markers now honor calibrated intrinsics. Newton fixes: MJCF fixed-joint chains are filtered like MuJoCo weld bodies (the YAM finger pads collided with their own wrist), and <code>SensorTiledCamera</code> renders convex hulls.",
+  "<strong>h12 → h13.</strong> Iteration 12 showed two sources of noise unrelated to the MCP. Which solver variant an agent happened to try decided minutes of its time: one MCP call that first tried MuJoCo's own contacts took 172 s, almost all of it compiling. The seed both conditions start from now also steps the starter with the elliptic cone and with MuJoCo's contacts, which brings that first use to 1.7 s. And one trial was ended by the API (“Selected model is at capacity”); the harness now records such endings and reruns the trial, which under one-at-a-time trials runs under the same conditions as its partner."
  ],
  "harness_rows": [
   [
@@ -172,6 +174,11 @@
    "h12",
    "<a href=\"https://github.com/eric-heiden/newton/commit/ad85db23\">ad85db23</a>",
    "Fair-start harness: shared per-task compile-cache seed, bubblewrap sandbox (read-only home, private /tmp and CLI state, hidden records, data, and harness), sequential pairs, mount-namespace cleanup. MCP <code>camera_body</code>/<code>camera_offset</code> and <code>overlay</code> markers; contact markers honor intrinsics. Newton fixes: MJCF weld-group collision filtering, convex hulls in <code>SensorTiledCamera</code>. Adds the ABC physical replay task with a hardened verifier and trial flags for introspection and downloads."
+  ],
+  [
+   "h13",
+   "<a href=\"https://github.com/eric-heiden/newton/commit/ff1244c9\">ff1244c9</a>",
+   "Solver variants in the compile-cache seed (the elliptic cone and MuJoCo's own contacts, whose first use dropped from 156 s to 1.7 s); trials ended by an API error are detected and rerun."
   ]
  ],
  "real": [
