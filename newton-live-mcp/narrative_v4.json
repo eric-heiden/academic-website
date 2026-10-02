@@ -242,7 +242,7 @@
   "<strong>Given a numeric scorer, agents do not look at the simulation.</strong> In the eight screwdriver runs, after h14 had made filmstrips legible, given Blender the real camera lenses, and told both conditions about it, not one image reached an agent's context; a single run rendered the wrist and top views to files once. Agents read the decisive behavior (does the screwdriver turn in the fingers?) from the score the task provides, and the real-world information they needed (start poses, bin, timing) came as numbers in the scene files. Better rendering pays off only where the decisive information exists only as pixels, which these tasks, by design, never required.",
   "<strong>Fair conditions take more than separate kernel caches.</strong> An audit of the harness, and an adversarial review of the fix with 36 agents, found these asymmetries and leaks:<ul><li>With per-trial caches, the MCP host compiled the starter's kernels before the agent started, outside its budget, while the restart agent paid the same compile inside its budget (27–95 s).</li><li>The stated start time preceded host startup.</li><li>Trials inherited the operator session's environment, including a cross-session messaging socket. Claude, but not Codex, loaded a home-directory <code>AGENTS.md</code>.</li><li>Trials shared <code>/tmp</code> and could read harness records, including the condition label, as well as hidden verification data and the operator's CLI history, which named held-out scores.</li><li>Concurrent trials could read each other's command lines, and in iteration 9 one agent did see the other model's fitting script.</li><li>Detached jobs outlived trials.</li><li>A run that used the MCP 38 times was misclassified as having no MCP tools, because it printed the prompt.</li></ul>The next harness version addresses each of them:<ul><li>Both conditions start from one compile-cache seed per task.</li><li>A barrier starts both agents together.</li><li>A sandbox gives each trial a private <code>/tmp</code>, a read-only home directory and tools, and hidden study data.</li><li>The environment is scrubbed, and Claude cannot use cross-session tools.</li><li>Cleanup kills leftover processes by trial and by sandbox namespace.</li><li>Options reach the runner through hidden spec files.</li><li>Timing-sensitive trials run one at a time.</li></ul>",
   "<strong>A live session needs guards that a restart workflow gets for free.</strong> Three silent-divergence bugs surfaced only through agent use: settings reverted by reset, stale bytecode after a quick edit, and memory corruption from recapturing a CUDA graph around a warm solver. A live harness is only as trustworthy as its bookkeeping, and each fix has a regression test.",
-  "<strong>The MuJoCo capture issue was a Newton bug, now fixed at the source.</strong> <code>SolverMuJoCo</code> created a persistent mapping lazily inside its first step. Newton examples capture that step in a CUDA graph, and any second capture around the same solver then crashed or corrupted the simulation, on upstream main as well (repro in Section 7). <a href=\"https://github.com/newton-physics/newton/pull/4377\">newton-physics/newton#4377</a> creates the mapping at construction. Live tooling found this bug because it re-records graphs in ways that one-shot scripts never do.",
+  "<strong>The MuJoCo capture issue was a Newton bug, now fixed at the source.</strong> <code>SolverMuJoCo</code> created a persistent mapping lazily inside its first step. Newton examples capture that step in a CUDA graph, and any second capture around the same solver then crashed or corrupted the simulation, on upstream main as well (repro in Section 9). <a href=\"https://github.com/newton-physics/newton/pull/4377\">newton-physics/newton#4377</a> creates the mapping at construction. Live tooling found this bug because it re-records graphs in ways that one-shot scripts never do.",
   "<strong>Explaining effective solver parameters saves investigation.</strong> Where an agent used the contact report, it found the grasp's root cause (finger priority overriding the cube's material) in its first call. Agents without it read solver kernels to reconstruct the same fact.",
   "<strong>Verifiers need the same scrutiny as the harness.</strong> A G1 verifier changed the playback rate after construction and silently failed controllers that precompute a plan. It was caught only because an agent claimed to pass all clips and the verification disagreed. Re-verifying all 40 G1 submissions changed exactly the three affected outcomes."
  ],
@@ -319,5 +319,123 @@
   "<strong>Choosing the next replay task.</strong> A design study with seven agents tested two candidates against the evidence. (A) A physical replay of “put the screwdriver in the bin” is feasible: an honest configuration (the gripper's real 50 N pinch, which the ABC simulator replaces by a 2.5 N pinch and inflated friction, plus stiff contacts) places it in 16 of 16 copies, and a public mirror holds 56 recordings of the same station, bin, and screwdriver. But as first proposed its gates did not reward physics: a weak grip with a fitted arm was held and placed as often as the honest one. (B) Scoring the fruit replay's look over the whole video failed outright: a flat colour per region, fitted in 7 s without looking at a single image, scored as well as the best tuned look, Blender scored lowest, the station looks the same in every episode, and a backplate photo beat honest physics on whole-frame metrics. The study therefore chose a redesigned (A): the decisive gate becomes in-hand rotation during the carry, which the real wrist videos fix (the real grasp is rigid in all 56 recordings) and which separates grip models cleanly (1.7° for the honest grip, 14.9° for the fruit task's fix, 36.5° for a one-line fix). Its stated expectation is a replication of the fruit result in a new physics regime, not an MCP advantage; a real MCP time effect would need a long episode where rewinding to a failing grasp saves tens of seconds. The same study found that MCP filmstrips were illegible in practice (a 30-frame strip reached the agent at about 65×48 px per frame) and that only the MCP prompt named Blender; h14 pages filmstrips to the displayed size and names both renderers in both prompts.",
   "<strong>The screwdriver task is built.</strong> A build workflow of eight agents prepared the main episode, 4 training and 12 unseen recordings (chosen from 57 for verdicts that stay the same under six ways of constructing the ground truth: time step, bin floor, base correction, a cylindrical instead of tapered handle, bin position, and start yaw), a tapered handle fitted to how the measured grip width varies with grasp height across the 56 recordings (r = −0.93), the starter, a reference, and a copy of the hardened verifier with screwdriver, bin, pinch, stiffness, and material audits. Two design choices came from its measurements: the in-hand window ends before the gripper is commanded open (otherwise an honest command delay failed it), and each scene starts the screwdriver where it lay before the fingers pushed it (which cut the reference's finger-gap error from 4 to 0.8 mm). The held-out rate threshold is 0.9 rather than the calibration rule's 47 of 48, because the reference passes every copy and the rule left honest variants at the edge of noise; it still rejects the fruit-task fix (0.67) and a 10 N grip (0.75). Every one of 35 cheats and forgeries fails. An adversarial agent found one family of in-bounds settings that passes: a 20 N grip with soft contacts and the largest allowed torsional friction patch; it reproduces the rigid carry on unseen episodes, so the verifier, which can only check what is observable, accepts it. A second variant that also moved the centre of mass toward the grasp is now rejected by a bound on the centre of mass. The build also found an upstream MuJoCo Warp issue: with the default pyramidal friction cone, condim 6 contacts turn NaN in the first step at friction 0.002 (MuJoCo C stays finite); the goal text discloses that the starter's low-friction control diverges for this reason.",
   "<strong>Iteration 14 (h14, the screwdriver task, four pairs).</strong> In the first Opus pair, both agents read the real clamping force off the gripper motor's logged effort (about 47–50 N per pad), stiffened the finger contacts, switched to the elliptic friction cone, and fitted per-joint arm gains and partial gravity compensation, and both replays passed every check they could run locally on the main episode and the four training episodes. With the MCP, Opus kept going for 971 s ($3.83) and its replay held, placed, and kept rigid all 48 unseen copies. Without it, Opus stopped after 444 s ($1.98) with a replay that lost every copy of one unseen episode and one copy of two others (42 of 48, under the 90% gate). The first GPT-6 Astra pair passed in both conditions, 1,209 s with the MCP and 1,331 s without (0.958 and 0.917 of unseen copies). In the second Opus pair both runs passed: 489 s with the MCP and 673 s without (0.958 and 0.917 of unseen copies). In the second Astra pair both runs passed again, but the MCP run took longer: 1,881 s against 1,345 s (0.979 and 1.0 of unseen copies). Over the four pairs, 4 of 4 MCP runs and 3 of 4 runs without it passed; the MCP took 1.19× the time, mostly because the one failing run without it stopped after seven minutes."
+ ],
+ "usage": [
+  "<strong>What agents use from the MCP.</strong> Across the 92 MCP-condition trials of iterations 0–14, agents made 1,998 MCP calls: 1,763 <code>newton_execute</code> (88%), 225 <code>newton_rebuild</code>, 8 <code>newton_describe</code>, and 2 calls of the structured <code>filmstrip</code> tool. Everything happened in Python cells inside the live session. The table counts the cells that used each helper and the trials in which it appeared at least once. Stepping and recording (<code>rollout</code>), live edits of model arrays and example attributes, reset, and the diagnostics (<code>health</code>, <code>solver_contacts</code>) carried most of the work; parallel worker sweeps appeared in about a quarter of the trials and checkpoints in about a fifth. Image tools were rare: <code>observe</code> in 11 trials, <code>filmstrip</code> in 8, <code>compare_images</code> never.",
+  "<strong>The live session did not replace the shell.</strong> MCP-condition agents still ran 426 scripts as fresh processes (1,424 without the MCP), edited files from the shell 450 times (1,246), and read Newton's source with grep, cat, or sed 864 times (1,914). Reading source was the most frequent single activity in both conditions, and about ten of the 59 failed MCP calls came from guessed API names (attributes that were renamed or never existed). Opus made 27 MCP and 12 shell calls per MCP trial; GPT-6 Astra 15 and 26.",
+  "<strong>Changes from this analysis (h15, in progress).</strong> The Blender backend is removed from the MCP again: agents fitted looks from scores rather than renders, and a tuned Blender look matched real frames no better than the tuned sensor. Dictionary-valued <code>rollout()</code> probes such as <code>contacts_between</code> are now also returned as nested dictionaries, after three agents lost a turn indexing them. A qualitative pass over all 184 transcripts is collecting why agents fell back to fresh scripts, what they searched for in the source, and what they rebuilt by hand, to decide what the MCP and Newton should add next.",
+  "<strong>Broader tasks.</strong> Every task so far started from a scene that already existed in Newton, with assets and solver in place, so agents only tuned it. Two new tasks start from a nearly clean plate. In <em>abc_scratch</em>, the agent gets a handful of photos of the fruit-bowl episode, the robot's logs, the camera calibration, and the station's robot model without any objects, and has to recreate the objects, tray, and physics so that a replay grasps and places them as in the recording. In <em>g1_mpc</em>, the agent gets the G1 humanoid, three reference clips, and a plain PD baseline that falls, and has to develop a tracking controller, investigating model predictive control, verified on the given clips and two unseen ones. Both are being built and audited now."
+ ],
+ "usage_rows": [
+  [
+   "<code>rollout()</code>: step and record series in one call",
+   "293",
+   "65"
+  ],
+  [
+   "<code>show()</code>: images and plots into the context",
+   "170",
+   "34"
+  ],
+  [
+   "reset",
+   "167",
+   "41"
+  ],
+  [
+   "edits of model arrays",
+   "163",
+   "53"
+  ],
+  [
+   "edits of example attributes (gains, settings)",
+   "138",
+   "33"
+  ],
+  [
+   "step",
+   "129",
+   "27"
+  ],
+  [
+   "<code>workers.map</code>: parallel sweeps in worker copies",
+   "108",
+   "21"
+  ],
+  [
+   "<code>notify_model_changed</code>",
+   "97",
+   "49"
+  ],
+  [
+   "<code>workers.broadcast</code>",
+   "95",
+   "27"
+  ],
+  [
+   "<code>health()</code>: NaNs, runaway velocities, buffer overflow",
+   "91",
+   "41"
+  ],
+  [
+   "<code>workers.submit</code>",
+   "80",
+   "18"
+  ],
+  [
+   "<code>solver_contacts()</code>: effective contact parameters",
+   "76",
+   "36"
+  ],
+  [
+   "rebuild from a cell",
+   "61",
+   "18"
+  ],
+  [
+   "<code>render()</code>: image as an array",
+   "60",
+   "8"
+  ],
+  [
+   "restore a checkpoint",
+   "48",
+   "16"
+  ],
+  [
+   "save a checkpoint",
+   "31",
+   "20"
+  ],
+  [
+   "describe",
+   "28",
+   "25"
+  ],
+  [
+   "<code>recapture()</code>",
+   "22",
+   "8"
+  ],
+  [
+   "<code>observe</code>",
+   "15",
+   "11"
+  ],
+  [
+   "<code>contacts_between()</code>",
+   "15",
+   "7"
+  ],
+  [
+   "<code>filmstrip</code>",
+   "13",
+   "8"
+  ],
+  [
+   "<code>compare_images()</code>",
+   "0",
+   "0"
+  ]
  ]
 }

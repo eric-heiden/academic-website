@@ -149,9 +149,13 @@ def build() -> str:
                 + figure("assets/v5/abc-renderers.jpg", "Four images of the same robot station from above: the real frame, the tuned sensor twin, an untuned Blender render that is darker and bluer, and a tuned Blender render with soft shadows.", 4,
                          "One frame of the ABC plates episode (frame 24): the real camera (left), a reference twin tuned for the camera sensor (18.5 dB color PSNR on this frame), the same twin in Blender EEVEE with its default studio look (14.5 dB), and after tuning exposure and per-object colors in Blender (18.9 dB). Blender adds soft shadows and ambient occlusion, but cables, plate patterns, and glare that the twin does not model limit both renderers.", 2584, 480)
                 + paragraphs("visual_replay")),
-        section("findings", 6, "Findings so far", paragraphs("findings")),
-        section("limits", 7, "Limits", paragraphs("limits")),
-        section("source", 8, "Source and data", paragraphs("source")),
+        section("usage", 6, "What agents use from the MCP", "".join(f"<p>{t}</p>" for t in NARRATIVE["usage"][:1])
+                + table("Helpers used inside <code>newton_execute</code> cells, 92 MCP-condition trials (i0\u2013i14)",
+                        ["Helper", "Cells", "Trials"], NARRATIVE["usage_rows"], numeric={1, 2}, label="MCP helper usage")
+                + "".join(f"<p>{t}</p>" for t in NARRATIVE["usage"][1:])),
+        section("findings", 7, "Findings so far", paragraphs("findings")),
+        section("limits", 8, "Limits", paragraphs("limits")),
+        section("source", 9, "Source and data", paragraphs("source")),
     ]
     footer = (
         '<footer class="report-footer"><span>Newton live simulation · experimental research</span>'
