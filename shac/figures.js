@@ -5,6 +5,7 @@
   const figures = [];
   let data = null;
   let tuning = null;
+  let loco = null;
 
   // Series colours are defined in shac.css so they follow the bright/dark theme.
   const CONFIG_STYLE = {
@@ -223,16 +224,99 @@
       if (noTrack) { layout.xaxis.visible = false; layout.yaxis.visible = false; layout.showlegend = false; }
     }
     return { traces: traces, layout: layout };
-  }, { group: "h1", metric: "length", axis: "minutes" });
+  }, { group: "h1", metric: "length", axis: "samples" });
+
+  // Figure: Go1 on the full command set (data/locomotion.json): tracking error and action saturation.
+  const LOCO_STYLE = {
+    shac: { color: "--loco-shac", dash: "solid" },
+    noent: { color: "--loco-noent", dash: "dot" },
+    sapo: { color: "--loco-sapo", dash: "solid" },
+    shacent: { color: "--loco-shacent", dash: "dash" },
+    squash: { color: "--loco-squash", dash: "longdash" }
+  };
+  const go1Fig = register("fig-go1-full", function (width) {
+    const metric = go1Fig.state.metric;
+    const traces = [];
+    const layout = baseLayout(width, "Training epoch", metric === "track" ? "Training tracking error (m/s)" :
+      metric === "sat" ? "Saturated action components (%)" : "Mean squash derivative 1 − a²");
+    if (!loco) return { traces: traces, layout: layout };
+    const label = {};
+    loco.go1.forEach(function (s) { label[s.key] = s.label + " (" + s.seeds + " seeds)"; });
+    const src = metric === "track" ? loco.go1 : loco.sat;
+    src.forEach(function (s) {
+      const st = LOCO_STYLE[s.key];
+      const y = metric === "track" ? s.track : metric === "sat" ? s.sat.map(function (v) { return 100 * v; }) : s.deriv;
+      const name = metric === "track" ? label[s.key] : label[s.key].replace(/ \(\d seeds\)/, " (seed 0)");
+      traces.push({ x: s.epoch, y: y, type: "scatter", mode: metric === "track" ? "lines" : "lines+markers", name: name,
+                    marker: { size: 5, color: css(st.color) },
+                    line: { color: css(st.color), width: 2, dash: st.dash },
+                    hovertemplate: name + ": " + (metric === "track" ? "%{y:.2f} m/s" : metric === "sat" ? "%{y:.0f}%" : "%{y:.2f}") +
+                                   "<extra></extra>" });
+    });
+    layout.hovermode = "x unified";
+    layout.yaxis.rangemode = "tozero";
+    if (metric === "sat") layout.yaxis.range = [0, 100];
+    if (metric === "deriv") layout.yaxis.range = [0, 1];
+    if (metric === "track") {
+      layout.yaxis.range = [0, 1.2];
+      layout.shapes = [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: 0.3, y1: 0.3,
+                         line: { color: css("--muted"), width: 1, dash: "dot" } }];
+      layout.annotations = [{ text: "walking threshold", xref: "paper", x: 1, y: 0.3, yanchor: "bottom", xanchor: "right",
+                              showarrow: false, font: { size: 10, color: css("--muted") } }];
+    }
+    return { traces: traces, layout: layout };
+  }, { metric: "track" });
+
+  // Figure: gait diagram (data/locomotion.json): foot heights and contact intervals under a 0.5 m/s command.
+  const gaitFig = register("fig-gait", function (width) {
+    const traces = [];
+    const layout = baseLayout(width, "Time (s)", "");
+    if (!loco || !loco.gait.length) return { traces: traces, layout: layout };
+    const g = loco.gait.find(function (x) { return x.key === gaitFig.state.policy; }) || loco.gait[0];
+    const feet = [{ name: "Left foot", color: css("--loco-left") }, { name: "Right foot", color: css("--loco-right") }];
+    feet.forEach(function (f, k) {
+      const h = g.height[k];
+      const t = h.map(function (_, i) { return i * g.dt; });
+      traces.push({ x: t, y: h.map(function (v) { return 100 * v; }), type: "scatter", mode: "lines", name: f.name,
+                    xaxis: "x", yaxis: "y2", line: { color: f.color, width: 2 },
+                    hovertemplate: f.name + ": %{y:.1f} cm<extra></extra>" });
+      // Contact intervals as horizontal bars.
+      const c = g.contact[k];
+      const base = [], len = [];
+      let s = null;
+      for (let i = 0; i <= c.length; i++) {
+        const on = i < c.length && c[i];
+        if (on && s === null) s = i;
+        if (!on && s !== null) { base.push(s * g.dt); len.push((i - s) * g.dt); s = null; }
+      }
+      traces.push({ type: "bar", orientation: "h", base: base, x: len, y: base.map(function () { return f.name; }),
+                    xaxis: "x", yaxis: "y", width: 0.55, marker: { color: f.color }, showlegend: false, name: f.name,
+                    customdata: base.map(function (b, i) { return [b, b + len[i]]; }),
+                    hovertemplate: f.name + " in contact: %{customdata[0]:.2f}–%{customdata[1]:.2f} s<extra></extra>" });
+    });
+    layout.height = width < 520 ? 320 : 330;
+    layout.margin = { l: 72, r: 12, t: 8, b: 44, pad: 0 };
+    layout.hovermode = "closest";
+    layout.xaxis.range = [0, 4];
+    layout.yaxis = Object.assign({}, layout.yaxis, { domain: [0, 0.28], title: { text: "" }, type: "category",
+      categoryorder: "array", categoryarray: ["Right foot", "Left foot"], showgrid: false });
+    layout.yaxis2 = Object.assign({}, layout.yaxis, { domain: [0.38, 1], type: "linear", showgrid: true,
+      gridcolor: css("--line"), title: { text: "Foot height (cm)", font: { color: css("--text"), size: 11 } },
+      rangemode: "tozero", categoryarray: undefined, categoryorder: undefined });
+    layout.showlegend = false;
+    return { traces: traces, layout: layout };
+  }, { policy: "g1_walk" });
 
   function drawAll() { figures.forEach(draw); }
 
   function start() {
     Promise.all([fetch("data/figures.json").then(function (r) { return r.json(); }),
-                 fetch("data/tuning.json").then(function (r) { return r.json(); }).catch(function () { return null; })])
+                 fetch("data/tuning.json").then(function (r) { return r.json(); }).catch(function () { return null; }),
+                 fetch("data/locomotion.json").then(function (r) { return r.json(); }).catch(function () { return null; })])
       .then(function (both) {
       const json = both[0];
       tuning = both[1];
+      loco = both[2];
       data = json;
       if (typeof window.Plotly === "undefined") {
         figures.forEach(function (f) { f.element.textContent = "The interactive plot could not be loaded."; });

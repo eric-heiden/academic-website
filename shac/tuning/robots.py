@@ -222,6 +222,21 @@ def _g1_feet3(m):
 
 MODEL_EDITS["g1_feet3"] = _g1_feet3
 
+
+def _g1_footpair(m):
+    """Lets the left and right foot capsules collide with each other (capsule-capsule pairs, supported by the
+    adjoint); all other robot geoms still collide with the floor only. Apply after floor_only and g1_feet3."""
+    import mujoco
+    for side, bit in (("left", "contype"), ("right", "conaffinity")):
+        b = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, f"{side}_ankle_roll_link")
+        for g in range(m.ngeom):
+            if m.geom_bodyid[g] == b and (m.geom_contype[g] or m.geom_conaffinity[g]):
+                arr = m.geom_contype if bit == "contype" else m.geom_conaffinity
+                arr[g] |= 4
+
+
+MODEL_EDITS["g1_footpair"] = _g1_footpair
+
 # Unitree G1 (29 dof) from mjlab via the MJWarp PR benchmark (capsule collision model, servo gains from motor
 # armature and a 10 Hz natural frequency, actuator force limits), floor-only collisions, 3 capsules per foot.
 ROBOTS["g1"] = Robot(

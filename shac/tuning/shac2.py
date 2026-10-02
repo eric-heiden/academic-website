@@ -156,7 +156,7 @@ for _k in ("humanoid_clean", "humanoid_surv", "humanoid_gait"):
 PRESETS["h1_vel"] = dict(actor_units=(256, 128), critic_units=(128, 128), actor_lr=2e-3, critic_lr=5e-4,
                          target_alpha=0.9)
 PRESETS["go1_vel"] = PRESETS["go1_vel_fwd"] = PRESETS["go1_gait"] = PRESETS["go1_rw"] = PRESETS["go1_rw_full"] = PRESETS["go1"]
-PRESETS["g1_vel"] = PRESETS["h1_gait"] = PRESETS["g1_gait"] = PRESETS["g1_gait_strong"] = PRESETS["h1_vel"]
+PRESETS["g1_vel"] = PRESETS["h1_gait"] = PRESETS["g1_gait"] = PRESETS["g1_gait_strong"] = PRESETS["g1_walk"] = PRESETS["g1_walk2"] = PRESETS["g1_walk_mid"] = PRESETS["h1_vel"]
 
 # ----------------------------------------------------------------------------- networks
 

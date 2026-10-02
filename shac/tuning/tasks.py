@@ -134,6 +134,10 @@ class TaskCfg:
     gait_offsets: tuple = ()  # phase offset per foot point (fraction of the period)
     gait_duty: float = 0.6  # stance fraction of the cycle
     gait_height: float = 0.08  # swing apex above the standing foot height (m)
+    # Standing gate of the gait clock: for commands with planar speed and yaw rate below this value, every foot is
+    # in clock stance (0 disables the gate, the clock then also steps in place).
+    gait_stand_cmd: float = 0.0
+    gait_stand_phase_zero: bool = False  # standing gate also zeroes the clock observation
     raibert_reach: float = 0.1  # foot target: nominal + reach * v + raibert_gain * (v - v_cmd) (yaw frame, s)
     raibert_gain: float = 0.1
 
@@ -476,7 +480,11 @@ class Env:
         """Per-foot swing progress in [0, 1) during swing, -1 in stance, from the gait clock."""
         t = self.task
         ph = (self.progress.float()[:, None] * self.dt / t.gait_period + self.gait_off) % 1.0
-        return torch.where(ph >= t.gait_duty, (ph - t.gait_duty) / (1.0 - t.gait_duty), -1.0)
+        sw = torch.where(ph >= t.gait_duty, (ph - t.gait_duty) / (1.0 - t.gait_duty), -1.0)
+        if t.gait_stand_cmd > 0:
+            stand = (self.cmd[:, 0:2].norm(dim=-1) < t.gait_stand_cmd) & (self.cmd[:, 2].abs() < t.gait_stand_cmd)
+            sw = torch.where(stand[:, None], -1.0, sw)
+        return sw
 
     def _f_joint_pos(self, f):
         return f.q[:, 7:]
@@ -529,8 +537,13 @@ class Env:
         return self.cmd
 
     def _obs_phase(self, f, a):
-        ph = 2.0 * math.pi * self.progress.float() * self.dt / self.task.gait_period
-        return torch.stack((torch.sin(ph), torch.cos(ph)), -1)
+        t = self.task
+        ph = 2.0 * math.pi * self.progress.float() * self.dt / t.gait_period
+        out = torch.stack((torch.sin(ph), torch.cos(ph)), -1)
+        if t.gait_stand_phase_zero and t.gait_stand_cmd > 0:
+            stand = (self.cmd[:, 0:2].norm(dim=-1) < t.gait_stand_cmd) & (self.cmd[:, 2].abs() < t.gait_stand_cmd)
+            out = torch.where(stand[:, None], 0.0, out)
+        return out
 
     def _obs_contact(self, f, a):
         return self.contact.float()
@@ -750,7 +763,8 @@ class Env:
         if not self.nfeet:
             return
         foot = torch.maximum(self.foot_of_geom[g[:, 0]], self.foot_of_geom[g[:, 1]])
-        valid = valid & (foot >= 0)
+        # Foot contacts are contacts with a non-foot geom (the floor); foot-foot contacts do not count.
+        valid = valid & (foot >= 0) & (torch.minimum(self.foot_of_geom[g[:, 0]], self.foot_of_geom[g[:, 1]]) < 0)
         hit = torch.zeros(nw * self.nfeet, device=self.dev)
         hit.index_add_(0, world * self.nfeet + foot.clamp(min=0), valid.float())
         contact = self._branch_majority(hit.view(nw, self.nfeet) > 0)
@@ -959,6 +973,13 @@ TASKS["g1_gait"] = dataclasses.replace(
 TASKS["g1_gait_strong"] = dataclasses.replace(
     TASKS["g1_gait"], rewards=TASKS["g1_vel"].rewards + (("gait_height", -120.0), ("gait_slip", -2.0), ("raibert", -20.0)),
     cmd_vy=(0.0, 0.0), cmd_standing_frac=0.02)
+
+# G1 walking with the strong gait prior on the full Isaac Lab G1 command set (lateral commands, 10% standing) and
+# a standing gate: zero commands hold both feet in clock stance.
+TASKS["g1_walk"] = dataclasses.replace(TASKS["g1_gait_strong"], cmd_vy=(-0.5, 0.5), cmd_standing_frac=0.1,
+                                       gait_stand_cmd=0.1)
+TASKS["g1_walk2"] = dataclasses.replace(TASKS["g1_walk"], gait_stand_phase_zero=True)
+TASKS["g1_walk_mid"] = dataclasses.replace(TASKS["g1_walk"], rewards=TASKS["g1_vel"].rewards + GAIT_REW)
 
 # Classic MuJoCo Humanoid (torque control) with the survival terms and the gait prior; the Raibert target uses
 # zero command (forward progress is rewarded by fwd_disp).
