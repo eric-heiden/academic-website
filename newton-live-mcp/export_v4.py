@@ -12,12 +12,31 @@ from pathlib import Path
 
 from export_v3 import redact as _redact_credentials
 
-# Held-out episode ids of the physical replay task stay private (agents have network access and could fetch the
-# public recordings); published records name them by position.
-_HELDOUT = Path.home() / ".newton-visual-private" / "abc_replay" / "heldout" / "scenes"
-HELDOUT_NAMES = {
-    path.stem: f"heldout_{k + 1}" for k, path in enumerate(sorted(_HELDOUT.glob("*.json")) if _HELDOUT.exists() else [])
-}
+# Held-out episode ids of the physical replay tasks stay private (agents have network access and could fetch the
+# public recordings); published records name them by task and position.
+_PRIVATE = Path.home() / ".newton-visual-private"
+
+
+def _heldout_names() -> dict[str, str]:
+    names = {}
+    for task, prefix in (("abc_replay", "heldout"), ("abc_bin", "bin_heldout")):
+        scenes = _PRIVATE / task / "heldout" / "scenes"
+        stems = sorted(path.stem for path in scenes.glob("*.json")) if scenes.exists() else []
+        spec = _PRIVATE / task / "heldout_spec.json"
+        if spec.exists():
+            data = json.loads(spec.read_text())
+            # Spares and the rest of the pool are unseen too.
+            for key in ("heldout", "spare", "pool"):
+                for entry in data.get(key) or []:
+                    stem = entry if isinstance(entry, str) else str(entry.get("id") or entry.get("uuid") or "")
+                    if stem and stem not in stems:
+                        stems.append(stem[:8])
+        for k, stem in enumerate(dict.fromkeys(stems)):
+            names[stem] = f"{prefix}_{k + 1}"
+    return names
+
+
+HELDOUT_NAMES = _heldout_names()
 
 
 def redact(text: str) -> str:
