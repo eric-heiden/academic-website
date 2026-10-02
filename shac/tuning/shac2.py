@@ -113,6 +113,10 @@ class Config:
     # auto-tuned temperature (initial 1.0, lr 5e-3, target -dim(A)/2), state-dependent std (log std in [-5, 2]),
     # two critics (mean for the actor's bootstrap, min for the TD targets), no target critic, SiLU, AdamW and
     # gradient clipping at 0.5. Explicit --set values override the preset.
+    # ext: tanh saturation penalty, reward += squash_reg * mean_j log(1 - a_j^2): the squash-correction part of the
+    # SAPO entropy without its Gaussian part. action_squash=False drops the tanh (unbounded actions).
+    squash_reg: float = 0.0
+    action_squash: bool = True
     sapo: bool = False
     ent_norm: bool = False
     state_std: bool = False
@@ -455,7 +459,7 @@ def train(cfg: Config, out: Path):
     history = []
     out.parent.mkdir(parents=True, exist_ok=True)
     meta = {"config": dataclasses.asdict(cfg), "task": dataclasses.asdict(env.task), "obs_dim": obs_dim,
-            "act_dim": act_dim}
+            "act_dim": act_dim, "action_squash": cfg.action_squash}
     t_start = time.time()
     torch.cuda.synchronize()
 
@@ -502,12 +506,15 @@ def train(cfg: Config, out: Path):
             gk_buf[i] = gamma_k
             if cfg.ivw or cfg.reuse_epochs:
                 u_list.append(u)
-            action = torch.tanh(u)
+            action = torch.tanh(u) if cfg.action_squash else u
             obs, rew, done, info = env.step(action)
+            if cfg.squash_reg:
+                rew = rew + cfg.squash_reg * torch.log(1.0 - action.square() + 1e-6).mean(-1)
             if cfg.ent_alpha > 0:
                 # log-density of the squashed sample; its negative is a one-sample entropy estimate.
-                logp = (-0.5 * eps.square() - logstd - 0.5 * math.log(2 * math.pi)).sum(-1) \
-                    - torch.log(1.0 - action.square() + 1e-6).sum(-1)
+                logp = (-0.5 * eps.square() - logstd - 0.5 * math.log(2 * math.pi)).sum(-1)
+                if cfg.action_squash:
+                    logp = logp - torch.log(1.0 - action.square() + 1e-6).sum(-1)
                 logp_sum = logp_sum + logp.detach().mean()
                 if cfg.ent_norm:
                     # SAPO: entropy offset and scaled by the target |H| = dim(A)/2 to lie roughly in [0, 1].
