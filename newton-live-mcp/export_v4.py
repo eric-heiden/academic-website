@@ -128,13 +128,22 @@ def pairs(rows: list[dict]) -> list[dict]:
     return sorted(index.values(), key=lambda p: (p["iteration"], p["task"], p["model"], p["replicate"]))
 
 
+def _sequential(row: dict) -> bool:
+    """Whether the trial ran under a harness that runs trials one at a time (h12 on)."""
+    try:
+        return int(str(row.get("harness") or "h0").lstrip("h").split("-")[0]) >= 12
+    except ValueError:
+        return False
+
+
 def summarize(rows: list[dict]) -> dict:
     groups = {}
     for pair in pairs(rows):
         if "mcp" not in pair or "restart" not in pair:
             continue
-        if any((pair[c].get("infrastructure_retries") or 0) > 0 for c in ("mcp", "restart")):
-            # A retried trial ran without its partner, so the pair is not a paired comparison.
+        if any((pair[c].get("infrastructure_retries") or 0) > 0 and not _sequential(pair[c]) for c in ("mcp", "restart")):
+            # Through h11 a retried trial ran without its concurrent partner, so the pair is not a paired comparison.
+            # From h12 every trial runs alone, so a retry runs under the same conditions as its partner.
             continue
         for scope in (pair["iteration"], f'{pair["iteration"]}:{pair["model"]}', "all", f'all:{pair["model"]}'):
             group = groups.setdefault(scope, {"pairs": 0, "mcp_pass": 0, "restart_pass": 0, "values": {}})

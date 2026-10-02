@@ -35,7 +35,7 @@ def trial_table(rows: list[dict]) -> str:
                     f'{pair["iteration"]} · {TASKS[pair["task"]]} · {MODELS[pair["model"]]} · {pair["replicate"]}',
                     CONDITIONS[condition],
                     status,
-                    f"{max(worst.values()):.2f}" if worst else "–",
+                    f"{max(float(v) for v in worst.values()):.2f}" if worst else "–",
                     f'{r["seconds"]:,.0f}',
                     f'{r["model_seconds"]:,.0f}' if r.get("model_seconds") is not None else "–",
                     f'{r["tool_seconds"]:,.0f}' if r.get("tool_seconds") is not None else "–",
