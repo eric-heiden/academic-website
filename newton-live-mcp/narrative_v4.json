@@ -17,7 +17,8 @@
   "i12": "h12",
   "i13": "h13",
   "i14": "h14",
-  "i15": "h15"
+  "i15": "h15",
+  "i16": "h16"
  },
  "loop": [
   "The previous study showed that a live MCP makes photo-based calibration cheaper in tokens. This loop asks a broader question. Can the harness be tuned until it reliably helps on the setup and tuning work that earlier coding agents often failed at? The three tasks are rebuilt from earlier reports. One tunes a controller for reference-motion following (from the <a href=\"../g1-whole-body-control/\">G1 whole-body-control report</a>). One debugs a slipping grasp (from <a href=\"../grasp-shake-drift/\">grasp-shake-drift</a> and <a href=\"../featherpgs-issues/\">FeatherPGS</a>). One calibrates a model against measurements from a real robot.",
@@ -210,6 +211,11 @@
    "h15",
    "<a href=\"https://github.com/eric-heiden/newton/commit/87199d5c\">87199d5c</a>",
    "MCP liveness features from the transcript analysis: failed cells and rebuilds roll back, rebuild overrides, <code>swap_solver</code>, <code>persist()</code>/<code>persist_source()</code>/<code>diff_model()</code>, workers that take functions, follow rebuilds, and restart after crashes, background jobs, <code>fresh()</code> clean-process runs, <code>solver_params()</code> and per-cell checks for unapplied model edits, per-world <code>health()</code>. Unused helpers removed; the guide states only tool semantics. Newton: <code>python -m newton.examples.headless</code>, <code>newton.utils.report_solver_params</code> and <code>report_health</code>, named in both prompts. Blender backend removed from the MCP. Adds the clean-plate tasks abc_scratch and g1_mpc."
+  ],
+  [
+   "h16",
+   "<a href=\"https://github.com/eric-heiden/newton/commit/1b9359aa\">1b9359aa</a>",
+   "Upstream Newton merged (MuJoCo 3.14); MCP images rendered with <code>SensorCamera</code>. MCP fixes from i15: workers start on first use and never delay a rebuild, reset rewinds clocks advanced by direct <code>example.step()</code> calls, notes only for edits no notify call covered, rollback restores rebound class attributes, no <code>result</code> trap; <code>fresh()</code>, <code>swap_solver</code>, and <code>diff_model</code> dropped from the guide. Newton for both conditions: <code>WorldView</code> (per-world values by label, state copies across worlds, refusal of values a solver does not apply), a SolverMuJoCo joint-coordinate bridge with a model-based-control docs page, camera project/unproject with OpenCV and RealSense distortion, <code>Model.find_*</code> label lookup, aggregated MuJoCo Warp overflow warnings. Harness: invisible workspace snapshots every 5 minutes, verified after the iteration for time to first pass; hardware facts in both prompts; three replicates per cell."
   ]
  ],
  "real": [
