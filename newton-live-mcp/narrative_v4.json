@@ -89,6 +89,18 @@
    "Reproduce a real manipulation episode physically",
    "A 4.6 s ABC-130k episode in which the right YAM arm picks up a screwdriver by its tapered handle and puts it into a bin, driven open loop by the recorded commands. The agent gets the episode with its top and right wrist videos, four more recordings of the same station, 64 arm logs, and helpers to replay, score, render through the real cameras, and summarize contacts. The real gripper pinches with 40–50 N; the starter keeps the ABC simulator's 2.5 N grip, so the screwdriver swings about 24° in the fingers. 60-minute budget.",
    "A batch of 68 worlds replayed by the verifier. Main episode, 8 copies: held and placed in ≥ 7, medians for in-hand rotation during the carry (≤ 6°; the real wrist videos show a rigid grasp in all 56 recordings of this station), slip, finger gap, lift-off, carry track, final tip, and arm tracking (≤ 0.0346 rad). Twelve unseen episodes, 4 copies each: ≥ 90% of copies held, placed, and rotated at most 12°. Controls: gripper forced open, and friction 0.002 everywhere (not held). Screwdriver, bin, pinch force, contact stiffness, and materials are audited; the reference passes every unseen copy, the starter none."
+  ],
+  [
+   "ABC scene from photos (from i15)",
+   "Build a physical scene from photos",
+   "The fruit-bowl episode again, from a nearly clean plate: 11 photos from the top and wrist cameras, the recorded arm and gripper commands and measurements, the calibrated cameras, the station's robot model without any objects, and 64 arm logs. The agent adds the three fruits and the tray with plausible sizes, masses, start poses, and materials, and tunes the physics, so that the open-loop replay grasps, carries, and places every fruit as in the recording. No replay helpers, scorers, or renderers are given. 90-minute budget.",
+   "The verifier's own replay in fresh processes, 8 copies (6 with fruit starts moved by up to 3 mm and 5°): each fruit held between the fingers through the real carry and at rest in the tray within 5 cm of the real fruit in ≥ 6 copies; two negative controls (gripper forced open; friction 0.02) lift no fruit by more than 1 cm. Fruits must start within 5 cm of where the top camera saw them, weigh 20–300 g, have plausible inertia and size (±30% of the tracked size), and receive no drives or forces; worlds must be identical and solver arrays must match the model. A private reference passes; the starter fails."
+  ],
+  [
+   "G1 tracking controller (from i15)",
+   "Develop a controller from a clean plate",
+   "The Unitree G1 humanoid (29 actuated joints) on SolverMuJoCo at 2 ms, three reference clips (walk, dance, jumping jacks), and a baseline that servos the joints toward the reference and falls within a second. The agent develops a controller that returns joint targets, gains, and feedforward torques every 10 ms, investigating model predictive control. No controller library or MPC code is given. 90-minute budget.",
+   "Each clip in a fresh process: the three given clips, two unseen clips, and walk played 0.85–0.95× slower. On every clip the robot stays upright with only its feet on the floor, with root position RMSE ≤ 6 cm, root orientation RMSE ≤ 10°, joint RMSE ≤ 0.12 rad, and sole RMSE ≤ 7 cm; setup ≤ 120 s and rollout ≤ 180 s per clip on an idle machine, scaled by measured load (at most 2.5×). The plant is fingerprinted every step. A strong earlier controller passes; the baseline fails."
   ]
  ],
  "results": [
@@ -192,6 +204,11 @@
    "h14",
    "<a href=\"https://github.com/eric-heiden/newton/commit/4fd08b74\">4fd08b74</a>",
    "MCP filmstrips paged to the size clients display images at; both prompts name both renderers (SensorTiledCamera and Blender); the MCP Blender backend renders calibrated lenses (RealSense, OpenCV) by resampling a covering pinhole; seeds also warm Blender's shader cache. Adds the ABC screwdriver-in-bin physical replay task."
+  ],
+  [
+   "h15",
+   "<a href=\"https://github.com/eric-heiden/newton/commit/87199d5c\">87199d5c</a>",
+   "MCP liveness features from the transcript analysis: failed cells and rebuilds roll back, rebuild overrides, <code>swap_solver</code>, <code>persist()</code>/<code>persist_source()</code>/<code>diff_model()</code>, workers that take functions, follow rebuilds, and restart after crashes, background jobs, <code>fresh()</code> clean-process runs, <code>solver_params()</code> and per-cell checks for unapplied model edits, per-world <code>health()</code>. Unused helpers removed; the guide states only tool semantics. Newton: <code>python -m newton.examples.headless</code>, <code>newton.utils.report_solver_params</code> and <code>report_health</code>, named in both prompts. Blender backend removed from the MCP. Adds the clean-plate tasks abc_scratch and g1_mpc."
   ]
  ],
  "real": [
