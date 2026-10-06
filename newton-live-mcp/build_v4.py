@@ -1,4 +1,7 @@
-"""Build index.html for the harness-improvement loop (run export_v4.py first)."""
+"""Build log.html, the full development log of the harness-improvement loop (run export_v4.py first).
+
+The short summary page is index.html (build_summary.py).
+"""
 
 from __future__ import annotations
 
@@ -167,5 +170,5 @@ def build() -> str:
 
 
 if __name__ == "__main__":
-    (HERE / "index.html").write_text(build())
-    print("wrote index.html")
+    (HERE / "log.html").write_text(build())
+    print("wrote log.html")

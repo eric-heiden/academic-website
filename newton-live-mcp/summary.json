@@ -1,0 +1,166 @@
+{
+ "modified": "2026-10-06",
+ "abstract": "Does a live connection to a running Newton simulation make coding agents faster or better at setting up and tuning simulations? Over 16 iterations, the same agent (Claude Opus 5.5 or GPT-6 Astra) solved the same task once with Newton's live MCP and once by editing and rerunning scripts; a hidden verifier checked every submission, and the MCP was improved between iterations from what the transcripts showed. Across 112 pairs on 13 tasks (controller tuning, contact debugging, system identification from real-robot data, physical replays of real manipulation episodes, and building a scene or a controller from a nearly clean plate), agents with the MCP needed 0.86× the time (95% interval 0.79–0.92; faster in 73 of 111 timed pairs) and passed about as often (104 vs 106). The gain depends on the task: 0.58× on G1 tracking, where every experiment pays setup and inspection overhead, and none where thinking or heavy simulation dominates. Token use depends on the agent: GPT-6 Astra used 0.75× the input tokens, while Opus spent the saved time on more experiments (cost 1.04×). Live use also exposed 13 Newton bugs, now reported upstream with fixes.",
+ "setup": [
+  "Newton's live MCP hosts an unmodified Newton example script in a running Python session. A coding agent drives it with two tools: <code>newton_execute</code> runs Python cells against the live simulation (with helpers such as <code>rollout()</code>, <code>checkpoint()</code>, and contact reports), and <code>newton_rebuild</code> reloads the script after the agent edits it.",
+  "Each trial gives a coding agent a task in a sandboxed workspace with a fixed time budget. In a pair, the same agent (Claude Opus 5.5 in Claude Code, or GPT-6 Astra in Codex) solves the same task once with the MCP and once by editing and rerunning scripts. Both start from the same compiled kernels and the same prompt apart from the workflow paragraph, and every submission is verified in a fresh process by a hidden verifier. After each iteration the transcripts are mined for friction, the harness is changed, and the next iteration measures the new version. From iteration 12 on, trials run one at a time.",
+  "The tasks grew from tuning existing scenes to working from real-robot data and, most recently, starting from a nearly clean plate."
+ ],
+ "tasks": {
+  "grasp_drift": {
+   "what": "Make a Franka grasp hold a cube that drifts while the arm shakes it (contacts, solver settings).",
+   "budget": "30 min"
+  },
+  "g1_track": {
+   "what": "Tune a Unitree G1 controller to follow a reference motion.",
+   "budget": "30 min"
+  },
+  "dp_real": {
+   "what": "Identify a real double pendulum (DFKI) from measured trajectories; held-out windows.",
+   "budget": "30 min"
+  },
+  "cube_toss": {
+   "what": "Fit a contact model to 570 real cube tosses (ContactNets); held-out tosses.",
+   "budget": "30 min"
+  },
+  "sdf_grind": {
+   "what": "Add material removal to a grinding scene with SDF collisions.",
+   "budget": "45 min"
+  },
+  "g1_hard": {
+   "what": "G1 tracking on clips that plain gain tuning cannot pass.",
+   "budget": "60 min"
+  },
+  "abc_twin": {
+   "what": "Fit the camera, geometry, and colors of a real ABC robot station to its camera frames.",
+   "budget": "45 min"
+  },
+  "abc_arm": {
+   "what": "Identify a real YAM arm's joint dynamics from recorded logs.",
+   "budget": "30 min"
+  },
+  "abc_look": {
+   "what": "Match the station's appearance in Blender to held-out real frames.",
+   "budget": "45 min"
+  },
+  "abc_replay": {
+   "what": "Physically replay a real fruit pick-and-place episode open loop; unseen episodes verified.",
+   "budget": "60 min"
+  },
+  "abc_bin": {
+   "what": "Physically replay a real screwdriver-into-bin episode; unseen episodes verified.",
+   "budget": "60 min"
+  },
+  "abc_scratch": {
+   "what": "Build the fruits, tray, and physics from 11 photos and robot logs so the replay grasps and places every fruit.",
+   "budget": "90 min"
+  },
+  "g1_mpc": {
+   "what": "Develop a G1 tracking controller (model predictive control) from a PD baseline that falls; unseen clips verified.",
+   "budget": "90 min"
+  }
+ },
+ "iterations_intro": [
+  "Iterations 0–8 tuned the harness on simulation tasks and real-robot calibration; 9–11 improved what agents see of the simulation; 12–14 added physical replays of real robot episodes under a sandboxed harness that runs one trial at a time; 15–16 start agents from a nearly clean plate. Most iterations ran one pair per task and agent, so a single iteration is noisy; Table 3 pools all iterations by task."
+ ],
+ "iterations": {
+  "i0": {
+   "harness": "h0",
+   "change": "Baseline: the hosted script with checkpoints and in-process rebuild, five tools."
+  },
+  "i1": {
+   "harness": "h1",
+   "change": "Helpers <code>rollout()</code>, contact report, and <code>health()</code>; Python errors keep the scene valid; automatic CUDA-graph recapture."
+  },
+  "i2": {
+   "harness": "h2",
+   "change": "Lean profile with two tools (execute, rebuild); two worker copies for sweeps."
+  },
+  "i3": {
+   "harness": "h3",
+   "change": "Tools loaded up front; resets keep the agent's settings; safer graph recapture."
+  },
+  "i4": {
+   "harness": "h4",
+   "change": "Shorter server instructions."
+  },
+  "i5": {
+   "harness": "h5",
+   "change": "Observations show everything the example renders; host restart with reconnect."
+  },
+  "i6": {
+   "harness": "h6",
+   "change": "Newton fix for recapturing MuJoCo CUDA graphs (newton#4377)."
+  },
+  "i7": {
+   "harness": "h7",
+   "change": "Remaining time in every MCP result and start time in both prompts (agents had stopped early)."
+  },
+  "i8": {
+   "harness": "h8",
+   "change": "Compact rebuild results (180 instead of 4,600 characters)."
+  },
+  "i9": {
+   "harness": "h9",
+   "change": "Visual phase: supersampled observations with calibrated intrinsics, RTX backend, image metrics."
+  },
+  "i10": {
+   "harness": "h10",
+   "change": "RealSense lens model, textures by default, headless OpenGL."
+  },
+  "i11": {
+   "harness": "h11",
+   "change": "Fair start: per-trial kernel caches; the MCP no longer reports a time budget; optional Blender backend."
+  },
+  "i12": {
+   "harness": "h12",
+   "change": "Sandboxed trials from a shared compile seed, run one at a time; Newton fix for MJCF weld-group collisions."
+  },
+  "i13": {
+   "harness": "h13",
+   "change": "Solver variants precompiled in the seed; trials ended by API errors are rerun."
+  },
+  "i14": {
+   "harness": "h14",
+   "change": "Filmstrips paged to readable size; Blender renders calibrated lenses."
+  },
+  "i15": {
+   "harness": "h15",
+   "change": "Liveness tools from the transcript analysis: rollback of failed cells, rebuild overrides, <code>persist()</code>, function workers and jobs, clean-process runs, solver-parameter and unapplied-edit reports; Blender and unused helpers removed."
+  },
+  "i16": {
+   "harness": "h16",
+   "change": "Upstream Newton merged (MuJoCo 3.14); fixes for h15's overheads; Newton APIs for both conditions (per-world edits by label, MuJoCo state bridge, camera projection, label lookup); workspace snapshots; three replicates."
+  }
+ },
+ "findings": [
+  "<strong>The MCP saves time, and the saving comes from the live session itself.</strong> Over 111 timed pairs agents with the MCP needed 0.86× the time and passed about as often (104 vs 106 of 112). Transcript analyses (184 trials of iterations 0–14, then the clean-plate iterations) trace the saving to not paying startup, scene loading, and compilation for every experiment, and to inspecting the running simulation instead of re-running it. Specialized helpers contributed little.",
+  "<strong>The task decides how much it saves.</strong> The MCP helped most where each experiment is cheap but has overhead: G1 tracking (0.58×), cube-toss calibration (0.76×), the hard G1 clips (0.77×), and the G1 MPC controller (0.81×). It did not help where thinking or heavy simulation dominates: the grasp fix (1.00×), SDF grinding (1.06×), the scene from photos (1.06×), and the screwdriver replay (1.19×).",
+  "<strong>Tokens and cost depend on the agent.</strong> GPT-6 Astra turned the faster loop into fewer tokens (0.75× input tokens). Opus used the time for more experiments (1.21× input tokens, cost 1.04×); on the scene from photos its MCP runs cost more in every pair of iteration 16.",
+  "<strong>Harness details matter as much as features.</strong> How tools are advertised and loaded, and how long their results are, moved input tokens from 1.30× (h0) to 0.74× (h3). Agents without a clock stopped after a fifth to a quarter of their budget until both prompts stated the start time (h7). Idle background workers that the prompt never mentioned cost about 2 minutes over the four MCP trials of iteration 15's first half until they started on demand (h16).",
+  "<strong>Agents want numbers and batches, not pictures.</strong> In iterations 0–14, <code>newton_execute</code> made up 88% of MCP calls and <code>rollout()</code> was the most used helper. Given a numeric score, agents rarely looked at renders, and image comparison, filmstrips, and an RTX or Blender backend went almost unused. Instead agents wrote their own copies of the verifier and their own multi-world batch harnesses in most recent trials, which is what the next MCP version targets.",
+  "<strong>Frontier agents can build scenes and controllers from scratch.</strong> Both agents rebuilt the fruit-bowl scene from photos and logs and wrote model-predictive controllers (GPU sampling MPC with 512 parallel robot copies, or iLQR) that track humanoid motions, including unseen clips, within 90 minutes. Without the MCP they passed the scene task in all 10 runs, with it in 7.",
+  "<strong>Verifiers need as much scrutiny as the harness.</strong> A G1 verifier changed the playback rate after construction, and the scene verifier measured the tray against a too-small outline, scored the low-friction control by a point that rises when a pear tips over in place, and scanned helper files the submission never imports. Each fix was applied to every trial of the task afterwards; re-verification changed 6 scene-task verdicts from fail to pass.",
+  "<strong>A live simulator is a good bug finder.</strong> Live editing and recapture exercise code paths that one-shot scripts do not; the study found 13 Newton bugs (Section 4)."
+ ],
+ "newton": [
+  "Live use of the simulator surfaced Newton bugs that one-shot scripts rarely hit. Re-recording a CUDA graph around a warm <code>SolverMuJoCo</code> corrupted memory; the fix is upstream as <a href=\"https://github.com/newton-physics/newton/pull/4377\">newton#4377</a>.",
+  "Thirteen more issues came out of the trials and the task building (<a href=\"https://github.com/newton-physics/newton/issues/4445\">#4445</a>–<a href=\"https://github.com/newton-physics/newton/issues/4457\">#4457</a>). Among them: MJCF bodies attached without a joint collided with their own parent and jammed a gripper; MJCF floors became invisible next to visual meshes; the camera sensor skipped convex hulls and the back of cloth; heightfields rendered with holes; ViewerRTX failed with the current ovrtx release. Ten pull requests with regression tests (<a href=\"https://github.com/newton-physics/newton/pull/4458\">#4458</a>–<a href=\"https://github.com/newton-physics/newton/pull/4467\">#4467</a>) fix ten of them; the cloth and texture-transform fixes for <code>SensorCamera</code> are merged, and the ViewerRTX fix was superseded by upstream's OVRTX update."
+ ],
+ "next": [
+  "<strong>Current MCP (h16).</strong> Two tools. <code>newton_execute</code> runs Python cells against the live simulation with helpers for rollouts, checkpoints, resets, contact and solver-parameter reports, health checks, observations, and background workers; a failed cell rolls the simulation back. <code>newton_rebuild</code> reloads the edited script, optionally with overrides of its constants, and keeps the previous scene if the rebuild fails. Newton utilities named in both conditions' prompts: a headless runner, solver and health reports, per-world edits by label (<code>WorldView</code>), a Newton↔MuJoCo state bridge, camera projection, and label lookup.",
+  "<strong>Next (h17).</strong> Agents repeatedly built their own batched evaluations: copies of the verifier, many candidates as worlds of one model, and planners that copy the current state into hundreds of worlds. Two recent works point the same way. <a href=\"https://robo-simex.github.io/\">SimEX</a> lets a coding agent improve a robot toolbox through self-generated simulated tasks with success predicates, then replays each real trial in simulation to screen candidate repairs; <a href=\"https://arxiv.org/abs/2607.05369\">Graph-as-Policy</a> rehearses many task variations in parallel and records state around each step to find failures. h17 makes such batched evaluation a first-class, efficient operation in Newton (for both conditions), with a thin live wrapper in the MCP, and updates to the latest Newton. The plan and its measurement will be added here."
+ ],
+ "limits": [
+  "Two models and one or two runs per cell in most iterations: single pairs vary as much as the MCP effect on some tasks. Iteration 16 runs three replicates per cell.",
+  "Pass rates are near the ceiling on most tasks, so the comparison mostly measures time, tokens, and cost.",
+  "Each iteration changes the harness, so iterations are not replicates of each other; the pooled ratio mixes harness versions and tasks.",
+  "Verifier fixes during an iteration are applied to every trial of the task afterwards (re-verification), but a verifier can still be wrong in ways nobody noticed.",
+  "One machine with one shared GPU slice; heavy simulation in both conditions can contend for it."
+ ],
+ "source": [
+  "Newton branch <a href=\"https://github.com/eric-heiden/newton/tree/eric-heiden/newton-live-mcp\">eric-heiden/newton-live-mcp</a>: the MCP host and helpers are in <code>newton/_src/mcp</code>; the loop harness, tasks, and verifiers in <code>tools/mcp_evaluation/v4</code> (<code>run_v4.py</code>, <code>run_seq.py</code>).",
+  "Trial data: <a href=\"data/v4/loop.json\">loop.json</a> (every trial's metrics and the paired ratios) and one transcript archive per iteration, for example <a href=\"data/v4/loop-transcripts-i16.zip\">loop-transcripts-i16.zip</a> (prompts, transcripts, submitted scripts, verifications, host logs).",
+  "The <a href=\"log.html\">full development log</a> keeps the per-iteration notes, figures (observations, renderers, the ABC station), the real-robot calibration references, the MCP usage statistics, and the table of every trial."
+ ]
+}

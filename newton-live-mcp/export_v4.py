@@ -80,8 +80,12 @@ def trial_rows() -> list[dict]:
             s = json.loads((workspace / "summary.json").read_text())
             v = s["verification"]
             reverified = workspace / "verification_v2.json"
+            if not reverified.exists():
+                # From i15: verifier fixes made during an iteration are applied to every trial of the task
+                # (tools/mcp_evaluation/v4/reverify.py writes reverify/result.json).
+                reverified = workspace / "reverify" / "result.json"
             if reverified.exists():
-                # G1 submissions were re-verified after the time-scaled playback was fixed.
+                # G1 submissions were re-verified after the time-scaled playback was fixed (verification_v2.json).
                 v2 = json.loads(reverified.read_text())
                 v = {k: v2.get(k) for k in ("success", "integrity", "failed_checks", "metrics", "normalized_worst")}
                 v["reverified_from"] = s["verification"].get("success")
