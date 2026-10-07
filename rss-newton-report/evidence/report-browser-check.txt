@@ -1,0 +1,6 @@
+### Result
+{"sections":12,"videoReady":[{"width":1440,"height":960,"duration":126.04,"error":null},{"width":1440,"height":960,"duration":39.52,"error":null},{"width":1440,"height":960,"duration":74.04,"error":null}]}
+### Ran Playwright code
+```js
+await (async page=>{await page.evaluate(()=>window.scrollTo({top:document.getElementById("demos").offsetTop,behavior:"instant"}));await page.waitForTimeout(300);await page.screenshot({path:"/tmp/rss-newton-study/report-videos-verified.png"});await page.locator("#rss-video").evaluate(v=>{v.currentTime=55});await page.waitForTimeout(500);return {sections:await page.locator("main>section").count(),videoReady:await page.locator("video").evaluateAll(vs=>vs.map(v=>({width:v.videoWidth,height:v.videoHeight,duration:v.duration,error:v.error?.message||null})))}})(page);
+```

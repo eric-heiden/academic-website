@@ -1,0 +1,123 @@
+ROBO SIM STUDIO / NEWTON ENGINEERING STUDY
+Snapshot date: 2026-10-07 UTC
+
+Open index.html in a browser. Keep media/, evidence/, and examples/ beside it.
+The report has no external CSS, JavaScript, font, or media dependency.
+For HTTP serving (optional):
+  cd /absolute/path/to/report/..
+  uvx --from rangehttpserver python -m RangeHTTPServer 8093 --bind 127.0.0.1
+Open http://127.0.0.1:8093/rss-newton-report/ (using your report directory name).
+Serving the parent also makes the sibling zip bundle downloadable.
+The optional server supports byte-range requests for video seeking.
+
+Source snapshots:
+  RSS: https://github.com/KeplerC/RoboSimStudio
+    9bb21c85f79240eb16cc5e610114edd74f1eb2b2 (main)
+  Newton PR #3850: https://github.com/newton-physics/newton/pull/3850
+    8bfd16eb8941feeaf33ed544464a25630839cff0
+    tested base: 7f07a3b693ea72bcca8c3564170e676b31ead0ec
+  Newton latest main, additionally audited:
+    7dcc81d39feb6e83155f615a1c1e0402c1e62517
+  Isaac Lab develop: f5383e7feb4c433372caf0d4d537e1e6c03ef0f2
+  Isaac Sim develop: 2469084bc328710207c6bc4ede32209082a9286c
+  Isaac Lab Arena main: d46405ae1d3a08e7f7aee6294f0a95f2ff6ef540
+
+Keep RSS and Newton PR environments separate. Use dedicated checkouts.
+All recorded sessions used Python 3.12 and an NVIDIA L4. No public share tunnel.
+Exact package versions: evidence/runtime-environments.json.
+
+RSS checkout:
+  git checkout 9bb21c85f79240eb16cc5e610114edd74f1eb2b2
+  uv sync
+  uv run python scripts/testrun.py --tier fast
+  uv run python scripts/testrun.py --tier medium -v
+  uv run python /absolute/path/to/report/examples/test_study_contracts.py
+  uv run --with 'newton[sim]==1.6.1' python /absolute/path/to/report/examples/test_study_contracts.py
+  uv run python -m robosimstudio_agent.serve --scene /absolute/path/to/report/examples/rss_scene.py --run-dir /tmp/rss-study-run --port 8091 --hold
+
+Open http://localhost:8091 before running the live probe from another terminal:
+  uv run --no-project python /absolute/path/to/report/examples/probe_live_session.py --run-dir /tmp/rss-study-run --output /absolute/path/to/results.json
+The live probe deliberately edits its owned scene file and restores it afterward.
+Use a dedicated study scene, not a working scene someone else is editing.
+The recorded camera position was (1.45, 1.05, 1.5), looking at (0.5, 0, 0.85).
+The default scene camera may initially be outside the procedural room.
+
+Newton PR checkout:
+  git fetch origin pull/3850/head
+  git checkout 8bfd16eb8941feeaf33ed544464a25630839cff0
+  uv sync --extra examples --extra dev
+  uv run --extra dev -m newton.tests -k test_viewer_viser
+  uv run --extra examples python /absolute/path/to/report/examples/newton_public_ui.py --check --device cpu
+  uv run --extra examples python /absolute/path/to/report/examples/newton_public_ui.py --check --device cuda:0
+  uv run --extra examples python /absolute/path/to/report/examples/newton_public_ui.py --port 8092
+  uv run --extra examples -m newton.examples ik_franka --viewer viser --render-fps 20
+
+Artifact notes:
+- media/*.mp4 are real browser session captures, encoded from the original WebM recordings.
+- Videos contain chapter overlays; no claimed robot grasp or controlled performance comparison.
+- The live edit video ends after the successful edit; the probe continues with snapshot and restoration.
+- evidence/rss-recorded-take contains actual RSS take data, not a validated policy dataset.
+- test_study_contracts.py is a characterization probe, not an accuracy or conservation benchmark.
+- newton_public_ui.py tests public-API composition and stale-command rejection, not a full plugin framework.
+- Isaac applications and optional SuperDex/Genesis/RTX engines were not run.
+
+No project code was changed or committed. No PRs or messages were posted.
+
+Four-part presentation revision:
+- The main report now has four sections: RSS overview/implementation, ecosystem/audiences,
+  integration options/components, and final recommendations/roadmap.
+- Added source-linked architecture and approximate ecosystem SVG diagrams in media/.
+- The old integration-track section is absent. The ecosystem map describes product roles
+  and ownership, rather than reproducing that section's integration-track narrative.
+- Newton's interactive ViewerViser is the report baseline; exact original snapshot details
+  remain above and in the raw evidence for reproducibility.
+- Four feature walkthroughs replace the lengthy capability subsections. All 17 feature-matrix
+  rows, three original recordings, five examples and original simulation evidence are retained.
+- The report explains that RSS's local command protocol is not an MCP server. The user's
+  Newton live MCP report is linked as ongoing research, not a shipped Newton API or RSS benchmark.
+- media/rss-architecture.svg and media/ecosystem-map.svg are standalone copies of the diagrams.
+- evidence/four-part-* files describe this revision. All older report-* QA files/screenshots
+  are historical renderings, not verification of the current report.
+- Original simulation tests were not rerun for this editorial and layout revision.
+- Python blocks and inline code use embedded, build-time syntax highlighting. No external
+  scripts or styles are needed; source text and indentation are preserved. Commit IDs stay plain.
+- evidence/syntax-highlighting-* records the highlighting revision's browser and source checks.
+- Embedded videos now use the shorter *-highlights.mp4 edits, with new poster frames and
+  chapter times. Opening/interstitial title cards and idle intervals are removed. Small corner
+  labels identify the action and playback speed. No simulated motion was synthesized.
+- The three original MP4 captures and posters remain unchanged. evidence/video-edit-map.json
+  records the original hashes, retained intervals, speed changes and new chapter starts.
+- The live report uses the edited files; original captures remain linked under Evidence.
+
+Read-only take inspection (no simulation process required):
+  uv run --no-project --with numpy python /absolute/path/to/report/examples/inspect_recorded_take.py
+  Original output: evidence/capability-take-inspection.json.
+
+Engineering API follow-up:
+- API comparison: RSS Scene/BuildRequest/Sim/TaskSpec, Newton ModelBuilder and Example
+  runner, plus ovnewton internal main 3e6576c2e4dcf24deda0d0c7b6b2aa43b87c33fb and
+  multiple-scenes 1877c4902c98161e28dfd8401cfc66d60eb6a48c source review.
+- New standalone example, in the same RSS environment as the original audit:
+    uv run python /absolute/path/to/report/examples/rss_cloth_cameras.py
+  It starts the studio at http://127.0.0.1:8097 with explicit MuJoCo/VBD routing.
+  Stop it with the Simulation / Stop server button. Camera views use the tiled renderer.
+- The recorded session used the same scene through the live server:
+    uv run python -m robosimstudio_agent.serve --scene /absolute/path/to/report/examples/rss_cloth_cameras.py --port 8097 --run-dir /tmp/rss-camera-study-run --camera-view --no-watch
+- Camera demo: media/rss-cloth-cameras.mp4 is a continuous 9.8-second recording
+  at normal speed, without title cards. The source WebM, recording actions,
+  clip provenance, GUI probes and runtime logs are bundled under media/ and evidence/.
+- GUI probe: inspector tri_ke log10 4 -> 4.3 changed the model array. Material
+  areal_density 0.3 -> 0.45 stayed pending; Apply & rebuild refused this hand-built
+  scene and left particle mass unchanged. No captured-graph/fresh-build equivalence claim.
+  camera-gui-probe.py records the post-interaction assertions from the original
+  host session; it expects that session/socket and its saved before/after JSON inputs.
+- Four-part-browser-qa.json verifies all four short clips over Tailscale, mobile
+  layout, navigation, images and filtering. engineering-browser-qa.json checks
+  the new API, screenshots and syntax highlighting.
+- The component-integration table now explains eight components, their Newton work,
+  recommended ownership and an initial acceptance check. Three annotated thumbnails
+  enlarge in a keyboard-accessible dialog; component-table-browser-qa.json records
+  desktop/mobile, image loading, close controls and syntax-highlighting checks.
+- Rebuild/package sources are in tools/. Run rebuild_four_part_report.py from this
+  report's tools directory to rebuild HTML; its companion module contains the
+  API/GUI revision. Paths in these reproduction scripts reflect the study host.

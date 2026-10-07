@@ -1,0 +1,117 @@
+{
+  "status": "passed",
+  "rss_commit": "9bb21c85f79240eb16cc5e610114edd74f1eb2b2",
+  "example": "examples/rss_cloth_cameras.py",
+  "before_gui_edits": {
+    "finite": true,
+    "tri": [
+      10000.0,
+      10000.0,
+      0.009999999776482582,
+      0.0,
+      0.0
+    ],
+    "edge": [
+      0.10000000149011612,
+      0.0010000000474974513
+    ],
+    "mass": 0.030719997361302376,
+    "program": "physics: proxy over 2 island(s)\n  island mujoco: mujoco x1 -> ['embodiment'] (16 bodies, 16 joints, 0 particles, derived shapes)\n  island vbd: vbd x1 -> ['block', 'towel'] (1 bodies, 1 joints, 361 particles, 3 shapes)\n  channel mujoco -> vbd: 16 bodies (two_way, 14 pairs) from ['embodiment']",
+    "cameras": [
+      [
+        "front",
+        640,
+        400
+      ],
+      [
+        "overhead",
+        640,
+        400
+      ]
+    ],
+    "load_seconds": 21.02753080194816,
+    "build": "ArrangementSpec(control_hz=60, substeps=8, gravity=-9.81, use_cuda_graph=True, backends=(('articulated', BackendSpec(solver='mujoco', params=(), substeps=1)), ('*', BackendSpec(solver='vbd', params=(), substeps=1))), coupling=CouplerSpec(method='proxy', params=()), collision=CollisionSpec(soft_contact_margin=0.008, full_surface_contact=False, force_sdf=False, rigid_gap=None, contact_ke=None, contact_kd=None, rigid_contact_max=0, collide_every=1, contact_matching='disabled', broad_phase='explicit'), overrides=())"
+  },
+  "after_inspector_tri_ke_log10_4_3": {
+    "tri": [
+      19952.623046875,
+      10000.0,
+      0.009999999776482582,
+      0.0,
+      0.0
+    ],
+    "mass": 0.030719997361302376,
+    "finite": true,
+    "frames": {
+      "overhead": {
+        "rgb": [
+          400,
+          640,
+          3
+        ]
+      }
+    }
+  },
+  "after_material_density_0_45_and_rebuild_button": {
+    "pending": "areal_density",
+    "status": "nothing to rebuild from -- this scene was assembled by hand, so a rebuild-tier edit belongs in the script that built it",
+    "mass": 0.030719997361302376,
+    "finite": true,
+    "density_requested": 0.45,
+    "loaded_at": 1791349764.1973157,
+    "step": 4964
+  },
+  "checks": [
+    "Explicit MuJoCo robot and VBD cloth/rigid islands",
+    "Both declared cameras 640x400; overhead renderer output uint8 RGB shape 400x640x3",
+    "GUI inspector updated first triangle shear coefficient from 10000 to 19952.623, matching 10**4.3",
+    "GUI structural density change remained pending; particle mass unchanged; hand-built scene rebuild refused with status",
+    "Simulation remains finite"
+  ],
+  "limitations": [
+    "One scene and one cloth pin; no two-handle or fresh-build equivalence test",
+    "Tiled renderer only; no RTX or ovnewton runtime",
+    "Inspector and Material panel hold separate working specs; cross-panel consistency not certified"
+  ],
+  "checked_at": "2026-10-07T05:18:50.599548+00:00",
+  "both_camera_frames_verified": {
+    "front": {
+      "rgb": {
+        "shape": [
+          400,
+          640,
+          3
+        ],
+        "dtype": "uint8"
+      }
+    },
+    "overhead": {
+      "rgb": {
+        "shape": [
+          400,
+          640,
+          3
+        ],
+        "dtype": "uint8"
+      }
+    }
+  },
+  "browser_console": {
+    "renderer": "ANGLE NVIDIA L4 OpenGL 4.5",
+    "errors": [
+      "One ERR_FILE_NOT_FOUND on a blob URL during initial load; no observed functional failure."
+    ],
+    "warnings": [
+      "THREE.Clock deprecation"
+    ]
+  },
+  "standalone_entry_point": {
+    "status": "passed",
+    "log": "rss-camera-direct.log",
+    "both_camera_images_shown": true,
+    "stopped_through_ui": true,
+    "example_sha256": "7270432514deba106302703d7d761e7222a2de8530a3ce86e24a0c0a7b737e94"
+  },
+  "ovnewton_public_source_commit": "cd06cb205276d5655bb99e5d12a3ce67635c9895",
+  "ovnewton_internal_source_review": "See api-followup-source-check.json; internal main and multiple-scene branch inspected, no runtime execution."
+}

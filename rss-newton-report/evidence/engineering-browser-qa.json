@@ -1,0 +1,57 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-10-07T05:28:56.924Z",
+  "highlighted": {
+    "count": 53,
+    "plain": [],
+    "blocks": [
+      {
+        "text": "import robosimstudio as rss\nfrom robosimstudio_studio import StudioConfig\n\n# GENERIC is an ArrangementSpec; backend names select solver factories.\nphysics = rss.replace(\n    rss.GENERIC,\n    control_hz=60, substeps=8,\n    backends=((\"articulated\", rss.backend(\"mujoco\")),\n              (\"*\", rss.backend(\"vbd\"))),\n)\nscene = rss.Scene(cell=\"bench_075\", physics=physics, name=\"cloth-cameras\")\nscene.add(rss.robot(\"panda\"))\nscene.add(rss.sheet(name=\"towel\", size=(0.32, 0.32), cells=(18, 18),\n                    at=(-0.16, -0.16, 0.05)))\nscene.add(rss.box(name=\"block\", half=(0.035,) * 3, at=(0.02, 0.25, 0.06)))\n# Camera poses use world coordinates; `at` above is relative to the bench.\nscene.add(rss.CameraSpec(name=\"front\", width=640, height=400,\n                         eye=(1.3, -0.7, 1.2), look_at=(0.5, 0, 0.85)))\nscene.add(rss.CameraSpec(name=\"overhead\", width=640, height=400,\n                         eye=(0.5, 0.01, 1.8), look_at=(0.5, 0, 0.8)))\n\nif __name__ == \"__main__\":\n    # build creates the Newton models, state/control, solver pipeline and warmup.\n    sim = scene.build(control_mode=\"joint_position\")\n    print(sim.pipeline.program.summary())\n    # Live camera panel owns its tiled renderer; the browser runs on Viser.\n    rss.view(sim, panels=\"all\", config=StudioConfig(live=True, port=8097), share=False)\n",
+        "tokens": 324,
+        "colors": [
+          "rgb(231, 165, 208)",
+          "rgb(231, 240, 228)",
+          "rgb(171, 192, 174)",
+          "rgb(182, 223, 229)",
+          "rgb(192, 206, 191)",
+          "rgb(184, 215, 255)",
+          "rgb(231, 215, 154)"
+        ]
+      }
+    ]
+  },
+  "video": {
+    "duration": 9.8,
+    "width": 1440,
+    "height": 960,
+    "playing": true
+  },
+  "newImages": [
+    {
+      "src": "media/rss-inspector-cutout.png",
+      "width": 322,
+      "height": 850,
+      "loaded": true
+    },
+    {
+      "src": "media/rss-material-cutout.png",
+      "width": 322,
+      "height": 830,
+      "loaded": true
+    },
+    {
+      "src": "media/rss-rebuild-cutout.png",
+      "width": 322,
+      "height": 255,
+      "loaded": true
+    },
+    {
+      "src": "media/rss-cameras-cutout.png",
+      "width": 322,
+      "height": 660,
+      "loaded": true
+    }
+  ],
+  "mobileWidth": 390,
+  "errors": []
+}

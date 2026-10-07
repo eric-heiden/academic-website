@@ -1,0 +1,82 @@
+ROBO SIM STUDIO / NEWTON ENGINEERING STUDY
+Snapshot date: 2026-10-07 UTC
+
+Open index.html in a browser. Keep media/, evidence/, and examples/ beside it.
+The report has no external CSS, JavaScript, font, or media dependency.
+For HTTP serving (optional):
+  cd /absolute/path/to/report
+  uvx --from rangehttpserver python -m RangeHTTPServer 8093 --bind 127.0.0.1
+The optional server supports byte-range requests for video seeking.
+
+Source snapshots:
+  RSS: https://github.com/KeplerC/RoboSimStudio
+    9bb21c85f79240eb16cc5e610114edd74f1eb2b2 (main)
+  Newton PR #3850: https://github.com/newton-physics/newton/pull/3850
+    8bfd16eb8941feeaf33ed544464a25630839cff0
+    tested base: 7f07a3b693ea72bcca8c3564170e676b31ead0ec
+  Newton latest main, additionally audited:
+    7dcc81d39feb6e83155f615a1c1e0402c1e62517
+  Isaac Lab develop: f5383e7feb4c433372caf0d4d537e1e6c03ef0f2
+  Isaac Sim develop: 2469084bc328710207c6bc4ede32209082a9286c
+  Isaac Lab Arena main: d46405ae1d3a08e7f7aee6294f0a95f2ff6ef540
+
+Keep RSS and Newton PR environments separate. Use dedicated checkouts.
+All recorded sessions used Python 3.12 and an NVIDIA L4. No public share tunnel.
+Exact package versions: evidence/runtime-environments.json.
+
+RSS checkout:
+  git checkout 9bb21c85f79240eb16cc5e610114edd74f1eb2b2
+  uv sync
+  uv run python scripts/testrun.py --tier fast
+  uv run python scripts/testrun.py --tier medium -v
+  uv run python /absolute/path/to/report/examples/test_study_contracts.py
+  uv run --with 'newton[sim]==1.6.1' python /absolute/path/to/report/examples/test_study_contracts.py
+  uv run python -m robosimstudio_agent.serve --scene /absolute/path/to/report/examples/rss_scene.py --run-dir /tmp/rss-study-run --port 8091 --hold
+
+Open http://localhost:8091 before running the live probe from another terminal:
+  uv run --no-project python /absolute/path/to/report/examples/probe_live_session.py --run-dir /tmp/rss-study-run --output /absolute/path/to/results.json
+The live probe deliberately edits its owned scene file and restores it afterward.
+Use a dedicated study scene, not a working scene someone else is editing.
+The recorded camera position was (1.45, 1.05, 1.5), looking at (0.5, 0, 0.85).
+The default scene camera may initially be outside the procedural room.
+
+Newton PR checkout:
+  git fetch origin pull/3850/head
+  git checkout 8bfd16eb8941feeaf33ed544464a25630839cff0
+  uv sync --extra examples --extra dev
+  uv run --extra dev -m newton.tests -k test_viewer_viser
+  uv run --extra examples python /absolute/path/to/report/examples/newton_public_ui.py --check --device cpu
+  uv run --extra examples python /absolute/path/to/report/examples/newton_public_ui.py --check --device cuda:0
+  uv run --extra examples python /absolute/path/to/report/examples/newton_public_ui.py --port 8092
+  uv run --extra examples -m newton.examples ik_franka --viewer viser --render-fps 20
+
+Artifact notes:
+- media/*.mp4 are real browser session captures, encoded from the original WebM recordings.
+- Videos contain chapter overlays; no claimed robot grasp or controlled performance comparison.
+- The live edit video ends after the successful edit; the probe continues with snapshot and restoration.
+- evidence/rss-recorded-take contains actual RSS take data, not a validated policy dataset.
+- test_study_contracts.py is a characterization probe, not an accuracy or conservation benchmark.
+- newton_public_ui.py tests public-API composition and stale-command rejection, not a full plugin framework.
+- Isaac applications and optional SuperDex/Genesis/RTX engines were not run.
+
+No project code was changed or committed. No PRs or messages were posted.
+
+Report revision (2026-10-07):
+- The report now centers on RoboSimStudio integration with Newton and its four-phase roadmap.
+- The cross-project integration-track section and broad ecosystem/competitive discussion were removed.
+- All original media, runnable examples, feature-matrix entries and raw study evidence are retained.
+- Existing report-* screenshots and QA logs describe the original report rendering.
+  report-revision-* artifacts describe the revised rendering; simulation tests were not rerun.
+- The archived source-index and repository metadata preserve the original audit's broader scope.
+
+Capability expansion (2026-10-07):
+- Added 13 detailed Newton-focused capability walkthroughs, code excerpts and nearby media.
+- Original source checkout rechecked at RSS revision 9bb21c85f79240eb16cc5e610114edd74f1eb2b2.
+- Original runnable examples and simulation evidence are preserved.
+- New read-only take example (Python + NumPy; no simulation process required):
+    python /absolute/path/to/report/examples/inspect_recorded_take.py
+  Its output is evidence/capability-take-inspection.json.
+- Code blocks identify complete snippets, adaptations, excerpts or internal API sketches.
+  Sketches require the documented live objects; they are not standalone Newton APIs.
+- evidence/report-capabilities-* describes the expanded page; older report rendering artifacts
+  remain historical evidence of earlier report revisions.

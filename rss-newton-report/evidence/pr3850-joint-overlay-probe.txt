@@ -1,0 +1,12 @@
+### Result
+{"count":57,"sample":["THREE.LineSegmentsGeometry.computeBoundingSphere(): Computed radius is NaN. The instanced position data is likely to have NaN values. wh","THREE.LineSegmentsGeometry.computeBoundingSphere(): Computed radius is NaN. The instanced position data is likely to have NaN values. wh","THREE.LineSegmentsGeometry.computeBoundingSphere(): Computed radius is NaN. The instanced position data is likely to have NaN values. wh"]}
+### Ran Playwright code
+```js
+await (async page=>{const errors=[];const listener=m=>{if(m.type()==="error")errors.push(m.text())};page.on("console",listener);await page.getByRole("checkbox",{name:"Show Joints",exact:true}).check();await page.waitForTimeout(2000);await page.getByRole("checkbox",{name:"Show Joints",exact:true}).uncheck();page.off("console",listener);return {count:errors.length,sample:errors.slice(0,3)}})(page);
+```
+### Page
+- Page URL: http://localhost:8080/
+- Page Title: Viser
+- Console: 57 errors, 1 warnings
+### Events
+- New console entries: ../../../../../../tmp/rss-newton-study/.playwright-cli/console-2026-10-07T01-04-50-669Z.log#L1-L62
