@@ -103,11 +103,6 @@ def extend(body,css,ROOT,r,n,nm,link,ex,ev,SIM,LAB):
 <p class="sources">{r('robosimstudio/scene/request.py','Shared scene request protocol')} · {r('robosimstudio/specs/task.py#L381','TaskSpec fields')} · {r('robosimstudio/core/env.py','Control / observation lifecycle')} · {link(OV+'docs/site/support.md','Current ovnewton cloth limits')} · {link(OVMULTI+'docs/ovnewton/multi-scene-design.md','Multiple-scene ownership and restrictions')} · {link('https://reports.eric-heiden.com/newton-ovstage-rtx/','Related USD preservation / import study')} · {link(LAB+'docs/source/concepts/native-physics-api/newton.rst','Lab runtime ownership')}</p>
 </div>'''
     s.select_one('#integration .flow-diagram').insert_before(fragment(lifecycle))
-    phases=s.select('#roadmap .phase')
-    if len(phases)==4:
-        phases[1].find('h3').string='Test the workflow and application boundary'
-        append(phases[1].find_all('div',recursive=False)[1],'<p>Include a native Example adapter and a small Python-versus-USD construction comparison. Agree on solver configuration, reset/rebuild and resource ownership with the ovnewton effort before proposing a new public application class.</p>')
-        phases[2].find('h3').string='Upstream reusable interaction and lifecycle contracts'
     s.select_one('#evidence>p').string='Original suite results and captures are retained below. This revision additionally runs the explicit-solver camera example and probes live GUI edits. The bundled script was also launched directly to verify its scene/build/view entry point. No Isaac or ovnewton runtime was executed for the API comparison; those findings are source reviews.'
     append(s.select_one('#evidence tbody'),f'<tr><td>{ex("rss_cloth_cameras.py")}</td><td>Explicit MuJoCo/VBD routing; two 640×400 camera views; cloth pin and release; live material edit and unsupported structural rebuild.</td><td>{ev("camera-demo-probe.json","Results")} · {ev("rss-camera-session.log","Session log")} · {ev("rss-camera-direct.log","Direct entry point")} · {ev("camera-video-provenance.json","Video provenance")}</td></tr>')
     s.select_one('footer').string='Engineering assessment. Proposed APIs and integrations are distinguished from executed examples. Original evidence is retained in the bundle.'
