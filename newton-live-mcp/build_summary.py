@@ -83,6 +83,121 @@ def effect_rows(rows: list[dict]) -> list[list[str]]:
     return [row for _, row in sorted(out, key=lambda item: item[0])]
 
 
+V6_ARMS = ("B", "H", "C", "H-noMCP", "E")
+
+
+def _median(values: list) -> float | None:
+    values = sorted(v for v in values if v is not None)
+    if not values:
+        return None
+    mid = len(values) // 2
+    return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+
+
+def _minutes(value: float | None) -> str:
+    return "–" if value is None else f"{value / 60:.1f}"
+
+
+def _dollars(value: float | None) -> str:
+    return "–" if value is None else f"${value:.2f}"
+
+
+def v6_arm(row: dict) -> str:
+    """Arm label with the harness iteration for harness arms (H v6.1, ...)."""
+    return f'{row["arm"]} {row["iteration"]}' if row.get("harness") else row["arm"]
+
+
+def v6_columns(trials: list[dict]) -> list[str]:
+    order = {arm: index for index, arm in enumerate(V6_ARMS)}
+    return sorted({v6_arm(r) for r in trials}, key=lambda a: (order.get(a.split()[0], 9), a))
+
+
+def v6_result_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
+    """One row per task, one column per arm: passes, median time and time to first pass, median cost."""
+    columns = v6_columns(trials)
+    tasks = sorted({r["task"] for r in trials}, key=lambda t: list(TEXT["v6"]["task_order"]).index(t) if t in TEXT["v6"]["task_order"] else 99)
+    rows = []
+    for task in tasks + ["all"]:
+        cells = [f"<b>{esc(TASKS.get(task, task))}</b>" if task != "all" else "<b>All tasks</b>"]
+        for column in columns:
+            group = [r for r in trials if v6_arm(r) == column and (task == "all" or r["task"] == task)]
+            if not group:
+                cells.append("–")
+                continue
+            passed = sum(r["success"] for r in group)
+            first = _median([r["first_pass_seconds"] for r in group if r["success"]])
+            cells.append(
+                f"{passed}/{len(group)} · {_minutes(_median([r['seconds'] for r in group]))} min"
+                + (f" (first pass {_minutes(first)})" if first is not None else "")
+                + f" · {_dollars(_median([r['cost_usd'] for r in group]))}"
+            )
+        rows.append(cells)
+    return ["Task"] + columns, rows
+
+
+def v6_usage_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
+    """Per arm: what the agents used (medians per trial; card counts are totals over the arm's trials)."""
+    out = []
+    for column in v6_columns(trials):
+        group = [r for r in trials if v6_arm(r) == column]
+        cards = [r.get("card_usage") or {} for r in group]
+        retrieved = sum(len(c.get("cards_retrieved") or []) for c in cards)
+        out.append(
+            [
+                esc(column),
+                str(len(group)),
+                f'{_median([r["turns"] for r in group]) or 0:.0f}',
+                f'{_median([r["tool_calls"] for r in group]) or 0:.0f}',
+                f'{_median([r["mcp_calls"] for r in group]) or 0:.0f}',
+                f'{_median([r["shell_python"] for r in group]) or 0:.0f}',
+                f'{_median([r["source_reads"] for r in group]) or 0:.0f}',
+                f'{sum(c.get("index_reads", 0) for c in cards)} / {sum(c.get("mcp_searches", 0) for c in cards)}' if any(cards) else "–",
+                f"{retrieved}" if any(cards) else "–",
+                f'{sum(c.get("auto_attached", 0) for c in cards)}' if any(cards) else "–",
+                f'{(_median([r["input_tokens"] for r in group]) or 0) / 1e6:.2f}M',
+            ]
+        )
+    head = ["Arm", "Trials", "Turns", "Tool calls", "MCP calls", "Python runs", "Source reads", "Index reads / card searches", "Cards read", "Cards attached", "Input tokens"]
+    return head, out
+
+
+def v6_section(number: int) -> str:
+    text = TEXT["v6"]
+    path = DATA.parent / "v6" / "trials.json"
+    trials = json.loads(path.read_text()) if path.exists() else []
+    body = "".join(f"<p>{p}</p>" for p in text["intro"])
+    body += table(
+        "Table 4. Arms of the cheaper-model study. Every trial runs alone in the same sandbox with the same budget, "
+        "hidden verifier and compile-cache seed as in iterations 0\u201317.",
+        ["Arm", "Models", "MCP", "Debug Cards and procedure", "Question"],
+        text["arms"],
+        prose=True,
+        label="v6 arms",
+    )
+    if trials:
+        head, rows = v6_result_rows(trials)
+        body += table(
+            "Table 5. Results per task and arm: verified passes / trials \u00b7 median agent time (median time to the first "
+            "passing snapshot, where measured) \u00b7 median cost per trial at list prices. H arms are labelled with their "
+            "harness iteration. sdf_grind is held out: no card was mined from its transcripts.",
+            head,
+            rows,
+            prose=True,
+            label="v6 results",
+        )
+        head, rows = v6_usage_rows(trials)
+        body += table(
+            "Table 6. What the agents used, per arm: medians per trial, except card counts, which are totals over the "
+            "arm's trials (cards read counts distinct cards per trial).",
+            head,
+            rows,
+            numeric=set(range(1, 11)),
+            label="v6 usage",
+        )
+    body += "".join(f"<p>{p}</p>" for p in text["log"])
+    return section("v6", number, text["title"], body)
+
+
 def task_rows(rows: list[dict]) -> list[list[str]]:
     used = defaultdict(set)
     for row in rows:
@@ -154,10 +269,11 @@ def build() -> str:
             ),
         ),
         section("findings", 3, "What we learned", "<ol class=\"findings\">" + "".join(f"<li>{f}</li>" for f in TEXT["findings"]) + "</ol>"),
-        section("newton", 4, "Newton fixes from the study", "".join(f"<p>{p}</p>" for p in TEXT["newton"])),
-        section("next", 5, "Current MCP and next steps", "".join(f"<p>{p}</p>" for p in TEXT["next"])),
-        section("limits", 6, "Limits", "<ul>" + "".join(f"<li>{p}</li>" for p in TEXT["limits"]) + "</ul>"),
-        section("source", 7, "Data, code, and the full log", "".join(f"<p>{p}</p>" for p in TEXT["source"])),
+        v6_section(4),
+        section("newton", 5, "Newton fixes from the study", "".join(f"<p>{p}</p>" for p in TEXT["newton"])),
+        section("next", 6, "Current MCP and next steps", "".join(f"<p>{p}</p>" for p in TEXT["next"])),
+        section("limits", 7, "Limits", "<ul>" + "".join(f"<li>{p}</li>" for p in TEXT["limits"]) + "</ul>"),
+        section("source", 8, "Data, code, and the full log", "".join(f"<p>{p}</p>" for p in TEXT["source"])),
     ]
     footer = (
         '<footer class="report-footer"><span>Newton live simulation · experimental research</span>'

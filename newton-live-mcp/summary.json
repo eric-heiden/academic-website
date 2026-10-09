@@ -154,7 +154,7 @@
  ],
  "next": [
   "<strong>Current MCP (h16).</strong> Two tools. <code>newton_execute</code> runs Python cells against the live simulation with helpers for rollouts, checkpoints, resets, contact and solver-parameter reports, health checks, observations, and background workers; a failed cell rolls the simulation back. <code>newton_rebuild</code> reloads the edited script, optionally with overrides of its constants, and keeps the previous scene if the rebuild fails. Newton utilities named in both conditions' prompts: a headless runner, solver and health reports, per-world edits by label (<code>WorldView</code>), a Newton↔MuJoCo state bridge, camera projection, and label lookup.",
-  "<strong>Next (v6): a Debug-Card harness for cheaper models.</strong> <a href=\"https://arxiv.org/abs/2609.36593\">Text2Sim</a> showed that an older, cheaper model with a structured harness and distilled “Debug Cards” (symptom → likely causes → checks → repairs) beat a newer frontier model working alone; work on adapted harnesses for small models reports similar gains. The next phase distills Newton Debug Cards from the 250 transcripts of this loop, delivers them as an agent skill and through the MCP (which attaches the matching card when it sees a symptom), adds a task-agnostic procedure (stated criteria as a checklist, verify in a clean process, deliver once the criteria are met), and compares cheaper models with this harness and the MCP (Claude Haiku 4.5, GPT-6 Luna) against Opus and GPT-6 Astra without them, measuring time and cost to the first verified solution and which cards and tools the agents actually used."
+  "<strong>Next.</strong> The cheaper-model study in section 4. If cheaper models with the harness and the MCP match the expensive ones, the useful parts of the cards go upstream as Newton documentation, and the card hooks go into the MCP."
  ],
  "limits": [
   "Two models and one or two runs per cell in most iterations: single pairs vary as much as the MCP effect on some tasks. Iteration 16 runs three replicates per cell.",
@@ -167,5 +167,62 @@
   "Newton branch <a href=\"https://github.com/eric-heiden/newton/tree/eric-heiden/newton-live-mcp\">eric-heiden/newton-live-mcp</a>: the MCP host and helpers are in <code>newton/_src/mcp</code>; the loop harness, tasks, and verifiers in <code>tools/mcp_evaluation/v4</code> (<code>run_v4.py</code>, <code>run_seq.py</code>).",
   "Trial data: <a href=\"data/v4/loop.json\">loop.json</a> (every trial's metrics and the paired ratios) and one transcript archive per iteration, for example <a href=\"data/v4/loop-transcripts-i16.zip\">loop-transcripts-i16.zip</a> (prompts, transcripts, submitted scripts, verifications, host logs).",
   "The <a href=\"log.html\">full development log</a> keeps the per-iteration notes, figures (observations, renderers, the ABC station), the real-robot calibration references, the MCP usage statistics, and the table of every trial."
- ]
+ ],
+ "v6": {
+  "title": "Cheaper models with a Debug-Card harness (running)",
+  "task_order": [
+   "g1_track",
+   "g1_hard",
+   "grasp_drift",
+   "cube_toss",
+   "abc_arm",
+   "sdf_grind"
+  ],
+  "intro": [
+   "Can a cheaper model with a harness reach a verified solution faster and more cheaply than an expensive model working alone? <a href=\"https://arxiv.org/abs/2609.36593\">Text2Sim</a> reports that an older, cheaper model with a structured harness and distilled “Debug Cards” (symptom → likely causes → checks → repairs) beat a newer frontier model. This phase tests the same idea for Newton, with the live MCP as part of the harness.",
+   "<strong>Debug Cards.</strong> One reader per task family went through all 245 transcripts of iterations 0–17 for episodes where agents struggled. The episodes were merged into 35 cards: contacts and friction, actuators and control, edits and multi-world batches, fitting models to data, scene building and cameras, plus one card that maps error and warning messages to cards. A verifier checked every API name, default and message against the current tree, with small CPU reproductions, and corrected 23 cards. Cards hold general Newton knowledge only: no task values and no verifier details. They are installed in the workspace as an agent skill, which both CLIs discover. Inside a live MCP session, cells can search them with <code>cards('query')</code>, and the host names a matching card once when a reply contains a message the card explains (20 cards have such signatures).",
+   "<strong>Procedure.</strong> A task-agnostic procedure is appended to the prompt:\n<ol><li>Write a criteria checklist.</li><li>Write a local check that runs the deliverable as verification will and covers each stated variation.</li><li>Look up the matching card before reading Newton source.</li><li>Change one thing at a time, and batch candidates where possible.</li><li>After three experiments without progress, decompose the problem.</li><li>Save every passing version.</li><li>Stop once all criteria pass with margin.</li></ol>It follows from the transcripts. 15 of the 18 real failures in iterations 0–17 came from checking something other than the stated criteria, and polishing after a pass was the largest time sink.",
+   "<strong>Tasks.</strong> There are six 30-minute tasks: G1 tracking, the hard G1 clips (budget cut from 60 to 30 minutes, which 17 of 18 earlier passes met), grasp drift, cube toss, ABC arm identification, and SDF grinding. SDF grinding is held out: no card was mined from its transcripts. The other five are in-distribution for the cards, which is a caveat for their results. Costs use list prices per million tokens (input / cached input / output):\n<ul><li>Opus 5.5: $4 / $0.20 / $20</li><li>Haiku 4.5: $1 / $0.10 / $5</li><li>GPT-6 Astra: $10 / $1 / $50</li><li>GPT-6 Luna: $0.10 / $0.01 / $0.50</li></ul>"
+  ],
+  "arms": [
+   [
+    "<b>B</b> baseline",
+    "Opus 5.5 (Claude Code), GPT-6 Astra (Codex)",
+    "no",
+    "no",
+    "The status quo, run once per task."
+   ],
+   [
+    "<b>H</b> harness",
+    "Claude Haiku 4.5 (Claude Code), GPT-6 Luna (Codex)",
+    "yes",
+    "yes",
+    "Does a cheap model with the harness match B, faster and more cheaply? Revised each harness iteration (v6.1, v6.2, …)."
+   ],
+   [
+    "<b>C</b> cheap plain",
+    "Haiku 4.5, Luna",
+    "no",
+    "no",
+    "How much does the harness add for cheap models?"
+   ],
+   [
+    "<b>H-noMCP</b>",
+    "Haiku 4.5, Luna",
+    "no",
+    "yes (as files)",
+    "How much does the MCP add inside the harness? Planned."
+   ],
+   [
+    "<b>E</b>",
+    "Opus 5.5, GPT-6 Astra",
+    "yes",
+    "yes",
+    "Does the harness also help expensive models? Planned."
+   ]
+  ],
+  "log": [
+   "<strong>Status (2026-10-10).</strong> Baseline B is running: all of its first seven trials passed, in 4–20 minutes at $0.39–3.62 each. Next come B on SDF grinding, then H with harness v6.1 (the 35 cards), then C. Time to first pass comes from snapshot verification after each plan."
+  ]
+ }
 }
