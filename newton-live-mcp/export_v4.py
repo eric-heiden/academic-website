@@ -65,6 +65,13 @@ def _record(run_dir: Path, name: str) -> Path:
     return path if path.exists() else run_dir / "workspace" / name
 
 
+def _first_pass(run_dir: Path) -> float | None:
+    path = run_dir / "snapshot_verification.json"
+    if not path.exists():
+        return None
+    return json.loads(path.read_text()).get("first_pass_seconds")
+
+
 def trial_rows() -> list[dict]:
     rows = []
     for iteration in sorted(p for p in LOOP.iterdir() if p.is_dir() and p.name.startswith("i")):
@@ -78,6 +85,9 @@ def trial_rows() -> list[dict]:
             if ".infra-failure" in trial or workspace.parent.name.startswith("i2") and not (workspace / "summary.json").exists():
                 continue
             s = json.loads((workspace / "summary.json").read_text())
+            if not s.get("agent_turns") and (s.get("agent_seconds") or 0) < 30:
+                # The agent never started (CLI auth or API failure before its first turn): not a result.
+                continue
             v = s["verification"]
             reverified = workspace / "verification_v2.json"
             if not reverified.exists():
@@ -120,6 +130,8 @@ def trial_rows() -> list[dict]:
                     "model_seconds": split.get("model_seconds"),
                     "infrastructure_retries": s.get("infrastructure_retries", 0),
                     "reverified_from": v.get("reverified_from"),
+                    # From i16: first snapshot that passes the verifier (s since budget start; None = never passed).
+                    "first_pass_seconds": _first_pass(workspace),
                     # From h12: review flags (introspection in the submission, downloads, hidden-data paths).
                     "flags": [k for k in ("introspection", "downloads", "private_reference") if s.get(k)],
                 }
@@ -179,6 +191,9 @@ def summarize(rows: list[dict]) -> dict:
                 if metric == "seconds" and timed_out:
                     continue  # a timeout censors the time at the budget, so it is not a measured duration
                 group["values"].setdefault(metric, []).append((pair["mcp"][metric], pair["restart"][metric]))
+            first = (pair["mcp"].get("first_pass_seconds"), pair["restart"].get("first_pass_seconds"))
+            if all(first):
+                group["values"].setdefault("first_pass_seconds", []).append(first)
     return {
         scope: {
             **{k: v for k, v in group.items() if k != "values"},

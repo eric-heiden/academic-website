@@ -49,6 +49,7 @@ def iteration_rows(rows: list[dict], summary: dict) -> list[list[str]]:
                 f'{group["pairs"]}',
                 f'{group["mcp_pass"]} / {group["restart_pass"]}',
                 ratio(r["seconds"]),
+                ratio(r.get("first_pass_seconds")),
                 ratio(r["input_tokens"]),
                 ratio(r.get("cost_usd")),
             ]
@@ -135,8 +136,9 @@ def build() -> str:
             + table(
                 "Table 2. One row per iteration. Each iteration ran on one harness version (a commit on the Newton branch). "
                 "Passes count verified successes with and without the MCP. Ratios are geometric means of MCP/no-MCP over "
-                "pairs; below 1 favors the MCP. Cost covers Claude Code (Opus) pairs only.",
-                ["Iteration", "What changed", "Tasks", "Pairs", "Passes MCP / no MCP", "Time", "Input tokens", "Opus cost"],
+                "pairs; below 1 favors the MCP. Time to first pass (from iteration 16) is the first workspace snapshot that passes "
+                "the verifier, over pairs where both runs passed. Cost covers Claude Code (Opus) pairs only.",
+                ["Iteration", "What changed", "Tasks", "Pairs", "Passes MCP / no MCP", "Time", "Time to first pass", "Input tokens", "Opus cost"],
                 iteration_rows(rows, summary),
                 prose=True,
                 label="Iterations",
