@@ -83,7 +83,7 @@ def effect_rows(rows: list[dict]) -> list[list[str]]:
     return [row for _, row in sorted(out, key=lambda item: item[0])]
 
 
-V6_ARMS = ("B", "H", "C", "H-noMCP", "E")
+V6_ARMS = ("B", "C", "C-mcp", "H", "H-noMCP", "E")
 
 
 def _median(values: list) -> float | None:
@@ -112,24 +112,28 @@ def v6_columns(trials: list[dict]) -> list[str]:
     return sorted({v6_arm(r) for r in trials}, key=lambda a: (order.get(a.split()[0], 9), a))
 
 
-def v6_result_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
-    """One row per task, one column per arm: passes, median time and time to first pass, median cost."""
+def v6_result_rows(trials: list[dict], model: str | None = None) -> tuple[list[str], list[list[str]]]:
+    """One row per task, one column per arm (B pooled over Opus and Astra; other arms for ``model`` only):
+    passes, median time (and time to the first passing snapshot), median cost."""
+    trials = [r for r in trials if r["arm"] == "B" or model is None or r["model"] == model]
     columns = v6_columns(trials)
-    tasks = sorted({r["task"] for r in trials}, key=lambda t: list(TEXT["v6"]["task_order"]).index(t) if t in TEXT["v6"]["task_order"] else 99)
+    order = list(TEXT["v6"]["task_order"])
+    tasks = sorted({r["task"] for r in trials}, key=lambda t: order.index(t) if t in order else 99)
     rows = []
     for task in tasks + ["all"]:
         cells = [f"<b>{esc(TASKS.get(task, task))}</b>" if task != "all" else "<b>All tasks</b>"]
         for column in columns:
             group = [r for r in trials if v6_arm(r) == column and (task == "all" or r["task"] == task)]
             if not group:
-                cells.append("–")
+                cells.append("\u2013")
                 continue
             passed = sum(r["success"] for r in group)
             first = _median([r["first_pass_seconds"] for r in group if r["success"]])
+            verdict = (("pass" if passed else "fail") if len(group) == 1 else f"{passed}/{len(group)}")
             cells.append(
-                f"{passed}/{len(group)} · {_minutes(_median([r['seconds'] for r in group]))} min"
-                + (f" (first pass {_minutes(first)})" if first is not None else "")
-                + f" · {_dollars(_median([r['cost_usd'] for r in group]))}"
+                f"{verdict} \u00b7 {_minutes(_median([r['seconds'] for r in group]))} min"
+                + (f" (first {_minutes(first)})" if first is not None else "")
+                + f" \u00b7 {_dollars(_median([r['cost_usd'] for r in group]))}"
             )
         rows.append(cells)
     return ["Task"] + columns, rows
@@ -138,8 +142,16 @@ def v6_result_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
 def v6_usage_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
     """Per arm: what the agents used (medians per trial; card counts are totals over the arm's trials)."""
     out = []
+    labels = {"haiku": "Haiku", "luna": "Luna"}
+    groups = []
     for column in v6_columns(trials):
-        group = [r for r in trials if v6_arm(r) == column]
+        members = [r for r in trials if v6_arm(r) == column]
+        if column == "B":
+            groups.append((column, members))
+            continue
+        for model in sorted({r["model"] for r in members}):
+            groups.append((f"{column} \u00b7 {labels.get(model, model)}", [r for r in members if r["model"] == model]))
+    for column, group in groups:
         cards = [r.get("card_usage") or {} for r in group]
         harness = any(r.get("harness") for r in group)
         out.append(
@@ -174,19 +186,20 @@ def v6_section(number: int) -> str:
         label="v6 arms",
     )
     if trials:
-        head, rows = v6_result_rows(trials)
-        body += table(
-            "Table 5. Results per task and arm: verified passes / trials \u00b7 median agent time (median time to the first "
-            "passing snapshot, where measured) \u00b7 median cost per trial at list prices. H arms are labelled with their "
-            "harness iteration. sdf_grind is held out: no card was mined from its transcripts.",
-            head,
-            rows,
-            prose=True,
-            label="v6 results",
-        )
+        for number, (model, name) in enumerate((("luna", "GPT-6 Luna"), ("haiku", "Claude Haiku 4.5")), start=5):
+            head, rows = v6_result_rows(trials, model)
+            body += table(
+                f"Table {number}. {name} against the expensive baseline, per task: verdict (or passes/trials) \u00b7 agent "
+                "time in minutes (time to the first passing snapshot) \u00b7 cost at list prices. B pools Opus and Astra "
+                "(medians); every other column is one trial per task. sdf_grind is held out: no card was mined from it.",
+                head,
+                rows,
+                prose=True,
+                label=f"v6 results {name}",
+            )
         head, rows = v6_usage_rows(trials)
         body += table(
-            "Table 6. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
+            "Table 7. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
             "source reads and input tokens; card counts are totals over the arm's trials (distinct cards per trial).",
             head,
             rows,
