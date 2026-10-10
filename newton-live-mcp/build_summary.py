@@ -141,23 +141,22 @@ def v6_usage_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
     for column in v6_columns(trials):
         group = [r for r in trials if v6_arm(r) == column]
         cards = [r.get("card_usage") or {} for r in group]
-        retrieved = sum(len(c.get("cards_retrieved") or []) for c in cards)
+        harness = any(r.get("harness") for r in group)
         out.append(
             [
                 esc(column),
                 str(len(group)),
-                f'{_median([r["turns"] for r in group]) or 0:.0f}',
                 f'{_median([r["tool_calls"] for r in group]) or 0:.0f}',
                 f'{_median([r["mcp_calls"] for r in group]) or 0:.0f}',
                 f'{_median([r["shell_python"] for r in group]) or 0:.0f}',
                 f'{_median([r["source_reads"] for r in group]) or 0:.0f}',
-                f'{sum(c.get("index_reads", 0) for c in cards)} / {sum(c.get("mcp_searches", 0) for c in cards)}' if any(cards) else "–",
-                f"{retrieved}" if any(cards) else "–",
-                f'{sum(c.get("auto_attached", 0) for c in cards)}' if any(cards) else "–",
+                f'{sum(1 for c in cards if c.get("cards_retrieved"))} of {len(group)}' if harness else "\u2013",
+                f'{sum(len(c.get("cards_retrieved") or []) for c in cards)}' if harness else "\u2013",
+                f'{sum(c.get("auto_attached", 0) for c in cards)}' if harness else "\u2013",
                 f'{(_median([r["input_tokens"] for r in group]) or 0) / 1e6:.2f}M',
             ]
         )
-    head = ["Arm", "Trials", "Turns", "Tool calls", "MCP calls", "Python runs", "Source reads", "Index reads / card searches", "Cards read", "Cards attached", "Input tokens"]
+    head = ["Arm", "Trials", "Tool calls", "MCP calls", "Python runs", "Source reads", "Trials reading cards", "Cards read", "Cards attached", "Input tokens"]
     return head, out
 
 
@@ -187,11 +186,11 @@ def v6_section(number: int) -> str:
         )
         head, rows = v6_usage_rows(trials)
         body += table(
-            "Table 6. What the agents used, per arm: medians per trial, except card counts, which are totals over the "
-            "arm's trials (cards read counts distinct cards per trial).",
+            "Table 6. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
+            "source reads and input tokens; card counts are totals over the arm's trials (distinct cards per trial).",
             head,
             rows,
-            numeric=set(range(1, 11)),
+            numeric=set(range(1, 10)),
             label="v6 usage",
         )
     body += "".join(f"<p>{p}</p>" for p in text["log"])
