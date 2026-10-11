@@ -146,11 +146,13 @@ def v6_result_rows(trials: list[dict], model: str) -> tuple[list[str], list[list
 
 
 def v6_expensive_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
-    """Opus and Astra: B, MCP only, and E per model."""
+    """Opus and Astra: B, MCP only, and E per model, each pooled over iterations (medians)."""
     names = {"opus": "Opus", "astra": "Astra"}
-    return _v6_matrix(
-        trials, lambda r: f"{v6_arm(r)} \u00b7 {names[r['model']]}" if r["model"] in names else None
-    )
+    head, rows = _v6_matrix(trials, lambda r: f"{names[r['model']]} {r['arm']}" if r["model"] in names else None)
+    # Order by model, then B, B-mcp, E.
+    order = [f"{model} {arm}" for model in ("Astra", "Opus") for arm in ("B", "B-mcp", "E")]
+    keep = [0] + [head.index(c) for c in order if c in head]
+    return [head[i] for i in keep], [[row[i] for i in keep] for row in rows]
 
 
 def v6_usage_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
@@ -200,13 +202,13 @@ def v6_section(number: int) -> str:
         label="v6 arms",
     )
     if trials:
-        number = 5
+        table_number = 5
         for model, name in (("luna", "GPT-6 Luna"), ("haiku", "Claude Haiku 4.5"), ("sol", "GPT-6 Sol")):
             if not any(r["model"] == model for r in trials):
                 continue
             head, rows = v6_result_rows(trials, model)
             body += table(
-                f"Table {number}. {name} against the expensive baseline, per task: verdict (or passes/trials) \u00b7 agent "
+                f"Table {table_number}. {name} against the expensive baseline, per task: verdict (or passes/trials) \u00b7 agent "
                 "time in minutes (time to the first passing snapshot) \u00b7 cost at list prices. B pools Opus and Astra "
                 "(medians); other columns are one trial per task unless noted. sdf_grind is held out: no card was mined from it.",
                 head,
@@ -214,20 +216,20 @@ def v6_section(number: int) -> str:
                 prose=True,
                 label=f"v6 results {name}",
             )
-            number += 1
+            table_number += 1
         head, rows = v6_expensive_rows(trials)
         body += table(
-            f"Table {number}. Opus and Astra without the MCP (B), with the MCP alone (B-mcp), and with the lite harness "
+            f"Table {table_number}. Opus and Astra without the MCP (B), with the MCP alone (B-mcp), and with the lite harness "
             "and the MCP (E), per task, in the same format.",
             head,
             rows,
             prose=True,
             label="v6 results expensive",
         )
-        number += 1
+        table_number += 1
         head, rows = v6_usage_rows(trials)
         body += table(
-            f"Table {number}. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
+            f"Table {table_number}. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
             "source reads and input tokens; card counts are totals over the arm's trials (distinct cards per trial).",
             head,
             rows,
