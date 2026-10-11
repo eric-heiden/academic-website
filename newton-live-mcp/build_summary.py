@@ -83,7 +83,7 @@ def effect_rows(rows: list[dict]) -> list[list[str]]:
     return [row for _, row in sorted(out, key=lambda item: item[0])]
 
 
-V6_ARMS = ("B", "C", "C-mcp", "H", "H-noMCP", "E")
+V6_ARMS = ("B", "B-mcp", "E", "C", "C-mcp", "H", "H-noMCP")
 
 
 def _median(values: list) -> float | None:
@@ -112,24 +112,25 @@ def v6_columns(trials: list[dict]) -> list[str]:
     return sorted({v6_arm(r) for r in trials}, key=lambda a: (order.get(a.split()[0], 9), a))
 
 
-def v6_result_rows(trials: list[dict], model: str | None = None) -> tuple[list[str], list[list[str]]]:
-    """One row per task, one column per arm (B pooled over Opus and Astra; other arms for ``model`` only):
-    passes, median time (and time to the first passing snapshot), median cost."""
-    trials = [r for r in trials if r["arm"] == "B" or model is None or r["model"] == model]
-    columns = v6_columns(trials)
-    order = list(TEXT["v6"]["task_order"])
-    tasks = sorted({r["task"] for r in trials}, key=lambda t: order.index(t) if t in order else 99)
+def _v6_matrix(trials: list[dict], label) -> tuple[list[str], list[list[str]]]:
+    """One row per task, one column per ``label(trial)`` (``None`` drops the trial): verdict or passes/trials, median
+    agent time (and median time to the first passing snapshot), median cost."""
+    trials = [r for r in trials if label(r) is not None]
+    order = {arm: index for index, arm in enumerate(V6_ARMS)}
+    columns = sorted({label(r) for r in trials}, key=lambda c: (order.get(c.split()[0], 9), c))
+    task_order = list(TEXT["v6"]["task_order"])
+    tasks = sorted({r["task"] for r in trials}, key=lambda t: task_order.index(t) if t in task_order else 99)
     rows = []
     for task in tasks + ["all"]:
         cells = [f"<b>{esc(TASKS.get(task, task))}</b>" if task != "all" else "<b>All tasks</b>"]
         for column in columns:
-            group = [r for r in trials if v6_arm(r) == column and (task == "all" or r["task"] == task)]
+            group = [r for r in trials if label(r) == column and (task == "all" or r["task"] == task)]
             if not group:
                 cells.append("\u2013")
                 continue
             passed = sum(r["success"] for r in group)
             first = _median([r["first_pass_seconds"] for r in group if r["success"]])
-            verdict = (("pass" if passed else "fail") if len(group) == 1 else f"{passed}/{len(group)}")
+            verdict = ("pass" if passed else "fail") if len(group) == 1 else f"{passed}/{len(group)}"
             cells.append(
                 f"{verdict} \u00b7 {_minutes(_median([r['seconds'] for r in group]))} min"
                 + (f" (first {_minutes(first)})" if first is not None else "")
@@ -139,10 +140,23 @@ def v6_result_rows(trials: list[dict], model: str | None = None) -> tuple[list[s
     return ["Task"] + columns, rows
 
 
+def v6_result_rows(trials: list[dict], model: str) -> tuple[list[str], list[list[str]]]:
+    """A cheap model's arms against B pooled over Opus and Astra."""
+    return _v6_matrix(trials, lambda r: "B" if r["arm"] == "B" else (v6_arm(r) if r["model"] == model else None))
+
+
+def v6_expensive_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
+    """Opus and Astra: B, MCP only, and E per model."""
+    names = {"opus": "Opus", "astra": "Astra"}
+    return _v6_matrix(
+        trials, lambda r: f"{v6_arm(r)} \u00b7 {names[r['model']]}" if r["model"] in names else None
+    )
+
+
 def v6_usage_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
     """Per arm: what the agents used (medians per trial; card counts are totals over the arm's trials)."""
     out = []
-    labels = {"haiku": "Haiku", "luna": "Luna"}
+    labels = {"haiku": "Haiku", "luna": "Luna", "sol": "Sol", "opus": "Opus", "astra": "Astra"}
     groups = []
     for column in v6_columns(trials):
         members = [r for r in trials if v6_arm(r) == column]
@@ -186,20 +200,34 @@ def v6_section(number: int) -> str:
         label="v6 arms",
     )
     if trials:
-        for number, (model, name) in enumerate((("luna", "GPT-6 Luna"), ("haiku", "Claude Haiku 4.5")), start=5):
+        number = 5
+        for model, name in (("luna", "GPT-6 Luna"), ("haiku", "Claude Haiku 4.5"), ("sol", "GPT-6 Sol")):
+            if not any(r["model"] == model for r in trials):
+                continue
             head, rows = v6_result_rows(trials, model)
             body += table(
                 f"Table {number}. {name} against the expensive baseline, per task: verdict (or passes/trials) \u00b7 agent "
                 "time in minutes (time to the first passing snapshot) \u00b7 cost at list prices. B pools Opus and Astra "
-                "(medians); every other column is one trial per task. sdf_grind is held out: no card was mined from it.",
+                "(medians); other columns are one trial per task unless noted. sdf_grind is held out: no card was mined from it.",
                 head,
                 rows,
                 prose=True,
                 label=f"v6 results {name}",
             )
+            number += 1
+        head, rows = v6_expensive_rows(trials)
+        body += table(
+            f"Table {number}. Opus and Astra without the MCP (B), with the MCP alone (B-mcp), and with the lite harness "
+            "and the MCP (E), per task, in the same format.",
+            head,
+            rows,
+            prose=True,
+            label="v6 results expensive",
+        )
+        number += 1
         head, rows = v6_usage_rows(trials)
         body += table(
-            "Table 7. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
+            f"Table {number}. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
             "source reads and input tokens; card counts are totals over the arm's trials (distinct cards per trial).",
             head,
             rows,
