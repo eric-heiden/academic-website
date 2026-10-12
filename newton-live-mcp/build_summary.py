@@ -189,28 +189,76 @@ def v6_usage_rows(trials: list[dict]) -> tuple[list[str], list[list[str]]]:
 
 
 def v6_section(number: int) -> str:
+    import build_cards  # noqa: PLC0415
+
     text = TEXT["v6"]
     path = DATA.parent / "v6" / "trials.json"
     trials = json.loads(path.read_text()) if path.exists() else []
-    body = "".join(f"<p>{p}</p>" for p in text["intro"])
+    cards = build_cards.load("cards.json")
+    harnesses = build_cards.load("harnesses.json")
+    usefulness = build_cards.load("card_usefulness.json")
+    stats = build_cards.card_stats(trials, usefulness)
+
+    def sub(title: str, anchor: str) -> str:
+        return f'<h3 id="{anchor}">{title}</h3>'
+
+    table_number = 4
+    body = sub("Result", "v6-result") + f"<p>{text['result']}</p>"
+    body += sub("Design", "v6-design") + f"<p>{text['question']}</p>"
     body += table(
-        "Table 4. Arms of the cheaper-model study. Every trial runs alone in the same sandbox with the same budget, "
-        "hidden verifier and compile-cache seed as in iterations 0\u201317.",
+        f"Table {table_number}. Arms of the cheaper-model study. Every trial runs alone in the same sandbox with the same "
+        "budget, hidden verifier and compile-cache seed as in iterations 0\u201317.",
         ["Arm", "Models", "MCP", "Debug Cards and procedure", "Question"],
         text["arms"],
         prose=True,
         label="v6 arms",
     )
+    table_number += 1
+    body += f"<p>{text['tasks_text']}</p>"
+    body += sub("The Debug Cards and how useful each was", "v6-cards") + "".join(f"<p>{p}</p>" for p in text["cards_text"])
+    if cards:
+        body += table(
+            f"Table {table_number}. {build_cards.CATALOG_CAPTION} Card ids link to the full card, its provenance and the "
+            "evidence for every classification.",
+            build_cards.CATALOG_HEAD,
+            build_cards.catalog_rows(cards, stats),
+            prose=True,
+            label="Debug Card catalog",
+        )
+        table_number += 1
+    if usefulness:
+        body += sub("What each task needed", "v6-tasks")
+        body += table(
+            f"Table {table_number}. The knowledge each task turned on, the card that states it, and passes of harness trials "
+            "that did or did not read that card (the first card listed). The last column pools every arm without cards.",
+            build_cards.TASK_HEAD,
+            build_cards.task_rows(trials, usefulness),
+            prose=True,
+            label="v6 task needs",
+        )
+        table_number += 1
+    if harnesses:
+        body += sub("Harness versions", "v6-harness")
+        body += table(
+            f"Table {table_number}. The three harness versions and their passes per model over all iterations; the "
+            "full prompt texts are on the Debug Cards page.",
+            build_cards.HARNESS_HEAD,
+            build_cards.harness_rows(harnesses, trials),
+            prose=True,
+            label="v6 harness versions",
+        )
+        table_number += 1
     if trials:
-        table_number = 5
+        body += sub("Results per model", "v6-results")
         for model, name in (("luna", "GPT-6 Luna"), ("haiku", "Claude Haiku 4.5"), ("sol", "GPT-6 Sol")):
             if not any(r["model"] == model for r in trials):
                 continue
             head, rows = v6_result_rows(trials, model)
             body += table(
-                f"Table {table_number}. {name} against the expensive baseline, per task: verdict (or passes/trials) \u00b7 agent "
-                "time in minutes (time to the first passing snapshot) \u00b7 cost at list prices. B pools Opus and Astra "
-                "(medians); other columns are one trial per task unless noted. sdf_grind is held out: no card was mined from it.",
+                f"Table {table_number}. {name} against the expensive baseline, per task: verdict (or passes/trials) \u00b7 "
+                "agent time in minutes (time to the first passing snapshot) \u00b7 cost at list prices. B pools Opus and "
+                "Astra (medians); other columns are one trial per task unless noted. sdf_grind is held out: no card was "
+                "mined from it.",
                 head,
                 rows,
                 prose=True,
@@ -219,24 +267,26 @@ def v6_section(number: int) -> str:
             table_number += 1
         head, rows = v6_expensive_rows(trials)
         body += table(
-            f"Table {table_number}. Opus and Astra without the MCP (B), with the MCP alone (B-mcp), and with the lite harness "
-            "and the MCP (E), per task, in the same format.",
+            f"Table {table_number}. Opus and Astra without the MCP (B), with the MCP alone (B-mcp), and with the lite "
+            "harness and the MCP (E), per task, in the same format (medians over replicates).",
             head,
             rows,
             prose=True,
             label="v6 results expensive",
         )
         table_number += 1
+        body += sub("What the agents used", "v6-usage")
         head, rows = v6_usage_rows(trials)
         body += table(
-            f"Table {table_number}. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh Python runs, Newton "
-            "source reads and input tokens; card counts are totals over the arm's trials (distinct cards per trial).",
+            f"Table {table_number}. What the agents used, per arm: medians per trial for tool calls, MCP calls, fresh "
+            "Python runs, Newton source reads and input tokens; card counts are totals over the arm's trials (distinct "
+            "cards per trial).",
             head,
             rows,
             numeric=set(range(1, 10)),
             label="v6 usage",
         )
-    body += "".join(f"<p>{p}</p>" for p in text["log"])
+    body += sub("Iteration log", "v6-log") + "".join(f"<p>{p}</p>" for p in text["log"])
     return section("v6", number, text["title"], body)
 
 
@@ -319,7 +369,7 @@ def build() -> str:
     ]
     footer = (
         '<footer class="report-footer"><span>Newton live simulation · experimental research</span>'
-        '<a href="log.html">Full development log</a><a href="study3.html">Visual calibration study (v3)</a>'
+        '<a href="log.html">Full development log</a><a href="cards.html">Debug Cards</a><a href="study3.html">Visual calibration study (v3)</a>'
         '<a href="study2.html">Three-way study (v2)</a><a href="historical.html">Original study</a><a href="../">All reports</a></footer>'
         "</main></div></body></html>"
     )

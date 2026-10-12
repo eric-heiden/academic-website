@@ -1,0 +1,4141 @@
+[
+ {
+  "trial": "v6.4/abc_arm-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 9.7,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "10s `cat FIT-03*`; 24s zero-order-hold delay sweep of cmd vs q without sim, 86s regression of torque on cmd(t-d)-q and qd for kp/kd, 43/111s partial gravcomp sweep: the card's checks. Final: delay 0.06 s, fitted kp/kd, gravcomp 0.85, friction."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 9.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "19s split episodes odd/even (train/val); 307s 8-episode bootstrap of held-out risk ('p95 ≈ 0.024, so the tail needs work')."
+   }
+  ],
+  "needed": "Model the real servo loop: a command latency (~25-85 ms zero-order hold), data-fitted per-joint gains (stiffer than nominal on joints 1-3), partial gravity compensation (~0.7-0.85) and higher joint friction, fitted on some episodes and checked on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/cube_toss-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 5.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "22s ev() parameterizes kd=2/tau, ke=(kd/(2*zeta))**2 (card's legacy mapping); 38s tau x zeta sweep; final tau=2 ms, zeta=2 ('impacts barely rebound'), the card's overdamped-impact repair."
+   },
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 5.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "22s first sweep is table height then mu (card: 'calibrate support height and friction first, then sweep contact tau/zeta'); 37s 'friction alone moved position error 0.099 → 0.037 m'; final mu 0.18, table -1.2 mm."
+   },
+   {
+    "id": "CON-05",
+    "how": "auto",
+    "first_seconds": 109.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to the condim warning during a mu_torsional sweep; card('CON-05') never opened. Final 'torsional and rolling friction: no effect, because the solver ignores them' restates the warning text itself."
+   }
+  ],
+  "needed": "Lower sliding friction (~0.18) plus a stiff (timeconst ~2 ms), critically to over-damped contact instead of the soft 20 ms starter contact, with the table ~1-2 mm lower; FIT-04 gives friction/support height and the order, CON-02 the tau/zeta mapping and overdamped impacts.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/g1_hard-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "g1_hard",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 5.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "96s 'adding leg IK that keeps feet planted', 251s CoM clamp, 318s Gaussian-smoothed root yaw, 254s soft hip yaw (hy=0.1): card repairs (flat-foot IK, CoM/ZMP clamp, smoothing, soften hip yaw). 352s 'SIG=0.15 passes on high5'."
+   },
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 5.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "33-39s raised servo gains (x3/10/30 of the armature-based starter); x30 gains kept in the final controller, but stiffness alone still fell."
+   },
+   {
+    "id": "CTL-01",
+    "how": "auto",
+    "first_seconds": 32.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to the SolverNotifyFlags AttributeError; card not opened. 36s switched to newton.ModelFlags.JOINT_DOF_PROPERTIES, which the error text itself names."
+   }
+  ],
+  "needed": "high5 cannot be balanced by joint PD alone: make the reference dynamically feasible (planted-foot leg IK, CoM clamp, low-passed root yaw, soft hip yaw) or use a contact-constrained inverse-dynamics QP fed through low-impedance servos; stiffer gains are needed but not sufficient.",
+  "needed_card": "CTL-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/g1_track-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 5.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "23-66s gain sweep from 10 Hz up; final 'Cause: the servos were too soft. Their stiffness was set from rotor armature at 10 Hz... sagged under body weight' (card cause); '>~90 Hz the stiff servos chatter against the ground' (card: high gains cause chatter)."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 5.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Only the optional clip: 125s 'high5... joints are tracking fine and the clip itself can't be balanced with joint tracking alone' (card symptom). No effect on the required wave criteria."
+   },
+   {
+    "id": "CTL-01",
+    "how": "auto",
+    "first_seconds": 19.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to the SolverNotifyFlags error; not opened. 23s fixed with newton.ModelFlags as the error text says."
+   }
+  ],
+  "needed": "The servo gains are sized from rotor armature (10 Hz), far too soft for the gravity load: raise them to ~40-70 Hz equivalent (kp from load) with near-critical damping; velocity feed-forward is optional.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/grasp_drift-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 6.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "25-27s solver_params('geom') on pads and cube (card check) shows pad priority 1 with soft solref 0.2; 80s gives pads their own stiff material. Final root cause: 'pads have contact priority 1, so their contact settings alone decide... inherited the robot-wide default'."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 6.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Pad ke=1.6e5, kd=800 chosen as '2.5 ms time constant (just above the solver's 2×dt floor) with critical damping' (card's legacy mapping and refsafe)."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 6.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "174s 'ke/kd/mu no longer matter (creep floor)'; 391s solimp sweep (card's empirical repair); final cites 'debug card CON-03'; pad solimp (0.3,0.6) cut 10 cm drift from 2.0 to 0.42 mm (margin only: 2.0 mm already passed)."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 6.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Impratio 200/5 tried at 228s, but as part of CON-03's one-at-a-time table; no cone change."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 8.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No condim/torsional change."
+   },
+   {
+    "id": "CON-07",
+    "how": "file",
+    "first_seconds": 8.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Readouts via contacts_between, also named in CON-01; no CON-07-specific action."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 8.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No grasp-geometry check."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 8.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Grip force (12 N/pad) read only to confirm the friction budget."
+   }
+  ],
+  "needed": "The finger pads have higher mujoco:geom_priority and inherit the soft robot-wide default material (solref 0.2 s), so their material alone decides the grasp contact: give the pads a stiff material (timeconst ~2-4 ms, zeta ~1). Optionally, lower the pad solimp to reduce the residual soft-friction creep.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/sdf_grind-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 3.8,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "Final design is the card's repair: 'copies the SDF's two textures (fine and coarse)... subtracts the volume the wheel swept since the previous frame... confirmed the model uses those same texture objects (checked with `is`)... all access to private fields stays inside that class'; isomesh re-extracted."
+   }
+  ],
+  "needed": "Edit the workpiece texture SDF in place on both levels (coarse and subgrid textures) that the model and collision reference (identity check), subtract the wheel's swept volume between consecutive poses, and re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/abc_arm-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 8.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "14-19s delay estimate from logs without sim; 131s static-pose regression; final 'tau ≈ kp·(cmd − q) + a·G(q)... latency about 30–50 ms' then batched fit of delay/gains/gravcomp 0.85/friction (card checks and repairs)."
+   }
+  ],
+  "needed": "Model the real servo loop: a command latency (~25-85 ms zero-order hold), data-fitted per-joint gains (stiffer than nominal on joints 1-3), partial gravity compensation (~0.7-0.85) and higher joint friction, fitted on some episodes and checked on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/cube_toss-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 169.2,
+  "cards": [
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 5.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "17s P() maps tau/zeta to kd=2/tau, ke=(kd/(2*zeta))**2; final ke/kd 'mean a 2 ms contact time constant and a damping ratio of 1.5... starter's 20 ms constant gave soft, deep impacts'."
+   },
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 5.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Final table height -1 mm from 'recorded cubes come to rest... ~1 mm below the half-width' (card support-height check, small gain). The main fix, mu 0.5→0.18, came from a generic sweep after tau/zeta."
+   },
+   {
+    "id": "CON-05",
+    "how": "auto",
+    "first_seconds": 97.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to the condim warning after a mu_torsional/mu_rolling sweep; not opened. Final 'torsional and rolling friction have no effect, because... condim 3 ignores them' comes from the warning text."
+   }
+  ],
+  "needed": "Lower sliding friction (~0.18) plus a stiff (timeconst ~2 ms), critically to over-damped contact instead of the soft 20 ms starter contact, with the table ~1-2 mm lower; FIT-04 gives friction/support height and the order, CON-02 the tau/zeta mapping and overdamped impacts.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/g1_hard-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "g1_hard",
+  "success": true,
+  "first_pass_seconds": 600.0,
+  "cards": [
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 5.1,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "28s 'reference likely not balanceable as-is. Checking reference feasibility'; 141s flat-foot IK; 284s 'trying softer hip-yaw servos (CTL-03)'; 353-378s CoM-clamped table: 'Breakthrough'. These are the card's repairs and make up the final controller."
+   },
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 5.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "19-28s stiff gains tried first ('Stiff gains alone still fall'); 341-353s torque-saturation check ('No saturation'); final gain scale 42."
+   },
+   {
+    "id": "CTL-01",
+    "how": "auto",
+    "first_seconds": 18.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to the SolverNotifyFlags error; not opened. 22s listed newton.ModelFlags members and moved on (the error text names the fix)."
+   }
+  ],
+  "needed": "high5 cannot be balanced by joint PD alone: make the reference dynamically feasible (planted-foot leg IK, CoM clamp, low-passed root yaw, soft hip yaw) or use a contact-constrained inverse-dynamics QP fed through low-impedance servos; stiffer gains are needed but not sufficient.",
+  "needed_card": "CTL-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/g1_track-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 192.8,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 5.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "Final 'Cause: the servo gains were set from the motor armature alone (a 10 Hz frequency)... far too soft to hold up the robot's weight'; fix 50 Hz, zeta 3. Notes foot slip at stiffer settings (card pitfall)."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 21.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read before the gain sweep: 26s used ModelFlags.JOINT_DOF_FORCE_PROPERTIES (no SolverNotifyFlags error, unlike the other Opus G1 trials); 75s tried the card's target offset (vff = kd/kp*qd_ref), no gain."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 5.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "high5 (optional) left falling: 'would likely need a balance controller'. No reference-feasibility work."
+   }
+  ],
+  "needed": "The servo gains are sized from rotor armature (10 Hz), far too soft for the gravity load: raise them to ~40-70 Hz equivalent (kp from load) with near-critical damping; velocity feed-forward is optional.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/grasp_drift-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 6.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "15s solver_params('geom') on pads and cube; 93s pad material ('The pads win the MuJoCo priority contest... alone define the grasp'); final root cause matches the card."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 9.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "93s code comment 'Legacy solref mapping: timeconst = 2/kd, dampratio = kd/(2*sqrt(ke))'; pads set to 4 ms, zeta 1."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 6.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Final: 'remaining slow, linear creep is the soft-friction floor described in debug card CON-03. Only solimp dmax moved it'; dmax 0.6 gives 0.42 mm (margin; 2.0 mm already passed)."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 6.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "159-193s added condim-4/torsional and impratio-200 knobs (card's 'no torsional friction about the grip axis', impratio): no effect, cause ruled out (~35 s)."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 9.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No grasp-geometry check."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 9.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Grip force read only to state 'not too little grip force'."
+   }
+  ],
+  "needed": "The finger pads have higher mujoco:geom_priority and inherit the soft robot-wide default material (solref 0.2 s), so their material alone decides the grasp contact: give the pads a stiff material (timeconst ~2-4 ms, zeta ~1). Optionally, lower the pad solimp to reduce the residual soft-friction creep.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/sdf_grind-opus-mcp-cards-v3-p0",
+  "model": "claude-opus-5-5",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 6.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "Final: helper '_TextureSdfCutter' edits 'the SDF's two storage levels (coarse grid and fine detail blocks)... model and collision pipeline hold those exact texture objects (I confirmed this)... extract_isomesh()... swept shape... no material left behind between frames'."
+   }
+  ],
+  "needed": "Edit the workpiece texture SDF in place on both levels (coarse and subgrid textures) that the model and collision reference (identity check), subtract the wheel's swept volume between consecutive poses, and re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/abc_arm-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 13.1,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "37s 'The logs show both a timing mismatch and different effective servo gains... sweep delay, gains, damping, and gravity compensation together in batched Newton rollouts'; final 'calibrated gains, armature, friction, partial gravity compensation, and an 11 ms command delay'."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 13.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "82-96s calibrate.py Harness packs 24 candidates x windows as worlds (2048 worlds, 0.4 s per eval) after reading BAT-03 and batched_evaluation.rst."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 13.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "148-157s output-error least_squares on the batched rollout with log-bounded (valid by construction) parameters."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 13.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "28s episodes split evenly into fit/validation; 207s full validation 0.0174 vs train 0.0157."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 13.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Gain writes go to joint_target_ke/kd with notify(ModelFlags.JOINT_DOF_FORCE_PROPERTIES|...), the card's route."
+   },
+   {
+    "id": "BAT-02",
+    "how": "file",
+    "first_seconds": 27.8,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "114s 'Check task rollout equivalence': per-world batch vs task rollout max diff 2.4e-7, twins identical."
+   },
+   {
+    "id": "FIT-02",
+    "how": "file",
+    "first_seconds": 13.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No residual-floor analysis."
+   },
+   {
+    "id": "BAT-01",
+    "how": "file",
+    "first_seconds": 27.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No flat sweep occurred."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 90.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read with solver source after 'SolverMuJoCo.reset() missing... state'; the fix (reset(self.s0)) came from the source signature."
+   }
+  ],
+  "needed": "Model the real servo loop: a command latency (~25-85 ms zero-order hold), data-fitted per-joint gains (stiffer than nominal on joints 1-3), partial gravity compensation (~0.7-0.85) and higher joint friction, fitted on some episodes and checked on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/cube_toss-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 13.8,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "28s lowest-vertex support height at measured orientation; 59s 'mu from slides [0.178 0.200 0.218...]' (card's physics-first estimates); 42s 'table surface about 2 mm below'; final mu 0.175, table -2 mm."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 13.8,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "48/59s read mujoco.rst solref-conversion section the card points to; 74-95s batched mu x ke x kd sweep with kd up to 1000-3000; 104s 'Lower friction and stronger contact damping produced the main improvement'."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 13.8,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "34-95s BatchRollout.evaluate over candidates x tosses (512 worlds)."
+   },
+   {
+    "id": "BAT-02",
+    "how": "file",
+    "first_seconds": 22.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "59s batch result for one toss checked against module.evaluate (0.09517 both)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 13.8,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "28s even/odd split; 95/113s reserved-200 validation 0.0137 m / 0.302 rad."
+   },
+   {
+    "id": "CON-11",
+    "how": "file",
+    "first_seconds": 137.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "After the linesearch-limit warning, 151s A/B with ls_iterations=100: same score, ruled out."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 137.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read for the linesearch warning; its 'often harmless once; A/B before raising' led to the 151s A/B."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 13.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "solver_params('geom') printed at 34s; no priority issue pursued."
+   },
+   {
+    "id": "BLD-01",
+    "how": "file",
+    "first_seconds": 22.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Mass/inertia printed, but that is the task's own constraint audit."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 22.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Torsional/rolling friction left at defaults."
+   }
+  ],
+  "needed": "Lower sliding friction (~0.18) plus a stiff (timeconst ~2 ms), critically to over-damped contact instead of the soft 20 ms starter contact, with the table ~1-2 mm lower; FIT-04 gives friction/support height and the order, CON-02 the tau/zeta mapping and overdamped impacts.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/g1_hard-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "g1_hard",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 13.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "87s 'stiffness alone cannot keep high5 upright: joint error falls below the limit, but the robot still tips' (card symptom); 162s contact-constrained inverse-dynamics QP (card repair) passes high5 at 190s."
+   },
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 13.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "QP torques sent as target offsets through low-impedance servos (kp=20, kd=2) refreshed every 2 substeps (card: feedforward via offsets, lower servo impedance)."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 28.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "47-73s gain sweep uses the card's target offset targets += refv*kd/kp."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 13.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "92s convert_joint_coords_to_mujoco, newton_body_to_mjc_body and find_bodies for foot-support FK on solver.mj_model (card's converters and maps)."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 13.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "threadpool_limits before use; fresh-process validate_g1.py at 0.9x and +2 s hold."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 28.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "47-87s BatchRollout.evaluate gain sweep (12 cases), which established that gains alone do not work."
+   },
+   {
+    "id": "CTL-05",
+    "how": "file",
+    "first_seconds": 28.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No IK written."
+   },
+   {
+    "id": "CTL-07",
+    "how": "file",
+    "first_seconds": 28.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No planner/private-model divergence."
+   },
+   {
+    "id": "CTL-08",
+    "how": "file",
+    "first_seconds": 28.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "QP chosen for quasi-static double support; no preview/MPC work."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 13.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   }
+  ],
+  "needed": "high5 cannot be balanced by joint PD alone: make the reference dynamically feasible (planted-foot leg IK, CoM clamp, low-passed root yaw, soft hip yaw) or use a contact-constrained inverse-dynamics QP fed through low-impedance servos; stiffer gains are needed but not sufficient.",
+  "needed_card": "CTL-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/g1_track-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 211.4,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "26s 'Its gains are based on motor armature, which underestimates the load carried by the legs' (card cause); final 'stronger stance gains'."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "26s 'position servos damp motion toward zero velocity' (card cause); reference-velocity compensation targets += v*kd/kp is in the final controller."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "80-108s BatchRollout.evaluate: 36 gain candidates, then 6 playback rates as worlds."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "184-203s fresh-process checks at held-out rates 1.35x/1.75x/2.5x."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 140.8,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "169s three repeated in-process runs agree (card check)."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Optional high5 left falling."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No feedback channel added."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No Newton/MuJoCo conversions."
+   },
+   {
+    "id": "CTL-08",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No whole-body controller."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 47.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read after a WorldSetup.schedule AttributeError not in its table; fixed via inspect.getsource in the same step."
+   }
+  ],
+  "needed": "The servo gains are sized from rotor armature (10 Hz), far too soft for the gravity load: raise them to ~40-70 Hz equivalent (kp from load) with near-critical damping; velocity feed-forward is optional.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/grasp_drift-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 11.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "14s 'I'm using the Newton debug cards. The finger shapes have higher contact priority than the cube, so they override its stiff material with the robot's much softer defaults' (before any measurement); final fix stiffens only the finger pads. Also auto-attached at 121.7 s."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 11.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "69s stiffness sweep along the legacy mapping ((250,10)...(250000,1000)); final comment 'legacy MuJoCo solref (0.2, 0.316)... gains give solref (0.002, 1), near the 2*sim_dt stability floor'. Also auto-attached at 23.7 s with the deep-penetration reply."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 11.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Stopped at 0.32/2.0 mm; no creep work."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 11.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Cone/impratio untouched."
+   },
+   {
+    "id": "CON-07",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "contacts_between readouts are also named in CON-01."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Sweep ran with MCP branch(), not batched worlds."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   }
+  ],
+  "needed": "The finger pads have higher mujoco:geom_priority and inherit the soft robot-wide default material (solref 0.2 s), so their material alone decides the grasp contact: give the pads a stiff material (timeconst ~2-4 ms, zeta ~1). Optionally, lower the pad solimp to reduce the residual soft-friction creep.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/sdf_grind-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 14.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "19s 'Card BLD-05 confirms that removal must update both levels of the sparse SDF in place, then re-extract the visible surface. I'll also subtract the volume swept between wheel poses'; 33s identity checks; 62s collide-only probe."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 14.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   }
+  ],
+  "needed": "Edit the workpiece texture SDF in place on both levels (coarse and subgrid textures) that the model and collision reference (identity check), subtract the wheel's swept volume between consecutive poses, and re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/abc_arm-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 14.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "39s 'The model currently applies full gravity compensation to most links, and its servo gains are the nominal simulation values' (card causes); 75-133s delay sweep, gravcomp x kp grid, least-squares fit of delay/kp/kd/gravcomp; final gains, armature, friction, 23 ms delay, partial gravcomp."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 14.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "74-75s calibration.py Evaluator packs candidates x windows as worlds (16 delays in 0.5 s)."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 14.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "127-254s output-error least_squares with log-parameterized gains and armature."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 14.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "26/39s split by episode parity 'so validation will use episodes excluded from tuning'; 325s full validation 0.0168."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 14.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Gain writes to joint_target_ke/kd with notify(ModelFlags.JOINT_DOF_FORCE_PROPERTIES), the card's route."
+   },
+   {
+    "id": "CON-06",
+    "how": "auto",
+    "first_seconds": 14.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to health() 'MuJoCo contact buffer full: nacon 0 >= naconmax 0' on a contact-free arm; read as a file at 25.4 s, then ignored. No detour."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 25.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read with CON-06; no message acted on."
+   }
+  ],
+  "needed": "Model the real servo loop: a command latency (~25-85 ms zero-order hold), data-fitted per-joint gains (stiffer than nominal on joints 1-3), partial gravity compensation (~0.7-0.85) and higher joint friction, fitted on some episodes and checked on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/cube_toss-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "42s 'sweeping friction and impact damping over a broad range' (card repair: sweep kd an order of magnitude each way, batched with friction); 58s read the solref section; 137s 'much better fit with sliding friction near 0.18 and substantially stronger impact damping'; final kd 1000."
+   },
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "32-42s rest-pose table height ('table surface about 1.9 mm below'), kept at -1.9 mm; friction came from the sweep."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "84-145s calibrate.Sweep on BatchRollout: 80 candidates x 50 tosses in 2.3 s."
+   },
+   {
+    "id": "BAT-02",
+    "how": "file",
+    "first_seconds": 48.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "85s batch vs single-world evaluate check (0.099988 both)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "32s even/odd split; 113/178s reserved-200 validation 0.0137 m / 0.301 rad."
+   },
+   {
+    "id": "CON-11",
+    "how": "file",
+    "first_seconds": 229.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "After the linesearch-limit warning, 247s A/B with ls_iterations=100: metric change 1e-7, ruled out."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 229.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read with CON-11; no repeat-disagreement work."
+   },
+   {
+    "id": "BAT-01",
+    "how": "file",
+    "first_seconds": 48.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No flat sweep."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 48.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read without a triggering message."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No priority issue."
+   },
+   {
+    "id": "BLD-01",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Mass/inertia check is the task's constraint audit."
+   }
+  ],
+  "needed": "Lower sliding friction (~0.18) plus a stiff (timeconst ~2 ms), critically to over-damped contact instead of the soft 20 ms starter contact, with the table ~1-2 mm lower; FIT-04 gives friction/support height and the order, CON-02 the tau/zeta mapping and overdamped impacts.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/g1_hard-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "g1_hard",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "125s 'stronger servos reduce joint error below 0.05 rad, but every variant still falls... adding a contact-constrained controller' (card symptom and QP repair); final 250 Hz double-support QP with soft root yaw."
+   },
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "303s 'Reducing servo stiffness was important—the stronger servos were fighting the computed torque between updates' (card: feedforward fought by the servo; lower servo impedance); final kp=10, kd=0.1."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "32s 'servos also damp toward zero velocity, so the current targets omit velocity feedforward'; 73s sweep with targets += kd/kp*v."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "93s convert_joint_coords_to_mujoco + newton_body_to_mjc_body for reference FK on solver.mj_model."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "threadpool_limits(1); 580s 'Fixed iteration interval avoids wall-clock-dependent adaptation' (adaptive_rho_interval=50); fresh-process 0.9x and 20 s checks."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "73s BatchRollout.evaluate gain sweep (12 cases), which showed that gains alone fail."
+   },
+   {
+    "id": "BAT-04",
+    "how": "file",
+    "first_seconds": 128.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Final step comment 'Capture an even number of substeps so both state buffers retain their identity across CUDA graph launches' (card repair) for the 2-substep control split."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No feedback-channel debugging."
+   },
+   {
+    "id": "CTL-05",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No IK."
+   },
+   {
+    "id": "CTL-07",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No planner model."
+   },
+   {
+    "id": "CTL-08",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No preview control."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 128.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read without a triggering message."
+   }
+  ],
+  "needed": "high5 cannot be balanced by joint PD alone: make the reference dynamically feasible (planted-foot leg IK, CoM clamp, low-passed root yaw, soft hip yaw) or use a contact-constrained inverse-dynamics QP fed through low-impedance servos; stiffer gains are needed but not sufficient.",
+  "needed_card": "CTL-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/g1_track-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "18s 'Its floating-base tracking card points to two likely causes: gains sized from motor inertia...'; 46s gravity qfrc_bias check (card check); final 'stronger, damped servos'."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 24.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "75-104s sweep and final controller use velocity feed-forward targets (card target offset)."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 24.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "75-175s BatchRollout.evaluate: 18 then 54 (gains x rates) cases."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 131.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "199s checks 'playback rates reserved from tuning and a longer hold'; 294s fresh-process 1.25x-2.5x and 20 s runs."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "40-46s convert_joint_coords_to_mujoco + mj_forward for the gravity-torque check."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Optional high5 left falling."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 24.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No feedback channel."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 131.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No repeat comparison."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   }
+  ],
+  "needed": "The servo gains are sized from rotor armature (10 Hz), far too soft for the gravity load: raise them to ~40-70 Hz equivalent (kp from load) with near-critical damping; velocity feed-forward is optional.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/grasp_drift-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "48s 'The finger pads have higher contact priority than the cube, so they override its stiff material with the robot's much softer defaults. I measured about 10.8 mm of penetration'; final pad-only stiffening."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Final comment 'These gains give MuJoCo solref (0.0025 s, sqrt(2)), above its 2*dt clamp' (card mapping/refsafe)."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Stopped at 0.33/2.01 mm."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Cone/impratio untouched."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No condim change."
+   },
+   {
+    "id": "CON-07",
+    "how": "file",
+    "first_seconds": 19.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "contacts_between readouts are also named in CON-01."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 19.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No batched sweep."
+   },
+   {
+    "id": "BAT-04",
+    "how": "file",
+    "first_seconds": 19.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No live solver/graph changes."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 19.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   }
+  ],
+  "needed": "The finger pads have higher mujoco:geom_priority and inherit the soft robot-wide default material (solref 0.2 s), so their material alone decides the grasp contact: give the pads a stiff material (timeconst ~2-4 ms, zeta ~1). Optionally, lower the pad solimp to reduce the residual soft-friction creep.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.5/sdf_grind-astra-mcp-cards-v3-p0",
+  "model": "gpt-6-astra",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 11.5,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "15s 'Card BLD-05 identifies the key issue: removal must update both levels of the sparse SDF that collision samples, then regenerate the visible surface'; 19/53s identity checks; final swept-volume subtraction on both levels."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 18.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration."
+   }
+  ],
+  "needed": "Edit the workpiece texture SDF in place on both levels (coarse and subgrid textures) that the model and collision reference (identity check), subtract the wheel's swept volume between consecutive poses, and re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "expensive"
+ },
+ {
+  "trial": "v6.4/abc_arm-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 8.5,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "25s: 'The XML also enables full gravity compensation on several links; I'll test delay and servo dynamics'; 28s regresses torque on (cmd(t-d)-q, -qd, 1) per delay (the card's check verbatim); final fix is 50 ms delay, per-joint kp/kd, per-link partial gravcomp [1.25,0.75,1.5,0.5,0.5], friction."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 8.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "5s plan to 'fit parameters on a subset of the logs and check them on separate episodes'; every sweep is scored on separate train/validation window samples; 423s even/odd episode parity check (0.0180 vs 0.0164)."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No FIT-01-specific action (no validate_inertia, no per-recording or two-split refits). The equation-error-then-output-error workflow it used is already in FIT-03."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "58s writes cal_fit.batch_score, which runs candidates x windows as the worlds of one model with per-world gains, gravcomp and delay (4x32 cases in 0.48 s). Did not use BatchRollout."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 12.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Gains were written per world before the solver was built. No notify call, gain readback or target-offset use followed."
+   },
+   {
+    "id": "BAT-01",
+    "how": "file",
+    "first_seconds": 324.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read right after a flat effort-limit sweep (322s, every score 0.01616). No positive control was run; at 334s the agent went back to sweeping delay."
+   }
+  ],
+  "needed": "Model the real servo: command latency (~50-60 ms), reduced or partial per-link gravity compensation instead of the XML's full gravcomp, and per-joint gains and friction fitted on open-loop output error with a held-out episode check.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.4/cube_toss-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 15.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "104s computes support height as final z minus the lowest-vertex offset at the measured orientation (the card's check), giving -2 mm; table_height -0.002 was adopted with little effect. Friction was swept widely before contact tuning."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 15.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "95s and 168s even/odd toss split ('lower friction value holds up on both halves'); 238s bootstrap over groups of 170 tosses for margin."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 15.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read the batched_evaluation docs at 21s, but candidates were scored one at a time with module.evaluate."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 15.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No priority or solmix checks."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 15.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "53s sweeps kd 5-800 alongside mu; the 88s mu x kd grid up to 3200 finds an overdamped contact (kd 1600) that, with mu 0.2, cuts error from 0.093 to 0.018 m. The card says 'impacts that barely rebound need an overdamped contact... sweep kd over a wide range, batched together with friction'. Final: mu 0.18, kd 1600."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 15.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No condim, torsional or rolling friction action."
+   }
+  ],
+  "needed": "Fit sliding friction (~0.18) and a short, strongly overdamped contact (large kd, zeta >> 1) jointly over a wide range, checked on held-out tosses.",
+  "needed_card": "CON-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.4/g1_hard-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "g1_hard",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 9.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "8s: 'sends reference joint angles to position servos with no root or contact feedback... gain tuning alone may leave the base drifting'. The final controller applies ID torque through servo target offsets that include kd*qd_ref (card repair). It also ran a global gain sweep (card pitfall) and kept 16x armature-sized gains."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 9.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "134s FK of the reference ankle poses (card check). 243s: 'reference feet remain nearly planted through the turn, while the current simulation loses foot contact... trying a contact aware whole body controller'. Final fix is an OSQP contact-constrained ID-QP with foot-wrench limits (card repair)."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 9.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "38s gain sweeps use notify_model_changed(JOINT_DOF_FORCE_PROPERTIES). The final step uses target += (tau + kd*qd_ref)/kp, which is CTL-01's offset formula."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 9.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Only single-world MCP rollouts and fresh-process runs; no batching."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 9.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Tested 0.9x playback because the task statement requires it; no data split."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 54.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "79s probes how small leg-target offsets move the base 'before adding feedback' (impulse test); 127-171s per-channel feedback ablations. That feedback route was dropped for the WBC at 243s."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 54.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "179-231s uses convert_joint_coords_to_mujoco, mjc_dof_to_newton_dof and newton_body_to_mjc_body, and reads model_based_control.rst (the card's doc pointer). The final WBC calls solver.convert_joint_coords_to_mujoco."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 345.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "After high5 flipped between pass and fall at 342s, it ran 3 fresh and 6 in-process repeats (404s, 421s); 477s: 'occasional late falls across repeats'."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 345.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "5 fresh runs per case (581s, 623s) exposed 1 fall in 5 on 0.9x ('treating that as a real failure', 627s). It tightened foot-wrench margins until 12/12 in-process and 6/6 fresh runs passed (752s, 1003s). Robustness came from this check; the controller itself came from CTL-03."
+   }
+  ],
+  "needed": "Contact-aware inverse-dynamics control (QP with foot wrench/friction/CoP limits) applied through the position servos as target offsets, robust across repeated fresh runs and 0.9x playback.",
+  "needed_card": "CTL-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.4/g1_track-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 16.8,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "41s: 'the card points out that the current gains are sized from armature, which can leave the whole-body sway mode underdamped'. A wide gain sweep followed (stable from 12x); final kp is 20x and kd 12x the armature-based values."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 16.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No reference feasibility checks."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 16.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "The faster-playback sweeps follow the task statement; no split logic."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 30.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Final target lead is 0.5*(kd/kp)*qd_ref, from CTL-01's q* = q_ref + kd*qd_ref/kp (436s: 'Half compensation for the servo's velocity damping cuts joint error sharply'). The agent cites CTL-01/CTL-02 at 597s. Not needed to pass."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 30.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Serial MCP rollouts only."
+   }
+  ],
+  "needed": "Servo gains sized for the whole-body gravity load instead of rotor armature (roughly 12-50x kp with more damping), so the robot stands and tracks wave, including faster playback.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.4/grasp_drift-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "20s: 'the material that controls a contact depends on which shape has priority'. 56s: 'The finger geoms have priority over the cube, so their soft contact response controls the pinch'. Fix: the cube's ke/kd on the finger geoms. Root cause reported as stated in the card."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "The finger ke=8e4/kd=8e2 were copied from the cube's existing material, not derived from the solref mapping."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No dt or creep table; the starter's solimp was left unchanged."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "The starter already used an elliptic cone (impratio 50); not touched."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No action."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No action."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No batching."
+   },
+   {
+    "id": "CON-07",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "The contacts_between/solver_params helpers it used are also named in CON-01. Nothing CON-07-specific (cfrc_ext, inactive rows) was used."
+   }
+  ],
+  "needed": "The finger geoms win the geom_priority contest and inherit the soft robot-wide default ke/kd, so they decide the pinch; give the fingers stiff contact material.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.4/sdf_grind-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 7.9,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "24s: 'collision reads those textures directly. I'll update both levels in place from the wheel's swept segment each frame, then extract the render mesh'. 39s identity check (s._coarse_texture is model._texture_sdf_coarse_textures[0]). 105-143s samples inside/outside points, compares grid volume with the analytic sweep, and runs a collide-only load probe. All are the card's checks and repairs."
+   }
+  ],
+  "needed": "Subtract the wheel's swept volume in place from both texture-SDF levels (the objects the collision pipeline references) every frame, then re-extract the render isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.5/abc_arm-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 12.7,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "35s: 'The arm XML has full gravity compensation, while the recorded shoulder and elbow torques are substantial. I'm checking gravity compensation and command timing'. 51s sweeps a zero-order-hold command delay against measured q without simulation (card check). Final: 60 ms delay, partial proximal/distal gravcomp, per-joint gains."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 12.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "79s holds out 8 episodes (val_ids); later sweeps (from 178s) score each candidate on train and validation; final 0.01834 rad on the held-out episodes vs 0.01824 on all 64 logs."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 12.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "99s and 139s: sweep_joint/batch_eval build candidates x windows as the worlds of one model with per-world gains and gravcomp (about 0.6 s per sweep)."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 36.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Gains were written before solver construction; no card-specific action."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 36.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No equation-error fit, inertia validation or split refits."
+   }
+  ],
+  "needed": "Model the real servo: command latency (~50-60 ms), reduced or partial per-link gravity compensation instead of the XML's full gravcomp, and per-joint gains and friction fitted on open-loop output error with a held-out episode check.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.5/cube_toss-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 14.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "61s computes the lowest-vertex height at the terminal frames (card check). 112s: 'lowest vertex around 1.8 mm below the nominal table plane, so I'm checking that small height offset'. 118s height sweep; the offset was not adopted (table_height stayed 0)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 14.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "34s builds disjoint train/validation toss groups; 259s cross-checks both; 283s even/odd and first/last-200 splits before saving."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 23.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No priority action."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 23.1,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "94s sweeps mu x tau x zeta using the card's legacy mapping kd=2/tau, ke=(1/(tau*zeta))**2; the best region is an overdamped short contact. The final PARAMS comment reads 'tau=2 ms, zeta=2' (ke 6.25e4, kd 1000, mu 0.18)."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 23.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Also auto-attached at 381s. After the pass was saved, it tested condim 4/6 with torsional/rolling friction against orientation error (295-395s, about 100 s). 431s: 'changed the scores only slightly, so I kept the simpler contact setup'. This ruled out a cause."
+   },
+   {
+    "id": "MSG-01",
+    "how": "auto",
+    "first_seconds": 335.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Attached on the rebuild error \"Custom attribute 'mujoco:condim' is not defined\". 5 s later it added SolverMuJoCo.register_custom_attributes(cube), which the error text also names. A file read at 418s routed the linesearch-limit warning to CON-11."
+   },
+   {
+    "id": "CON-11",
+    "how": "file",
+    "first_seconds": 421.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Linesearch warning left as is; final message does not mention it."
+   }
+  ],
+  "needed": "Fit sliding friction (~0.18) and a short, strongly overdamped contact (large kd, zeta >> 1) jointly over a wide range, checked on held-out tosses.",
+  "needed_card": "CON-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.5/g1_hard-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 10.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "35s: 'the current gains are based on motor inertia and may be too weak for the body load' (card cause), followed by gain sweeps. Final gains: legs 16x, arms 6.5x armature-sized. No feedforward was shipped."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 10.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "90s FK of reference feet and 198s reference CoM/ZMP vs feet (card checks). 470-735s attempts the card's OSQP ID-QP; it fell repeatedly (OSQP 'solved inaccurate' at max_iter) and was abandoned after about 265 s. The repair is valid (v6.4 and plain Sol pass with it); the implementation failed."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 10.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Single-world in-process rollouts only."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 10.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No split; tested 0.9x playback as the task requires."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 23.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "All gain sweeps call notify_model_changed(JOINT_DOF_FORCE_PROPERTIES); 741s compares compiled actuator_gainprm with model gains (card check)."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 66.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "491s uses mjc_body_to_newton and mjc_dof_to_newton_dof maps for the whole-body controller (later abandoned)."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 66.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "117s per-joint-pair impulse tests (+0.03 rad target offsets, root dpos/rpy response) before adding leg-target feedback and offsets."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 1237.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "1248s rebuilds the solver with iterations=200 and gets the same 5.68 cm root error, ruling out unconverged solves."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 1237.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Shipped a knife-edge hip-offset schedule (852s: amp 0.199 and 0.201 fall, 0.200 passes; 1110s: 0.217 and 0.221 fall, 0.219 passes) checked with one fresh run per case. The card's marginality warning was not acted on."
+   }
+  ],
+  "needed": "Contact-aware inverse-dynamics control (QP with foot wrench/friction/CoP limits) applied through the position servos as target offsets, robust across repeated fresh runs and 0.9x playback.",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Mostly non-knowledge, plus a failed implementation. After the ID-QP attempt failed (470-735s), it fell back to a hand-tuned, knife-edge hip-pitch offset schedule. It then judged root RMSE per coordinate (3.3 cm) although its own Euclidean value was 5.7 cm (433s and 1366s; final message: 'a per-frame Euclidean-distance RMSE is a different metric'). The verifier's Euclidean root RMSE on 0.9x high5 was 5.74 cm against a 4 cm limit. It ran to 1710 s.",
+  "missing_card": "A worked recipe for contact-aware ID-QP tracking through position servos (per-physics-step updates, heel and toe contact points, CoP/friction margins, solver tolerances) that makes CTL-03's repair implementable; the metric choice was a non-knowledge error.",
+  "group": "sol"
+ },
+ {
+  "trial": "v6.5/g1_track-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 589.7,
+  "cards": [
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "47-59s checks model gains, the notify method and the JOINT_DOF_FORCE_PROPERTIES flag; every gain sweep then calls notify_model_changed(JOINT_DOF_FORCE_PROPERTIES)."
+   },
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "44s: 'checking servo gain and velocity tracking first'; 113-129s CoM over ankles, qfrc_bias and actuator_force checks. The sweep stopped at 8x, and 171s concluded 'Gain changes alone did not stop the fall' (v6.4 shows 12x or more suffices). Final kp 5x, kd 4x."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "113s compares the reference CoM with the ankle positions over the clip (card check)."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "140s and 151s per-joint-pair +/-0.1 rad impulse tests map the root response. They set the signs of the final stance offsets and the root-x/pitch feedback through ankle/hip pitch targets (171s, 257-488s)."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Serial in-process rollouts only."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "The faster-playback sweeps follow the task statement."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 23.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No converter or name-map use."
+   }
+  ],
+  "needed": "Servo gains sized for the whole-body gravity load instead of rotor armature (roughly 12-50x kp with more damping), so the robot stands and tracks wave, including faster playback. Balance feedback through the leg targets is an alternative.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.5/grasp_drift-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 11.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "Read via 'cat cards/CON-{01,03,04,08,09}.md', which card_usage.json missed, and auto-attached at 43.3s. 41s: 'checking which geometry controls that softness'. 58s assigns finger shape_material_ke/kd plus notify(SHAPE_PROPERTIES), the card's live repair. 72s: 'the fingers have higher contact priority, so their soft material (ke=250, kd=10) overrides the cube's much stiffer material'."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 11.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No action (brace-expanded read, not logged in card_usage.json)."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 11.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No action (brace-expanded read, not logged in card_usage.json)."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 11.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No action (brace-expanded read, not logged in card_usage.json)."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 11.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No action (brace-expanded read, not logged in card_usage.json)."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 43.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read via 'cat cards/CON-{02,07}.md' (not logged). The fix copies the cube's ke/kd onto the fingers; no solref reasoning."
+   },
+   {
+    "id": "CON-07",
+    "how": "file",
+    "first_seconds": 43.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read together with the solver_contacts(detail=True) call it recommends, which CON-01 also names, so it had no separate effect (brace-expanded read, not logged)."
+   }
+  ],
+  "needed": "The finger geoms win the geom_priority contest and inherit the soft robot-wide default ke/kd, so they decide the pinch; give the fingers stiff contact material.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.5/sdf_grind-sol-mcp-cards-v3-p0",
+  "model": "gpt-6-sol",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 11.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "23s and 47s identity and handle checks between the workpiece SDF textures and model._texture_sdf_*. 64s: 'share the same texture handles, so an in-place texture edit will reach hydroelastic collision. I'm adding a swept-wheel subtraction to both the coarse grid and the fine subgrids, then extracting the render mesh'. 122s collide-only load probe; 150s grid volume vs analytic sweep."
+   }
+  ],
+  "needed": "Subtract the wheel's swept volume in place from both texture-SDF levels (the objects the collision pipeline references) every frame, then re-extract the render isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "sol"
+ },
+ {
+  "trial": "v6.1/abc_arm-haiku-mcp-cards-v1-p0",
+  "model": "claude-haiku-4-5",
+  "task": "abc_arm",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [],
+  "needed": "Replay calibration of the YAM arm: fit command latency (~90 ms), per-joint servo gains, and partial per-link gravity compensation (real arm sags) jointly with batched output-error evaluation.",
+  "needed_card": "FIT-03",
+  "found": false,
+  "failure_reason": "Never opened a card (no index or card read). Ran 60+ serial grid sweeps through newton_execute over delay, friction, damping and armature and pushed them to extremes (friction 3.6 N m, armature x0.0125, delay 22 ms) to absorb the unmodelled gravity sag. Never tried gravcomp or per-joint gains. Timed out at 1800 s: held-out 0.0243 rad vs 0.023.",
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/abc_arm-luna-mcp-cards-v1-p0",
+  "model": "gpt-6-luna",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 1200.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "34 s: 'The matching card is FIT-03; its checks point first to command latency and the torque-to-error relationship'. Then ran a delay sweep, a torque regression for kp/kd, and at 1031 s a gravcomp sweep that 'found the shared cause' (scale 0.84 plus a per-link override). Final = delay 0.09 s + per-joint gains + partial per-link gravcomp, which is FIT-03's repair."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Used the torque regression only as an initial guess (83 s), then profiled one joint at a time (338-379 s: 'profiling joints 2 and 3 individually') and fit the scored output error in batches, following FIT-01's checks and repair."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Gains are written at build time in build_model. No notify flags, servo-law offsets or actuator-array checks from the card appear."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 18.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "209 s: 'confirmed the BatchRollout setup ... accepts per-world gains, starts, and delayed command schedules. I'm moving the gain search into candidate-by-window batches'. Later ran the full-window candidate sweeps (652 s onward) the same way."
+   }
+  ],
+  "needed": "Replay calibration: command latency (~90 ms), per-joint servo gains, and partial per-link gravity compensation fitted jointly on output error.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/cube_toss-haiku-mcp-cards-v1-p0",
+  "model": "claude-haiku-4-5",
+  "task": "cube_toss",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [],
+  "needed": "Data-first contact calibration: friction from slide deceleration (~0.18), table height from resting heights (~-1 mm), and a short, well-damped contact time constant for near-plastic impacts (kd ~500-1000 under the legacy ke/kd->solref mapping).",
+  "needed_card": "FIT-04",
+  "found": false,
+  "failure_reason": "Never opened a card and never used the MCP. Ran 26 serial full checks of hand-picked configs and found heavy damping by brute force (ke=480, kd=37250, 100 substeps, mu 0.245), but never estimated friction or table height from the data. Accepted a local 0.0202 m (0.8% over the limit) and stopped at 1012 s with about 13 min left; held-out 0.0223 m.",
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/cube_toss-luna-mcp-cards-v1-p0",
+  "model": "gpt-6-luna",
+  "task": "cube_toss",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 17.9,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "Followed FIT-04's checks: 135 s 'clean contact-slide segments suggest a sliding friction coefficient near 0.21' (mu ~ a/g); 324/527 s release and free-flight vs post-impact split; 935 s table height from the recorded lowest points. The card's 'restitution is not read by SolverMuJoCo' led at 734-830 s to 'testing the restitution-capable XPBD solver'. The final deliverable (XPBD + data-derived mu 0.23 + table +1 mm) follows from this. The card's tau/zeta step was skipped."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 17.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No least-squares identification or inertia validation. No reference to the card."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 17.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Candidate sweeps ran as batched candidates x 24-toss scenario tables (dbg_sweep, 'candidate passed failed scenarios' table at 205 s)."
+   },
+   {
+    "id": "BAT-01",
+    "how": "file",
+    "first_seconds": 17.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "135 s: 'A batched positive control also confirmed that friction changes reach the solver: setting it to zero caused large drift'. Later kf=0 was used as a frictionless positive control (830 s)."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 112.8,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "479 s: swept ke at fixed kd ('normal contact damping ... keeping its time constant fixed'), using the card's ke/kd->solref mapping. It kept the nominal 20 ms time constant and never tried the shorter tau that the impacts needed."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 112.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No priority or solmix check. Single cube vs plane, no visible effect."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 112.8,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "360-450 s: 'Contact report confirms default condim=3 leaves the measured material's torsional and rolling friction inactive'. Added mujoco:condim 6 and tested extremes, which ruled out torsional/rolling friction (worse full-set score); about 2 min."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 212.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "232 s: checked convert_joint_coords_to/from_mujoco and gravity alongside a finite-difference vs logged-velocity test. 324 s: release velocities and free flight agree, which ruled out a state-convention error."
+   },
+   {
+    "id": "FIT-02",
+    "how": "file",
+    "first_seconds": 212.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "232 s start-state consistency check (finite-difference positions vs logged velocities) and the pre/post-impact error decomposition (324, 527, 1073 s) follow FIT-02's checks and localized the error to impacts."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 527.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "570-711 s: 'Following CON-04, added model-backed cone/impratio settings ... pyramidal cone worsened ... keep elliptic'; impratio 1-20 had no effect. Ruled out the cause (about 140 s)."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 583.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "583 s: looked up the linesearch-limit warning and went to CON-11 (586 s). A second read at 768 s, after a cone-assignment error not listed in the table, had no effect."
+   },
+   {
+    "id": "CON-11",
+    "how": "file",
+    "first_seconds": 586.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "598-615 s: report_health check per the card. NOTES: 'Following MSG-01/CON-11 ... no health warnings ... the one-off linesearch event did not recur', so it did not ship extra iterations."
+   }
+  ],
+  "needed": "Data-first contact calibration: friction from slide deceleration (~0.18), table height from resting heights, and a short, well-damped contact time constant for near-plastic impacts (kd ~500-1000), all with real margin on unseen tosses.",
+  "needed_card": "FIT-04",
+  "found": false,
+  "failure_reason": "Overfit to a thin margin. Never shortened the MuJoCo contact time constant (kept kd=100, i.e. tau 20 ms, and swept only zeta). Switched to XPBD and hand-tuned mu to 4 decimals, relaxation, torsion and table height to a local 0.01896 m (5% margin, against the procedure's ~20%). Held-out 0.02003 m failed by 0.16%.",
+  "missing_card": "A sharper FIT-04/CON-02 line: 'the starter kd=100 means a 20 ms contact time constant; toss impacts need tau of a few ms (kd ~500-1000) before friction tuning, so sweep tau, not only zeta'.",
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/g1_hard-haiku-mcp-cards-v1-p0",
+  "model": "claude-haiku-4-5",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [],
+  "needed": "Beyond load-based servo gains (enough for wave), high5's turn and weight shift needs balance-aware control: check reference feasibility (CoM/ZMP vs support, foot yaw in the turn), with inverse-dynamics feedforward plus CoM/ZMP-clamped or contact-constrained balance feedback at physics rate and softened hip yaw.",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Never opened a card. Did blind uniform gain sweeps (5-200 Hz), a velocity-target attempt and a CTRL_DIRECT torque-control detour. Its live tests reset state inconsistently ('falls even with a fixed target'), and joint-index bugs corrupted its own metrics. Gave up at 556 s with about 20 min left, shipping 35 Hz gains (wave passes, high5 and high5 0.9x fall).",
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/g1_hard-luna-mcp-cards-v1-p0",
+  "model": "gpt-6-luna",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 36.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Gravity-torque check via eval_inverse_dynamics_passive (346 s). 449 s: 'Static gravity torques at the starting pose are modest'. A 25 Hz gain raise (kept for legs and waist) ruled out sag and torque headroom as the high5 cause."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 36.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Re-read at 546 s after three failed experiments. FK of the reference feet (701 s). 1315 s: 'switching to the CTL-03 feedforward check: compute inverse-dynamics joint torques for the reference', which put mj_inverse feedforward in the final (pre-fall joint RMSE 0.028). The card's CoM/ZMP clamp, foot-yaw and hip-yaw repairs were never tried."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 36.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "912 s: unit-tested quat_rotation_error_xyzw on known rotations (CTL-04 check) before adding pitch/x feedback. The feedback still ran once per frame rather than per physics step, as the card recommends."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 36.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "613 s: looked up solver.convert_joint_coords_to_mujoco. The final feedforward converts reference q/qd through it before mujoco.mj_inverse (CTL-06 repair: use the converters)."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 36.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No repeat, perturbed or loaded-run validation beyond the procedure's fresh-process check."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 61.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "803 s: 'adding the documented position-servo velocity offset' (target += kd*qd_ref/kp). Pre-fall joint RMSE went from 0.086 to 0.049; kept in the final."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 61.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Printed the BatchRollout.evaluate signature (38 s) but ran every experiment as a serial single-clip fresh process."
+   }
+  ],
+  "needed": "Balance-aware control for high5's turn and weight shift: reference feasibility (CoM/ZMP vs support polygon, foot yaw), ID feedforward plus CoM/ZMP-aware feedback at physics rate, softened hip yaw (on top of load-based gains).",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Partially applied the right card: took CTL-03's inverse-dynamics feedforward and CTL-01's velocity offset, but balanced with heuristic frame-rate pitch/x feedback through hip/ankle targets. It never checked reference CoM/ZMP or foot yaw in the turn. Spent the full budget on about 14 serial single-clip runs; wave passes, both high5 runs fall at about 2.1 s.",
+  "missing_card": "A concrete, tested balance-controller recipe for a weight-shifting/turning humanoid clip (CoM or capture-point feedback mapped to ankle/hip targets every physics step, or a small contact-constrained ID QP), with starting gains and how to verify CoM/ZMP margin.",
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/g1_track-haiku-mcp-cards-v1-p0",
+  "model": "claude-haiku-4-5",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [],
+  "needed": "Servo gains sized from rotor armature (10 Hz) are far too soft for the gravity/whole-body load. Load-based, much stiffer gains (optionally plus a velocity-feedforward target offset) keep the G1 upright on wave.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/g1_track-luna-mcp-cards-v1-p0",
+  "model": "gpt-6-luna",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 720.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 17.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "39 s: 'position servos sized only from reflected rotor inertia can leave the body unsupported'. Exp1 raised 10 to 20 Hz (final 22 Hz); Exp2 gravity feedforward via eval_inverse_dynamics_passive did not help and was removed (about 25 s). Gains alone at 20 Hz still fell."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 17.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Re-read at 259 s. The 276 s FK of the reference feet ('reference feet stay essentially planted and flat') ruled out an infeasible reference."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 17.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No repeat, loaded or rate-after-construction checks beyond the procedure's fresh-process 1.0x/1.5x checks."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 17.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Exp8 adds 'q_target += (kd/kp)*qdot_ref' (code comment: 'POSITION servos damp toward zero joint velocity, so offset their position targets'), which cut early joint RMSE to about 0.03. Part of the final controller."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 259.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "After reading, ran per-channel impulse tests (290 s hip pitch, 409 s ankle, 492 s yaw, 643 s roll) and moved feedback into a Warp kernel run every 2 ms substep (Exp5). NOTES: 'CTL-04 suggests the large combined 50 Hz feedback loop was too aggressive'. The passing fix (717 s) is substep-rate pitch/yaw feedback plus rate damping."
+   }
+  ],
+  "needed": "Servo gains far too soft (10 Hz from armature). Stiffer load-based gains suffice (haiku: 50 Hz alone); luna instead combined 22 Hz gains, velocity feedforward and physics-rate attitude feedback.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/grasp_drift-haiku-mcp-cards-v1-p0",
+  "model": "claude-haiku-4-5",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 74.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "80 s: 'CON-04 is about slip during motion. The script already uses cone=\"elliptic\" with impratio=50.0'. This ruled out cone/impratio."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 80.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read 'for slow creeping' then moved straight to CON-02. No creep/dt checks."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 82.7,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "92 s diagnostic prints the card's mapping, 'Gripper shape kd: 10 -> timeconst = 2/kd = 0.2 s (>> 2*dt ...)'. 95 s: 'root cause: the gripper is 320x softer than the cube'. Then stiffened default_shape_cfg (final ke=2500, kd=100), which fixed the drift (0.10 mm in the TCP frame)."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 128.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "140 s: 'According to CON-01 ... The gripper fingers have priority=1, which means their friction takes precedence'. Added mu=2.0 to the finger default (shipped, a secondary change; stiffening was the main fix)."
+   }
+  ],
+  "needed": "The fingers have higher geom priority and inherit the robot's soft default_shape_cfg (ke=250, kd=10, i.e. a 0.2 s time constant), so their soft material decides the pad/cube contact. Stiffen the deciding finger geoms (or the default).",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/grasp_drift-luna-mcp-cards-v1-p0",
+  "model": "gpt-6-luna",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 26.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "174 s: 'The symptom matches ... CON-04; this model already selects an elliptic friction cone and high impratio, so I'm measuring actual in-hand drift'. This ruled out cone/impratio."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 26.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No creep/dt table or noslip discussion."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 43.6,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "375 s: report_solver_params('geom') rows for finger and cube shapes (CON-01 check). 453 s: 'the fingers have higher MuJoCo geom priority than the cube, so their very soft material sets the contact law'. Fix: finger shape_material_ke/kd set to the cube's (the card's 'put the intended material on the deciding geom'). Passed first try."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 43.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Only an implicit 'grip slip ... rather than a missed grasp' (373 s). No CON-08 checks."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 43.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "426 s: contacts_between('shake_cube','fr3_leftfinger', detail=True), the card's per-pad normal-force check, gave about 7.7 N per pad with 10-11 mm penetration, which fed the 453 s diagnosis."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 428.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read right before the diagnosis. Used to interpret the compiled finger solref '(0.2 s, 0.316)' and to verify '(0.0025 s, 1.414)' after the fix (534 s)."
+   }
+  ],
+  "needed": "Higher-priority finger geoms inherit the soft robot default material and decide the pad/cube contact. Stiffen the finger (deciding) geoms.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/sdf_grind-haiku-mcp-cards-v1-p0",
+  "model": "claude-haiku-4-5",
+  "task": "sdf_grind",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "MSG-01",
+    "how": "auto",
+    "first_seconds": 192.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Auto-attached to 'WarpCodegenAttributeError ... Could not find function wp.texture_shape' (MSG-01's table only covers WarpCodegenTypeError). No reference to it. The next actions (212-246 s) dropped texture editing for isomesh vertex removal plus an SDF rebuild."
+   }
+  ],
+  "needed": "Edit the SDF the model's collision pipeline actually holds, in place (coarse and fine texture levels), subtracting the wheel volume swept between consecutive poses, then re-extract the isomesh. A rebuilt SDF that is not registered never reaches collision.",
+  "needed_card": "BLD-05",
+  "found": false,
+  "failure_reason": "Never opened a card, BLD-05 included. Rebuilt a new SDF from a vertex-filtered isomesh every 20 frames and assigned it to self.workpiece_sdf only (unregistered with the model, inside try/except: pass), so collision geometry never changed (removed volume 0). Declared success from a '240 vertices removed' proxy without measuring volume or load, and ended at 516 s.",
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.1/sdf_grind-luna-mcp-cards-v1-p0",
+  "model": "gpt-6-luna",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 13.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "42-51 s: ran the card's identity check: 'The debug-card identity check passes: the mesh's attached SDF is the exact object being edited, and the model's coarse and fine texture handles are those same textures'. 294 s: 'added an in-place Boolean SDF subtraction over each frame's swept wheel segment, updating both' levels. Passed first full check (removed-volume error 1.9%)."
+   }
+  ],
+  "needed": "In-place edit of the collision-held texture SDF (both levels) by the swept wheel volume between poses, plus isomesh re-extraction.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.1"
+ },
+ {
+  "trial": "v6.2/abc_arm-haiku-mcp-cards-v2-p0",
+  "model": "claude-haiku-4-5",
+  "task": "abc_arm",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 48.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "55 s NOTES: 'Based on FIT-03 debug card: the real servo adds latency' -> 65 s delay sweep (0.0367 -> 0.0284 rad), delay kept in the final file (0.05 s). Partial use only: the card's 'real arm is soft' framing led to a downward-only gain sweep (0.5-1.0x at 120 s) and the wrong conclusion 'gains are already optimal'; the card's torque regression and partial-gravcomp check were never run."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 50.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "From 120 s it tuned directly on its own held-out episodes 09-16 with ever finer delay/friction grids (ultra_fine_tune, squeeze_harder), the card's named pitfall; local 0.02337 vs verification 0.0258 rad."
+   }
+  ],
+  "needed": "Identify the real servo from the logs: per-joint kp/kd from a torque regression on (delayed command - q, qd) (shoulder gains well above nominal, wrist gains lower), a ~40 ms command delay, and partial gravity compensation (~0.85).",
+  "needed_card": "FIT-03",
+  "found": false,
+  "failure_reason": "Read FIT-03 but applied only its latency part plus a uniform friction scale; never regressed per-joint gains or tried partial gravcomp; overfit fine grids on its local held-out split; stopped at 876 s of 1800 s after misreading the clock ('about 4 minutes left' at 836 s with ~16 min remaining). Verification 0.0258 rad vs 0.023.",
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/abc_arm-luna-mcp-cards-v2-p0",
+  "model": "gpt-6-luna",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "80 s ran the card's check offline (regress torque on cmd(t-d)-q, qd per joint over a delay grid) -> kp [64,85,73,9,9,6] and kd; 271 s 'torque-fitted gains plus a 40 ms delay' 0.0314 -> 0.0161 rad; 449 s partial gravcomp (card repair) -> final 0.85. Read via glob 'FIT-03*.md', not logged in card_usage.json."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "check.py holds out 16 logs of 8 episodes and tunes on the rest; 449 s and 1043 s reject changes 'smaller than the train/holdout spread'."
+   },
+   {
+    "id": "CTL-07",
+    "how": "file",
+    "first_seconds": 14.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read in the opening batch; no planner or replica was built, no follow-up."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 502.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read at a plateau; next actions came from FIT-02's checks, no split refits or regularization."
+   },
+   {
+    "id": "FIT-02",
+    "how": "file",
+    "first_seconds": 502.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "519-529 s dbg_diag computed per-joint RMSE and correlation of window error with |tau| and speed (card check) -> joint-4 gain/effort sweep at 548 s (no gain), then gravcomp refinement."
+   }
+  ],
+  "needed": "Identify the real servo from the logs: per-joint kp/kd from a torque regression on (delayed command - q, qd) (shoulder gains well above nominal, wrist gains lower), a ~40 ms command delay, and partial gravity compensation (~0.85).",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/cube_toss-haiku-mcp-cards-v2-p0",
+  "model": "claude-haiku-4-5",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-05",
+    "how": "auto",
+    "first_seconds": 73.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to the condim warning from a mu_rolling=0.001 probe; never opened, condim unchanged; at 78 s it moved on to verifying mu=0.2, kd=1000."
+   }
+  ],
+  "needed": "Calibrate contact from the data: low sliding friction (mu ~0.19-0.2) and a short, well-damped contact time constant (tau ~2-5 ms via the legacy ke/kd mapping, i.e. much larger kd/ke than the defaults); a ~3 mm lower support helps the margin. Found by a 5-toss live sweep (58-74 s) without reading any card.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/cube_toss-luna-mcp-cards-v2-p0",
+  "model": "gpt-6-luna",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 1200.0,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "67 s the card's physics-first estimates (rebound ratio ~0.15, sliding deceleration 2.8 m/s^2); 102/419 s lowest-vertex support height about -3 mm, adopted as table_height -0.003 (odd split 0.0185 -> 0.0177 m)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "check.py tunes on even tosses and scores odd tosses; every candidate validated on the odd half (675 s, 1115 s)."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "268 s grid uses the card's legacy mapping kd=2/tau, ke=(kd/(2*zeta))^2; 650 s tau=5 ms, zeta=0.5 cut orientation 0.97 -> 0.43 rad; final ke=2.5e5, kd=800 (tau 2.5 ms, zeta 0.8). Also auto-attached at 1121.6 s ('deep penetration'), after the fix, with no effect."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 131.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "From 183 s every sweep (25-96 candidates x 200 tosses) ran as BatchRollout.evaluate in about 2-25 s each."
+   },
+   {
+    "id": "MSG-01",
+    "how": "file",
+    "first_seconds": 131.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Auto-attached at 314.8 s to 'Custom attribute mujoco:condim is not defined'; 322 s card('MSG-01') -> 327 s added SolverMuJoCo.register_custom_attributes and the rebuild succeeded."
+   },
+   {
+    "id": "CON-11",
+    "how": "file",
+    "first_seconds": 131.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Linesearch-limit warning checked with health() at 146 s; NOTES 'all metrics were finite': ruled out, no iteration change."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 353.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Auto-attached at 335.4 s; the condim-6 test was already planned at 284/321 s, the 385 s condim sweep gave no position gain and the final keeps condim 3 (the ~170 s condim detour, 284-456 s, predates the card)."
+   },
+   {
+    "id": "FIT-02",
+    "how": "file",
+    "first_seconds": 560.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "586 s phase split (pre-contact 1.4 mm / 0.013 rad) and start-state check (measured vs finite-difference velocity) localized the error to the first table contact -> 635 s contact tau/zeta sweep."
+   }
+  ],
+  "needed": "Calibrate contact from the data: low sliding friction (mu ~0.19-0.2) and a short, well-damped contact time constant (tau ~2-5 ms via the legacy ke/kd mapping, i.e. much larger kd/ke than the defaults); a ~3 mm lower support helps the margin.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/g1_hard-haiku-mcp-cards-v2-p0",
+  "model": "claude-haiku-4-5",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 38.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "41.5 s 'gains are sized from actuator inertia rather than gravity load, and there's no gravity feedforward' (card cause); feedforward tried and reverted at 158-171 s; final uniform kp=1000, kd=50 (353 s) contradicts the card's repair (load-sized gains, feedforward instead of extreme gains). wave passes, high5 falls."
+   }
+  ],
+  "needed": "Make high5 feasible for the robot: anchor the planted feet flat with leg IK, clamp the commanded CoM inside the support polygon with margin, smooth the reference without lag, on top of load-sized stiff servos with gravity/inverse-dynamics feedforward.",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Never opened CTL-03. 90-330 s went to reading model.joint_q as the live state ('servo not moving'), then it reset the file and set extreme uniform gains; stopped at 390 s of 1800 s with a report of 'expected' passes and no high5 check. high5 and high5_slow fell (root RMSE 0.82 m).",
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/g1_hard-luna-mcp-cards-v2-p0",
+  "model": "gpt-6-luna",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "165 s gravity check from the card: 'largest gravity load asks for roughly 0.21 rad of servo error' -> gravity + reference-velocity feedforward with scaled kp/kd (joint RMSE 0.156 -> 0.024 rad in the final)."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "584 s CoM vs support-box check; 1246 s 'reference CoM approaches the front edge of the foot support ... testing the card's suggested yaw-torque reduction' (hip/waist yaw at 0.2x). Its main repair (planted-foot leg IK, CoM clamp, smoothing) was never tried."
+   },
+   {
+    "id": "CTL-08",
+    "how": "file",
+    "first_seconds": 15.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No preview/MPC or contact-schedule work followed."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 25.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "121 s report_solver_params('actuator') -> 165 s 'servo parameters are reaching SolverMuJoCo and are clamped at the effort limits' (ruled out)."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 25.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No Newton/MuJoCo state conversion or name lookup followed."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 25.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No calibration split; not applicable to a controller task."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 25.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "~1650 s NOTES: 'The live-process slow high5 result did not reproduce in a fresh process (CTL-09)' -> restored the fresh-checked settings."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 79.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "796-890 s ankle impulse test (card check) found a positive ankle-pitch target opposes forward pitch; the first implementation still had the sign reversed (982-1077 s, ~100 s) and the ablation the card recommends found it."
+   },
+   {
+    "id": "CTL-05",
+    "how": "file",
+    "first_seconds": 79.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No hand-written IK or Jacobian."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 79.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "340-415 s gain and feedforward sweeps ran as BatchRollout branches on high5."
+   },
+   {
+    "id": "BAT-02",
+    "how": "file",
+    "first_seconds": 694.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read when the batched static pose tipped; 890 s 'single-world and three-world static runs agree within 1.4e-5', so the fall was real (ruled out a batch artifact)."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 694.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Same twin/single-world comparison as BAT-02 at 725-890 s; confirmed worlds agree."
+   }
+  ],
+  "needed": "Make high5 feasible for the robot: anchor the planted feet flat with leg IK, clamp the commanded CoM inside the support polygon with margin, smooth the reference without lag, on top of load-sized stiff servos with gravity/inverse-dynamics feedforward.",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Read CTL-03 and ran its CoM check but applied only the hip-yaw softening; built ankle, xy-lean and height feedback loops instead of making the reference feasible. Lost ~100 s to a reversed feedback sign and ~200 s confirming batch vs single-world agreement; ran out of time with high5 root RMSE 0.043 m locally and 0.088 m in verification (upright on all clips, joints pass).",
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/g1_track-haiku-mcp-cards-v2-p0",
+  "model": "claude-haiku-4-5",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 68.8,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "73 s 'The issue is clear from card CTL-02: the gains are based on actuator inertia rather than gravity load'; 97 s gravity torque / kp check -> 'scale kp by 16.3x'; gains raised at 117 s (snapshot pass at 240 s); final 50 Hz natural frequency (25x kp)."
+   },
+   {
+    "id": "MSG-01",
+    "how": "auto",
+    "first_seconds": 424.3,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached to 'Control.joint_target_pos was removed'; the message named joint_target_q and the agent reverted at 432 s without opening the card."
+   }
+  ],
+  "needed": "Size servo stiffness from the gravity load instead of rotor armature (about 10-25x the 10 Hz armature gains) so stance joints stay inside the error budget; with only 10x, a correctly signed root-pitch-to-ankle balance loop is also needed.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/g1_track-luna-mcp-cards-v2-p0",
+  "model": "gpt-6-luna",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 840.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 16.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "164 s 'checking compiled servo gains, gravity load'; NOTES 'static bias torque / kp peaks at 0.265 rad' -> kp 10x (KP_SCALE=10 in the final)."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 16.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "434-442 s foot FK over the clip: soles 0.8-4.9 mm, tilt <= 0.063 rad, 'No obvious foot scuff/lift infeasibility' (ruled out)."
+   },
+   {
+    "id": "CTL-09",
+    "how": "file",
+    "first_seconds": 16.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Validated 1.25x, 1.5x (twice) and 2.0x playback in fresh processes before freezing (822-881 s, 1169-1237 s)."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 49.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Only inspected BatchRollout signatures; sweeps ran sequentially in dbg_sweep.py."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 49.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "1121 s reference-velocity feedforward q_ref += (kd/kp)*qd_ref (the card's target-offset law) made the 2x stress playback pass; compiled gains and limits confirmed."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 590.7,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "689 s unit-tested quat_pitch_xyzw on known rotations and ran a small-gain polarity test (card checks) -> 720 s 'found the balance loop's effective sign ... kept the robot upright and brought nominal RMSEs under threshold'."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 590.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No conversion or name-lookup work followed."
+   }
+  ],
+  "needed": "Size servo stiffness from the gravity load instead of rotor armature (about 10-25x the 10 Hz armature gains) so stance joints stay inside the error budget; with only 10x, a correctly signed root-pitch-to-ankle balance loop is also needed.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/grasp_drift-haiku-mcp-cards-v2-p0",
+  "model": "claude-haiku-4-5",
+  "task": "grasp_drift",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 57.8,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No cone/impratio check (the scene is already elliptic with impratio 50); next actions inspected gripper joint values."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 61.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No friction budget or batched one-at-a-time table; creep never examined."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 63.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No per-pad force vs limit check."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 65.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "96-117 s compared gripper targets with model.joint_q (static initial values) and concluded 'joint limits prevent the gripper from closing'; the wrong conclusion came from reading the model instead of the state, and the card's pad-contact checks were never run."
+   }
+  ],
+  "needed": "The finger geoms win the contact priority contest and their soft legacy contact (ke=250, kd=10 -> solref tau 0.2 s) lets the pads sink 12-14 mm and the cube rotate; stiffen the finger contact material (~10x ke/kd).",
+  "needed_card": "CON-01",
+  "found": false,
+  "failure_reason": "Never opened CON-01/CON-02 or ran solver_params('geom'); misread static model.joint_q as live state and 'fixed' the finger joint limits (-0.02 m); its test appended aliased example.state_0 references, so displacement read 0.00 mm; declared success at 491 s. Verification: 10 cm drift 26.4 mm (limit 5).",
+  "missing_card": "Reading live state: model.joint_q/body_q hold the initial configuration and state_0/state_1 swap every substep, so measure from state_0 and copy .numpy() each frame.",
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/grasp_drift-luna-mcp-cards-v2-p0",
+  "model": "gpt-6-luna",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 10.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Next read at 13 s was CON-01 (CON-03: 'Rule out CON-01 and CON-07 first'); 24 s plan checks contact materials before the creep hypothesis, which was never needed."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 10.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "24.2 s 'already uses an elliptic cone with impratio=50, so the basic CON-04 repair is present' (ruled out)."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 13.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "75 s solver_params('geom') on the finger shapes -> 116.7 s 'finger geoms have priority 1 and therefore impose friction 1.0 and a 0.2 s contact time constant; the cube's ... are not the deciding values' -> 240 s stiffen only the finger contacts (card repair: material on the deciding geom)."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 13.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "240 s 'whose 0.2 s legacy contact time constant lets the pads sink deeply' (tau = 2/kd with kd=10); finger ke/kd 10x: 26.3 -> 2.03 mm."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 83.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "127-240 s traced both pads with contacts_between(detail=True) (card check: both pads active), finding 12-14 mm penetration and cube rotation."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 83.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Pad normal force (~11 N) was logged but never compared with a force limit; no actuator check."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 110.5,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "The stiffness sweep ran live by editing model arrays, not with BatchRollout."
+   }
+  ],
+  "needed": "The finger geoms win the contact priority contest and their soft legacy contact (ke=250, kd=10 -> solref tau 0.2 s) lets the pads sink 12-14 mm and the cube rotate; stiffen the finger contact material (~10x ke/kd).",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/sdf_grind-haiku-mcp-cards-v2-p0",
+  "model": "claude-haiku-4-5",
+  "task": "sdf_grind",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [],
+  "needed": "Edit the SDF texture data the collision model already references, in place on both the coarse grid and the fine subgrids, subtracting the wheel's swept volume between consecutive poses; verify with a collide-only load probe.",
+  "needed_card": "BLD-05",
+  "found": false,
+  "failure_reason": "Never opened a card and made no MCP calls; rebuilt a new SDF from a filtered isomesh into self.workpiece_sdf, which collision never reads (BLD-05: 'a rebuilt SDF that is not registered does not reach collision'); its check.py did not test removal on the collision side; declared success at 763 s. Removed volume 0, groove load unchanged.",
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.2/sdf_grind-luna-mcp-cards-v2-p0",
+  "model": "gpt-6-luna",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 7.1,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "13-35 s ran the card's identity check (model textures 'is' the workpiece textures) and collide-only probe (43 contacts, 15.4 kN); 259 s in-place subtraction of the swept segment on coarse + fine subgrids (card repair); 346 s probe shows groove cleared. Read via glob 'BLD-05*.md', not logged in card_usage.json."
+   }
+  ],
+  "needed": "Edit the SDF texture data the collision model already references, in place on both the coarse grid and the fine subgrids, subtracting the wheel's swept volume between consecutive poses; verify with a collide-only load probe.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.2"
+ },
+ {
+  "trial": "v6.3/abc_arm-haiku-mcp-cards-v3-p0",
+  "model": "claude-haiku-4-5",
+  "task": "abc_arm",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "BAT-03",
+    "how": "auto",
+    "first_seconds": 1597.9,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "1598 s: attached to a 'Failed to allocate 2640896 bytes' error at the end of a 240 s serial sweep cell; next action (1608 s) 'apply the best settings found to the file'; no batching or chunking change."
+   }
+  ],
+  "needed": "Command latency (~70-90 ms) plus reduced gravity compensation on the lower arm links (the real arm sags), with per-joint servo gain/friction calibration, accepted on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": false,
+  "failure_reason": "Never opened a card or the index; ran ~30 serial global-scale sweeps (delay, uniform kp/kd scale, armature, friction up to 9x) on all 64 logs, never touched gravity compensation or per-joint terms; plateaued at 0.0256 rad (held-out 0.0251 > 0.023) and was cut off at the time limit (last tool call rejected at 1800 s).",
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/abc_arm-luna-mcp-cards-v3-p0",
+  "model": "gpt-6-luna",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 700.8,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "19 s: 'The provided card points to latency, gravity compensation, and servo response as likely causes'; first sweeps are command delay (86 s) and gravcomp (116 s); final fix = 80 ms delay + gravcomp ~0.8 on lower links (451-519 s) + per-joint gains."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "19 s: 'reserve a separate episode split for validation'; 63 s 24/8 episode split with train/val columns in every sweep; 654 s scores a second disjoint 8-episode split (0.0164 rad) before editing."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "86 s: batch_fit builds one model with candidates x windows as worlds (W=C*S; 10 delays x 894 windows in 5 s), used for all ~30 sweeps."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No equation-error fit, regularisation or validity parameterisation; no visible use."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 12.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Gains set at build time through the starter's build_model; no notify or target-offset use."
+   }
+  ],
+  "needed": "Command latency (~70-90 ms) plus reduced gravity compensation on the lower arm links (the real arm sags), with per-joint servo gain/friction calibration, accepted on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/abc_arm-luna-mcp-cards-v3-p1",
+  "model": "gpt-6-luna",
+  "task": "abc_arm",
+  "success": true,
+  "first_pass_seconds": 840.0,
+  "cards": [
+   {
+    "id": "FIT-03",
+    "how": "file",
+    "first_seconds": 14.0,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "12 s: 'inspect the replay setup and FIT-03/FIT-05 guidance'; 59-67 s regresses torque on (cmd(t-d)-q, -qd, 1) per joint over delays (the card's check); final = 70 ms delay, regressed gains, MJCF gravcomp scaled 0.85 (504-535 s)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 14.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Episode split train {5,7,9,11} / val {6,8,10,13} from 230 s; 756-771 s scores a separate unseen 8-episode set (0.0208 rad) before finishing."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 27.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "50 s: 'a principled starting point ... before spending time on expensive dynamics rollouts'; equation-error gains used only as the 'torque_guess' start (316 s), then candidates judged on the task's output-error scorer."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 27.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Candidates still evaluated one model per candidate in serial fresh processes (107-790 s), not candidates x scenarios as worlds."
+   }
+  ],
+  "needed": "Command latency (~70-90 ms) plus reduced gravity compensation on the lower arm links (the real arm sags), with per-joint servo gain/friction calibration, accepted on held-out episodes.",
+  "needed_card": "FIT-03",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/cube_toss-haiku-mcp-cards-v3-p0",
+  "model": "claude-haiku-4-5",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 123.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No friction estimate from slide deceleration and no support-height check; lowered mu at 167-171 s only from sweep results ('try even lower friction')."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 126.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No citation or mapping check; 138-141 s continues its pre-card 'very stiff, very damped' + more-substeps sweep (sweep2 at 103 s predates the read) to ke=1e5, kd=3000, 100 substeps."
+   }
+  ],
+  "needed": "Low sliding friction (~0.2) and a stiff, strongly damped contact (impacts barely rebound: tau of a few ms, zeta >= 1 under the legacy ke/kd -> solref mapping), calibrated batched on a train/validation split.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/cube_toss-luna-mcp-cards-v3-p0",
+  "model": "gpt-6-luna",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 13.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Follows its repair order: friction plus contact tau/zeta sweep batched (103 s), condim/torsional (172 s), tau/zeta x substeps (233 s), then fine mu around 0.2 (278 s)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 13.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "17 s: 'tune on a representative split and reserve the remaining tosses as a held-out check'; even-index train / odd-index validation (285 s, 313 s)."
+   },
+   {
+    "id": "FIT-01",
+    "how": "file",
+    "first_seconds": 13.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 13.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "68-103 s: BatchRollout.evaluate over candidates x tosses (120 worlds) for every sweep."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 84.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No priority/solmix check or edit."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 84.6,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "103 s sweep parameterised with its legacy mapping kd=2/tau, ke=(kd/(2*zeta))^2, batched with friction; final tau=2 ms, zeta=1.5 (code comment cites the mapping)."
+   },
+   {
+    "id": "CON-05",
+    "how": "file",
+    "first_seconds": 84.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "139 s: 'torsional and rolling friction are inactive because the model uses MuJoCo condim=3'; condim 6 kept in the final model; auto-attached again at 345 s on the 'condim leaves out' warning, after which the table plane was set to condim 6 too (361-382 s)."
+   },
+   {
+    "id": "MSG-01",
+    "how": "auto",
+    "first_seconds": 143.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Attached to 'Custom attribute mujoco:condim is not defined'; file read at 146 s; next call adds SolverMuJoCo.register_custom_attributes (152 s). The error text also named the fix."
+   },
+   {
+    "id": "CON-11",
+    "how": "file",
+    "first_seconds": 399.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read for a linesearch-limit warning; ran health() (402 s), which was ok, and made no solver change. Ruled out a problem."
+   }
+  ],
+  "needed": "Low sliding friction (~0.2) and a stiff, strongly damped contact (impacts barely rebound: tau of a few ms, zeta >= 1 under the legacy ke/kd -> solref mapping), calibrated batched on a train/validation split.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/cube_toss-luna-mcp-cards-v3-p1",
+  "model": "gpt-6-luna",
+  "task": "cube_toss",
+  "success": true,
+  "first_pass_seconds": 312.5,
+  "cards": [
+   {
+    "id": "FIT-04",
+    "how": "file",
+    "first_seconds": 11.5,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "49 s: 'sweeping friction and impact dissipation first'; the first sweep covers mu, kd and table_height (support height) (71 s); final mu 0.18, kd 800, table -2.5 mm."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 11.5,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "49 s: even/odd split, 'tuning on half the recordings and checking the other half'; fine sweeps reported on both halves (227 s)."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 20.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 20.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "124 s: kd swept 200-3200 jointly with mu (wide range, batched with friction), reaching the strongly damped kd=800."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 20.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Inspected the MCP evaluate signature (20 s) but swept candidates serially with module.evaluate."
+   }
+  ],
+  "needed": "Low sliding friction (~0.2) and a stiff, strongly damped contact (impacts barely rebound: tau of a few ms, zeta >= 1 under the legacy ke/kd -> solref mapping), calibrated batched on a train/validation split.",
+  "needed_card": "FIT-04",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/g1_hard-haiku-mcp-cards-v3-p0",
+  "model": "claude-haiku-4-5",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [],
+  "needed": "high5's root turn and weight shift cannot be balanced by joint-space PD: it needs model-based balance, i.e. contact-constrained inverse-dynamics (QP) torques delivered as servo target offsets, with unscored root yaw as slack / softened hip yaw.",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Never opened a card; cycled armature-scaled gain frequencies (20-100 Hz), acceleration and velocity feedforward, and damping ratios with no balance model; high5 and 0.9x high5 fall (root RMSE 0.79-0.81 m) while wave passes.",
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/g1_hard-luna-mcp-cards-v3-p0",
+  "model": "gpt-6-luna",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 10.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read via a CTL-02* glob that card_usage.json missed. 91 s: adds reference inverse-dynamics torques 'as servo target offsets, including velocity compensation'; kept in final ('reference velocity and gravity compensation'). Enough for wave, not for high5."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 10.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read via glob, missed by card_usage.json. 59-91 s: reference inverse dynamics vs effort limits (its check), concluding 'mostly dynamically trackable'; 255 s switches to 'a contact aware whole body controller ... enforcing foot contact constraints' (its QP repair), abandoned by ~620 s."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 13.6,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Only single-world rollouts."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 13.6,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "394 s: target = q + (tau + kd*qd)/kp (the card's target-offset law) used to deliver the feedforward torques."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 28.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "47 s: solver.convert_joint_coords_to_mujoco used to build reference qpos/qvel for mj_inverse."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 28.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Pelvis/ankle feedback added later (866-1119 s) without its impulse/sign tests."
+   },
+   {
+    "id": "CTL-08",
+    "how": "file",
+    "first_seconds": 256.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CTL-05",
+    "how": "file",
+    "first_seconds": 256.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No hand IK problems; no visible use."
+   },
+   {
+    "id": "CON-06",
+    "how": "file",
+    "first_seconds": 754.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "754 s: 'checking the solver's actual floor contacts'; health() at 761 s showed 12 contacts and no overflow, ruling out missing contacts."
+   },
+   {
+    "id": "CON-07",
+    "how": "file",
+    "first_seconds": 754.9,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "contacts_between on the feet (780 s) showed 47 N and 247 N normal forces; 866 s concludes 'tipping over the planted support points, not the feet sliding'."
+   },
+   {
+    "id": "CON-01",
+    "how": "auto",
+    "first_seconds": 760.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached on 'higher geom_priority' in a report; no reaction."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 766.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No contact-stiffness change."
+   }
+  ],
+  "needed": "high5's root turn and weight shift cannot be balanced by joint-space PD: it needs model-based balance, i.e. contact-constrained inverse-dynamics (QP) torques delivered as servo target offsets, with unscored root yaw as slack / softened hip yaw.",
+  "needed_card": "CTL-03",
+  "found": false,
+  "failure_reason": "Tried CTL-03's QP at 255 s, but its hand-built contact estimate (reference feet a few mm above the floor, then a fixed-contact solve) gave no or wrong support reaction and worse tracking. It reverted at ~600 s to gravity feedforward plus heuristic pelvis/foot feedback; high5 falls at frame ~103; it stopped at 1345 s.",
+  "missing_card": "A worked balance recipe for humanoids on SolverMuJoCo position servos: a per-step contact-constrained inverse-dynamics QP on solver.mj_model (feet as unilateral contacts with friction-cone/CoP limits, not rigid 6-DoF constraints; unscored root yaw as slack) delivered as q* = q + (tau + kd*qd)/kp with reduced servo kp, plus a short turn/weight-shift segment as its pass check.",
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/g1_hard-luna-mcp-cards-v3-p1",
+  "model": "gpt-6-luna",
+  "task": "g1_hard",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "227 s: 'express the computed joint torques as servo target offsets'; 616 s adds reference-velocity feedforward 'to cancel the damping lag' (the card's 'velocity feedforward missing')."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "227 s: switches to a whole-body torque QP enforcing the reference foot poses (its repair); 892 s 'lets yaw yield ... since the score checks root position and uprightness' and 1244 s low-passes hip/waist yaw (its 'soften hip yaw; low-pass unscored root yaw'). The delivered controller is that QP blended with PD, and it still failed high5."
+   },
+   {
+    "id": "CTL-08",
+    "how": "file",
+    "first_seconds": 8.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CON-02",
+    "how": "auto",
+    "first_seconds": 32.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached on 'deep penetration (> 10 mm)'; no contact change; 115 s raises servo bandwidth instead."
+   }
+  ],
+  "needed": "high5's root turn and weight shift cannot be balanced by joint-space PD: it needs model-based balance, i.e. contact-constrained inverse-dynamics (QP) torques delivered as servo target offsets, with unscored root yaw as slack / softened hip yaw.",
+  "needed_card": "CTL-03",
+  "found": true,
+  "failure_reason": "Implemented the right approach (contact QP, target offsets, yaw slack), but with the feet as fixed 6-axis constraints blended with stiff PD. It tipped during the high5 turn and the 0.9x run (root RMSE 0.40/0.32 m); it stopped at 1409 s.",
+  "missing_card": "A worked balance recipe for humanoids on SolverMuJoCo position servos: a per-step contact-constrained inverse-dynamics QP on solver.mj_model (feet as unilateral contacts with friction-cone/CoP limits, not rigid 6-DoF constraints; unscored root yaw as slack) delivered as q* = q + (tau + kd*qd)/kp with reduced servo kp, plus a short turn/weight-shift segment as its pass check.",
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/g1_track-haiku-mcp-cards-v3-p0",
+  "model": "claude-haiku-4-5",
+  "task": "g1_track",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-01",
+    "how": "mcp",
+    "first_seconds": 129.8,
+    "class": "misleading",
+    "seconds_lost": 50,
+    "evidence": "134 s: 'Perfect! I found the issue. The POSITION servo mode needs a velocity offset'; 158 s adds notify_model_changed. The joints only looked frozen because its probe stepped a fresh model.state(). Its report_solver_params check (174 s) then showed correctly compiled gains."
+   },
+   {
+    "id": "CTL-02",
+    "how": "mcp",
+    "first_seconds": 128.1,
+    "class": "misleading",
+    "seconds_lost": 10,
+    "evidence": "Seen only as a cards() search hit. 273 s: 'Looking at the CTL-02 debug card, I realize the issue might be gravity'; adds gravity feedforward against the same measurement artifact, removed again at 423-431 s."
+   }
+  ],
+  "needed": "Servo gains sized from the gravity load instead of rotor armature (kp up ~4-10x, near-critical kd), reference-velocity feedforward in the target, and a small pelvis pitch/position correction through the legs, validated with margin on faster playback.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": "Measurement bug: it read a fresh model.state(), so nothing appeared to move, and it chased servo, ctrl and graph causes for ~5 min. It then shipped untested 35 Hz armature-scaled gains at 513 s (70% of the budget unused). Wave passes, but the unseen faster playback misses root RMSE by 0.4 mm (0.0404 > 0.04 m).",
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/g1_track-luna-mcp-cards-v3-p0",
+  "model": "gpt-6-luna",
+  "task": "g1_track",
+  "success": true,
+  "first_pass_seconds": 480.0,
+  "cards": [
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 8.4,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "21 s: 'controller gains are very low: they were derived from reflected armature inertia, which matches the failure pattern in CTL-02'; 146 s gravity torques via eval_inverse_dynamics_passive (its check); final = 20 Hz servos + reference velocity compensation + ankle balance."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 8.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 40.4,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "67 s: writes joint_target_ke/kd then solver.notify_model_changed (its repair); 171 s velocity-feedforward target offset, kept in the final controller."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 40.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Its 1.25-2x speed probes (337-385 s) come from the task's unseen faster playback, not a data split."
+   }
+  ],
+  "needed": "Servo gains sized from the gravity load instead of rotor armature (kp up ~4-10x, near-critical kd), reference-velocity feedforward in the target, and a small pelvis pitch/position correction through the legs, validated with margin on faster playback.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/g1_track-luna-mcp-cards-v3-p1",
+  "model": "gpt-6-luna",
+  "task": "g1_track",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [
+   {
+    "id": "CTL-01",
+    "how": "file",
+    "first_seconds": 26.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Final step adds target += (kd/kp)*qd_ref (velocity feedforward, the card's target-offset law)."
+   },
+   {
+    "id": "CTL-02",
+    "how": "file",
+    "first_seconds": 26.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "36 s: 'existing gains are scaled from reflected armature alone, which the debug card flags as too weak for whole-body gravity loads'; KP_SCALE=10 in the final controller."
+   },
+   {
+    "id": "CTL-03",
+    "how": "file",
+    "first_seconds": 26.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "159 s: 'in-place body turn while both reference ankle centers stay almost fixed ... points to stance balance and yaw/foot interaction'; adds a YAW_SERVO_SCALE knob."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 26.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CTL-06",
+    "how": "file",
+    "first_seconds": 160.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "159 s: 'checking the state conventions'; balance code comments 'Newton stores the free-joint quaternion as xyzw' and uses world-frame angular velocity (final lines 181-192)."
+   },
+   {
+    "id": "CTL-05",
+    "how": "file",
+    "first_seconds": 160.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CTL-04",
+    "how": "file",
+    "first_seconds": 160.0,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Swept the feedback sign (203-212 s, 'negative pos feedback trial') rather than running its impulse test."
+   },
+   {
+    "id": "BAT-05",
+    "how": "file",
+    "first_seconds": 359.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "Read after 1.5x runs disagreed (0.039 vs 0.079 m); 367-383 s in-process repeats and 436-478 s fresh-process runs (its check)."
+   }
+  ],
+  "needed": "Servo gains sized from the gravity load instead of rotor armature (kp up ~4-10x, near-critical kd), reference-velocity feedforward in the target, and a small pelvis pitch/position correction through the legs, validated with margin on faster playback.",
+  "needed_card": "CTL-02",
+  "found": true,
+  "failure_reason": "Marginal closed loop: 1.5x-playback root RMSE ranged 0.021-0.079 m across in-process runs, and it shipped after two fresh runs at 492 s (73% of budget left). The verifier's faster playback scored 0.0434 > 0.04 m. It did not read CTL-09 (repeat/held-out margin).",
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/grasp_drift-haiku-mcp-cards-v3-p0",
+  "model": "claude-haiku-4-5",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 102.6,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "141 s: prints compiled geom_solref (0.2 s time constant, its check); 153 s: 'The contact stiffness parameters are too soft'; stiffens the finger default ke/kd, verifies solref and re-tunes the damping ratio 7.07 -> 1.12 (177-202 s)."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 105.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 108.7,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "118 s: tried to print solver.cone_type/impratio (its check), got an AttributeError and dropped it."
+   },
+   {
+    "id": "CTL-01",
+    "how": "auto",
+    "first_seconds": 120.4,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Attached because dir(solver) printed 'SolverNotifyFlags' (false match); no effect."
+   }
+  ],
+  "needed": "The finger geoms win the contact (higher geom priority) and inherit the robot-wide soft default (ke=250, kd=10 -> 0.2 s time constant); put a stiff material on the deciding finger geoms.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/grasp_drift-luna-mcp-cards-v3-p0",
+  "model": "gpt-6-luna",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 9.0,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "15 s solver_params('option'); 28 s: 'starts with an elliptic friction cone and impratio=50, so the common low-friction-cone default is already addressed' (ruled out)."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "168 s: 'the finger geoms are assigned higher MuJoCo contact priority, so they override the cube's stiff contact material'; the fix puts a stiff material on the deciding finger geoms (176 s)."
+   },
+   {
+    "id": "CON-02",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "168 s: compares compiled time constants (0.2 s fingers vs 0.0025 s cube) to quantify the softness."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "79 s: 'checking the effective finger contact material and grip loads'; 84-89 s per-pad contacts_between normal force and penetration (its check)."
+   },
+   {
+    "id": "FIT-05",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "BAT-03",
+    "how": "file",
+    "first_seconds": 15.1,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "Read the batch docs (23 s) but ran single-world live experiments."
+   }
+  ],
+  "needed": "The finger geoms win the contact (higher geom priority) and inherit the robot-wide soft default (ke=250, kd=10 -> 0.2 s time constant); put a stiff material on the deciding finger geoms.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/grasp_drift-luna-mcp-cards-v3-p1",
+  "model": "gpt-6-luna",
+  "task": "grasp_drift",
+  "success": true,
+  "first_pass_seconds": 120.0,
+  "cards": [
+   {
+    "id": "CON-04",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "21 s: 'already uses an elliptic friction cone and a high impratio, so the obvious solver defaults are not the failure' (ruled out)."
+   },
+   {
+    "id": "CON-03",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "unused",
+    "seconds_lost": null,
+    "evidence": "No visible use."
+   },
+   {
+    "id": "CON-01",
+    "how": "file",
+    "first_seconds": 10.2,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "21 s: 'checking ... which shape's material wins for those contacts'; 115 s root cause: 'Finger priority makes that soft response govern the cube contacts'; the fix matches finger ke/kd to the cube (116 s)."
+   },
+   {
+    "id": "CON-08",
+    "how": "file",
+    "first_seconds": 16.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "80-87 s: raw mjw_data.contact rows mapped to shapes; 85 s: 'Raw MuJoCo data confirms cube-finger contacts are being generated ... rather than a missing-collider problem'."
+   },
+   {
+    "id": "CON-09",
+    "how": "file",
+    "first_seconds": 16.3,
+    "class": "helpful",
+    "seconds_lost": null,
+    "evidence": "21 s: 'checking whether the fingers actually load the cube symmetrically'; 28 s per-pad contacts_between(detail=True) (its check)."
+   }
+  ],
+  "needed": "The finger geoms win the contact (higher geom priority) and inherit the robot-wide soft default (ke=250, kd=10 -> 0.2 s time constant); put a stiff material on the deciding finger geoms.",
+  "needed_card": "CON-01",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/sdf_grind-haiku-mcp-cards-v3-p0",
+  "model": "claude-haiku-4-5",
+  "task": "sdf_grind",
+  "success": false,
+  "first_pass_seconds": null,
+  "cards": [],
+  "needed": "Edit the texture SDF that the collision pipeline references in place on both coarse and fine levels, subtracting the wheel's swept volume between consecutive poses, then re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": false,
+  "failure_reason": "Never opened a card. Its kernel overwrote voxels inside the wheel's current pose with 1e9 via copy_to/copy_from instead of a signed-distance subtraction of the swept volume. It tried per-frame pipeline rebuilds and a too-slow mesh rebuild, then shipped without a full-pass check, claiming success at ~800 s. Verifier: 8% of the groove cleared, 48% of the volume removed, load ratio 0.99.",
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/sdf_grind-luna-mcp-cards-v3-p0",
+  "model": "gpt-6-luna",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 240.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 9.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "15 s: 'checking whether the live collision model holds that same SDF object and how its coarse and fine texture levels are represented before choosing the in-place edit' (its identity check); final: 'subtracts the wheel's swept volume from both SDF texture levels used by collision, then refreshes the rendered surface'."
+   }
+  ],
+  "needed": "Edit the texture SDF that the collision pipeline references in place on both coarse and fine levels, subtracting the wheel's swept volume between consecutive poses, then re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ },
+ {
+  "trial": "v6.3/sdf_grind-luna-mcp-cards-v3-p1",
+  "model": "gpt-6-luna",
+  "task": "sdf_grind",
+  "success": true,
+  "first_pass_seconds": 360.0,
+  "cards": [
+   {
+    "id": "BLD-05",
+    "how": "file",
+    "first_seconds": 16.3,
+    "class": "decisive",
+    "seconds_lost": null,
+    "evidence": "Read via a BLD-05* glob that card_usage.json missed. 20 s: 'The BLD-05 card points to two requirements here: edit the same texture SDF object the model collides against, and subtract the entire swept volume between frames'; 245-302 s in-place swept-cylinder subtraction, isomesh refreshed."
+   }
+  ],
+  "needed": "Edit the texture SDF that the collision pipeline references in place on both coarse and fine levels, subtracting the wheel's swept volume between consecutive poses, then re-extract the isomesh.",
+  "needed_card": "BLD-05",
+  "found": true,
+  "failure_reason": null,
+  "missing_card": null,
+  "group": "v6.3"
+ }
+]
