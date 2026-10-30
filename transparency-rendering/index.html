@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <title>ViewerGL Transparency Rendering Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #5d6678;
+      --line: #d8dee8;
+      --soft: #edf2f7;
+      --accent: #1667a6;
+      --accent-strong: #0f4e82;
+      --good: #227a50;
+      --warn: #a36316;
+      --shadow: 0 12px 32px rgba(31, 41, 55, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 36px 24px 60px;
+    }
+
+    header {
+      padding: 30px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      max-width: 980px;
+      font-size: 34px;
+    }
+
+    h2 {
+      margin: 34px 0 14px;
+      font-size: 23px;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    a {
+      color: var(--accent-strong);
+    }
+
+    code {
+      padding: 2px 5px;
+      background: var(--soft);
+      border-radius: 4px;
+      font-family: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+
+    .subtitle {
+      max-width: 950px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 6px 11px;
+      color: #293244;
+      background: #f9fbfd;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(31, 41, 55, 0.08);
+      overflow: hidden;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-height: 124px;
+    }
+
+    .metric strong {
+      font-size: 28px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric span,
+    .caption,
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .summary-system {
+      margin: 22px 0 10px;
+      color: #344054;
+    }
+
+    .good {
+      color: var(--good);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(31, 41, 55, 0.08);
+    }
+
+    th,
+    td {
+      padding: 12px 13px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    th {
+      color: #344054;
+      background: #eef3f8;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 16px 18px;
+      background: #eef7fc;
+      border: 1px solid #c8dfef;
+      border-radius: 8px;
+    }
+
+    .callout p + p {
+      margin-top: 10px;
+    }
+
+    .scene-card img,
+    .comparison img,
+    .viewer img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #111827;
+    }
+
+    .scene-card img {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .viewer {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .viewer-toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 340px) 1fr auto;
+      gap: 14px;
+      align-items: end;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fafcfe;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    select,
+    button {
+      min-height: 38px;
+      padding: 7px 10px;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      color: #ffffff;
+      background: var(--accent);
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+
+    .timeline-wrap {
+      display: grid;
+      gap: 8px;
+    }
+
+    .timeline-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .timeline {
+      position: relative;
+      height: 38px;
+      padding: 15px 0;
+      cursor: ew-resize;
+      touch-action: none;
+    }
+
+    .timeline-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 17px;
+      height: 4px;
+      background: #d2dae6;
+      border-radius: 999px;
+    }
+
+    .timeline-fill {
+      position: absolute;
+      left: 0;
+      top: 17px;
+      height: 4px;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 999px;
+    }
+
+    .timeline-thumb {
+      position: absolute;
+      top: 9px;
+      left: 0%;
+      width: 20px;
+      height: 20px;
+      margin-left: -10px;
+      background: #ffffff;
+      border: 4px solid var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(31, 41, 55, 0.24);
+    }
+
+    .ticks {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .tick {
+      position: absolute;
+      top: 13px;
+      width: 1px;
+      height: 12px;
+      background: rgba(71, 85, 105, 0.35);
+    }
+
+    .triptych {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px;
+      background: #e9eef5;
+    }
+
+    figure {
+      margin: 0;
+      background: #0b1020;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    figcaption {
+      padding: 8px 10px;
+      color: #d7deea;
+      background: #111827;
+      font-size: 13px;
+    }
+
+    .viewer-note {
+      padding: 0 16px 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .foot {
+      margin-top: 36px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .grid,
+      .grid.two,
+      .grid.three,
+      .triptych,
+      .viewer-toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .page {
+        padding: 22px 14px 42px;
+      }
+
+      header {
+        padding: 22px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>ViewerGL Transparency Rendering: Sorted Blending vs Weighted OIT</h1>
+      <p class="subtitle">
+        Cross-system benchmark results plus orbiting visual comparisons for transparent cloth, robots,
+        and repeated mesh-heavy scenes. The visual comparison viewer updates frame-by-frame with a
+        mouse-draggable timeline.
+      </p>
+      <div class="meta">
+        <span class="pill">Run date: June 30, 2026</span>
+        <span class="pill">Benchmark request: 1920 x 1080, 30 measured frames</span>
+        <span class="pill">M1 framebuffer: 3840 x 2160, Retina 2x</span>
+        <span class="pill">Orbit comparison: 960 x 540, 12 camera frames</span>
+        <span class="pill">Opacity defaults: cloth 0.42, robot 0.34, benchmark 0.45</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>System Under Test</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>GPU</th>
+            <th>CPU</th>
+            <th>RAM</th>
+            <th>OS</th>
+            <th>Driver</th>
+            <th>Framebuffer</th>
+            <th>Newton</th>
+            <th>Warp</th>
+            <th>Python</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td>NVIDIA GeForce RTX 4090, 24 GiB</td>
+            <td>Intel Core i9-12900K</td>
+            <td>64 GiB</td>
+            <td>Windows 11 10.0.22635</td>
+            <td>595.79</td>
+            <td>1920 x 1080</td>
+            <td>1.4.0.dev0</td>
+            <td>1.14.0</td>
+            <td>3.12.3</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td>Apple M1, 8-core integrated GPU</td>
+            <td>Apple M1, 8 cores (4 performance, 4 efficiency)</td>
+            <td>8 GiB unified memory</td>
+            <td>macOS 26.2 (25C56), arm64</td>
+            <td>OpenGL 4.1 Metal - 90.5</td>
+            <td>3840 x 2160 (1920 x 1080 request, Retina 2x)</td>
+            <td>1.4.0.dev0</td>
+            <td>1.14.0</td>
+            <td>3.12.12</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Benchmark Summary</h2>
+      <h3 class="summary-system">RTX 4090 desktop · 1920 x 1080</h3>
+      <div class="grid">
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-0.9%</strong>
+            <span><code>cloth_shirt_4</code> OIT speedup. Sorted and OIT are effectively tied on this view.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="good">+23.7%</strong>
+            <span><code>shape_cloud_240</code> OIT speedup over sorted blending.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="good">+36.0%</strong>
+            <span><code>mesh_spheres_160</code> OIT speedup over sorted blending.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="good">+34.9%</strong>
+            <span><code>bunny_meshes_24</code> OIT speedup over sorted blending.</span>
+          </div>
+        </div>
+      </div>
+      <h3 class="summary-system">MacBook Pro M1 · 3840 x 2160 Retina framebuffer</h3>
+      <div class="grid">
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-16.2%</strong>
+            <span><code>cloth_shirt_4</code> OIT speedup. OIT takes 16.152 ms versus 13.541 ms sorted.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-21.7%</strong>
+            <span><code>shape_cloud_240</code> OIT speedup. OIT takes 12.519 ms versus 9.801 ms sorted.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-27.8%</strong>
+            <span><code>mesh_spheres_160</code> OIT speedup. OIT takes 12.313 ms versus 8.889 ms sorted.</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body metric">
+            <strong class="warn">-28.1%</strong>
+            <span><code>bunny_meshes_24</code> OIT speedup. OIT takes 11.386 ms versus 8.190 ms sorted.</span>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <p>
+          <strong>Sorted blending</strong> draws transparent objects back-to-front and uses conventional alpha blending.
+          <strong>Weighted OIT</strong> accumulates transparent fragments into order-independent buffers and resolves
+          the result approximately. The OIT path avoids object-level ordering sensitivity, while visual differences
+          remain scene-dependent.
+        </p>
+        <p>
+          <strong>Reading the results:</strong> OIT speedup is
+          <code>(sorted mean / OIT mean - 1) x 100</code>, so negative values mean OIT is slower.
+          The M1 requested a 1920 x 1080 window, but the native macOS Retina context produced a
+          3840 x 2160 backing framebuffer. It therefore shaded four times as many pixels as the RTX run;
+          compare each system's sorted-versus-OIT behavior rather than treating the two systems as equal-resolution tests.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Frame Time Results</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>Scene</th>
+            <th>Geometry</th>
+            <th class="num">Sorted mean ms</th>
+            <th class="num">OIT mean ms</th>
+            <th class="num">OIT speedup</th>
+            <th class="num">Mean abs RGB</th>
+            <th class="num">RMS RGB</th>
+            <th class="num">Max abs RGB</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>cloth_shirt_4</code></td>
+            <td>4 transparent shirt cloth meshes, 50,944 cloth triangles</td>
+            <td class="num">10.961</td>
+            <td class="num">11.058</td>
+            <td class="num warn">-0.9%</td>
+            <td class="num">0.856</td>
+            <td class="num">3.063</td>
+            <td class="num">64</td>
+          </tr>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>shape_cloud_240</code></td>
+            <td>240 transparent primitive shapes plus opaque ground</td>
+            <td class="num">3.638</td>
+            <td class="num">2.941</td>
+            <td class="num good">+23.7%</td>
+            <td class="num">1.846</td>
+            <td class="num">6.295</td>
+            <td class="num">71</td>
+          </tr>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>mesh_spheres_160</code></td>
+            <td>160 transparent generated sphere mesh instances</td>
+            <td class="num">1.846</td>
+            <td class="num">1.357</td>
+            <td class="num good">+36.0%</td>
+            <td class="num">0.994</td>
+            <td class="num">4.386</td>
+            <td class="num">66</td>
+          </tr>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>bunny_meshes_24</code></td>
+            <td>24 transparent bunny.usd mesh instances, 292,800 mesh triangles</td>
+            <td class="num">2.002</td>
+            <td class="num">1.484</td>
+            <td class="num good">+34.9%</td>
+            <td class="num">0.360</td>
+            <td class="num">3.112</td>
+            <td class="num">93</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>cloth_shirt_4</code></td>
+            <td>4 transparent shirt cloth meshes, 50,944 cloth triangles</td>
+            <td class="num">13.541</td>
+            <td class="num">16.152</td>
+            <td class="num warn">-16.2%</td>
+            <td class="num">0.839</td>
+            <td class="num">3.049</td>
+            <td class="num">66</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>shape_cloud_240</code></td>
+            <td>240 transparent primitive shapes plus opaque ground</td>
+            <td class="num">9.801</td>
+            <td class="num">12.519</td>
+            <td class="num warn">-21.7%</td>
+            <td class="num">1.815</td>
+            <td class="num">6.264</td>
+            <td class="num">72</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>mesh_spheres_160</code></td>
+            <td>160 transparent generated sphere mesh instances</td>
+            <td class="num">8.889</td>
+            <td class="num">12.313</td>
+            <td class="num warn">-27.8%</td>
+            <td class="num">0.971</td>
+            <td class="num">4.367</td>
+            <td class="num">66</td>
+          </tr>
+          <tr>
+            <td>MacBook Pro M1</td>
+            <td><code>bunny_meshes_24</code></td>
+            <td>24 transparent bunny.usd mesh instances, 292,800 mesh triangles</td>
+            <td class="num">8.190</td>
+            <td class="num">11.386</td>
+            <td class="num warn">-28.1%</td>
+            <td class="num">0.356</td>
+            <td class="num">3.101</td>
+            <td class="num">98</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Benchmark Screenshots (RTX 4090 desktop)</h2>
+      <div class="grid two">
+        <article class="card scene-card">
+          <a href="benchmark/cloth_shirt_4_compare.png">
+            <img src="benchmark/cloth_shirt_4_compare.png" alt="cloth_shirt_4 sorted and OIT comparison">
+          </a>
+          <div class="card-body">
+            <h3><code>cloth_shirt_4</code></h3>
+            <p class="caption">Four transparent garment meshes from <code>unisex_shirt.usd</code>.</p>
+          </div>
+        </article>
+        <article class="card scene-card">
+          <a href="benchmark/shape_cloud_240_compare.png">
+            <img src="benchmark/shape_cloud_240_compare.png" alt="shape_cloud_240 sorted and OIT comparison">
+          </a>
+          <div class="card-body">
+            <h3><code>shape_cloud_240</code></h3>
+            <p class="caption">Mixed primitive transparency stress test.</p>
+          </div>
+        </article>
+        <article class="card scene-card">
+          <a href="benchmark/mesh_spheres_160_compare.png">
+            <img src="benchmark/mesh_spheres_160_compare.png" alt="mesh_spheres_160 sorted and OIT comparison">
+          </a>
+          <div class="card-body">
+            <h3><code>mesh_spheres_160</code></h3>
+            <p class="caption">Repeated transparent mesh spheres with opaque ground.</p>
+          </div>
+        </article>
+        <article class="card scene-card">
+          <a href="benchmark/bunny_meshes_24_compare.png">
+            <img src="benchmark/bunny_meshes_24_compare.png" alt="bunny_meshes_24 sorted and OIT comparison">
+          </a>
+          <div class="card-body">
+            <h3><code>bunny_meshes_24</code></h3>
+            <p class="caption">Twenty-four transparent <code>bunny.usd</code> mesh instances.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Orbiting Visual Comparison</h2>
+      <div class="viewer">
+        <div class="viewer-toolbar">
+          <label>
+            Scene
+            <select id="sceneSelect"></select>
+          </label>
+          <div class="timeline-wrap">
+            <div class="timeline-head">
+              <span>Orbit frame</span>
+              <span id="frameLabel">1 / 12</span>
+            </div>
+            <div id="timeline" class="timeline" role="slider" tabindex="0" aria-label="Orbit frame" aria-valuemin="1" aria-valuemax="12" aria-valuenow="1">
+              <div class="timeline-track"></div>
+              <div id="timelineFill" class="timeline-fill"></div>
+              <div id="ticks" class="ticks"></div>
+              <div id="timelineThumb" class="timeline-thumb"></div>
+            </div>
+          </div>
+          <button id="playButton" type="button">Play</button>
+        </div>
+        <div class="triptych">
+          <figure>
+            <figcaption>Sorted transparency</figcaption>
+            <img id="sortedFrame" alt="Sorted transparency orbit frame">
+          </figure>
+          <figure>
+            <figcaption>Weighted OIT</figcaption>
+            <img id="oitFrame" alt="Weighted OIT orbit frame">
+          </figure>
+          <figure>
+            <figcaption>Amplified absolute difference</figcaption>
+            <img id="diffFrame" alt="Amplified difference orbit frame">
+          </figure>
+        </div>
+        <p id="sceneNote" class="viewer-note"></p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Orbit Difference Metrics</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>Scene</th>
+            <th>Description</th>
+            <th class="num">Mean abs RGB</th>
+            <th class="num">RMS RGB</th>
+            <th class="num">Max abs RGB</th>
+            <th>Contact sheet</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>franka_cloth</code></td>
+            <td>Franka arm with transparent <code>unisex_shirt.usd</code> cloth</td>
+            <td class="num">0.183</td>
+            <td class="num">1.190</td>
+            <td class="num">46</td>
+            <td><a href="orbit/franka_cloth/franka_cloth_orbit_compare.png">PNG</a></td>
+          </tr>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>h1_cloth</code></td>
+            <td>H1 robot with transparent Style3D jacket cloth</td>
+            <td class="num">0.037</td>
+            <td class="num">0.484</td>
+            <td class="num">38</td>
+            <td><a href="orbit/h1_cloth/h1_cloth_orbit_compare.png">PNG</a></td>
+          </tr>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>franka_robot</code></td>
+            <td>Single transparent Franka arm</td>
+            <td class="num">0.042</td>
+            <td class="num">0.570</td>
+            <td class="num">69</td>
+            <td><a href="orbit/franka_robot/franka_robot_orbit_compare.png">PNG</a></td>
+          </tr>
+          <tr>
+            <td>RTX 4090 desktop</td>
+            <td><code>franka_robot_grid</code></td>
+            <td>3x3 grid of transparent Franka arms</td>
+            <td class="num">0.082</td>
+            <td class="num">0.844</td>
+            <td class="num">63</td>
+            <td><a href="orbit/franka_robot_grid/franka_robot_grid_orbit_compare.png">PNG</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p class="foot">
+      Data sources: RTX 4090
+      <a href="benchmark/results.json"><code>benchmark/results.json</code></a> and
+      <a href="benchmark/summary.md"><code>benchmark/summary.md</code></a>; MacBook Pro M1
+      <a href="benchmark/macbook-pro-m1/results.json"><code>results.json</code></a>,
+      <a href="benchmark/macbook-pro-m1/summary.md"><code>summary.md</code></a>, and
+      <a href="benchmark/macbook-pro-m1/run-info.json"><code>run-info.json</code></a>; orbit
+      <a href="orbit/summary.md"><code>summary.md</code></a>. The difference images multiply absolute
+      RGB differences to make subtle ordering/resolution differences visible.
+    </p>
+  </main>
+
+  <script>
+    const scenes = [
+      {
+        id: "franka_cloth",
+        label: "Franka + transparent cloth",
+        note: "Franka arm with transparent unisex_shirt.usd cloth. Sorted and OIT rows are close, with differences concentrated in overlapping cloth folds.",
+        frames: 12
+      },
+      {
+        id: "h1_cloth",
+        label: "H1 + transparent jacket",
+        note: "H1 robot with transparent Style3D h1_jacket cloth. The jacket remains readable from the full orbit.",
+        frames: 12
+      },
+      {
+        id: "franka_robot",
+        label: "Single transparent Franka",
+        note: "Single transparent Franka arm, useful for checking robot mesh and primitive shape transparency without cloth.",
+        frames: 12
+      },
+      {
+        id: "franka_robot_grid",
+        label: "3x3 transparent Franka grid",
+        note: "Nine transparent Franka arms stress the opacity path with many repeated robot shapes.",
+        frames: 12
+      }
+    ];
+
+    const sceneSelect = document.getElementById("sceneSelect");
+    const timeline = document.getElementById("timeline");
+    const timelineFill = document.getElementById("timelineFill");
+    const timelineThumb = document.getElementById("timelineThumb");
+    const ticks = document.getElementById("ticks");
+    const frameLabel = document.getElementById("frameLabel");
+    const playButton = document.getElementById("playButton");
+    const sceneNote = document.getElementById("sceneNote");
+    const sortedFrame = document.getElementById("sortedFrame");
+    const oitFrame = document.getElementById("oitFrame");
+    const diffFrame = document.getElementById("diffFrame");
+
+    let sceneIndex = 0;
+    let frameIndex = 0;
+    let dragging = false;
+    let timer = null;
+
+    function framePath(kind, scene, frame) {
+      return `orbit/${scene.id}/${kind}/frame_${String(frame).padStart(3, "0")}.png`;
+    }
+
+    function currentScene() {
+      return scenes[sceneIndex];
+    }
+
+    function setFrame(nextFrame) {
+      const scene = currentScene();
+      frameIndex = Math.max(0, Math.min(scene.frames - 1, nextFrame));
+      const pct = scene.frames === 1 ? 0 : (frameIndex / (scene.frames - 1)) * 100;
+      timelineFill.style.width = `${pct}%`;
+      timelineThumb.style.left = `${pct}%`;
+      frameLabel.textContent = `${frameIndex + 1} / ${scene.frames}`;
+      timeline.setAttribute("aria-valuenow", String(frameIndex + 1));
+      sortedFrame.src = framePath("sorted", scene, frameIndex);
+      oitFrame.src = framePath("weighted_oit", scene, frameIndex);
+      diffFrame.src = framePath("diff", scene, frameIndex);
+      sceneNote.textContent = scene.note;
+    }
+
+    function setFrameFromPointer(event) {
+      const scene = currentScene();
+      const rect = timeline.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      setFrame(Math.round(ratio * (scene.frames - 1)));
+    }
+
+    function renderTicks() {
+      const scene = currentScene();
+      ticks.innerHTML = "";
+      for (let i = 0; i < scene.frames; i++) {
+        const tick = document.createElement("span");
+        tick.className = "tick";
+        tick.style.left = `${scene.frames === 1 ? 0 : (i / (scene.frames - 1)) * 100}%`;
+        ticks.appendChild(tick);
+      }
+    }
+
+    function loadScene(index) {
+      sceneIndex = index;
+      frameIndex = 0;
+      const scene = currentScene();
+      timeline.setAttribute("aria-valuemax", String(scene.frames));
+      renderTicks();
+      setFrame(0);
+    }
+
+    function stopPlayback() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+        playButton.textContent = "Play";
+      }
+    }
+
+    scenes.forEach((scene, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = scene.label;
+      sceneSelect.appendChild(option);
+    });
+
+    sceneSelect.addEventListener("change", () => {
+      stopPlayback();
+      loadScene(Number(sceneSelect.value));
+    });
+
+    timeline.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      timeline.setPointerCapture(event.pointerId);
+      setFrameFromPointer(event);
+    });
+
+    timeline.addEventListener("pointermove", (event) => {
+      if (dragging) {
+        setFrameFromPointer(event);
+      }
+    });
+
+    timeline.addEventListener("pointerup", (event) => {
+      dragging = false;
+      timeline.releasePointerCapture(event.pointerId);
+      setFrameFromPointer(event);
+    });
+
+    timeline.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setFrame(frameIndex + 1);
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setFrame(frameIndex - 1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        setFrame(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        setFrame(currentScene().frames - 1);
+      }
+    });
+
+    playButton.addEventListener("click", () => {
+      if (timer) {
+        stopPlayback();
+        return;
+      }
+      playButton.textContent = "Pause";
+      timer = setInterval(() => {
+        const scene = currentScene();
+        setFrame((frameIndex + 1) % scene.frames);
+      }, 180);
+    });
+
+    loadScene(0);
+  </script>
+</body>
+</html>

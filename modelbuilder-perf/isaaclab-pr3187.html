@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newton PR 3187 Isaac Lab Startup Benchmark</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root { color-scheme: light; --paper: #f7f8fb; --panel: #ffffff; --ink: #18212f; --muted: #5f6b7a; --line: #d9e0ea; --main: #2563eb; --pr: #0f766e; --soft: #eef2f7; --good: #14532d; --bad: #b91c1c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width: min(1180px, calc(100% - 36px)); margin: 0 auto; padding: 34px 0 70px; }
+    h1 { max-width: 980px; margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3.7rem); line-height: 1.04; letter-spacing: 0; }
+    h2 { margin: 38px 0 14px; font-size: 1.45rem; letter-spacing: 0; }
+    p, li { color: var(--muted); line-height: 1.55; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .93em; }
+    a { color: var(--pr); }
+    .lede { max-width: 980px; font-size: 1.05rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 26px; }
+    .chip { border: 1px solid var(--line); border-radius: 999px; background: var(--panel); padding: 7px 10px; color: #465467; font-size: .88rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+    .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 16px; }
+    .panel strong { color: var(--ink); }
+    .callout { border-left: 5px solid var(--pr); background: var(--panel); border-radius: 0 8px 8px 0; padding: 14px 16px; margin: 18px 0; }
+    .callout p { margin: 0; }
+    .plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+    .plot { min-height: 430px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 8px; }
+    .table-scroll { overflow-x: auto; }
+    .table-scroll table { min-width: 900px; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: .92rem; }
+    th { background: var(--soft); font-weight: 800; }
+    tr:last-child td { border-bottom: 0; }
+    .good { color: var(--good); font-weight: 900; }
+    .bad { color: var(--bad); font-weight: 900; }
+    .small { font-size: .91rem; }
+    @media (max-width: 760px) { main { width: min(100% - 24px, 1180px); } .plot-grid { grid-template-columns: 1fr; } .plot { min-height: 360px; } }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">Back to ModelBuilder report</a></p>
+  <h1>Newton PR 3187 Isaac Lab Startup Benchmark</h1>
+  <p class="lede">Newton PR <a href="https://github.com/newton-physics/newton/pull/3187">#3187</a> compared against Newton <code>origin/main</code> inside an Isaac Lab worktree. Each run used <code>presets=newton_mjwarp</code>, the summary benchmark backend, an editable Newton install verified before launch, and a 2-logical-CPU affinity cap.</p>
+  <div id="metadata" class="meta"></div>
+  <section class="grid">
+    <div class="panel"><strong>Runtime</strong><p id="runtime">Loading...</p></div>
+    <div class="panel"><strong>Worktrees</strong><p><code>~/repos/newton-bench-main</code><br><code>~/repos/newton-bench-pr3187</code><br><code>~/repos/IsaacLab-newton-bench</code></p></div>
+    <div class="panel"><strong>Sampling</strong><p>Single samples. All visible rows use 1024 envs and were run sequentially under <code>taskset -c 0,1</code>. Franka uses <code>Isaac-Reach-Franka</code> because <code>Isaac-Lift-Cube-Franka</code> does not expose <code>newton_mjwarp</code> here.</p></div>
+  </section>
+  <div class="callout"><p id="headline">Loading benchmark summary...</p></div>
+  <h2>Summary Table</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Task</th><th>Envs</th><th>Main env creation</th><th>PR env creation</th><th>Env speedup</th><th>Scene speedup</th><th>Simulation-start speedup</th><th>First-step delta</th></tr></thead>
+      <tbody id="summary-body"></tbody>
+    </table>
+  </div>
+  <h2>Plotly Plots</h2>
+  <div class="plot-grid">
+    <div id="plot-env-creation" class="plot"></div>
+    <div id="plot-speedups" class="plot"></div>
+    <div id="plot-phase-stack" class="plot"></div>
+    <div id="plot-top-wrapper" class="plot"></div>
+  </div>
+  <h2>Notes</h2>
+  <ul id="notes"></ul>
+  <p class="small">Normalized data: <a href="data/isaaclab_pr3187_startup_summary.json"><code>data/isaaclab_pr3187_startup_summary.json</code></a>. Raw benchmark JSON manifest: <a href="data/isaaclab_pr3187_raw/index.json"><code>data/isaaclab_pr3187_raw/index.json</code></a>.</p>
+</main>
+<script>
+const fmt = (value, digits = 2) => Number(value).toLocaleString(undefined, {maximumFractionDigits: digits, minimumFractionDigits: digits});
+const speedClass = (value) => value >= 1 ? "good" : "bad";
+const deltaClass = (value) => value <= 0 ? "good" : "bad";
+const runLabel = (run) => `${run.task_short} ${run.num_envs} / ${run.revision_label}`;
+const pairLabel = (pair) => `${pair.task_short} (${pair.num_envs} envs)`;
+const layoutBase = {paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "#ffffff", margin: {l: 58, r: 24, t: 58, b: 78}, font: {family: "Inter, system-ui, sans-serif", color: "#18212f"}, legend: {orientation: "h", y: -0.22}};
+function renderPage(data) {
+  const meta = data.metadata;
+  document.getElementById("metadata").innerHTML = [
+    `Generated <code>${meta.generated_at_utc}</code>`,
+    `Newton main <code>${meta.newton_revisions.main.commit}</code>`,
+    `PR 3187 <code>${meta.newton_revisions.pr3187.commit}</code>`,
+    `Isaac Lab <code>${meta.isaaclab_commit}</code>`,
+    `CPU cap <code>${meta.cpu_limit.cpu_list}</code>`
+  ].map((text) => `<span class="chip">${text}</span>`).join("");
+  const sampleRun = data.runs[0] || {};
+  const versions = sampleRun.versions || {};
+  document.getElementById("runtime").innerHTML = `Isaac Lab ${versions.isaaclab_version || "unknown"}, Torch ${versions.torch_version || "unknown"}, Warp ${versions.warp_version || "unknown"}, MuJoCo Warp ${versions.mujoco_warp_version || "unknown"}.`;
+  const best = data.summary_rows.reduce((current, row) => row.env_speedup > current.env_speedup ? row : current, data.summary_rows[0]);
+  document.getElementById("headline").innerHTML = `<strong>Headline:</strong> At 1024 envs under the CPU cap, PR 3187 is near parity on Cartpole, Ant, and Humanoid, improves G1 env creation by 1.32x, and improves ${best.task} env creation by ${fmt(best.env_speedup, 2)}x.`;
+  document.getElementById("summary-body").innerHTML = data.summary_rows.map((row) => `
+    <tr>
+      <td>${row.task}</td>
+      <td>${row.num_envs}</td>
+      <td>${fmt(row.env_main_s, 3)}</td>
+      <td>${fmt(row.env_pr_s, 3)}</td>
+      <td class="${speedClass(row.env_speedup)}">${fmt(row.env_speedup, 2)}x</td>
+      <td>${fmt(row.scene_speedup, 2)}x</td>
+      <td>${fmt(row.sim_start_speedup, 2)}x</td>
+      <td class="${deltaClass(row.first_step_delta_pct)}">${row.first_step_delta_pct >= 0 ? "+" : ""}${fmt(row.first_step_delta_pct, 1)}%</td>
+    </tr>
+  `).join("");
+  document.getElementById("notes").innerHTML = meta.notes.map((note) => `<li>${note}</li>`).join("");
+  renderPlots(data);
+}
+function renderPlots(data) {
+  const colors = {main: "#2563eb", pr3187: "#0f766e"};
+  const labels = data.pairs.map(pairLabel);
+  Plotly.newPlot("plot-env-creation", [
+    {type: "bar", name: "Newton main", x: labels, y: data.pairs.map((pair) => pair.metrics.env_creation_wall_s.main_s), marker: {color: colors.main}},
+    {type: "bar", name: "PR 3187", x: labels, y: data.pairs.map((pair) => pair.metrics.env_creation_wall_s.pr_s), marker: {color: colors.pr3187}}
+  ], {...layoutBase, title: "Env Creation Wall Time", yaxis: {title: "seconds"}, barmode: "group"}, {responsive: true, displaylogo: false});
+  Plotly.newPlot("plot-speedups", [
+    {type: "bar", name: "Env creation", x: labels, y: data.pairs.map((pair) => pair.metrics.env_creation_wall_s.speedup), marker: {color: "#0f766e"}},
+    {type: "bar", name: "Scene creation", x: labels, y: data.pairs.map((pair) => pair.metrics.scene_creation_s.speedup), marker: {color: "#b45309"}},
+    {type: "bar", name: "Simulation start", x: labels, y: data.pairs.map((pair) => pair.metrics.simulation_start_s.speedup), marker: {color: "#7c3aed"}}
+  ], {...layoutBase, title: "PR Speedup vs Main", yaxis: {title: "main / PR, higher is better", rangemode: "tozero"}, barmode: "group"}, {responsive: true, displaylogo: false});
+  const phaseRuns = data.runs.slice().sort((left, right) => (left.task_short + left.num_envs + left.revision).localeCompare(right.task_short + right.num_envs + right.revision));
+  const phaseNames = ["app_launch", "python_imports", "task_config", "env_creation", "first_step"];
+  const phaseDisplay = {app_launch: "App launch", python_imports: "Python imports", task_config: "Task config", env_creation: "Env creation", first_step: "First step"};
+  Plotly.newPlot("plot-phase-stack", phaseNames.map((phase, index) => {
+    const palette = ["#64748b", "#0284c7", "#ca8a04", "#0f766e", "#be123c"];
+    return {type: "bar", name: phaseDisplay[phase], x: phaseRuns.map(runLabel), y: phaseRuns.map((run) => run.phases[phase].wall_s), marker: {color: palette[index]}};
+  }), {...layoutBase, title: "Reported Startup Phase Breakdown", yaxis: {title: "seconds"}, barmode: "stack"}, {responsive: true, displaylogo: false});
+  const wrapperName = "isaaclab.sim.utils.prims:wrapper";
+  Plotly.newPlot("plot-top-wrapper", [
+    {type: "bar", name: "Newton main", x: labels, y: data.pairs.map((pair) => {
+      const run = data.runs.find((item) => item.task === pair.task && item.num_envs === pair.num_envs && item.revision === "main");
+      return ((run && run.phases.env_creation.measurements_ms[wrapperName]) || 0) / 1000;
+    }), marker: {color: colors.main}},
+    {type: "bar", name: "PR 3187", x: labels, y: data.pairs.map((pair) => {
+      const run = data.runs.find((item) => item.task === pair.task && item.num_envs === pair.num_envs && item.revision === "pr3187");
+      return ((run && run.phases.env_creation.measurements_ms[wrapperName]) || 0) / 1000;
+    }), marker: {color: colors.pr3187}}
+  ], {...layoutBase, title: "Env-Creation Hotspot: isaaclab.sim.utils.prims:wrapper", yaxis: {title: "own time, seconds"}, barmode: "group"}, {responsive: true, displaylogo: false});
+}
+fetch("data/isaaclab_pr3187_startup_summary.json").then((response) => response.json()).then(renderPage).catch((error) => {
+  document.getElementById("headline").textContent = `Could not load benchmark data: ${error.message}`;
+});
+</script>
+</body>
+</html>

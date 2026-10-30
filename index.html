@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reports</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2430;
+      --muted: #687283;
+      --line: #d9dee7;
+      --paper: #f7f5f0;
+      --panel: #fffdf8;
+      --accent: #0f766e;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    main {
+      width: min(920px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 56px 0;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    p {
+      max-width: 680px;
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+    .report-list {
+      display: grid;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .report-card {
+      display: block;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: inherit;
+      text-decoration: none;
+    }
+    .report-card:focus,
+    .report-card:hover {
+      border-color: var(--accent);
+      outline: none;
+    }
+    .report-card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 1.2rem;
+    }
+    .report-card span {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Reports</h1>
+    <p>Research notes, experiment summaries, and supporting media.</p>
+    <ul class="report-list">
+      <li>
+        <a class="report-card" href="newton-model-cameras/">
+          <strong>Cameras in the Model</strong>
+          <span>A proposed Newton API for declaring cameras in ModelBuilder, importing them from USD and MJCF, and rendering them with SensorCamera. Covers the Model/sensor split, label-based camera selection, precomputed and analytic rays for per-environment intrinsics, user-defined camera models, per-hit outputs for custom imaging, lidar as a site-mounted ray sensor, Isaac Lab integration, and alternatives considered. A prototype exercises the design, including a thermal camera on a squeezed soft block.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="rss-newton-report/">
+          <strong>RoboSimStudio and Newton</strong>
+          <span>An analysis of RSS scene construction, interactive editing, and coding-agent workflows, compared with Newton and Isaac applications. Includes API comparisons, runnable examples, demonstrations, and a roadmap for adding reusable manipulation, parameter editing, application interfaces, and camera support to Newton.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="newton-live-mcp/">
+          <strong>Live inspection and tuning of Newton simulations</strong>
+          <span>A registered 61-trial study of Newton MCP, IPython MCP, and script restarts, including clean-slate identification from measured Panda robot data. Newton reduces paired time and tokens versus restarting on existing tasks; real-data identification shows no general advantage. Persistent Python, failures, uncertainty, Windows checks, and reproducible evidence are included.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="newton-ovstage-rtx/">
+          <strong>USD scene preservation for Newton RTX</strong>
+          <span>Current Newton and ovnewton workflows, duplicated physics import rules, and a proposed shared importer with source-scene RTX rendering; appearance comparisons and measured publication costs.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="solver-observables/">
+          <strong>Solver Observables Architecture</strong>
+          <span>A proposed Newton API for optional solver diagnostics: composable flags, inherited row frequencies, eager allocation, custom solver extension, sensor consumption, and articulation selection, with architecture diagrams and Python examples.</span>
+        </a>
+      </li>
+      <li><a class="report-card" href="g1-whole-body-control/"><strong>Whole-body control of Kimodo G1 motions in Newton</strong><span>G1 motion tracking with an inverse-dynamics QP baseline, DIAL-MPC, finite-difference and analytic Gauss–Newton, and measured quality/latency tradeoffs in MuJoCo Warp.</span></a></li>
+      <li>
+        <a class="report-card" href="newton-ipc/">
+          <strong>Incremental potential contact in Newton</strong>
+          <span>Warp-native IPC with swept cloth self-contact and CUDA graphs: a 54-run folding rerun, independent distance audits, before/after video, and measured convergence and runtime tradeoffs against VBD.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="sdf-grinding/">
+          <strong>SDF grinding in Newton</strong>
+          <span>Short example of hydroelastic SDF-SDF contact, geometric material removal, and ViewerGL mesh updates.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="superdex-vs-newton/">
+          <strong>SuperDex vs Newton: two opposite bets on contact</strong>
+          <span>Meta's Project SuperDex shipped on 24 August 2026 with no paper and no benchmarks, so this reads its source, installs its wheels and measures it against Newton on matched scenes. SuperDex Physics turns out to be a CPU variational-implicit engine — Backward Euler/BDF/DIRK, Newton&ndash;Raphson with PSD projection, smoothed-penalty contact with IPC friction, SDF narrow phase with no GJK — and the shipped wheels <em>cannot</em> use a GPU: <code>CUDA_CG</code> throws at runtime. On a box pile it beats Newton's GPU XPBD by 31&times; at one body and loses by 8.4&times; at 216, crossing over at 48; Newton then adds a batch axis and reaches 679k env-steps/s on a seventh of a Blackwell. Resting penetration is invariant from 1&nbsp;ms to 200&nbsp;ms steps but is a pure function of load&nbsp;&divide;&nbsp;stiffness, and threading peaks at four workers then goes 2.7&times; backwards. Also situates SuperDex, MuJoCo, VBD/AVBD and Kamino as four different answers to what a contact <em>is</em>, plus two Newton crashes surfaced along the way.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="featherpgs-issues/">
+          <strong>FeatherPGS grasp stability: what breaks, what to set, what to fix</strong>
+          <span>A Franka arm grasps and shakes a cube, and a two-pad coupon strips the same problem down to one contact. FeatherPGS has no gravity compensation, so a position-controlled arm sags 4.65&deg; and never reaches its target pose; the contact-row budget defaults to ten contacts against a scene that needs seventy, and overflow is silent. Fix both and the grasp holds to 0.82&nbsp;mm, or 0.32&nbsp;mm with more iterations, with no contact tuning at all &mdash; and the coupon still holds at a 16.7&nbsp;ms time step. Also covers a velocity pass that turns speculative contacts into walls, a squeeze a hard contact model cannot express, and an execution default that blocks CUDA graph capture. Interactive plots and ViewerGL rollouts.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="newton-xpbd-fluids/">
+          <strong>XPBD fluids in Newton vs. the OmniSurg PBF solver</strong>
+          <span>Head-to-head benchmark of Newton's position-based fluids against a faster external PBF implementation, both driven by one harness in one process against the same <code>Model</code>: Newton runs 8&ndash;12&times; slower, and the cause is that its density kernels re-query the hash grid on every solver iteration instead of reading a neighbor list materialized once per substep &mdash; 20&times; the marginal cost per iteration, and 91% of the frame in two kernels. Scaling, ablation and per-kernel breakdowns, a dam-break filmstrip showing the two flows agree, and a ranked list of fixes.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="grasp-shake-drift/">
+          <strong>Why a grasped cube creeps out of a two-finger gripper</strong>
+          <span>Root-cause investigation of grasp drift in Newton 1.4.0 + MuJoCo Warp 3.10: a Franka shake test loses 6.4 mm per 11.5 s and drops the cube outright at 10 cm amplitude. Friction, contact source, contact refresh rate, solver iterations and tolerance are all ruled out by measurement; the cause is contact compliance rectified by cyclic load, on finger pads still carrying the 2500 N/m import default because <code>geom_priority</code> discards everything authored on the object. Stiffening the pads gives a consistent ~20× reduction at identical simulation cost.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="manosim/">
+          <strong>manosim in Newton: replaying human grasps from HUG</strong>
+          <span>The unmodified manosim MANO hand MJCF driven by real 10 Hz HUG-Bench MANO trajectories against metric-scale scanned objects: an MJCF importer fix for slide+ball floating bases, headless ViewerGL montage and whole-scene replays, 60/60 stable rollouts with 2.2 mm wrist tracking, and the root cause of a ball-joint drive instability that MuJoCo hides by honouring dampratio and Newton does not.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="newton-tight-fit-insertion/">
+          <strong>Tight-Fit Assembly in Newton: Solvers &amp; Tunnelling</strong>
+          <span>Bring-up and solver investigation for gear-on-shaft and DisplayPort cable insertion on a Flexiv Rizon 4s: combined worktree, Kit-free headless env, ViewerGL video rollouts, a new VBD solver manager plus VBD/Kamino presets — and an isolated three-gear study showing the shipped meshes drive the train to 0.1% slip under XPBD at 100 Hz, while the training preset's MuJoCo contact path convex-hulls the teeth and shafts away for 100% slip.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="newton-gym/">
+          <strong>Newton Gym: graph-captured RL environments for Newton</strong>
+          <span>FlashSAC vs PPO on cartpole, ant, and G1 locomotion; single-CUDA-graph step pipeline, 22M env-steps/s scaling, multi-GPU scaffolding.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="mac-fluid-solver/">
+          <strong>SolverMACFluid: two-way coupled incompressible fluid for Newton</strong>
+          <span>Staggered MAC-grid incompressible fluid solver coupled to MuJoCo through Newton's experimental proxy framework: solver-native buoyancy/drag/torque wrenches with roundoff-level action–reaction, bit-exact coupling-iteration restarts, CUDA-graph stepping, validation tables, and settling-sphere, motor-paddle, and articulated-swimmer demos — including 30 s+ large-tank rollouts (out-and-back marathon, three-swimmer race, nine-link eel), a realistic 50 cm robot at 1200 kg/m³ in true-viscosity water on 2.7M cells, and a wake-fidelity study showing the new clamped MacCormack advection preserving 3× the wake energy of semi-Lagrangian.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="neural-connections/">
+          <strong>Neural connections inside Warp kernels</strong>
+          <span>NeuralSim-style patchbay prototype for Warp: named wires in kernels re-wired from Python with @wp.func nonlinearities and tiny inlined MLPs — modular synth demo (audio included), a trained hybrid simulation, and a puck-on-table demo that recovers a spatial friction heatmap through a position-driven neural connection.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="HRDexDB/">
+          <strong>HRDexDB dexterous-grasp replay in Newton</strong>
+          <span>120 real xArm6 + Allegro V5 / Inspire F1 picking episodes replayed fully dynamically with SolverMuJoCo: PD joint targets only, passive objects colliding as watertight CoACD decompositions, ground-truth overlay videos, per-hand CMA-ES calibration with winner's-curse revalidation, and median object-tracking error of 4–8 cm across 35 objects.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="flying-knots/">
+          <strong>Flying Knots in Newton</strong>
+          <span>Mid-air overhand knot tied by an xArm7 replaying the paper's digitized throw with SolverVBD cable joints: trajectory digitization, IK-driven arm, knot-topology metrics, tuned 17/20 kinematic success, and a fully dynamic MuJoCo-coupled variant that ties the knot 12/12.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="discograd/">
+          <strong>DiscoGrad-style program smoothing in Warp</strong>
+          <span>Gaussian smoothing helpers for branch-heavy Warp objectives, with triangle intersection gradients, 2D collision optimization, variance plots, and CPU benchmark tables.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="shac/">
+          <strong>SHAC and SAPO locomotion with the MuJoCo Warp adjoint</strong>
+          <span>Training Go1, H1, G1, and the MuJoCo Humanoid with analytic gradients of MuJoCo Warp PR #1535. Implicit damping allows larger physics steps, but larger steps shorten the informative gradient horizon, and 20 ms policies fail at 1 ms. On Isaac Lab's Go1 velocity task SHAC stands still because its tanh-squashed actions saturate; SAPO's entropy terms, which penalize saturation, let every tested seed learn the full command set. With SHAC, H1 walks without a gait prior once the target critic follows the critic quickly; the G1 tracks commands without a prior but limps, and walks with symmetric alternating steps with SAPO, a differentiable gait prior, and colliding feet.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="transparency-rendering/">
+          <strong>ViewerGL Transparency Rendering</strong>
+          <span>Cross-system screenshot and frame-time comparison of sorted back-to-front blending and weighted order-independent transparency for transparent meshes and cloth.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="newton-fluid-support/">
+          <strong>Newton XPBD Fluid Support</strong>
+          <span>XPBD density projection, cohesion, viscosity, two-way rigid coupling, anisotropic surface reconstruction, the public fluid API, stability coverage, and RTX 4090 benchmarks—with six ten-second simulations spanning an Archimedes screw pump, dam break, multiple fluids, waves, buoyant bodies, and robot cup transfer.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="assets-without-articulationrootapi/">
+          <strong>Newton assets without ArticulationRootAPI</strong>
+          <span>Design options and evidence for jointed USD mechanisms that have no articulation root, including JointView and importer-inferred articulation strategies.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="featherstone-origin-offset/">
+          <strong>Featherstone Origin-Offset</strong>
+          <span>Numerical stability investigation and benchmarks for floating-base Featherstone articulations driven far from the world origin.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="determinism/">
+          <strong>Newton Determinism</strong>
+          <span>Scenario results, diagnostics, and accompanying videos.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="deterministic-mesh-inertia/">
+          <strong>Deterministic mesh inertia</strong>
+          <span>Latest Warp PR&nbsp;#1355 rerun for Newton mesh inertia: V2 original atomic lowering is bit-exact and much faster after the multi-component reduction update; V3 <code>tile_sum</code> remains fastest.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="mimic-joints/">
+          <strong>Newton Mimic Joints</strong>
+          <span>Design alternatives, parameterization tradeoffs, benchmark results, and schema evidence.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="cutting/">
+          <strong>Newton Cutting Simulation</strong>
+          <span>Literature overview and concrete Newton/Warp implementation paths for real-time soft-object cutting.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="modelbuilder-perf/">
+          <strong>Newton ModelBuilder Performance</strong>
+          <span>ModelBuilder.finalize() and add_builder() timing and memory benchmarks for replicated USD RL workloads and targeted optimization variants.</span>
+        </a>
+      </li>
+      <li>
+        <a class="report-card" href="param-estimation/">
+          <strong>Real2Sim Parameter Estimation</strong>
+          <span>Literature groups, Newton toolbox design, and a Franka/Warp prototype for estimating robot and object physical parameters from real data.</span>
+        </a>
+      </li>
+    </ul>
+  </main>
+</body>
+</html>

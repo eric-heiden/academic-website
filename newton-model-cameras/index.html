@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cameras in the Model</title>
+<meta name="description" content="Design proposal: declaring cameras in Newton's ModelBuilder, importing them from USD and MJCF, and rendering them with SensorCamera.">
+<style>
+:root {
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f2f2ef;
+  --fg: #1d1f21;
+  --muted: #5d6166;
+  --border: #dcdcd7;
+  --accent: #2f6f4e;
+  --accent-soft: #e3efe8;
+  --warn: #8a5a00;
+  --warn-soft: #fbf0d9;
+  --bad: #9b2c2c;
+  --bad-soft: #f8e4e4;
+  --model: #2f5f8f;
+  --model-soft: #e2ecf6;
+  --sensor: #7a4a8c;
+  --sensor-soft: #efe5f3;
+  --user: #8a5a00;
+  --user-soft: #fbf0d9;
+  --code-bg: #f4f4f1;
+  --tok-kw: #8a3b8f;
+  --tok-str: #2f6f4e;
+  --tok-num: #a1541a;
+  --tok-com: #7b7f84;
+  --tok-fn: #2f5f8f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a;
+    --surface: #1e2023;
+    --surface-2: #26292d;
+    --fg: #e6e6e3;
+    --muted: #a3a7ab;
+    --border: #3a3d42;
+    --accent: #7cc49d;
+    --accent-soft: #233a2e;
+    --warn: #e7b866;
+    --warn-soft: #3a2f1a;
+    --bad: #ec9a9a;
+    --bad-soft: #3f2323;
+    --model: #8fb8e3;
+    --model-soft: #1f2e3e;
+    --sensor: #cfa6df;
+    --sensor-soft: #33263a;
+    --user: #e7b866;
+    --user-soft: #3a2f1a;
+    --code-bg: #222427;
+    --tok-kw: #d7a1e0;
+    --tok-str: #8fd0aa;
+    --tok-num: #f0b27a;
+    --tok-com: #8b9095;
+    --tok-fn: #93bde8;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a;
+  --surface: #1e2023;
+  --surface-2: #26292d;
+  --fg: #e6e6e3;
+  --muted: #a3a7ab;
+  --border: #3a3d42;
+  --accent: #7cc49d;
+  --accent-soft: #233a2e;
+  --warn: #e7b866;
+  --warn-soft: #3a2f1a;
+  --bad: #ec9a9a;
+  --bad-soft: #3f2323;
+  --model: #8fb8e3;
+  --model-soft: #1f2e3e;
+  --sensor: #cfa6df;
+  --sensor-soft: #33263a;
+  --user: #e7b866;
+  --user-soft: #3a2f1a;
+  --code-bg: #222427;
+  --tok-kw: #d7a1e0;
+  --tok-str: #8fd0aa;
+  --tok-num: #f0b27a;
+  --tok-com: #8b9095;
+  --tok-fn: #93bde8;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+.page { max-width: 920px; margin: 0 auto; padding: 40px 16px 96px; }
+header.doc-head { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 28px; }
+.eyebrow { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+h1 { font-size: 34px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -.01em; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 30px 0 8px; }
+h4 { font-size: 15px; margin: 22px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+p, li { max-width: 72ch; }
+a { color: var(--accent); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 600; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; margin: 14px 0 18px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.hljs-keyword, .hljs-built_in, .hljs-literal { color: var(--tok-kw); }
+.hljs-string { color: var(--tok-str); }
+.hljs-number { color: var(--tok-num); }
+.hljs-comment { color: var(--tok-com); font-style: italic; }
+.hljs-title, .hljs-title.function_ { color: var(--tok-fn); }
+.hljs-meta { color: var(--tok-com); }
+
+.tldr { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 16px 20px; margin: 8px 0 8px; }
+.tldr h2 { border: 0; margin: 0 0 8px; padding: 0; font-size: 18px; }
+.tldr ul { margin: 0; padding-left: 20px; }
+.tldr li { margin: 4px 0; }
+.callout { border-left: 4px solid var(--border); background: var(--surface-2); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout.good { border-left-color: var(--accent); background: var(--accent-soft); }
+.callout p { margin: 4px 0; }
+
+nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; margin: 24px 0; font-size: 14.5px; }
+nav.toc ol { margin: 6px 0 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+nav.toc li { margin: 2px 0; break-inside: avoid; }
+nav.toc a { color: var(--fg); text-decoration: none; }
+nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+.table-wrap { overflow-x: auto; margin: 14px 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+td.wrap code { white-space: normal; }
+
+.chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.model { color: var(--model); background: var(--model-soft); }
+.chip.sensor { color: var(--sensor); background: var(--sensor-soft); }
+.chip.user { color: var(--user); background: var(--user-soft); }
+.chip.ok { color: var(--accent); background: var(--accent-soft); }
+.chip.no { color: var(--bad); background: var(--bad-soft); }
+.chip.part { color: var(--warn); background: var(--warn-soft); }
+
+figure { margin: 22px 0 26px; }
+.fig-scroll { overflow-x: auto; border-radius: 10px; }
+figure svg { display: block; width: 100%; min-width: 720px; height: auto; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; max-width: 80ch; }
+svg text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; fill: currentColor; }
+svg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+svg .box { fill: var(--surface); stroke: currentColor; stroke-width: 1.2; }
+svg .box-model { fill: var(--model-soft); stroke: var(--model); stroke-width: 1.4; }
+svg .box-sensor { fill: var(--sensor-soft); stroke: var(--sensor); stroke-width: 1.4; }
+svg .box-user { fill: var(--user-soft); stroke: var(--user); stroke-width: 1.4; }
+svg .box-bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.2; }
+svg .box-good { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+svg .edge { stroke: currentColor; stroke-width: 1.3; fill: none; }
+svg .edge-accent { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+svg .edge-bad { stroke: var(--bad); stroke-width: 1.3; fill: none; stroke-dasharray: 4 3; }
+svg .boundary { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 6 5; fill: none; }
+svg .lbl { font-size: 11.5px; fill: var(--muted); }
+svg .ttl { font-size: 13px; font-weight: 600; }
+svg .sm { font-size: 12px; }
+svg .xs { font-size: 11px; }
+svg .t-model { fill: var(--model); }
+svg .t-sensor { fill: var(--sensor); }
+svg .t-bad { fill: var(--bad); }
+svg .t-accent { fill: var(--accent); }
+svg .arrowhead { fill: currentColor; }
+svg .arrowhead-accent { fill: var(--accent); }
+svg .arrowhead-bad { fill: var(--bad); }
+
+.req-id { font-weight: 700; color: var(--accent); white-space: nowrap; }
+.small { font-size: 14px; color: var(--muted); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+.card h4 { margin-top: 4px; }
+.card ul { padding-left: 18px; margin: 6px 0; }
+.card li { font-size: 14.5px; }
+dl.decisions dt { font-weight: 600; margin-top: 14px; }
+dl.decisions dd { margin: 4px 0 0 0; padding-left: 14px; border-left: 3px solid var(--border); }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  h1 { font-size: 27px; }
+  h2 { font-size: 21px; }
+  nav.toc ol { columns: 1; }
+  .two-col { grid-template-columns: 1fr; }
+  pre { font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc-head">
+  <p class="eyebrow">Newton design proposal &middot; draft for review</p>
+  <h1>Cameras in the Model</h1>
+  <p style="margin:0 0 12px;font-size:18px;color:var(--muted)">Declare cameras in <code>ModelBuilder</code>, import them from USD and MJCF, and render them with <code>SensorCamera</code> without hand-maintained pose, ray and world bookkeeping.</p>
+  <div class="meta">
+    <span><b>Status</b> Draft, prototyped</span>
+    <span><b>Tracking issue</b> <a href="https://github.com/newton-physics/newton/issues/4899">newton#4899</a></span>
+    <span><b>Date</b> 2026-10-22</span>
+    <span><b>Updated</b> 2026-10-23</span>
+    <span><b>Base</b> <code>main</code> @ c81f4f332</span>
+    <span><b>Builds on</b> newton#3276, newton#3627 and an earlier prototype PR</span>
+  </div>
+</header>
+
+<section class="tldr" aria-labelledby="tldr">
+  <h2 id="tldr">Summary</h2>
+  <ul>
+    <li><b>Cameras become a Model entity</b>, like bodies, shapes and tendons. <code>ModelBuilder.add_camera(body, *, xform, ...)</code> declares one; <code>add_usd</code> and <code>add_mjcf</code> create them from <code>UsdGeom.Camera</code> prims and <code>&lt;camera&gt;</code> elements. <code>add_builder</code> and <code>replicate</code> copy them into every world.</li>
+    <li><b>The Model stores what the asset describes; the sensor stores what the render needs.</b> The camera's frame, body, world, intrinsics and clip range go in <code>model.camera_*</code>. Resolution, ray bundles and output buffers stay in <code>SensorCamera</code>. This is the same split USD makes between <code>UsdGeom.Camera</code> and <code>UsdRender.Product</code>, and it answers the objection that rays depend on resolution and therefore cannot be model data.</li>
+    <li><b><code>SensorCamera</code> gains a <code>cameras=</code> selector</b> that uses the same label matching as <code>SensorIMU(sites=...)</code>. A bound sensor works out each view's camera, world and pose from the model and the state, so <code>update(state, color_image=...)</code> needs no transforms, rays or <code>world_indices</code>. The current explicit API is unchanged.</li>
+    <li><b>Camera models are pluggable.</b> A camera model is a ray function from pixel to ray. Built-in pinhole rays are either cached (<code>RayMode.PRECOMPUTED</code>, fast) or evaluated in the kernel from per-camera intrinsic arrays (<code>RayMode.ANALYTIC</code>, for per-environment intrinsics randomization), like mujoco_warp's <code>use_precomputed_rays</code>. Users bring their own model as data (<code>CameraLens.CUSTOM</code> plus <code>set_camera_rays</code>) or as code (an experimental <code>@wp.func</code> ray function whose parameters can be CAMERA custom attributes).</li>
+    <li><b>A prototype exercises the whole design</b> (<a href="#prototype">section 14</a>). Model cameras, USD and MJCF import, all four ray sources, a site-mounted lidar and a thermal camera work end to end, and the existing camera, builder and replication tests still pass. The main addition it motivated is per-hit output (face index and barycentrics), which lets users build their own imaging modalities on top of the renderer.</li>
+    <li><b>Lidar needs no new sensor class.</b> A <code>SensorCamera</code> bound to sites, with a custom ray pattern and depth output, is a range scanner. The proposal adds what is missing for that today: site mounting, per-view min and max range, and graph-safe pattern updates.</li>
+    <li><b>No generic <code>add_sensor()</code>, and no cameras-as-shapes or cameras-as-sites.</b> Sites stay the way to declare frame-only sensors (IMU, frame transform, and lidar through <code>SensorCamera(sites=...)</code>). A sensor kind gets its own Model entity only when assets carry description data that has to survive import and replication. Today that is only cameras.</li>
+  </ul>
+</section>
+
+<nav class="toc" aria-label="Contents">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#requirements">Requirements (Isaac Lab and Newton)</a></li>
+    <li><a href="#principles">Design principles</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#builder-api">Builder and Model API</a></li>
+    <li><a href="#sensor-api">SensorCamera API</a></li>
+    <li><a href="#rays">Camera models and rays</a></li>
+    <li><a href="#import">USD and MJCF import</a></li>
+    <li><a href="#worlds">Worlds, replication and views</a></li>
+    <li><a href="#isaaclab">Isaac Lab integration</a></li>
+    <li><a href="#alternatives">Alternatives considered</a></li>
+    <li><a href="#other-sensors">Lidar and other sensors</a></li>
+    <li><a href="#compat">Compatibility</a></li>
+    <li><a href="#prototype">Prototype</a></li>
+    <li><a href="#phasing">Phasing</a></li>
+    <li><a href="#open-questions">Open questions</a></li>
+    <li><a href="#references">References</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="problem">1. Problem</h2>
+
+<p><code>SensorCamera</code> is now Newton's camera sensor (<code>SensorTiledCamera</code> was deprecated in #3913). It is a good renderer, but Newton has no concept of a camera. Every caller passes in three things on every <code>update()</code> call (<a href="../newton/_src/sensors/sensor_camera.py">sensor_camera.py:900</a>):</p>
+
+<pre><code class="language-python">camera.update(
+    state,
+    camera_transforms,      # (view_count,) world-space poses, computed by the caller every frame
+    camera_rays,            # (H, W, S, 2) one lens + resolution, shared by every view
+    world_indices=...,      # (view_count,) which world each view renders
+    color_image=color,
+)</code></pre>
+
+<p>Everything that describes the camera itself (where it is mounted, which world it belongs to, its lens, its clip range) therefore lives in user code. The consequences show up in Newton's own example and, more seriously, in Isaac Lab:</p>
+
+<ul>
+  <li><b>Pose bookkeeping.</b> A body-mounted camera needs a hand-written kernel that composes <code>body_q</code> with a mount offset (<a href="../newton/examples/sensors/example_sensor_camera.py">example_sensor_camera.py:94</a> <code>fill_body_camera_transforms</code>). Isaac Lab runs a whole parallel site system for this (<code>NewtonSiteFrameView</code>: its own <code>site_body</code>/<code>site_local</code> arrays, body-ancestor resolution, per-world expansion and pose kernel), even though Newton's own <code>add_site</code> is what IMU, frame transformer and ray caster use.</li>
+  <li><b>View-to-world mapping.</b> <code>world_indices</code> and the view order are implicit conventions that callers have to rebuild. This was the main confusion in the #3276 review, and Isaac Lab has had several ordering bugs in this area (IsaacLab #8545, #7688).</li>
+  <li><b>No import.</b> <code>add_usd</code> and <code>add_mjcf</code> drop camera prims and <code>&lt;camera&gt;</code> elements. Isaac Lab reads intrinsics back from the USD stage at init and builds its own K matrix and ray kernel, so the Newton Warp path still needs a stage.</li>
+  <li><b>No per-environment intrinsics.</b> A single shared ray bundle means intrinsics randomization across environments is impossible. Isaac Lab raises <i>"Newton Warp requires identical camera intrinsics across environments: its native ray field is shared across worlds."</i></li>
+  <li><b>Clip range is global.</b> The far clip is <code>RenderConfig.max_distance</code>, which is baked into the kernel with <code>wp.static</code> (<a href="../newton/_src/sensors/sensor_camera_render/render.py">render.py:182</a>). Isaac Lab overwrites the shared default config before every camera's render, and the near clip is never applied.</li>
+  <li><b>No subset rendering.</b> Isaac Lab renders every world on every update, even when only some environments are due or are being reset.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="requirements">2. Requirements</h2>
+
+<p>These requirements come from reading Isaac Lab <code>main</code> (8c9b995) and its issue tracker, from the prior Newton PRs, and from how mujoco_warp handles cameras. "Source" names the evidence.</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>ID</th><th>Requirement</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td class="req-id">R1</td><td>Declare cameras on the per-env <b>prototype before replication</b>, and let cloning create the per-world copies with stable ordering.</td><td class="small">Isaac Lab spawns camera prims before replication; IsaacLab #8000 "Cloning owns ... declared cameras"; #8545, #7688 ordering bugs; only env_0 camera prims exist in USD (#6928, #7036)</td></tr>
+<tr><td class="req-id">R2</td><td><b>Parse cameras from USD and MJCF</b>, resolving the parent rigid body even through non-body Xform ancestors.</td><td class="small">Isaac Lab and MJCF-based workflows; IsaacLab #8211 (camera under a non-body articulation Xform failed to resolve)</td></tr>
+<tr><td class="req-id">R3</td><td><b>Attach to a body</b> with a local offset, or <b>fix</b> to the world or env frame; poses evaluated from <code>State</code> each step.</td><td class="small">Isaac Lab <code>NewtonSiteFrameView</code>; Newton example kernel</td></tr>
+<tr><td class="req-id">R4</td><td><b>Precomputed rays</b> for speed and for arbitrary custom lenses.</td><td class="small">Rendering cost of per-pixel ray generation; calibrated lens models that no built-in helper covers</td></tr>
+<tr><td class="req-id">R5</td><td><b>Per-environment, runtime-changeable intrinsics</b> (domain randomization) that stay CUDA-graph safe.</td><td class="small">mujoco_warp <code>use_precomputed_rays=False</code>, documented for camera-intrinsics randomization; IsaacLab #7916; the "identical intrinsics" error above</td></tr>
+<tr><td class="req-id">R6</td><td><b>Render a subset</b>: choose cameras statically, and mask environments or views per call.</td><td class="small">Multi-camera scenes rarely need every camera every step; newton#3276 ("disable cameras ... once they don't need further training"); Isaac Lab <code>env_mask</code> and update periods</td></tr>
+<tr><td class="req-id">R7</td><td><b>Several cameras per world</b>, with <b>different resolutions</b>, sharing one scene representation.</td><td class="small">Isaac Lab: one <code>CameraCfg</code> per camera, each with its own size; the renderer shares one Newton sensor across them</td></tr>
+<tr><td class="req-id">R8</td><td><b>Per-camera clip range</b> (near and far).</td><td class="small">Isaac Lab <code>clipping_range</code>; <code>max_distance</code> overwrite</td></tr>
+<tr><td class="req-id">R9</td><td><b>Tiled batching</b>: all worlds for a camera in one launch, and <b>heterogeneous worlds</b> allowed.</td><td class="small">Tiled rendering throughput; Newton supports heterogeneous worlds</td></tr>
+<tr><td class="req-id">R10</td><td><b>Runtime pose writes</b> (<code>set_world_poses</code>, resets, mount-offset randomization).</td><td class="small">Isaac Lab <code>Camera.set_world_poses</code>; #8664, #8665, #8682 stale or misplaced poses</td></tr>
+<tr><td class="req-id">R11</td><td><b>Lens distortion</b> (OpenCV pinhole and fisheye, F-theta, Kannala-Brandt).</td><td class="small">Isaac Lab <code>OpenCv*DistortionCfg</code>; newton#3578; existing <code>compute_camera_rays_*</code> helpers</td></tr>
+<tr><td class="req-id">R12</td><td><b>Zero cost when unused</b>: a camera in the model costs nothing until a sensor renders it.</td><td class="small">Newton convention; USD stages often carry viewport cameras</td></tr>
+<tr><td class="req-id">R13</td><td><b>User-defined camera models</b> (calibrated, exotic or research lenses) without changing Newton, including per-environment parameters.</td><td class="small">Lens models no built-in helper covers; newton#3578; Isaac Lab distortion cfgs</td></tr>
+<tr><td class="req-id">R14</td><td><b>Range sensing (lidar-style)</b> on the same ray machinery, without a new ray-sensor class.</td><td class="small">Review of newton#3347 (consolidate ray sensing around the camera sensor and <code>intersect_ray</code>); Isaac Lab ray caster on sites</td></tr>
+<tr><td class="req-id">R15</td><td><b>Custom imaging modalities</b> (thermal, material or semantic channels) computed from per-hit data and user attributes, without changing the renderer.</td><td class="small">Prototype thermal camera (section 14); Isaac Lab segmentation remapping from <code>shape_index_image</code></td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="principles">3. Design principles</h2>
+
+<dl class="decisions">
+  <dt>P1. The Model describes and the sensor renders.</dt>
+  <dd>Anything an asset author writes down (mount frame, parent body, world, focal length, aperture, clip range) goes in the Model. Anything that depends on how you choose to render (resolution, sample count, ray buffers, output images, lighting) goes in <code>SensorCamera</code>. USD makes the same cut: <code>UsdGeom.Camera</code> has no resolution, and resolution lives on <code>UsdRender.Product</code>, which points at a camera. This settles a recurring design question: <b>rays never go in the Model</b>, because they depend on resolution, but <b>cameras do</b>.</dd>
+  <dt>P2. A camera is a per-world instance.</dt>
+  <dd>Each camera row has a world index, like bodies and shapes, so heterogeneous worlds work by construction. A camera added in the global scope (world <code>-1</code>) is a single declaration that renders every world. This is the "observer camera" case that the example and #3627 both had to special-case.</dd>
+  <dt>P3. Reuse existing Newton vocabulary.</dt>
+  <dd><code>add_camera(body, *, xform, label, custom_attributes)</code> follows <code>add_site</code>. <code>SensorCamera(model, cameras=...)</code> follows <code>SensorIMU(model, sites=...)</code> and label matching. Model arrays use the <code>camera_*</code> prefix and the existing <code>AttributeSpec</code> registry, so <code>replicate</code>, <code>add_builder</code>, custom attributes and model views all handle them.</dd>
+  <dt>P4. The explicit path stays.</dt>
+  <dd><code>SensorCamera(model)</code> with no <code>cameras=</code> behaves exactly as it does today. A bound sensor can still be given explicit <code>camera_transforms</code> or <code>camera_rays</code> as per-call overrides, which keeps custom lenses and externally driven poses simple.</dd>
+</dl>
+
+<!-- ============================================================ -->
+<h2 id="architecture">4. Architecture</h2>
+
+<figure><div class="fig-scroll">
+<svg viewBox="0 0 960 460" role="img" aria-label="Data flow: USD, MJCF and Python declarations become camera rows in ModelBuilder and are finalized into Model camera arrays. SensorCamera selects cameras by label at construction, holds resolution-dependent rays, and on every update composes view poses from the camera mounts and State body_q before ray tracing.">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+    <marker id="a1g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-accent"/></marker>
+  </defs>
+
+  <text x="20" y="32" class="lbl">ASSETS</text>
+  <text x="210" y="32" class="lbl">BUILD</text>
+  <text x="440" y="32" class="lbl t-model">MODEL · describes</text>
+  <text x="720" y="32" class="lbl t-sensor">SENSOR · renders</text>
+
+  <rect x="20" y="52" width="160" height="56" rx="8" class="box"/>
+  <text x="34" y="75" class="ttl">USD</text>
+  <text x="34" y="94" class="xs mono">UsdGeom.Camera</text>
+  <rect x="20" y="124" width="160" height="56" rx="8" class="box"/>
+  <text x="34" y="147" class="ttl">MJCF</text>
+  <text x="34" y="166" class="xs mono">&lt;camera&gt;</text>
+  <rect x="20" y="196" width="160" height="56" rx="8" class="box"/>
+  <text x="34" y="219" class="ttl">Python / cfg</text>
+  <text x="34" y="238" class="xs mono">add_camera()</text>
+
+  <path d="M180,80 L208,100" class="edge" marker-end="url(#a1)"/>
+  <path d="M180,152 L208,152" class="edge" marker-end="url(#a1)"/>
+  <path d="M180,224 L208,204" class="edge" marker-end="url(#a1)"/>
+
+  <rect x="210" y="52" width="170" height="200" rx="8" class="box"/>
+  <text x="224" y="75" class="ttl">ModelBuilder</text>
+  <text x="224" y="100" class="sm">camera rows</text>
+  <text x="224" y="118" class="xs">body, xform, world, label,</text>
+  <text x="224" y="134" class="xs">intrinsics, clip range</text>
+  <text x="224" y="166" class="sm">add_builder / replicate</text>
+  <text x="224" y="184" class="xs">remap body, set world,</text>
+  <text x="224" y="200" class="xs">offset fixed cameras,</text>
+  <text x="224" y="216" class="xs">prefix labels</text>
+
+  <path d="M380,152 L438,152" class="edge" marker-end="url(#a1)"/>
+  <text x="409" y="144" class="lbl" text-anchor="middle">finalize</text>
+
+  <rect x="440" y="52" width="190" height="200" rx="8" class="box-model"/>
+  <text x="454" y="75" class="ttl t-model">Model</text>
+  <text x="454" y="98" class="xs mono">camera_world</text>
+  <text x="454" y="114" class="xs mono">camera_body</text>
+  <text x="454" y="130" class="xs mono">camera_transform</text>
+  <text x="454" y="146" class="xs mono">camera_focal_length</text>
+  <text x="454" y="162" class="xs mono">camera_aperture(_offset)</text>
+  <text x="454" y="178" class="xs mono">camera_clipping_range</text>
+  <text x="454" y="194" class="xs mono">camera_resolution (hint)</text>
+  <text x="454" y="210" class="xs mono">camera_label</text>
+  <text x="454" y="234" class="xs">+ AttributeFrequency.CAMERA</text>
+
+  <rect x="440" y="290" width="190" height="56" rx="8" class="box"/>
+  <text x="454" y="313" class="ttl">State</text>
+  <text x="454" y="332" class="xs mono">body_q (every step)</text>
+
+  <rect x="720" y="52" width="220" height="300" rx="8" class="box-sensor"/>
+  <text x="734" y="75" class="ttl t-sensor">SensorCamera</text>
+  <text x="734" y="93" class="xs mono">cameras="*/wrist", W, H</text>
+
+  <rect x="732" y="104" width="196" height="56" rx="6" class="box"/>
+  <text x="744" y="124" class="sm">view table (init)</text>
+  <text x="744" y="142" class="xs mono">view_camera, view_world</text>
+  <text x="744" y="155" class="xs">one row per (camera, world)</text>
+
+  <rect x="732" y="170" width="196" height="56" rx="6" class="box"/>
+  <text x="744" y="190" class="sm">rays</text>
+  <text x="744" y="207" class="xs">PRECOMPUTED: bundle per lens</text>
+  <text x="744" y="220" class="xs">ANALYTIC: none stored</text>
+
+  <rect x="732" y="236" width="196" height="104" rx="6" class="box"/>
+  <text x="744" y="256" class="sm">update(state, ...)</text>
+  <text x="744" y="276" class="xs">1. pose kernel</text>
+  <text x="756" y="292" class="xs">body_q[body] · camera_transform</text>
+  <text x="744" y="312" class="xs">2. ray trace via RenderContext</text>
+  <text x="756" y="328" class="xs">(shared by sensors of a model)</text>
+
+  <path d="M630,124 L730,132" class="edge-accent" marker-end="url(#a1g)"/>
+  <text x="680" y="116" class="lbl" text-anchor="middle">select by label</text>
+  <path d="M630,226 L730,262" class="edge-accent" marker-end="url(#a1g)"/>
+  <text x="672" y="216" class="lbl" text-anchor="middle">mounts,</text>
+  <text x="672" y="229" class="lbl" text-anchor="middle">intrinsics</text>
+  <path d="M630,318 L730,306" class="edge-accent" marker-end="url(#a1g)"/>
+  <text x="680" y="304" class="lbl" text-anchor="middle">body_q</text>
+
+  <rect x="720" y="384" width="220" height="56" rx="8" class="box"/>
+  <text x="734" y="407" class="ttl">images</text>
+  <text x="734" y="426" class="xs mono">(view_count, H, W) each</text>
+  <path d="M830,352 L830,382" class="edge" marker-end="url(#a1)"/>
+</svg></div>
+<figcaption>Figure 1. Camera data flow. Blue is scene description: importers and the builder create it, and it is replicated with the scene. Purple is render state, which the sensor creates. The green edges are the only links between them: the sensor selects cameras by label once, then reads their mounts and intrinsics from the Model and <code>body_q</code> from the State on every update.</figcaption>
+</figure>
+
+<h3>What changes compared to today</h3>
+
+<figure><div class="fig-scroll">
+<svg viewBox="0 0 960 300" role="img" aria-label="Today Isaac Lab reads intrinsics from USD, builds its own rays, tracks camera poses in its own site view, overwrites the global far clip, and renders all worlds; with the proposal the camera prim is imported once and the bound SensorCamera does the rest.">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+    <marker id="a2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-bad"/></marker>
+    <marker id="a2g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-accent"/></marker>
+  </defs>
+  <text x="20" y="28" class="ttl">Today</text>
+  <text x="80" y="28" class="lbl">Isaac Lab Newton Warp renderer</text>
+
+  <rect x="20" y="44" width="140" height="44" rx="7" class="box"/>
+  <text x="32" y="64" class="sm">USD camera prim</text>
+  <text x="32" y="80" class="xs">env_0 only</text>
+
+  <rect x="200" y="40" width="190" height="34" rx="7" class="box-bad"/>
+  <text x="212" y="61" class="xs">own ray kernel (K from USD)</text>
+  <rect x="200" y="82" width="190" height="34" rx="7" class="box-bad"/>
+  <text x="212" y="103" class="xs">own site view + pose kernel</text>
+  <rect x="200" y="124" width="190" height="34" rx="7" class="box-bad"/>
+  <text x="212" y="145" class="xs">global max_distance override</text>
+
+  <path d="M160,60 L198,57" class="edge-bad" marker-end="url(#a2b)"/>
+  <path d="M160,72 L198,99" class="edge-bad" marker-end="url(#a2b)"/>
+  <path d="M160,80 L198,140" class="edge-bad" marker-end="url(#a2b)"/>
+
+  <rect x="430" y="70" width="230" height="58" rx="7" class="box"/>
+  <text x="442" y="92" class="sm mono">SensorTiledCamera.update</text>
+  <text x="442" y="112" class="xs">rays, transforms per call; all worlds</text>
+  <path d="M390,57 L428,86" class="edge" marker-end="url(#a2)"/>
+  <path d="M390,99 L428,99" class="edge" marker-end="url(#a2)"/>
+  <path d="M390,141 L428,114" class="edge" marker-end="url(#a2)"/>
+  <text x="680" y="88" class="xs t-bad">✗ intrinsics must match across envs</text>
+  <text x="680" y="106" class="xs t-bad">✗ no near clip, far clip global</text>
+  <text x="680" y="124" class="xs t-bad">✗ stage needed at runtime</text>
+
+  <line x1="20" y1="176" x2="940" y2="176" class="boundary"/>
+
+  <text x="20" y="204" class="ttl">Proposed</text>
+  <rect x="20" y="222" width="140" height="44" rx="7" class="box"/>
+  <text x="32" y="242" class="sm">USD camera prim</text>
+  <text x="32" y="258" class="xs">or add_camera()</text>
+  <rect x="200" y="222" width="190" height="44" rx="7" class="box-model"/>
+  <text x="212" y="242" class="sm">add_usd + replicate</text>
+  <text x="212" y="258" class="xs mono">model.camera_*</text>
+  <rect x="430" y="222" width="230" height="44" rx="7" class="box-sensor"/>
+  <text x="442" y="242" class="sm mono">SensorCamera(cameras=...)</text>
+  <text x="442" y="258" class="xs mono">update(state, view_mask=...)</text>
+  <path d="M160,244 L198,244" class="edge-accent" marker-end="url(#a2g)"/>
+  <path d="M390,244 L428,244" class="edge-accent" marker-end="url(#a2g)"/>
+  <text x="680" y="234" class="xs t-accent">✓ per-env intrinsics (ANALYTIC)</text>
+  <text x="680" y="252" class="xs t-accent">✓ per-camera near/far</text>
+  <text x="680" y="270" class="xs t-accent">✓ render only due views</text>
+</svg></div>
+<figcaption>Figure 2. The three red side channels that Isaac Lab maintains today (ray generation, a second site system for poses, and a global clip override) become model data that the bound sensor consumes.</figcaption>
+</figure>
+
+<!-- ============================================================ -->
+<h2 id="builder-api">5. Builder and Model API</h2>
+
+<h3>5.1 <code>ModelBuilder.add_camera</code></h3>
+
+<p>The signature mirrors <code>add_site</code> (a positional <code>body</code>, then keyword-only <code>xform</code>, <code>label</code> and <code>custom_attributes</code>). The intrinsics parameters reuse the names of the existing <code>SensorCamera.compute_camera_rays_pinhole</code> helper, so the same words mean the same thing everywhere.</p>
+
+<pre><code class="language-python">def add_camera(
+    self,
+    body: int,
+    *,
+    xform: Transform | None = None,
+    lens: CameraLens = CameraLens.PINHOLE,
+    fov: float | None = None,
+    focal_length: float | None = None,
+    horizontal_aperture: float | None = None,
+    vertical_aperture: float | None = None,
+    horizontal_aperture_offset: float = 0.0,
+    vertical_aperture_offset: float = 0.0,
+    clipping_range: tuple[float, float] = (0.01, 1.0e6),
+    resolution: tuple[int, int] | None = None,
+    label: str | None = None,
+    custom_attributes: dict[str, Any] | None = None,
+) -&gt; int:
+    """Add a pinhole camera rigidly attached to a body or to the world.
+
+    The camera looks along its local -Z axis with +Y up and +X right
+    (USD, OpenGL and MuJoCo convention).
+
+    Args:
+        body: Parent body index, or -1 for a camera fixed in the world
+            frame of the current world context.
+        xform: Camera frame relative to the parent body [m, rad]. For
+            ``body == -1`` it is the world-frame pose. Defaults to identity.
+        lens: Lens model. ``PINHOLE`` uses the intrinsics below.
+            ``CUSTOM`` means the rays are supplied to the sensor (custom
+            rays or a ray function) and the intrinsics are ignored.
+        fov: Vertical field of view [rad]. Mutually exclusive with
+            ``focal_length``. The horizontal extent then follows the image
+            aspect ratio (square pixels), which matches MJCF ``fovy``.
+        focal_length: Lens focal length [m]. Only ratios with the aperture
+            affect the projection.
+        horizontal_aperture: Sensor width [m]. If ``None`` or 0, it is
+            derived from ``vertical_aperture`` and the image aspect ratio.
+        vertical_aperture: Sensor height [m]. If ``None`` or 0, it is
+            derived from ``horizontal_aperture`` and the image aspect ratio.
+        horizontal_aperture_offset: Principal-point offset [m].
+        vertical_aperture_offset: Principal-point offset [m].
+        clipping_range: (near, far) distances [m]. Hits outside the range
+            are reported as misses.
+        resolution: Nominal (width, height) [px] authored by the asset.
+            Only a default for sensors; it does not allocate anything.
+        label: Unique label, e.g. a USD prim path. Defaults to
+            ``camera_{index}``.
+        custom_attributes: Values for CAMERA-frequency custom attributes.
+
+    Returns:
+        The camera index.
+    """</code></pre>
+
+<p>If no intrinsics are given, the camera gets <code>fov = radians(45)</code>, the MuJoCo default. <code>newton.CameraLens</code> starts with <code>PINHOLE</code> and <code>CUSTOM</code>. Built-in distortion models (OpenCV, fisheye, F-theta, Kannala-Brandt) are added in <a href="#phasing">phase 2</a>; until then a distorted lens is a <code>CUSTOM</code> camera with rays from the existing helpers (<a href="#rays">section 7.2</a>).</p>
+
+<h3>5.2 New Model fields</h3>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Attribute</th><th>Type, shape</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>camera_count</code></td><td><code>int</code></td><td></td></tr>
+<tr><td><code>camera_label</code></td><td><code>list[str]</code></td><td>Label matching target for <code>SensorCamera(cameras=...)</code>.</td></tr>
+<tr><td><code>camera_world</code></td><td><code>array[int32]</code> (camera_count,)</td><td><code>-1</code> = global (renders every world). Spec references <code>WORLD</code>.</td></tr>
+<tr><td><code>camera_world_start</code></td><td><code>array[int32]</code> (world_count + 2,)</td><td>Same layout as <code>shape_world_start</code>.</td></tr>
+<tr><td><code>camera_body</code></td><td><code>array[int32]</code> (camera_count,)</td><td><code>-1</code> = fixed. Spec references <code>BODY</code>, so coupled-model views remap it.</td></tr>
+<tr><td><code>camera_transform</code></td><td><code>array[transform]</code> (camera_count,)</td><td>Body-local mount (or world pose for <code>body == -1</code>). Writable at runtime (R10).</td></tr>
+<tr><td><code>camera_lens</code></td><td><code>array[int32]</code> (camera_count,)</td><td><code>CameraLens</code> value. <code>CUSTOM</code> cameras take their rays from the sensor.</td></tr>
+<tr><td><code>camera_focal_length</code></td><td><code>array[float32]</code> (camera_count,)</td><td>[m]. Writable at runtime (R5).</td></tr>
+<tr><td><code>camera_aperture</code></td><td><code>array[vec2]</code> (camera_count,)</td><td>(horizontal, vertical) [m]; a 0 component is derived from the image aspect.</td></tr>
+<tr><td><code>camera_aperture_offset</code></td><td><code>array[vec2]</code> (camera_count,)</td><td>Principal-point offset [m].</td></tr>
+<tr><td><code>camera_clipping_range</code></td><td><code>array[vec2]</code> (camera_count,)</td><td>(near, far) [m]. Replaces the global <code>max_distance</code> for bound sensors (R8).</td></tr>
+<tr><td><code>camera_resolution</code></td><td><code>array[vec2i]</code> (camera_count,)</td><td>Nominal (width, height) [px]; (0, 0) = none.</td></tr>
+</tbody>
+</table></div>
+
+<p>A new <code>Model.AttributeFrequency.CAMERA</code> lets importers and users attach per-camera data such as semantic tags, ISP settings, randomization ranges or the parameters of a user camera model (7.3), using the same mechanism as every other entity. There is deliberately <b>no</b> per-camera ray array, sensor object or <code>enabled</code> flag in the Model: those are render state (P1), and enabling is a sensor concern (<code>view_mask</code>).</p>
+
+<div class="callout"><p><b>Why intrinsics are device arrays and not frozen lens objects.</b> An earlier prototype stored deduplicated <code>CameraPinhole(...)</code> Python objects plus an index. That is tidy for import, but it cannot express per-world randomized intrinsics without a host round trip. Flat arrays can be written by a randomization kernel inside a CUDA graph and read directly by the analytic ray kernel (R5), the same way mujoco_warp batches <code>cam_fovy</code>/<code>cam_intrinsic</code>.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="sensor-api">6. SensorCamera API</h2>
+
+<p><code>SensorCamera</code> is the established camera sensor, so this extends it rather than adding a new class. The constructor gains a frame source (model cameras or sites) and a choice of ray source. Everything new is keyword-only and defaults to today's behavior.</p>
+
+<pre><code class="language-python">class SensorCamera:
+    class RayMode(IntEnum):
+        PRECOMPUTED = 0   # cache built-in lens rays, one bundle per distinct lens (default)
+        ANALYTIC = 1      # evaluate built-in lens rays in the kernel from model intrinsics
+
+    @wp.struct
+    class RayQuery:       # input to a user ray function (section 7.3), experimental
+        view: int
+        camera: int       # model camera index, or site index for site-bound sensors
+        world: int
+        x: int
+        y: int
+        sample: int
+        width: int
+        height: int
+        sample_count: int
+
+    def __init__(
+        self,
+        model: Model,
+        *,
+        cameras: str | list[str] | re.Pattern[str] | list[int] | None = None,
+        sites: str | list[str] | re.Pattern[str] | list[int] | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        sample_count: int = 1,
+        ray_mode: RayMode = RayMode.PRECOMPUTED,
+        ray_function: wp.Function | None = None,   # experimental
+        ray_params: wp.array2d[wp.float32] | None = None,  # experimental
+        clipping_range: tuple[float, float] | None = None,
+        default_clear_data: ClearData | None = None,
+        default_render_config: RenderConfig | None = None,
+        load_textures: bool = True,
+    ): ...
+
+    # Available when constructed with ``cameras`` or ``sites``:
+    view_count: int                  # number of rendered views
+    width: int
+    height: int
+    view_camera: wp.array[wp.int32]  # model camera (or site) index per view
+    view_world: wp.array[wp.int32]   # world index per view
+
+    HIT_TRIANGLE_MESH, HIT_PARTICLES, HIT_NONE  # shape_index_image sentinels (section 7.5)
+
+    def compute_view_transforms(self, state, out=None) -&gt; wp.array[wp.transformf]: ...
+    def set_camera_rays(self, rays, *, cameras=None) -&gt; None: ...  # custom rays (section 7.2)
+    def sync_camera_rays(self) -&gt; None: ...   # PRECOMPUTED: rebuild after intrinsics change
+
+    def update(
+        self,
+        state: State,
+        camera_transforms: wp.array[wp.transformf] | None = None,  # now optional
+        camera_rays: wp.array4d[wp.vec3f] | None = None,           # now optional
+        *,
+        color_image=None, depth_image=None, forward_depth_image=None,
+        shape_index_image=None, normal_image=None, albedo_image=None,
+        hdr_color_image=None,
+        view_mask: wp.array[wp.bool] | None = None,                 # new
+        face_index_image: wp.array3d[wp.int32] | None = None,       # new, per-hit data
+        barycentric_image: wp.array3d[wp.vec2f] | None = None,      # new, per-hit data
+        world_indices: wp.array[wp.int32] | None = None,
+        clear_data=None, render_config=None, sync_deformables=True,
+    ) -&gt; None: ...</code></pre>
+
+<h3>6.1 Semantics</h3>
+<ul>
+  <li><b>Frame source.</b> <code>cameras</code> selects model cameras by <a href="../docs/concepts/sensors.rst">label matching</a> on <code>model.camera_label</code>. Their frames <i>and</i> optics come from the Model. <code>sites</code> instead selects sites, which provide only a frame. A site-bound sensor therefore needs its rays from <code>set_camera_rays</code>, a <code>ray_function</code> or the per-call <code>camera_rays</code>, and its clip range from <code>clipping_range</code> (default <code>(0, inf)</code>). This is how ray sensors such as lidar are built (<a href="#other-sensors">section 12</a>). Pass at most one of the two; with neither, the sensor is unbound and behaves as today. The selection is fixed at construction, like <code>SensorIMU(sites=...)</code>, which is the static half of R6.</li>
+  <li><b>Views.</b> Each selected camera or site with world <code>w &ge; 0</code> produces one view that renders world <code>w</code>. Each selected global one produces one view per world. Views are ordered by index, then world. For a pattern such as <code>"*/wrist_cam"</code> on a replicated scene, view <code>i</code> is environment <code>i</code>, so the output is <code>(num_envs, H, W)</code> with no reshaping. <code>view_camera</code> and <code>view_world</code> make the mapping explicit (R1).</li>
+  <li><b>Resolution.</b> <code>width</code> and <code>height</code> default to <code>camera_resolution</code> when all selected cameras agree, and otherwise are required. One sensor has one resolution, because outputs are dense <code>(view_count, H, W)</code> arrays. Different resolutions use different sensors (R7).</li>
+  <li><b>Rays.</b> Each view gets its rays from exactly one source: a built-in lens (PRECOMPUTED or ANALYTIC), a custom bundle, or a ray function. <a href="#rays">Section 7</a> covers all four.</li>
+  <li><b>Poses.</b> Each <code>update()</code> launches a small kernel, <code>view_pose = body_q[body] * frame_transform</code> (using the camera or site mount, or just the transform for fixed frames), into an internal buffer with a stable address, then renders. Both launches are graph capturable. An explicit <code>camera_transforms</code> argument overrides the computed poses for that call.</li>
+  <li><b>Masking.</b> <code>view_mask[v] == False</code> skips view <code>v</code> and leaves its outputs untouched (the existing <code>WorldRenderFlag.DISABLE_PRESERVE</code> path). This is the dynamic half of R6: update periods, partial resets, retired cameras.</li>
+  <li><b>Clip range.</b> A bound sensor reads the near and far distances per view at run time instead of the <code>wp.static</code> <code>max_distance</code>, which removes the kernel variant per far value and adds near clipping (R8). The values come from <code>camera_clipping_range</code> for cameras, or from <code>clipping_range</code> for sites; passing <code>clipping_range</code> also overrides the camera values.</li>
+  <li><b>Shared scene state.</b> All <code>SensorCamera</code> instances for the same model and <code>load_textures</code> setting share one internal <code>RenderContext</code> (BVH bindings, textures, lights). Several bound sensors (one per resolution, camera group or lidar) then cost what the single shared Isaac Lab sensor costs today (R7). See <a href="#open-questions">open question 5</a> on lights.</li>
+  <li><b>Per-hit outputs.</b> <code>face_index_image</code> and <code>barycentric_image</code> report which triangle, mesh face or particle each pixel hit and where. Together with <code>shape_index_image</code> they let user kernels compute new imaging channels (<a href="#custom-imaging">section 7.5</a>). <code>allocate_image_face_index()</code> and <code>allocate_image_barycentric()</code> allocate them.</li>
+  <li><b>Unbound sensors.</b> With neither <code>cameras</code> nor <code>sites</code>, <code>camera_transforms</code> and <code>camera_rays</code> are required, as they are today, and the <code>view_*</code> attributes raise.</li>
+</ul>
+
+<h3>6.2 Minimal example</h3>
+<pre><code class="language-python">import warp as wp
+import newton
+from newton.sensors import SensorCamera
+
+robot = newton.ModelBuilder()
+robot.add_usd("franka.usda")  # UsdGeom.Camera prims in the asset are imported as well
+hand = robot.body_label.index("/franka/panda_hand")
+robot.add_camera(hand, xform=wp.transform((0.0, 0.0, 0.05), wp.quat_identity()),
+                 fov=1.0, clipping_range=(0.02, 3.0), label="wrist_cam")
+
+builder = newton.ModelBuilder()
+builder.add_ground_plane()
+builder.add_camera(-1, xform=overview_pose, fov=0.8, label="overview")  # global: every world
+builder.replicate(robot, copy_count=1024, label_prefixes=[f"env_{i}" for i in range(1024)])
+model = builder.finalize()
+
+wrist = SensorCamera(model, cameras="env_*/wrist_cam", width=128, height=128)
+overview = SensorCamera(model, cameras="overview", width=640, height=480)
+wrist_rgb = wrist.allocate_image_color()   # (1024, 128, 128); view_count/size default from the sensor
+overview_rgb = overview.allocate_image_color()
+
+for _ in range(steps):
+    solver.step(state_0, state_1, control, contacts, dt)
+    model.bvh_refit_shapes(state_1)
+    wrist.update(state_1, color_image=wrist_rgb)
+    overview.update(state_1, color_image=overview_rgb)</code></pre>
+
+<p>This removes the two transform kernels, the two hand-built ray bundles and the <code>world_indices</code> array that <code>example_sensor_camera.py</code> needs today.</p>
+
+<!-- ============================================================ -->
+<h2 id="rays">7. Camera models and rays</h2>
+
+<p>A camera model is a mapping from (pixel, sample) to a ray in the sensor frame: an origin and a direction. Everything in this section is about who defines that mapping and whether the sensor caches its output. Rays never live in the Model, because they depend on resolution. Lens <i>parameters</i> may live in the Model, either as the built-in intrinsic arrays or as CAMERA-frequency custom attributes.</p>
+
+<p><b>Ray contract</b>, shared by every source below:</p>
+<ul>
+  <li>The origin and direction are expressed in the frame of the camera or site. Origins can vary per ray, which supports non-central lenses and multi-emitter scanners.</li>
+  <li>Directions must be unit length. The kernel reports <code>depth_image</code> as the hit parameter along the ray without normalizing it, so it is a metric range only for unit directions. The built-in helpers already normalize.</li>
+  <li>A zero direction marks an unused slot. The kernel treats it as a miss without tracing it, which is what the fisheye helpers already rely on outside the lens's field of view.</li>
+  <li>The -Z forward convention matters only for built-in lenses and for <code>forward_depth_image</code>. Custom rays can point anywhere, including behind the frame.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 960 330" role="img" aria-label="Four ray sources feed one render kernel. Built-in lenses read model intrinsics and are either cached as ray bundles (PRECOMPUTED) or evaluated inline (ANALYTIC). Custom lenses are either a user-supplied ray bundle copied into the sensor (CUSTOM data) or a user ray function compiled into the kernel (custom code).">
+  <defs>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+    <marker id="a3g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-accent"/></marker>
+  </defs>
+  <text x="20" y="26" class="lbl">LENS DEFINED BY</text>
+  <text x="330" y="26" class="lbl">SENSOR HOLDS</text>
+  <text x="650" y="26" class="lbl">EVERY UPDATE</text>
+
+  <rect x="20" y="40" width="260" height="56" rx="7" class="box-model"/>
+  <text x="32" y="62" class="sm t-model">1. Built-in, PRECOMPUTED</text>
+  <text x="32" y="82" class="xs mono">camera_lens = PINHOLE</text>
+  <rect x="330" y="40" width="250" height="56" rx="7" class="box-sensor"/>
+  <text x="342" y="62" class="sm t-sensor">bundle per lens group</text>
+  <text x="342" y="82" class="xs mono">sync_camera_rays()</text>
+  <path d="M280,68 L328,68" class="edge" marker-end="url(#a3)"/>
+  <path d="M580,68 L648,90" class="edge" marker-end="url(#a3)"/>
+
+  <rect x="20" y="110" width="260" height="56" rx="7" class="box-model"/>
+  <text x="32" y="132" class="sm t-model">2. Built-in, ANALYTIC</text>
+  <text x="32" y="152" class="xs">model intrinsics, may differ per env</text>
+  <rect x="330" y="110" width="250" height="56" rx="7" class="boundary" style="fill:none"/>
+  <text x="342" y="132" class="sm">no stored rays</text>
+  <text x="342" y="152" class="xs">pinhole() inlined in the kernel</text>
+  <path d="M280,138 L328,138" class="edge" marker-end="url(#a3)"/>
+  <path d="M580,138 L648,145" class="edge" marker-end="url(#a3)"/>
+
+  <rect x="20" y="180" width="260" height="56" rx="7" class="box-user"/>
+  <text x="32" y="202" class="sm">3. Custom rays (data)</text>
+  <text x="32" y="222" class="xs mono">camera_lens = CUSTOM, or sites=</text>
+  <rect x="330" y="180" width="250" height="56" rx="7" class="box-sensor"/>
+  <text x="342" y="202" class="sm t-sensor">bundle per custom group</text>
+  <text x="342" y="222" class="xs mono">set_camera_rays(rays)</text>
+  <path d="M280,208 L328,208" class="edge" marker-end="url(#a3)"/>
+  <path d="M580,208 L648,200" class="edge" marker-end="url(#a3)"/>
+
+  <rect x="20" y="250" width="260" height="56" rx="7" class="box-user"/>
+  <text x="32" y="272" class="sm">4. Custom model (code)</text>
+  <text x="32" y="292" class="xs mono">ray_function + ray_params</text>
+  <rect x="330" y="250" width="250" height="56" rx="7" class="boundary" style="fill:none"/>
+  <text x="342" y="272" class="sm">no stored rays</text>
+  <text x="342" y="292" class="xs">user @wp.func inlined in the kernel</text>
+  <path d="M280,278 L328,278" class="edge" marker-end="url(#a3)"/>
+  <path d="M580,278 L648,256" class="edge" marker-end="url(#a3)"/>
+
+  <rect x="650" y="40" width="290" height="266" rx="8" class="box"/>
+  <text x="664" y="64" class="ttl">render kernel</text>
+  <text x="664" y="88" class="xs">for each (view, pixel, sample):</text>
+  <text x="676" y="110" class="xs">1. ray from source 1–4</text>
+  <text x="676" y="130" class="xs">2. transform by view pose</text>
+  <text x="676" y="150" class="xs">3. clip to near / far of the view</text>
+  <text x="676" y="170" class="xs">4. trace the shared scene BVH</text>
+  <text x="676" y="190" class="xs">5. write requested outputs only</text>
+  <text x="664" y="222" class="xs" style="fill:var(--muted)">Depth-only renders skip shading,</text>
+  <text x="664" y="238" class="xs" style="fill:var(--muted)">which makes range sensing cheap.</text>
+</svg>
+<figcaption>Figure 3. Four ray sources feed one kernel. Sources 1 and 2 are built-in lens models that read the Model's intrinsic arrays. Sources 3 and 4 are how users bring their own camera model, as data or as code. The kernel steps after "ray from source" are identical for all four.</figcaption>
+</figure>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Source</th><th>Lens defined by</th><th>Rays live in</th><th>Varies per env</th><th>Use for</th></tr></thead>
+<tbody>
+<tr><td>1. PRECOMPUTED</td><td>Model intrinsics (built-in lens)</td><td>Sensor, one bundle per distinct lens</td><td>Possible, at one bundle per env</td><td>Default; fast; MSAA/SSAA</td></tr>
+<tr><td>2. ANALYTIC</td><td>Model intrinsics (built-in lens)</td><td>Nowhere</td><td><b>Yes</b>, free</td><td>Intrinsics randomization (R5)</td></tr>
+<tr><td>3. Custom rays</td><td>Any user kernel or calibration table</td><td>Sensor, one bundle per <code>set_camera_rays</code> group</td><td>At one bundle per env</td><td>Calibrated or exotic lenses, scan patterns (R13, R14)</td></tr>
+<tr><td>4. Ray function <span class="chip part">experimental</span></td><td>User <code>@wp.func</code> + parameters</td><td>Nowhere</td><td><b>Yes</b>, free</td><td>Parametric custom models with randomization, time-varying scans</td></tr>
+</tbody>
+</table></div>
+
+<h3>7.1 Built-in lenses: precomputed vs analytic</h3>
+
+<p>Both modes read the same Model arrays; they differ only in whether the sensor caches the derived rays. PRECOMPUTED groups the selected cameras by identical intrinsics and stores one bundle per group. After writing <code>model.camera_*</code>, <code>sync_camera_rays()</code> rebuilds the bundles in place at a stable address, and raises if the grouping of equal lenses changes. ANALYTIC stores nothing and evaluates the pinhole projection per pixel from <code>camera_*[view_camera[v]]</code>, so per-environment intrinsics cost no memory (a per-env bundle would be <code>4096 × 128² × 2 × 12 B ≈ 1.6 GB</code>).</p>
+
+<p><b>Kernel change.</b> The render kernel currently reads <code>camera_rays[py, px, s, k]</code> from a single bundle (<a href="../newton/_src/sensors/sensor_camera_render/render.py">render.py:589</a>, <a href="../newton/_src/sensors/sensor_camera_render/render.py">render.py:690</a>). It gains a <code>wp.static</code> switch between a bundle indexed by <code>view_ray_bundle[view]</code> and an inline ray generator. newton#3276 (<code>camera_indices[:, 1]</code>) and mujoco_warp (<code>ray_offset</code>) both used a per-view bundle index, so that half is already proven.</p>
+
+<pre><code class="language-python"># Per-env focal-length randomization, captured in the same CUDA graph as the render.
+wrist = SensorCamera(model, cameras="env_*/wrist_cam", width=128, height=128,
+                     ray_mode=SensorCamera.RayMode.ANALYTIC)
+
+@wp.kernel
+def randomize_focal(seed: int, nominal: float, focal: wp.array[float]):
+    c = wp.tid()
+    focal[c] = nominal * (1.0 + 0.1 * (wp.randf(wp.rand_init(seed, c)) - 0.5))
+
+wp.launch(randomize_focal, dim=model.camera_count, inputs=[seed, 0.024, model.camera_focal_length])
+wrist.update(state, color_image=rgb)   # each env renders with its own focal length</code></pre>
+
+<h3>7.2 Custom rays as data</h3>
+
+<p>A camera declared with <code>lens=CameraLens.CUSTOM</code> has no analytic model, and its intrinsic fields are ignored. Its rays come from the sensor:</p>
+
+<pre><code class="language-python">sensor.set_camera_rays(rays, cameras=None)
+#   rays:    (H, W, S, 2) vec3f, shared by the matched cameras, or
+#            (N, H, W, S, 2) vec3f, one bundle per matched camera (e.g. per-env calibrations)
+#   cameras: label pattern selecting a subset of this sensor's cameras; None = all of them</code></pre>
+
+<ul>
+  <li>The sensor copies the rays into its own bundle storage. The first call allocates; later calls with the same shapes are device copies at a stable address, so a scan pattern can be updated every step inside a CUDA graph.</li>
+  <li><code>H</code>, <code>W</code> and <code>S</code> must match the sensor's <code>height</code>, <code>width</code> and <code>sample_count</code>.</li>
+  <li><code>update()</code> raises if a selected CUSTOM camera has no rays. ANALYTIC mode raises for CUSTOM cameras rather than guessing a model.</li>
+  <li>PINHOLE and CUSTOM cameras can share a sensor and a launch, because each view already carries a bundle index.</li>
+  <li>Site-bound sensors use the same method, since sites never have built-in optics.</li>
+  <li>The per-call <code>camera_rays=</code> override in <code>update()</code> stays as an escape hatch and remains the only option for unbound sensors.</li>
+</ul>
+
+<pre><code class="language-python">proto.add_camera(hand, xform=mount, lens=newton.CameraLens.CUSTOM,
+                 resolution=(640, 480), label="wrist_cam")
+...
+wrist = SensorCamera(model, cameras="env_*/wrist_cam", width=640, height=480)
+rays = my_calibrated_lens_rays(640, 480, device=model.device)  # (480, 640, 1, 2), any kernel
+wrist.set_camera_rays(rays)
+wrist.update(state, color_image=rgb)</code></pre>
+
+<h3>7.3 Custom camera models as code <span class="chip part">experimental</span></h3>
+
+<p>Data alone cannot express a custom model whose parameters change per environment without one bundle per environment, or a scan pattern that changes every step without re-uploading rays. For those cases a sensor accepts a user <code>@wp.func</code> that the render kernel inlines in place of the built-in pinhole. The render kernel is already specialized per configuration with <code>wp.static</code>, so the function is captured the same way and compiled once per distinct function.</p>
+
+<ul>
+  <li><b>Signature:</b> <code>(params, query: SensorCamera.RayQuery) -&gt; (origin, direction)</code>, following the ray contract above.</li>
+  <li><b>Parameters:</b> <code>params</code> is a <code>wp.array2d[float32]</code> table passed as <code>ray_params</code>, typically one row per model camera (indexed by <code>query.camera</code>) or per world. It lives on the device, so values and step counters can be written inside a captured graph. The prototype settled on this fixed type because it keeps the render kernel's signature stable; arbitrary user structs remain an open question.</li>
+  <li><b>Where the parameters come from:</b> declare them as CAMERA-frequency custom attributes. They are then authored in USD (<code>newton:&lt;namespace&gt;:&lt;name&gt;</code>) or MJCF, parsed by the importers, replicated per world, and can be randomized, with no Newton change. A one-line kernel gathers them into the parameter table.</li>
+  <li><b>Scope:</b> one ray function per sensor, applied to all of its views (CUSTOM cameras or sites). To cache a function's output instead, evaluate it once into a bundle with your own kernel and use 7.2.</li>
+  <li><b>Built-in lenses:</b> the phase-2 lens types (OpenCV, fisheye, F-theta, Kannala-Brandt) can be implemented as built-in ray functions on the same mechanism.</li>
+</ul>
+
+<pre><code class="language-python"># A barrel-distorted lens whose field of view and distortion are per-camera custom attributes.
+for name in ("lens_fov", "lens_k1"):
+    builder.add_custom_attribute(
+        ModelBuilder.CustomAttribute(
+            name=name, namespace="thermal", frequency=Model.AttributeFrequency.CAMERA, dtype=wp.float32
+        )
+    )  # USD: newton:thermal:lens_fov / newton:thermal:lens_k1 on the camera prim
+builder.add_camera(-1, xform=pose, lens=newton.CameraLens.CUSTOM, resolution=(192, 144), label="thermal_cam",
+                   custom_attributes={"thermal:lens_fov": 0.73, "thermal:lens_k1": 0.12})
+
+@wp.func
+def barrel_lens(params: wp.array2d[wp.float32], q: SensorCamera.RayQuery):
+    half = wp.tan(0.5 * params[q.camera, 0])
+    k1 = params[q.camera, 1]
+    x = ((float(q.x) + 0.5) / float(q.width) - 0.5) * 2.0 * half * float(q.width) / float(q.height)
+    y = (0.5 - (float(q.y) + 0.5) / float(q.height)) * 2.0 * half
+    scale = 1.0 + k1 * (x * x + y * y) / (half * half)
+    return wp.vec3f(0.0), wp.normalize(wp.vec3f(x * scale, y * scale, -1.0))
+
+@wp.kernel
+def gather(fov: wp.array[float], k1: wp.array[float], out: wp.array2d[float]):
+    c = wp.tid()
+    out[c, 0] = fov[c]
+    out[c, 1] = k1[c]
+
+params = wp.zeros((model.camera_count, 2), dtype=wp.float32)
+wp.launch(gather, model.camera_count, inputs=[model.thermal.lens_fov, model.thermal.lens_k1], outputs=[params])
+thermal = SensorCamera(model, cameras="thermal_cam", ray_function=barrel_lens, ray_params=params)
+# Randomize model.thermal.lens_k1 per camera and gather again; the next update() uses the new values.</code></pre>
+
+<h3>7.4 Comparison with mujoco_warp</h3>
+
+<p>mujoco_warp's camera model is what MJCF can describe: <code>cam_projection</code> (perspective or orthographic), <code>cam_fovy</code>, <code>cam_sensorsize</code> and <code>cam_intrinsic</code>, with no lens type and no distortion. With <code>use_precomputed_rays=True</code>, <code>create_render_context</code> fills flat <code>rc.ray</code>/<code>rc.ray_offset</code> arrays from the unbatched intrinsics, one block per active camera, shared by all worlds. With <code>False</code>, the kernel calls the same <code>compute_ray</code> with per-world <code>cam_fovy</code>/<code>cam_intrinsic</code>, which is the documented path for intrinsics randomization. Both paths are the same analytic model, so "precomputed" is a cache, not an extension point. Custom lenses are only possible by overwriting <code>rc.ray</code> in place, with an implicit layout and per-ray origins honored only if the model also has an orthographic camera. Sources 1 and 2 above match mujoco_warp; sources 3 and 4 are where this design goes further.</p>
+
+<h3 id="custom-imaging">7.5 Custom imaging from per-hit outputs</h3>
+
+<p>Some sensors need a different quantity per pixel rather than different rays: temperature for a thermal camera, a material or semantic ID, an emissivity-weighted radiance. Compiling user shading into the renderer would couple every such sensor to renderer internals. Instead the sensor reports what each ray hit, and a user kernel computes the quantity:</p>
+
+<ul>
+  <li><code>shape_index_image</code>: the shape index, or <code>SensorCamera.HIT_TRIANGLE_MESH</code> for deformable triangle surfaces, <code>HIT_PARTICLES</code> for particles, and <code>HIT_NONE</code> for misses.</li>
+  <li><code>face_index_image</code>: the triangle index into <code>Model.tri_indices</code> for deformable hits, the face index for mesh shapes, or the particle index.</li>
+  <li><code>barycentric_image</code>: the barycentric coordinates <code>(u, v)</code> of the hit, using Warp's convention <code>p = u·p0 + v·p1 + (1 − u − v)·p2</code>.</li>
+</ul>
+
+<p>With these three images, any per-vertex, per-particle or per-shape attribute (including custom attributes) can be interpolated at the hit point. Requesting barycentrics makes the kernel use its full hit path, because the depth-only path skips them. The prototype's thermal camera (<a href="#prototype">section 14</a>) is built this way:</p>
+
+<pre><code class="language-python">@wp.kernel
+def compose_thermal(shape_index: wp.array3d[wp.uint32], face: wp.array3d[wp.int32], bary: wp.array3d[wp.vec2f],
+                    tri_indices: wp.array2d[wp.int32], vertex_temp: wp.array[float], shape_temp: wp.array[float],
+                    background: float, out_temp: wp.array2d[float]):
+    y, x = wp.tid()
+    s = shape_index[0, y, x]
+    t = background
+    if s == wp.uint32(wp.static(SensorCamera.HIT_TRIANGLE_MESH)):
+        f = face[0, y, x]
+        b = bary[0, y, x]
+        t = (b[0] * vertex_temp[tri_indices[f, 0]] + b[1] * vertex_temp[tri_indices[f, 1]]
+             + (1.0 - b[0] - b[1]) * vertex_temp[tri_indices[f, 2]])
+    elif s &lt; wp.uint32(0xFFFFFFF0):
+        t = shape_temp[wp.int32(s)]
+    out_temp[y, x] = t
+
+thermal.update(state, shape_index_image=si, face_index_image=fi, barycentric_image=bc)
+wp.launch(compose_thermal, (thermal.height, thermal.width),
+          inputs=[si, fi, bc, model.tri_indices, model.thermal.temperature, model.thermal.surface_temperature, 12.0],
+          outputs=[temperature_image])</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="import">8. USD and MJCF import</h2>
+
+<p>Both importers gain a flag named after their existing site flags: <code>add_usd(..., load_cameras=True)</code> (next to <code>load_sites</code>) and <code>add_mjcf(..., parse_cameras=True)</code> (next to <code>parse_sites</code>). Body resolution uses the same "nearest rigid-body ancestor, fold intermediate Xforms into the local transform" rule as sites and visual shapes, which fixes the IsaacLab #8211 class of failures by construction.</p>
+
+<h3>8.1 USD (<code>UsdGeom.Camera</code>)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>USD</th><th>Model</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>prim path</td><td><code>camera_label</code></td><td>Matches Isaac Lab <code>prim_path</code> patterns.</td></tr>
+<tr><td>xformOps up to the nearest <code>RigidBodyAPI</code> ancestor</td><td><code>camera_body</code>, <code>camera_transform</code></td><td>No body ancestor: <code>body = -1</code>, world pose with up-axis conversion and import <code>xform</code>, as <code>compute_camera_transforms_usd</code> does today.</td></tr>
+<tr><td><code>focalLength</code></td><td><code>camera_focal_length</code></td><td>Tenths of a scene unit, converted to [m] with <code>metersPerUnit</code>.</td></tr>
+<tr><td><code>horizontalAperture</code>, <code>verticalAperture</code></td><td><code>camera_aperture</code></td><td>Same unit conversion.</td></tr>
+<tr><td><code>horizontalApertureOffset</code>, <code>verticalApertureOffset</code></td><td><code>camera_aperture_offset</code></td><td></td></tr>
+<tr><td><code>clippingRange</code></td><td><code>camera_clipping_range</code></td><td>Scene units to [m]. Neither prior PR read this; Isaac Lab needs it.</td></tr>
+<tr><td><code>projection = "orthographic"</code></td><td>&mdash;</td><td>Warn and skip (phase 1).</td></tr>
+<tr><td><code>UsdRender.Product</code> whose <code>camera</code> rel targets the prim</td><td><code>camera_resolution</code></td><td>Optional hint from standard OpenUSD; no Newton schema needed.</td></tr>
+<tr><td>Custom attributes on the prim</td><td>CAMERA-frequency custom attributes</td><td>Existing custom-attribute parsing.</td></tr>
+<tr><td>Lens distortion attributes (as authored by Isaac Lab's distortion cfgs)</td><td>&mdash;</td><td>Phase 2; read as plain attributes, with no Omniverse dependency.</td></tr>
+</tbody>
+</table></div>
+
+<p><b>Schema disposition</b> (required by <a href="../CODING_GUIDELINES.rst">CODING_GUIDELINES</a> "USD schema and importer support"): <i>supported</i> through standard <code>UsdGeom.Camera</code> and <code>UsdRender.Product</code>, with no new schema in phase 1. Lens distortion is <i>deferred</i> to phase 2 and needs an owner and an issue (it can track newton#3578). Tests must check that a USD-authored camera and an equivalent <code>add_camera</code> call produce identical Model rows, including defaults, units, frames and invalid inputs.</p>
+
+<h3>8.2 MJCF (<code>&lt;camera&gt;</code>)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>MJCF</th><th>Model</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>enclosing <code>&lt;body&gt;</code> / <code>&lt;worldbody&gt;</code> / <code>&lt;frame&gt;</code></td><td><code>camera_body</code></td><td>Uses <code>class</code>/<code>childclass</code> defaults.</td></tr>
+<tr><td><code>name</code></td><td><code>camera_label</code></td><td></td></tr>
+<tr><td><code>pos</code>, <code>quat</code> / <code>axisangle</code> / <code>xyaxes</code> / <code>zaxis</code> / <code>euler</code></td><td><code>camera_transform</code></td><td>The MuJoCo camera frame is already -Z forward and +Y up, so no conversion is needed.</td></tr>
+<tr><td><code>fovy</code> [deg]</td><td>focal length + vertical aperture; <code>aperture.x = 0</code></td><td>The horizontal extent follows the image aspect, as in MuJoCo.</td></tr>
+<tr><td><code>focal</code> + <code>sensorsize</code> (+ <code>principal</code>)</td><td>focal length, aperture (+ offset)</td><td>Physical units.</td></tr>
+<tr><td><code>focalpixel</code> / <code>principalpixel</code> + <code>resolution</code></td><td>converted to the above</td><td>Uses <code>sensorsize</code>/<code>resolution</code> as the pixel pitch.</td></tr>
+<tr><td><code>resolution</code></td><td><code>camera_resolution</code></td><td></td></tr>
+<tr><td><code>mode</code> &ne; fixed, <code>target</code></td><td>imported as fixed</td><td>Warn. The original mode is kept in a CAMERA-frequency custom attribute for a later tracking-camera phase.</td></tr>
+<tr><td><code>orthographic="true"</code></td><td>&mdash;</td><td>Warn and skip.</td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="worlds">9. Worlds, replication and views</h2>
+
+<p>Cameras follow the rules shapes already follow in <code>add_builder</code>/<code>replicate</code>: the body index is remapped, the world becomes the destination world, world-fixed cameras (<code>body == -1</code>) inside the source builder get the per-copy <code>xform</code>/<code>spacing</code> applied, and <code>label_prefixes</code> are prepended. Global cameras are only ever declared at the global scope of the outer builder.</p>
+
+<figure><div class="fig-scroll">
+<svg viewBox="0 0 960 300" role="img" aria-label="Five model cameras: a global overview camera and wrist and head cameras in worlds 0 and 1. A sensor selecting wrist cameras gets two views, one per world. A sensor selecting the global overview camera also gets two views, one for each world.">
+  <defs>
+    <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+  </defs>
+  <text x="20" y="28" class="lbl">MODEL CAMERAS</text>
+  <rect x="20" y="40" width="380" height="240" rx="8" class="box-model"/>
+  <text x="34" y="66" class="xs" style="font-weight:600">idx</text>
+  <text x="74" y="66" class="xs" style="font-weight:600">label</text>
+  <text x="230" y="66" class="xs" style="font-weight:600">world</text>
+  <text x="290" y="66" class="xs" style="font-weight:600">body</text>
+  <line x1="30" y1="76" x2="390" y2="76" class="edge" style="stroke-width:.6"/>
+  <text x="34" y="100" class="xs mono">0</text><text x="74" y="100" class="xs mono">overview</text><text x="230" y="100" class="xs mono">-1</text><text x="290" y="100" class="xs mono">-1</text>
+  <text x="34" y="136" class="xs mono">1</text><text x="74" y="136" class="xs mono">env_0/wrist_cam</text><text x="230" y="136" class="xs mono">0</text><text x="290" y="136" class="xs mono">hand₀</text>
+  <text x="34" y="172" class="xs mono">2</text><text x="74" y="172" class="xs mono">env_0/head_cam</text><text x="230" y="172" class="xs mono">0</text><text x="290" y="172" class="xs mono">head₀</text>
+  <text x="34" y="208" class="xs mono">3</text><text x="74" y="208" class="xs mono">env_1/wrist_cam</text><text x="230" y="208" class="xs mono">1</text><text x="290" y="208" class="xs mono">hand₁</text>
+  <text x="34" y="244" class="xs mono">4</text><text x="74" y="244" class="xs mono">env_1/head_cam</text><text x="230" y="244" class="xs mono">1</text><text x="290" y="244" class="xs mono">head₁</text>
+
+  <text x="560" y="28" class="lbl">SENSOR VIEWS</text>
+  <rect x="560" y="40" width="380" height="104" rx="8" class="box-sensor"/>
+  <text x="574" y="62" class="sm mono t-sensor">cameras="env_*/wrist_cam"  128×128</text>
+  <text x="574" y="92" class="xs mono">view 0 → camera 1, world 0</text>
+  <text x="574" y="120" class="xs mono">view 1 → camera 3, world 1</text>
+
+  <rect x="560" y="160" width="380" height="104" rx="8" class="box-sensor"/>
+  <text x="574" y="182" class="sm mono t-sensor">cameras="overview"  640×480</text>
+  <text x="574" y="212" class="xs mono">view 0 → camera 0, world 0</text>
+  <text x="574" y="240" class="xs mono">view 1 → camera 0, world 1</text>
+
+  <path d="M400,132 L556,88" class="edge" marker-end="url(#a4)"/>
+  <path d="M400,204 L556,116" class="edge" marker-end="url(#a4)"/>
+  <path d="M400,96 C470,96 500,208 556,208" class="edge-accent" marker-end="url(#a4)"/>
+  <path d="M400,96 C480,96 500,236 556,236" class="edge-accent" marker-end="url(#a4)"/>
+  <text x="560" y="292" class="lbl t-accent">global camera → one view per world</text>
+</svg></div>
+<figcaption>Figure 4. View expansion. Per-world cameras produce exactly one view each, and a global camera fans out to every world. Views are ordered by (camera, world), so a per-environment pattern yields views in environment order.</figcaption>
+</figure>
+
+<p><b>Heterogeneous worlds</b> need no special handling. If world 7 has no wrist camera, the pattern simply matches one fewer camera, and <code>view_world</code> tells the caller which environments are present. This is the case that "one <code>SensorCamera</code> per camera replicated like meshes" (#3627) could not express.</p>
+
+<!-- ============================================================ -->
+<h2 id="isaaclab">10. Isaac Lab integration</h2>
+
+<p>Isaac Lab already registers IMU, frame-transformer and ray-caster sites on the prototype builder before replication (<code>NewtonManager.cl_register_site</code> → <code>builder.add_site</code>). Cameras would follow the same path, either from the env_0 USD prim it already spawns or directly from <code>CameraCfg</code>:</p>
+
+<pre><code class="language-python"># Prototype builder, before replication (R1)
+proto.add_usd(stage, root_path="/World/envs/env_0", load_cameras=True)
+# ...or straight from the config, like cl_register_site does for sites:
+proto.add_camera(
+    body=hand_body,
+    xform=offset_in_opengl_convention,          # CameraCfg.OffsetCfg converted once
+    focal_length=lens_m(cfg.spawn.focal_length),         # cfg lens units -&gt; [m]
+    horizontal_aperture=lens_m(cfg.spawn.horizontal_aperture),
+    clipping_range=cfg.spawn.clipping_range,
+    resolution=(cfg.width, cfg.height),
+    label="Robot/ee_link/palm_link/Camera",
+)
+builder.replicate(proto, copy_count=num_envs,
+                  label_prefixes=[f"/World/envs/env_{i}" for i in range(num_envs)])
+model = builder.finalize()
+
+# One SensorCamera per CameraCfg (R7); all share the model's RenderContext.
+cam = SensorCamera(model, cameras="/World/envs/env_*/Robot/ee_link/palm_link/Camera",
+                   width=cfg.width, height=cfg.height,
+                   ray_mode=SensorCamera.RayMode.ANALYTIC)   # if intrinsics are randomized (R5)
+rgb = cam.allocate_image_color()        # (num_envs, H, W), aliased into the torch buffer
+depth = cam.allocate_image_depth_forward()
+
+# Inside the physics CUDA graph
+cam.update(state, color_image=rgb, forward_depth_image=depth, view_mask=envs_due)  # R6</code></pre>
+
+<div class="two-col">
+  <div class="card">
+    <h4>Isaac Lab code this replaces</h4>
+    <ul>
+      <li>The camera branch of <code>NewtonSiteFrameView</code> (body-ancestor search, per-world expansion, pose kernel).</li>
+      <li>The K-matrix and ray kernels and the "identical intrinsics" restriction.</li>
+      <li>The <code>default_render_config.max_distance</code> overwrite before each render.</li>
+      <li>World-to-OpenGL pose packing per camera.</li>
+      <li>Reading camera intrinsics from the stage at runtime.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>What stays in Isaac Lab</h4>
+    <ul>
+      <li>Config conventions (<code>ros</code>/<code>world</code> offsets → OpenGL, at declaration time).</li>
+      <li>Segmentation remapping from <code>shape_index_image</code> (unchanged).</li>
+      <li><code>set_world_poses</code>: converts the desired world pose to a mount offset and writes <code>model.camera_transform</code> (R10).</li>
+      <li>Moving from deprecated <code>SensorTiledCamera</code> to <code>SensorCamera</code>, which it has to do anyway.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="alternatives">11. Alternatives considered</h2>
+
+<p>The useful way to compare the options is to ask where each piece of camera data lives. <span class="chip model">Model</span> = replicated scene description, <span class="chip sensor">Sensor</span> = render state, <span class="chip user">User</span> = recomputed by the caller.</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Option</th><th>Frame / body / world</th><th>Intrinsics</th><th>Resolution &amp; rays</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>A. Status quo + import helpers</b><br><span class="small">importers return camera descriptors</span></td>
+  <td><span class="chip user">User</span></td><td><span class="chip user">User</span></td><td><span class="chip user">User</span></td>
+  <td><span class="chip no">Reject</span> <span class="small">Does not solve R1, R3 or R9; Isaac Lab keeps its parallel site system.</span></td>
+</tr>
+<tr>
+  <td><b>B. Camera as a shape</b><br><span class="small"><code>add_shape_camera</code>, #3627 description</span></td>
+  <td><span class="chip model">Model</span> <span class="small">in <code>shape_*</code></span></td><td><span class="chip sensor">Sensor obj in Model</span></td><td><span class="chip sensor">Sensor obj in Model</span></td>
+  <td><span class="chip no">Reject</span> <span class="small">A camera is not geometry. It grows <code>shape_count</code>, which sizes collision and BVH data, so every shape consumer needs another skip. It also puts render state inside the Model.</span></td>
+</tr>
+<tr>
+  <td><b>C. Camera bound to a site</b><br><span class="small"><code>add_site(camera=SensorCamera)</code>, #3627 final</span></td>
+  <td><span class="chip model">Model</span> <span class="small">site shape</span></td><td><span class="chip sensor">Sensor obj in Model</span></td><td><span class="chip sensor">Sensor obj in Model</span></td>
+  <td><span class="chip part">Partial</span> <span class="small">Reuses site plumbing, but the sensor must exist before <code>finalize</code>, there is one lens and resolution per sensor and at most one camera per world per sensor, and importers return specs that users must turn into sensors. <code>UsdGeom.Camera</code> is not a site prim.</span></td>
+</tr>
+<tr>
+  <td><b>D. Generic <code>add_sensor()</code></b><br><span class="small"><code>sensor_*</code> arrays for all kinds</span></td>
+  <td><span class="chip model">Model</span></td><td><span class="chip model">untyped param bag</span></td><td>?</td>
+  <td><span class="chip no">Reject</span> <span class="small">Sensors share only a frame, and sites already provide that. The rest diverges (optics, contact pairs, lidar patterns). This is the vague "Entity" abstraction the guidelines warn against.</span></td>
+</tr>
+<tr>
+  <td><b>E. Model entity with deduped lens objects</b><br><span class="small">earlier prototype PR</span></td>
+  <td><span class="chip model">Model</span></td><td><span class="chip model">Python objects</span></td><td><span class="chip sensor">Sensor</span> <span class="small">custom rays in Model</span></td>
+  <td><span class="chip part">Close</span> <span class="small">The right structure, but host-side lens objects block per-env randomization (R5), and custom rays in the Model contradict P1.</span></td>
+</tr>
+<tr style="background:var(--accent-soft)">
+  <td><b>F. Model entity, device intrinsics</b><br><span class="small">this proposal</span></td>
+  <td><span class="chip model">Model</span></td><td><span class="chip model">Model arrays</span></td><td><span class="chip sensor">Sensor</span></td>
+  <td><span class="chip ok">Proposed</span> <span class="small">Meets R1&ndash;R10 and R12&ndash;R14; R11 in phase 2.</span></td>
+</tr>
+</tbody>
+</table></div>
+
+<p><b>Why not "one SensorCamera per camera, replicated like meshes"?</b> Newton has no shared-asset-to-instance mapping for shapes either: meshes are shared, but shape instances are per world. Cameras need the same per-instance treatment for heterogeneous worlds and per-env intrinsics. The underlying goal of that design, one array of camera records instead of loose index arrays, is met by the view table, which the sensor owns, not the user.</p>
+
+<!-- ============================================================ -->
+<h2 id="other-sensors">12. Lidar and other sensors</h2>
+
+<h3>12.1 Lidar is a site-bound SensorCamera with custom rays</h3>
+
+<p>A scanning range sensor is a set of rays from a mounted frame plus the hit distance along each ray. <code>SensorCamera</code> already traces arbitrary per-ray origins and directions and writes <code>depth_image</code>, so with sites as a frame source (6.1) and sensor-owned custom rays (7.2, 7.3), a lidar needs no new sensor class. That also matches the direction from the review of newton#3347 (the closed <code>SensorLidar</code> request newton#3346): consolidate ray sensing around the camera sensor and <code>newton.intersect_ray</code>, and keep models of specific scanners downstream. Newton provides the mechanism, and a scanner model is a ray pattern or ray function.</p>
+
+<pre><code class="language-python"># Mount: an ordinary site; no new Model concept.
+robot.add_site(base, xform=wp.transform((0.0, 0.0, 0.35), wp.quat_identity()), label="lidar")
+...
+channels, steps = 32, 1024
+lidar = SensorCamera(model, sites="env_*/lidar", width=steps, height=channels,
+                     clipping_range=(0.3, 100.0))          # min / max range [m]
+lidar.set_camera_rays(spinning_pattern(channels, steps))   # (32, 1024, 1, 2), unit dirs in the site frame
+ranges = lidar.allocate_image_depth()                       # (num_envs, 32, 1024) [m]
+no_return = SensorCamera.ClearData(clear_depth=-1.0)        # miss value
+
+lidar.update(state, depth_image=ranges, clear_data=no_return)
+# Optional: shape_index_image for per-point semantics, normal_image for incidence angle.</code></pre>
+
+<p>Irregular patterns (rosette or solid-state scanners, sparse fans) use a <code>(1, N)</code> "image", or a grid with zero directions in unused slots. Non-repeating patterns either call <code>set_camera_rays</code> each step (a graph-safe copy) or use a ray function that reads a step counter from its parameters.</p>
+
+<h3>12.2 How close to trivial is it?</h3>
+
+<p>Most of it is already there. These are the gaps, and what closes them:</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Aspect</th><th>Today</th><th>With this proposal</th></tr></thead>
+<tbody>
+<tr><td>Range output</td><td><span class="chip ok">Works</span> <code>depth_image</code> is the hit parameter along each ray: metric range for unit directions</td><td>Unchanged; the ray contract (7) requires unit directions</td></tr>
+<tr><td>Cost of depth-only</td><td><span class="chip ok">Works</span> the kernel skips shading when no color, albedo or HDR output is requested</td><td>Unchanged</td></tr>
+<tr><td>Arbitrary patterns</td><td><span class="chip ok">Works</span> rays are independent per pixel; zero directions skip</td><td>Sensor-owned, graph-safe updates via <code>set_camera_rays</code></td></tr>
+<tr><td>Miss value</td><td><span class="chip ok">Works</span> <code>ClearData.clear_depth</code> (default 0)</td><td>Unchanged</td></tr>
+<tr><td>Mounting and per-env poses</td><td><span class="chip no">Manual</span> caller composes <code>body_q</code> and offsets every frame</td><td><code>sites=</code> frame source and view table</td></tr>
+<tr><td>Min / max range</td><td><span class="chip no">Global</span> far only, baked into the kernel (<code>max_distance</code>); no min</td><td>Per-view <code>clipping_range</code></td></tr>
+<tr><td>Hitting its own housing</td><td><span class="chip part">Near clip only</span></td><td>Near clip; per-view shape or body exclusion is an <a href="#open-questions">open question</a></td></tr>
+<tr><td>Point cloud</td><td><span class="chip part">Manual</span> <code>origin + range · direction</code></td><td>A small helper, or downstream</td></tr>
+<tr><td>What rays hit</td><td colspan="2">The render scene (visible shapes, particles, cloth, Gaussians), not collision geometry. Collision-geometry queries remain <code>newton.intersect_ray</code>'s job.</td></tr>
+<tr><td>Not modeled</td><td colspan="2">Scan timing and motion distortion (all rays fire at one instant per update), multiple returns, and reflectivity (approximate from <code>normal_image</code> and <code>albedo_image</code>). With <code>sample_count &gt; 1</code>, depth is the nearest sample, which approximates beam divergence as a first return.</td></tr>
+</tbody>
+</table></div>
+
+<h3>12.3 Declaring other sensors</h3>
+
+<p>Lidar fits the rule that this proposal uses for every sensor kind:</p>
+
+<div class="callout good"><p><b>Sites declare frames, and sensors are configured where they are constructed.</b> A sensor kind gets its own Model entity <i>only</i> when its description is authored in assets (USD or MJCF) and has to survive import and replication.</p></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Sensor</th><th>Asset-authored description beyond a frame?</th><th>Declaration</th></tr></thead>
+<tbody>
+<tr><td><code>SensorIMU</code>, <code>SensorFrameTransform</code></td><td>No</td><td>Sites (unchanged)</td></tr>
+<tr><td><code>SensorContact</code></td><td>No (bodies and shapes)</td><td>Bodies/shapes (unchanged)</td></tr>
+<tr><td>Lidar / range scanners</td><td>No standard schema; the pattern is configuration</td><td>Sites + <code>SensorCamera(sites=...)</code> with custom rays</td></tr>
+<tr><td><b>Camera</b></td><td><b>Yes</b>: <code>UsdGeom.Camera</code>, MJCF <code>&lt;camera&gt;</code> optics</td><td><b>Camera entity</b></td></tr>
+<tr><td>Lights (future)</td><td>Yes: <code>UsdLux</code>, MJCF <code>&lt;light&gt;</code></td><td>Likely the next entity, with the same pattern</td></tr>
+</tbody>
+</table></div>
+
+<p>An entity that follows the pattern provides <code>add_&lt;kind&gt;(body, *, xform, ..., label, custom_attributes)</code>, <code>&lt;kind&gt;_body/_transform/_world/_label</code> arrays, an <code>AttributeFrequency</code> and a <code>&lt;kind&gt;s=</code> selector on its sensor. Sites stay; nothing is deprecated. If a standard lidar schema appears in USD later, lidar can move to an entity through the same steps cameras take here.</p>
+
+<!-- ============================================================ -->
+<h2 id="compat">13. Compatibility</h2>
+<ul>
+  <li><code>SensorCamera(model)</code> and <code>update(state, camera_transforms, camera_rays, ...)</code> are unchanged. Making the two positional arguments optional is not a breaking change.</li>
+  <li><code>allocate_image_*</code> gain optional <code>view_count</code>/<code>width</code>/<code>height</code> defaults for bound sensors. Existing positional calls are unchanged.</li>
+  <li>Assets that contain cameras get a nonzero <code>camera_count</code> after import. Nothing renders unless a sensor selects them. Pass <code>load_cameras=False</code>/<code>parse_cameras=False</code> to opt out, for example for stages with viewport cameras inside <code>root_path</code>.</li>
+  <li><code>SensorTiledCamera</code> stays deprecated and gets no camera-entity support.</li>
+  <li>Mark <code>RayMode.ANALYTIC</code> and <code>AttributeFrequency.CAMERA</code> custom attributes as experimental for one release, and <code>ray_function</code>, <code>ray_params</code> and <code>RayQuery</code> as experimental until the signature has settled, following the experimental-API procedure.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="prototype">14. Prototype</h2>
+
+<p>To check that the design holds together, phase 1 and parts of phase 2 were prototyped against Newton <code>main</code> @ c81f4f332. The prototype is exploratory and unpublished; it is meant to answer design questions, not to be merged as is. All images below were rendered by the prototype's <code>SensorCamera</code>.</p>
+
+<h3>14.1 What was built</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Area</th><th>Prototype</th><th>Not done</th></tr></thead>
+<tbody>
+<tr><td>Model and builder</td><td class="wrap"><code>add_camera</code>, <code>camera_*</code> arrays, <code>AttributeFrequency.CAMERA</code>, <code>CameraLens</code> (<code>PINHOLE</code>, <code>CUSTOM</code>). <code>add_builder</code>/<code>replicate</code> copy cameras through the existing attribute-spec merge; fixed cameras move with each copy. <code>collapse_fixed_joints</code> remaps cameras like shapes.</td><td class="wrap"><code>camera_world_start</code></td></tr>
+<tr><td>Importers</td><td class="wrap"><code>UsdGeom.Camera</code>: units, <code>clippingRange</code>, <code>UsdRender.Product</code> resolution, parents found through non-body Xforms. MJCF <code>&lt;camera&gt;</code>: <code>fovy</code>, <code>focal</code>/<code>sensorsize</code>/<code>principal</code> and their pixel variants.</td><td class="wrap">Tracking modes (imported as fixed); lens-distortion attributes</td></tr>
+<tr><td><code>SensorCamera</code></td><td class="wrap"><code>cameras=</code>/<code>sites=</code>, view table, pose kernel, <code>view_mask</code>, per-view near/far, deduplicated precomputed bundles, <code>ANALYTIC</code>, <code>set_camera_rays</code>, <code>ray_function</code>, face-index and barycentric outputs, a shared render context.</td><td class="wrap">Built-in distortion lenses</td></tr>
+<tr><td>Renderer</td><td class="wrap">One ray generator selected with <code>wp.static</code>: shared bundle, stacked bundles indexed per view, inline pinhole, or user function. The explicit <code>update(state, transforms, rays)</code> path is unchanged.</td><td class="wrap">Benchmark of analytic vs precomputed rays</td></tr>
+<tr><td>Tooling</td><td class="wrap">Five examples covering every use case, each with a headless self-check.</td><td class="wrap">Unit tests for the new API; viewer frustums; MuJoCo export</td></tr>
+</tbody>
+</table></div>
+<p>The existing camera, tiled-camera, USD-camera, builder replication, custom-attribute, model, coupled-solver and tendon-builder tests (562 tests, 109 skipped) and the MJCF and USD importer suites pass with the prototype.</p>
+
+<h3>14.2 Examples</h3>
+
+<p><b>Thermal camera on a squeezed soft block</b> (R5, R13, R15). A tetrahedral block simulated with VBD rests on the ground and is squeezed in a loop by keyframed parallel jaws. Temperatures are a PARTICLE-frequency custom attribute; the jaws' and ground's surface temperatures are a SHAPE-frequency attribute. Each frame, every tetrahedron releases heat <code>q = L · ‖ΔE‖<sub>F</sub> · V</code>, where <code>ΔE</code> is the change of its Green strain <code>E = ½(FᵀF − I)</code> since the last frame, <code>V</code> its rest volume and <code>L</code> a hysteresis loss per unit strain change [J/m³]. The heat is split over the four vertices, and each vertex's temperature rises by its share divided by its lumped heat capacity (density × specific heat × the vertex's share of tetrahedron volume). Heat then diffuses along tetrahedron edges and surface vertices relax toward the air, jaw and ground temperatures. Loss, diffusivity and cooling rates are exaggerated so that a single squeeze is visible. The thermal camera is a <code>CUSTOM</code> camera declared in the builder; its barrel-distorted lens is the ray function from section 7.3, and the thermal image is composed with the kernel from section 7.5.</p>
+
+<figure>
+<img src="img/thermal_sequence.png" alt="Top row: a regular camera view of the soft block between two jaws, settled, squeezed, just after release, and after cooling. Bottom row: the thermal camera at the same moments; the block is uniformly cool when settled, warms while squeezed, is hottest just after release, and has cooled toward ambient later. The jaws are cooler than the block." style="width:100%;height:auto;image-rendering:pixelated;border:1px solid var(--border);border-radius:10px">
+<figcaption>Figure 5. Prototype renders, left to right: settled, squeezed, just after release, and cooled. Top: pinhole camera. Bottom: thermal camera with the same pose, a barrel-distorted lens, and an ironbow color map from 16 to 36 °C. Simulated with exaggerated thermal parameters.</figcaption>
+</figure>
+
+<figure>
+<div class="fig-scroll"><svg viewBox="0 0 760 300" role="img" aria-label="Block temperature over 18 seconds. Each squeeze, shaded, raises the mean temperature by about 5 degrees and the maximum by about 10 to 15 degrees; between squeezes the block cools back toward about 23 to 25 degrees, so the temperature oscillates instead of ratcheting up.">
+  <rect x="75.4" y="40" width="84.3" height="216" style="fill:var(--surface-2)"/>
+  <rect x="287.5" y="40" width="81.1" height="216" style="fill:var(--surface-2)"/>
+  <rect x="496.6" y="40" width="81.1" height="216" style="fill:var(--surface-2)"/>
+  <rect x="705.7" y="40" width="34.3" height="216" style="fill:var(--surface-2)"/>
+  <line x1="56" y1="239.4" x2="740" y2="239.4" class="edge" style="stroke-width:.4;opacity:.35"/>
+  <text x="48" y="243.4" class="xs" text-anchor="end">20</text>
+  <line x1="56" y1="197.8" x2="740" y2="197.8" class="edge" style="stroke-width:.4;opacity:.35"/>
+  <text x="48" y="201.8" class="xs" text-anchor="end">25</text>
+  <line x1="56" y1="156.3" x2="740" y2="156.3" class="edge" style="stroke-width:.4;opacity:.35"/>
+  <text x="48" y="160.3" class="xs" text-anchor="end">30</text>
+  <line x1="56" y1="114.8" x2="740" y2="114.8" class="edge" style="stroke-width:.4;opacity:.35"/>
+  <text x="48" y="118.8" class="xs" text-anchor="end">35</text>
+  <line x1="56" y1="73.2" x2="740" y2="73.2" class="edge" style="stroke-width:.4;opacity:.35"/>
+  <text x="48" y="77.2" class="xs" text-anchor="end">40</text>
+  <text x="56.0" y="272" class="xs" text-anchor="middle">0</text>
+  <text x="130.9" y="272" class="xs" text-anchor="middle">2</text>
+  <text x="205.8" y="272" class="xs" text-anchor="middle">4</text>
+  <text x="280.7" y="272" class="xs" text-anchor="middle">6</text>
+  <text x="355.6" y="272" class="xs" text-anchor="middle">8</text>
+  <text x="430.4" y="272" class="xs" text-anchor="middle">10</text>
+  <text x="505.3" y="272" class="xs" text-anchor="middle">12</text>
+  <text x="580.2" y="272" class="xs" text-anchor="middle">14</text>
+  <text x="655.1" y="272" class="xs" text-anchor="middle">16</text>
+  <text x="730.0" y="272" class="xs" text-anchor="middle">18</text>
+  <line x1="56" y1="256" x2="740" y2="256" class="edge"/>
+  <line x1="56" y1="40" x2="56" y2="256" class="edge"/>
+  <text x="398" y="292" class="sm" text-anchor="middle">time [s]</text>
+  <text x="14" y="148" class="sm" text-anchor="middle" transform="rotate(-90 14 148)">temperature [°C]</text>
+  <polyline points="56.6,239.4 59.7,239.4 62.9,239.4 66.0,239.4 69.1,239.4 72.2,239.4 75.4,239.4 78.5,239.4 81.6,239.4 84.7,238.0 87.8,213.9 90.9,192.6 94.1,176.6 97.2,170.9 100.3,171.9 103.4,172.8 106.6,173.7 109.7,174.5 112.8,175.3 115.9,176.1 119.0,176.8 122.2,177.5 125.3,178.2 128.4,178.9 131.5,179.6 134.6,180.3 137.7,175.2 140.9,159.6 144.0,134.4 147.1,116.4 150.2,112.6 153.4,114.0 156.5,115.5 159.6,117.1 162.7,118.6 165.8,120.0 169.0,121.5 172.1,123.0 175.2,124.3 178.3,125.2 181.4,126.1 184.5,127.1 187.7,128.0 190.8,129.0 193.9,130.0 197.1,131.0 200.2,132.1 203.3,133.2 206.4,134.3 209.5,135.4 212.6,136.6 215.8,137.7 218.9,138.9 222.0,140.1 225.1,141.3 228.2,142.5 231.4,143.6 234.5,144.7 237.6,145.7 240.7,146.8 243.9,147.9 247.0,149.0 250.1,150.1 253.2,151.2 256.3,152.3 259.4,153.5 262.6,154.6 265.7,155.7 268.8,156.8 271.9,157.9 275.1,159.1 278.2,160.2 281.3,161.3 284.4,162.4 287.5,163.5 290.7,164.6 293.8,165.7 296.9,147.3 300.0,129.7 303.1,115.5 306.2,109.3 309.4,110.7 312.5,112.4 315.6,114.0 318.7,115.6 321.9,117.1 325.0,118.6 328.1,120.0 331.2,121.0 334.3,122.1 337.5,123.2 340.6,124.3 343.7,125.4 346.8,124.0 349.9,113.3 353.0,93.1 356.2,73.4 359.3,66.4 362.4,68.0 365.6,69.9 368.7,71.9 371.8,73.9 374.9,75.8 378.0,77.7 381.1,79.6 384.3,81.4 387.4,82.9 390.5,84.5 393.6,86.0 396.7,87.6 399.9,89.2 403.0,90.8 406.1,92.4 409.2,94.0 412.4,95.6 415.5,97.3 418.6,98.9 421.7,100.5 424.8,102.2 427.9,103.9 431.1,105.5 434.2,107.2 437.3,108.8 440.4,110.5 443.6,112.2 446.7,113.8 449.8,115.5 452.9,117.2 456.0,118.8 459.2,120.5 462.3,122.1 465.4,123.8 468.5,125.4 471.6,127.0 474.7,128.7 477.9,130.3 481.0,131.9 484.1,133.5 487.2,135.1 490.4,136.6 493.5,138.2 496.6,139.7 499.7,141.3 502.8,142.8 506.0,129.1 509.1,111.0 512.2,98.3 515.3,90.5 518.4,91.6 521.5,93.6 524.7,95.6 527.8,97.1 530.9,98.5 534.1,99.9 537.2,101.3 540.3,102.7 543.4,104.1 546.5,105.5 549.6,106.9 552.8,108.4 555.9,108.5 559.0,100.8 562.1,83.5 565.2,61.8 568.4,52.6 571.5,54.0 574.6,56.2 577.7,58.4 580.9,60.6 584.0,62.7 587.1,64.4 590.2,66.2 593.3,68.0 596.4,69.8 599.6,71.6 602.7,73.4 605.8,75.3 608.9,77.1 612.1,78.9 615.2,80.7 618.3,82.6 621.4,84.4 624.5,86.3 627.7,88.1 630.8,90.0 633.9,91.8 637.0,93.7 640.1,95.6 643.2,97.4 646.4,99.3 649.5,101.1 652.6,103.0 655.7,104.8 658.9,106.7 662.0,108.5 665.1,110.3 668.2,112.1 671.3,113.9 674.5,115.7 677.6,117.5 680.7,119.3 683.8,121.1 686.9,122.8 690.0,124.6 693.2,126.3 696.3,128.0 699.4,129.8 702.6,131.4 705.7,133.1 708.8,134.8 711.9,136.4 715.0,127.3 718.1,108.4 721.3,94.6 724.4,86.2 727.5,86.2 730.6,88.3 733.7,90.2 736.9,91.7 740.0,93.2" fill="none" style="stroke:var(--bad);stroke-width:1.8"/>
+  <polyline points="56.6,239.4 59.7,239.5 62.9,239.6 66.0,239.7 69.1,239.8 72.2,239.9 75.4,239.9 78.5,240.0 81.6,240.1 84.7,239.1 87.8,220.5 90.9,206.5 94.1,198.6 97.2,197.3 100.3,198.7 103.4,200.2 106.6,201.6 109.7,203.0 112.8,204.3 115.9,205.5 119.0,206.6 122.2,207.7 125.3,208.7 128.4,209.7 131.5,210.6 134.6,211.5 137.7,209.3 140.9,199.9 144.0,178.5 147.1,158.9 150.2,155.5 153.4,157.9 156.5,160.5 159.6,163.0 162.7,165.4 165.8,167.7 169.0,169.9 172.1,171.9 175.2,173.9 178.3,175.8 181.4,177.6 184.5,179.3 187.7,180.9 190.8,182.5 193.9,184.0 197.1,185.5 200.2,186.9 203.3,188.3 206.4,189.6 209.5,190.8 212.6,192.1 215.8,193.2 218.9,194.4 222.0,195.5 225.1,196.6 228.2,197.6 231.4,198.6 234.5,199.6 237.6,200.5 240.7,201.5 243.9,202.3 247.0,203.2 250.1,204.1 253.2,204.9 256.3,205.7 259.4,206.5 262.6,207.2 265.7,207.9 268.8,208.7 271.9,209.4 275.1,210.1 278.2,210.7 281.3,211.4 284.4,212.0 287.5,212.6 290.7,213.2 293.8,213.9 296.9,198.4 300.0,184.0 303.1,175.5 306.2,173.5 309.4,175.4 312.5,177.5 315.6,179.5 318.7,181.4 321.9,183.2 325.0,184.9 328.1,186.6 331.2,188.1 334.3,189.6 337.5,191.0 340.6,192.4 343.7,193.7 346.8,193.0 349.9,185.4 353.0,166.4 356.2,146.5 359.3,139.2 362.4,141.7 365.6,144.6 368.7,147.4 371.8,150.1 374.9,152.6 378.0,155.1 381.1,157.4 384.3,159.7 387.4,161.8 390.5,163.9 393.6,165.9 396.7,167.8 399.9,169.6 403.0,171.4 406.1,173.1 409.2,174.7 412.4,176.3 415.5,177.9 418.6,179.4 421.7,180.8 424.8,182.2 427.9,183.5 431.1,184.9 434.2,186.1 437.3,187.4 440.4,188.6 443.6,189.7 446.7,190.9 449.8,192.0 452.9,193.1 456.0,194.1 459.2,195.1 462.3,196.1 465.4,197.1 468.5,198.0 471.6,198.9 474.7,199.8 477.9,200.7 481.0,201.6 484.1,202.4 487.2,203.2 490.4,204.0 493.5,204.8 496.6,205.5 499.7,206.3 502.8,207.0 506.0,195.3 509.1,180.1 512.2,170.4 515.3,167.3 518.4,169.1 521.5,171.3 524.7,173.4 527.8,175.5 530.9,177.5 534.1,179.3 537.2,181.1 540.3,182.8 543.4,184.4 546.5,185.9 549.6,187.4 552.8,188.8 555.9,189.2 559.0,183.0 562.1,166.2 565.2,146.8 568.4,135.2 571.5,137.4 574.6,140.3 577.7,143.2 580.9,146.0 584.0,148.6 587.1,151.1 590.2,153.6 593.3,155.9 596.4,158.1 599.6,160.2 602.7,162.3 605.8,164.2 608.9,166.2 612.1,168.0 615.2,169.8 618.3,171.5 621.4,173.1 624.5,174.7 627.7,176.3 630.8,177.8 633.9,179.2 637.0,180.6 640.1,182.0 643.2,183.3 646.4,184.6 649.5,185.9 652.6,187.1 655.7,188.3 658.9,189.4 662.0,190.5 665.1,191.6 668.2,192.7 671.3,193.7 674.5,194.8 677.6,195.7 680.7,196.7 683.8,197.6 686.9,198.6 690.0,199.4 693.2,200.3 696.3,201.2 699.4,202.0 702.6,202.8 705.7,203.6 708.8,204.4 711.9,205.1 715.0,197.2 718.1,181.1 721.3,170.3 724.4,165.8 727.5,167.2 730.6,169.4 733.7,171.6 736.9,173.7 740.0,175.7" fill="none" style="stroke:var(--model);stroke-width:1.8"/>
+  <line x1="490" y1="18" x2="514" y2="18" style="stroke:var(--bad);stroke-width:2"/>
+  <text x="520" y="22" class="xs">max over particles</text>
+  <line x1="620" y1="18" x2="644" y2="18" style="stroke:var(--model);stroke-width:2"/>
+  <text x="650" y="22" class="xs">mean</text>
+</svg></div>
+<figcaption>Figure 6. Mean and maximum block temperature in the thermal example. Shaded intervals are squeezes (closing, holding, opening). Each squeeze heats the block, mostly on release, and the block cools toward ambient before the next one, so the temperature settles into a periodic pattern.</figcaption>
+</figure>
+
+<p><b>Lens zoo</b> (R4, R11, R13). One sensor renders a <code>PINHOLE</code> camera and two <code>CUSTOM</code> cameras on a rotating rig in a single launch, with four samples per pixel and SSAA. The custom cameras receive a Kannala-Brandt fisheye bundle and an OpenCV-distorted bundle through one <code>set_camera_rays</code> call.</p>
+
+<figure>
+<img src="img/lens_zoo.png" alt="Three images from the same rig: a pinhole view, a 190-degree circular fisheye view, and a barrel-distorted OpenCV view of colored primitives arranged around the rig." style="width:100%;height:auto;border:1px solid var(--border);border-radius:10px">
+<figcaption>Figure 7. Pinhole, Kannala-Brandt fisheye (190°), and OpenCV-distorted lenses rendered by one sensor in one launch.</figcaption>
+</figure>
+
+<p><b>Site-mounted lidar</b> (R14). Two worlds with different obstacle layouts each contain a robot driving in a circle, with a lidar site inside a small housing. <code>SensorCamera(sites=...)</code> uses a 16 × 360 spinning pattern updated in place every frame; a near clip of 0.12 m keeps the beams from hitting the housing, and the ranges are converted to a world-space point cloud.</p>
+
+<figure>
+<img src="img/lidar_ranges.png" alt="Two lidar range images, one per world. Rows are elevation channels; the lower channels hit the ground, and obstacles appear as vertical streaks that differ between the two worlds." style="width:100%;height:auto;image-rendering:pixelated;border:1px solid var(--border);border-radius:10px">
+<figcaption>Figure 8. Range images of the two worlds (rows: 16 channels from −15° to +15°, stretched; columns: 360 azimuth steps; brighter is closer, black is no return).</figcaption>
+</figure>
+
+<p><b>Replicated cameras and USD import</b> (R1–R3, R5–R8). The MJCF humanoid's two <code>&lt;camera&gt;</code> elements and a head camera added before <code>replicate</code> give per-world body-mounted cameras. A global overview camera renders alternate halves of the worlds via <code>view_mask</code>, and the side cameras use <code>ANALYTIC</code> rays with per-world randomized focal lengths. A separate example imports a <code>UsdGeom.Camera</code> nested under a non-body Xform of a rigid body, with its clip range and a <code>UsdRender.Product</code> resolution, and selects the cameras by prim path.</p>
+
+<figure>
+<img src="img/replicated_side.png" alt="Four images, one per world, from the humanoid's imported side camera. The same scene appears at four different zoom levels because each world has a different randomized focal length." style="width:100%;height:auto;image-rendering:pixelated;border:1px solid var(--border);border-radius:10px">
+<figcaption>Figure 9. The imported MJCF side camera in four worlds, rendered with analytic rays and a different randomized focal length per world.</figcaption>
+</figure>
+
+<h3>14.3 Findings</h3>
+<ul>
+  <li><b>Stacked bundles instead of a fifth array dimension.</b> Warp arrays have at most four dimensions, so per-view bundles are stacked along rows as <code>(bundle_count · H, W, S, 2)</code> and selected with <code>view_ray_bundle</code>. Deduplicating identical pinhole lenses kept the replicated scenes at one bundle per sensor.</li>
+  <li><b>Near clipping is cheap.</b> The trace starts <code>near</code> along each ray, and distances are reported from the unshifted origin. Passing <code>far</code> per view at run time also removes the kernel variant per <code>max_distance</code> value for bound sensors.</li>
+  <li><b>Custom imaging needs per-hit data, not only custom rays.</b> Shape index, face index and barycentrics are enough for the thermal camera and generalize to other channels without a shading hook. The depth-only trace path drops barycentrics, so requesting them selects the full path.</li>
+  <li><b>A fixed parameter table works for ray functions.</b> <code>wp.array2d[float32]</code> keeps the kernel signature stable, and gathering CAMERA custom attributes into it is one small kernel.</li>
+  <li><b>Render-context sharing changes lighting semantics.</b> The prototype shares one context only among bound sensors, so their lights are shared while unbound sensors keep their own. Open question 5 remains.</li>
+  <li><b>Import order matters.</b> USD cameras must be added after fixed-joint collapsing so body indices are final, and <code>collapse_fixed_joints</code> itself must remap cameras like shapes.</li>
+  <li><b>MJCF tracking modes are visible.</b> The humanoid's <code>trackcom</code> cameras rotate with the torso when imported as fixed mounts. MuJoCo parity needs tracking modes.</li>
+  <li><b>Heat models must be robust to solver noise.</b> A first version that heated from the squared strain rate was dominated by velocity jitter and the release snap. Per-frame strain-change hysteresis was stable. Normalizing by each vertex's volume share removed a lattice pattern from the five-tetrahedra grid split.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="phasing">15. Phasing</h2>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Phase</th><th>Scope</th><th>Unblocks</th></tr></thead>
+<tbody>
+<tr><td><b>1</b></td><td class="wrap">
+  Model camera entity + <code>add_camera</code>; <code>add_builder</code>/<code>replicate</code>/model views; USD and MJCF pinhole import with tests; <code>SensorCamera(cameras=..., sites=...)</code>, view table, pose kernel, <code>view_mask</code>, per-view clip range; PRECOMPUTED with per-view bundle index; ANALYTIC pinhole; <code>CameraLens.CUSTOM</code> + <code>set_camera_rays</code>; shared RenderContext; rewrite <code>example_sensor_camera</code>; a site-mounted lidar example; changelog fragment. Prototyped (section 14) except unit tests and the changelog.
+</td><td>R1&ndash;R10, R12, R14, R13 (as data). Isaac Lab can drop its camera site view and its per-env intrinsics restriction.</td></tr>
+<tr><td><b>2</b></td><td class="wrap">
+  Experimental <code>ray_function</code>; built-in distortion lenses as more <code>CameraLens</code> values with coefficient rows, implemented as built-in ray functions and filled from Isaac Lab-authored distortion attributes; viewer frustum drawing and "look through camera"; export to MuJoCo cameras in <code>SolverMuJoCo</code>; MJCF tracking modes.
+</td><td>R11, R13 (as code); debugging; MuJoCo parity.</td></tr>
+<tr><td><b>3</b></td><td class="wrap">Lights as Model entities (<code>UsdLux</code>, MJCF <code>&lt;light&gt;</code>), which makes shared RenderContext lighting well defined.</td><td>Scene fidelity from assets.</td></tr>
+</tbody>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="open-questions">16. Open questions</h2>
+<ol>
+  <li><b>Lens length units.</b> SI meters (guideline-consistent, MJCF-native) or USD-style "consistent units, only ratios matter" (what the existing <code>compute_camera_rays_pinhole</code> documents)? This proposal says meters, with conversion in the USD importer.</li>
+  <li><b>Default ray mode.</b> PRECOMPUTED for speed, or ANALYTIC so randomization "just works"? The analytic pinhole is a handful of flops per pixel next to a BVH traversal, so a benchmark (#3627's asv camera bench) should decide.</li>
+  <li><b>Global camera semantics.</b> Is "a world <code>-1</code> camera renders every world" the right default, or should it require an explicit <code>worlds=</code> on the sensor?</li>
+  <li><b>Runtime poses in State?</b> Writing <code>model.camera_transform</code> follows the <code>shape_transform</code> precedent. Externally animated cameras (teleop, cinematics) could argue for a <code>State</code> field instead.</li>
+  <li><b>Lighting when RenderContext is shared.</b> Lights are scene state. Until phase 3, should <code>create_default_light</code> on one sensor affect all sensors on the model (honest), or should each sensor keep a light override?</li>
+  <li><b>Keep <code>camera_resolution</code>?</b> It is only a hint (MJCF <code>resolution</code>, <code>UsdRender.Product</code>). Dropping it makes <code>width</code>/<code>height</code> always required.</li>
+  <li><b>Lens representation for phase 2.</b> An enum plus fixed-width coefficient rows (device side, randomizable, mujoco_warp-like), or frozen lens dataclasses (as in the earlier prototype)?</li>
+  <li><b>Exposing view poses.</b> Is <code>SensorCamera.compute_view_transforms</code> enough for viewers and Isaac Lab's <code>FrameView</code>, or do we want a model-level <code>eval_camera_transforms(model, state, out)</code>?</li>
+  <li><b>Ray function parameters.</b> The prototype uses <code>(params: wp.array2d[float32], RayQuery) -&gt; (origin, direction)</code>. Is a fixed float table enough, or should arbitrary user structs be supported? Should the function also get the view pose, for rolling-shutter-style models?</li>
+  <li><b>Per-hit outputs vs a shading hook.</b> Shape index, face index and barycentrics covered the thermal camera. Are they enough for other modalities, or should the renderer also accept a user shading function, for example for lighting-dependent channels?</li>
+  <li><b>Sites as a frame source.</b> <code>SensorCamera(sites=...)</code> keeps lidar out of the Model. The alternative is declaring lidars as <code>CUSTOM</code> cameras, which gives one selection path but puts meaningless intrinsics on them.</li>
+  <li><b>What ray sensors hit.</b> The render scene includes visual-only shapes, particles and Gaussians, and it has no per-view shape or body exclusion. Does range sensing need a collision-geometry mode or an exclusion list, or is that <code>intersect_ray</code>'s domain?</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="references">17. References</h2>
+<ul class="small">
+  <li>newton#3276 "Add SensorBatchedCamera" (closed): <code>camera_indices = [world, ray_bundle]</code>; review threads on index layout.</li>
+  <li>newton#3627 "New CameraSensor Implementation" (closed): camera-as-site with <code>set_site_camera</code>, USD/MJCF parsing, asv camera benchmark.</li>
+  <li>Earlier prototype PR "Add cameras as first-class objects" (closed): <code>add_camera</code>, deduped projections, viewer frusta.</li>
+  <li>mujoco_warp <code>render_util.create_render_context(cam_active=..., use_precomputed_rays=...)</code>; batched <code>cam_fovy</code>/<code>cam_intrinsic</code>.</li>
+  <li>Isaac Lab <code>main</code> 8c9b995: <code>newton_warp_renderer.py</code>, <code>newton_site_frame_view.py</code>, <code>newton_manager.py</code> (<code>cl_register_site</code>), <code>camera_cfg.py</code>; issues and PRs #6928, #7036, #7688, #7916, #8000, #8211, #8545, #8664, #8665, #8682, #8765.</li>
+  <li>Newton: <a href="../newton/_src/sensors/sensor_camera.py">sensor_camera.py</a>, <a href="../newton/_src/sim/builder.py">builder.py</a> (<code>add_site</code>, <code>replicate</code>), <a href="../newton/_src/sim/model.py">model.py</a> (<code>AttributeFrequency</code>, <code>AttributeSpec</code>), <a href="../docs/concepts/sites.rst">sites.rst</a>, <a href="../docs/concepts/sensors.rst">sensors.rst</a>; newton#3346 and newton#3347 (closed <code>SensorLidar</code> request and PR, with the review direction cited in section 12), newton#3578 (OpenCV distortion).</li>
+</ul>
+
+<footer>
+  Draft for design review. Code snippets show the proposed API, as exercised by an unpublished prototype. Line references are against <code>main</code> @ c81f4f332.
+</footer>
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try { window.hljs && hljs.highlightAll(); } catch (e) {}
+</script>
+</body>
+</html>

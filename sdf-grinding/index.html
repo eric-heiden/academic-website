@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SDF grinding in Newton</title>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <meta
+      name="description"
+      content="A short Newton example for hydroelastic SDF contact and geometric material removal."
+    >
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #202124;
+        background: #f5f5f5;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(900px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      a { color: #0756a3; }
+      h1 { margin: 20px 0 8px; font-size: 2rem; }
+      h2 { margin: 34px 0 8px; font-size: 1.25rem; }
+      p { margin: 8px 0; }
+      ul { margin: 8px 0; padding-left: 22px; }
+      li + li { margin-top: 5px; }
+
+      video {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        margin-top: 12px;
+        background: #111;
+        border: 1px solid #bbb;
+      }
+
+      pre {
+        overflow: auto;
+        margin: 12px 0;
+        padding: 14px;
+        border: 1px solid #ccc;
+        background: #fff;
+        font: 0.86rem/1.5 Consolas, "Courier New", monospace;
+        tab-size: 4;
+      }
+
+      .source {
+        max-height: 720px;
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin: 10px 0;
+      }
+
+      .note {
+        color: #555;
+        font-size: 0.94rem;
+      }
+
+      @media (max-width: 600px) {
+        main { width: min(100% - 24px, 900px); padding-top: 20px; }
+        h1 { font-size: 1.65rem; }
+        pre { font-size: 0.78rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="../">All reports</a>
+      <h1>SDF grinding in Newton</h1>
+      <p>A small example of SDF-SDF contact and geometric material removal. It does not run a dynamics solver.</p>
+
+      <h2>Overview</h2>
+      <ul>
+        <li>The workpiece is a static ellipsoid stored as a texture SDF.</li>
+        <li>The grinder is a kinematic cylinder. Both shapes have hydroelastic contact enabled.</li>
+        <li>Each frame calls the hydroelastic collision pipeline directly.</li>
+        <li>ViewerGL renders the contact surface and plots its integrated pressure.</li>
+        <li>The grinder volume is subtracted from the workpiece with an SDF CSG difference.</li>
+        <li>The zero isosurface is rebuilt with Marching Cubes and logged as a dynamic ViewerGL mesh.</li>
+      </ul>
+
+      <h2>Video</h2>
+      <video controls muted loop playsinline preload="metadata" poster="poster.jpg">
+        <source src="sdf_grinding.mp4" type="video/mp4">
+      </video>
+      <p class="note">ViewerGL shows the moving tool, updated workpiece, pressure-colored contact field, and integrated normal-load plot.</p>
+
+      <h2>Set up SDF-SDF contact</h2>
+      <ul>
+        <li>Build the workpiece SDF explicitly so its samples can be edited later.</li>
+        <li>Set <code>is_hydroelastic=True</code> on both shape configurations.</li>
+        <li>Request the contact surface for ViewerGL.</li>
+        <li>No solver is required to call the collision pipeline.</li>
+      </ul>
+      <pre><code>workpiece_sdf = workpiece_mesh.build_sdf(
+    max_resolution=256,
+    narrow_band_range=(-0.08, 0.08),
+    texture_format="float32",
+    paired_samples=False,
+)
+
+shape_cfg = newton.ModelBuilder.ShapeConfig(
+    is_hydroelastic=True,
+    kh=1.0e8,
+    gap=0.005,
+    margin=0.0,
+)
+
+pipeline = newton.CollisionPipeline(
+    model,
+    sdf_hydroelastic_config=newton.geometry.HydroelasticSDF.Config(
+        output_contact_surface=True,
+    ),
+)
+contacts = pipeline.contacts()
+pipeline.collide(state, contacts)
+
+viewer.show_hydro_contact_surface = True
+viewer.log_hydro_contact_surface(
+    pipeline.hydroelastic_sdf.get_contact_surface()
+)</code></pre>
+
+      <h2>Remove material</h2>
+      <ul>
+        <li>For an SDF difference, use <code>max(workpiece_distance, -tool_distance)</code>.</li>
+        <li>Apply the operation to the coarse samples and every allocated fine subgrid sample.</li>
+        <li>Copy the modified arrays back into the <code>Texture3D</code> objects.</li>
+        <li>Extract and log a new surface after each edit.</li>
+      </ul>
+      <pre><code>point_in_tool = wp.transform_point(
+    wp.transform_inverse(grinder_xform), point
+)
+tool_distance = _sdf_cylinder_z(
+    point_in_tool, grinder_radius, grinder_half_width
+)
+sdf_values[z, y, x] = wp.max(sdf_values[z, y, x], -tool_distance)
+
+texture_data.coarse_texture.copy_from(coarse_values)
+texture_data.subgrid_texture.copy_from(subgrid_values)
+
+surface = workpiece_sdf.extract_isomesh(device=model.device)
+viewer.log_mesh(
+    "/workpiece_sdf", points, indices, dynamic=True
+)</code></pre>
+
+      <h2>Notes</h2>
+      <ul>
+        <li>This is geometric removal only. Contact forces do not drive the grinder.</li>
+        <li>The built-in contact-surface color is based on penetration depth. With the same linear stiffness on both shapes, it is proportional to pressure.</li>
+        <li>The plotted value is integrated pressure, or normal load: <code>sum(max(-distance * stiffness, 0))</code>.</li>
+        <li>A physical wear model could scale removal by pressure, slip speed, and time step.</li>
+        <li>Higher SDF resolution increases both the number of edited samples and the cost of rebuilding the Marching Cubes mesh.</li>
+        <li>The example requires a CUDA-capable device.</li>
+      </ul>
+
+      <h2>Run</h2>
+      <pre><code>cd &lt;newton-checkout&gt;
+uv sync --extra examples
+uv run python &lt;path-to-download&gt;/example_sdf_grinding.py</code></pre>
+      <div class="links">
+        <a href="example_sdf_grinding.py" download>Download example_sdf_grinding.py</a>
+        <a href="sdf_grinding.mp4" download>Download MP4</a>
+      </div>
+
+      <h2>Full source</h2>
+      <pre class="source"><code id="sourceCode">Loading example_sdf_grinding.py…</code></pre>
+    </main>
+
+    <script>
+      fetch("example_sdf_grinding.py")
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.text();
+        })
+        .then((source) => {
+          document.getElementById("sourceCode").textContent = source;
+        })
+        .catch(() => {
+          document.getElementById("sourceCode").textContent =
+            "Could not load the source. Use the download link above.";
+        });
+    </script>
+  </body>
+</html>

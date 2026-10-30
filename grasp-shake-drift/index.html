@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why grasped objects creep out of a two-finger gripper in Newton + MuJoCo Warp</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6b7d;
+      --paper: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8deea;
+      --blue: #2456a6;
+      --teal: #0f766e;
+      --rust: #9a3412;
+      --green: #166534;
+      --amber: #b45309;
+      --shadow: 0 18px 42px rgba(23, 32, 51, 0.09);
+    }
+    * { box-sizing: border-box; }
+    html { overflow-x: hidden; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+    header, main { width: min(1180px, calc(100% - 36px)); margin: 0 auto; }
+    header { padding: 44px 0 26px; border-bottom: 1px solid var(--line); }
+    .eyebrow { margin: 0 0 10px; color: var(--teal); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+    h1 { max-width: 1000px; margin: 0; font-size: clamp(2.1rem, 5vw, 3.9rem); line-height: 1.0; }
+    .lead { max-width: 940px; margin: 18px 0 0; color: var(--muted); font-size: 1.08rem; line-height: 1.58; }
+    .meta { margin: 16px 0 0; color: var(--muted); font-size: 0.86rem; }
+    main { padding: 26px 0 70px; }
+    section { padding: 30px 0; border-bottom: 1px solid var(--line); }
+    section:last-child { border-bottom: none; }
+    h2 { margin: 0 0 13px; font-size: clamp(1.4rem, 3vw, 2.0rem); }
+    h3 { margin: 22px 0 9px; font-size: 1.06rem; }
+    p, li { color: var(--muted); line-height: 1.62; font-size: 1rem; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--blue); }
+    strong.ink { color: var(--ink); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    code { font-size: 0.92em; background: #eef2f9; padding: 1px 5px; border-radius: 4px; }
+    pre {
+      overflow-x: auto; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel); font-size: 0.84rem; line-height: 1.5;
+    }
+    pre code { background: none; padding: 0; }
+    .metric-grid { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+    .metric { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); padding: 14px 16px; }
+    .metric span { color: var(--muted); font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric strong { display: block; margin-top: 6px; font-size: 1.6rem; line-height: 1.05; }
+    .metric small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.4; font-size: 0.83rem; }
+    .cards { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; }
+    .card strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 1.0rem; }
+    .card p { margin: 0; font-size: 0.94rem; }
+    table {
+      width: 100%; margin: 14px 0; border-collapse: collapse; background: var(--panel);
+      border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 0.9rem;
+    }
+    th, td { padding: 8px 11px; border-bottom: 1px solid var(--line); text-align: left; color: var(--ink); }
+    th { background: #eef2f9; font-size: 0.76rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
+    tr:last-child td { border-bottom: none; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .ok { color: var(--green); font-weight: 700; }
+    .bad { color: var(--rust); font-weight: 700; }
+    .warn-t { color: var(--amber); font-weight: 700; }
+    figure { margin: 20px 0; }
+    figure img, figure video {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow);
+    }
+    figcaption { margin-top: 8px; color: var(--muted); font-size: 0.87rem; line-height: 1.5; }
+    .video-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .video-card { margin: 0; }
+    .note {
+      margin: 16px 0; padding: 13px 16px; border-left: 4px solid var(--teal);
+      background: var(--panel); border-radius: 0 8px 8px 0; color: var(--muted); font-size: 0.95rem;
+    }
+    .note.warn { border-left-color: var(--rust); }
+    details.code-drop {
+      margin: 18px 0; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--panel); box-shadow: var(--shadow); overflow: hidden;
+    }
+    details.code-drop > summary {
+      cursor: pointer; padding: 13px 16px; font-size: 0.95rem; color: var(--ink);
+      font-weight: 600; list-style: none; display: flex; align-items: baseline; gap: 9px;
+    }
+    details.code-drop > summary::-webkit-details-marker { display: none; }
+    details.code-drop > summary::before { content: "\25B8"; color: var(--teal); }
+    details[open].code-drop > summary::before { content: "\25BE"; }
+    details.code-drop > summary:hover { color: var(--blue); }
+    details.code-drop > summary small { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+    details.code-drop pre {
+      margin: 0; border: none; border-top: 1px solid var(--line); border-radius: 0;
+      max-height: 620px; overflow: auto; box-shadow: none; font-size: 0.79rem;
+    }
+    .note.key { border-left-color: var(--blue); }
+    .note strong { color: var(--ink); }
+    @media (max-width: 900px) {
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .cards, .video-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Newton · MuJoCo Warp · contact tuning</p>
+  <h1>Why a grasped cube creeps out of a two-finger gripper</h1>
+  <p class="lead">
+    A shake test on a Franka FR3 loses its grip on a 4&nbsp;cm cube — slowly and perfectly repeatably, about
+    half a millimetre per shake cycle. It is not a friction problem, not a collision-pipeline problem,
+    and not a solver-convergence problem. It is <strong class="ink">contact compliance being rectified by
+    cyclic load</strong>, and the parameter that controls it is one the test never actually sets, because
+    the example hands contact authority to the finger geoms via <code>mujoco:geom_priority</code>.
+    Raising the finger pads' contact stiffness by 100&times; removes 95&nbsp;% of the drift.
+  </p>
+  <p class="meta">
+    Repro: <a href="https://github.com/StoneT2000/newton-tests">StoneT2000/newton-tests</a> ·
+    Newton&nbsp;1.4.0 (latest public release), MuJoCo&nbsp;Warp&nbsp;3.10.0.3, Warp&nbsp;1.15.0, NVIDIA&nbsp;L40 ·
+    all numbers below measured, not estimated.
+  </p>
+</header>
+
+<main>
+
+<section>
+  <h2>Answers first</h2>
+
+  <div class="cards">
+    <div class="card">
+      <strong>1. Should a shake test work in MuJoCo Warp?</strong>
+      <p>Yes — but not at the contact stiffness this example inherits. As shipped, a 3&nbsp;cm / 1&nbsp;Hz
+      shake bleeds <strong class="ink">6.4&nbsp;mm</strong> over 11.5&nbsp;s and a 10&nbsp;cm shake
+      <strong class="bad">drops the cube outright</strong>. With the pads stiffened, the same 3&nbsp;cm shake
+      holds to <strong class="ok">0.31&nbsp;mm</strong> and the 10&nbsp;cm shake holds too.</p>
+    </div>
+    <div class="card">
+      <strong>2. Is it mis-tuning?</strong>
+      <p>Yes, but not where you looked. The <code>ke</code>, <code>kd</code> and <code>mu</code> you set on the
+      cube are <strong class="ink">silently discarded</strong>: the example gives the finger geoms
+      <code>geom_priority&nbsp;=&nbsp;1</code>, and in MuJoCo the higher-priority geom supplies friction and
+      solref/solimp for the pair outright. The grasp actually runs on the fingers' imported defaults —
+      <code>ke&nbsp;=&nbsp;2500&nbsp;N/m</code>.</p>
+    </div>
+    <div class="card">
+      <strong>3. Does the fix cost speed?</strong>
+      <p>No. The fix is a material parameter, not a smaller timestep. Measured:
+      <strong class="ok">6.13 vs 6.20&nbsp;ms/frame</strong> — inside run-to-run noise — at the same
+      <code>sim_dt&nbsp;=&nbsp;1/960</code> and
+      <code>control&nbsp;dt&nbsp;=&nbsp;1/60</code> you already use. Going stiffer than
+      <code>ke&nbsp;=&nbsp;2.5e5</code> buys nothing: by then pad penetration is already down from 1.87&nbsp;mm
+      to 0.06&nbsp;mm, and there is no compliance left to remove.</p>
+    </div>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric">
+      <span>Baseline drift</span><strong>6.36 mm</strong>
+      <small>cube displacement in the gripper frame after 11.5&nbsp;s of 3&nbsp;cm / 1&nbsp;Hz shaking</small>
+    </div>
+    <div class="metric">
+      <span>Friction cone in use</span><strong>2.1 %</strong>
+      <small>measured from <code>efc_force</code>; the grasp is nowhere near sliding, yet it drifts</small>
+    </div>
+    <div class="metric">
+      <span>Pad penetration</span><strong>1.9 mm</strong>
+      <small>at 22.5&nbsp;N of grip force — the contact is soft enough to rectify</small>
+    </div>
+    <div class="metric">
+      <span>After the fix</span><strong>0.31 mm</strong>
+      <small>20&times; less drift, below the stationary-hold noise floor of 0.56&nbsp;mm</small>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The reproduction</h2>
+  <p>
+    <code>franka_cube_shake.py</code> from the repro follows Newton's
+    <a href="https://github.com/newton-physics/newton/blob/main/newton/examples/contacts/example_brick_stacking.py"><code>example_brick_stacking.py</code></a>
+    closely: a fixed FR3 driven by analytical IK, <code>SolverMuJoCo</code> with
+    <code>solver="newton"</code>, <code>integrator="implicitfast"</code>, elliptic cone,
+    <code>impratio=50</code>, and Newton's own collision pipeline
+    (<code>use_mujoco_contacts=False</code>). It approaches, descends, grasps, lifts, then shakes forever on a
+    three-axis Lissajous path.
+  </p>
+  <p>
+    I ran it headless with an instrumented wrapper that logs the cube's pose <em>in the TCP frame</em> every
+    frame, so arm motion cancels out and only relative slip remains. Versions match the report exactly:
+    Newton 1.4.0, MuJoCo Warp 3.10.0.3.
+  </p>
+
+  <figure>
+    <video src="media/baseline.mp4" controls loop muted playsinline poster="media/baseline.jpg"></video>
+    <figcaption>
+      <strong>As shipped.</strong> 3&nbsp;cm / 1&nbsp;Hz shake. The overlay reads out the cube's displacement
+      in the gripper frame. The cube never visibly &ldquo;slips&rdquo; — it walks, one small step per cycle.
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="media/plot_timeseries.png" alt="Slip accumulates linearly; each shake cycle adds the same increment">
+    <figcaption>
+      Left: displacement grows linearly, dominated by the shake axis. The oscillatory component is only
+      0.09&nbsp;mm — within a cycle the cube is held rigidly. Right: each 1&nbsp;Hz cycle deposits the same
+      increment (alternating 0.64 / 0.37&nbsp;mm, a period-2 pattern locked to the 2&nbsp;s Lissajous period).
+      That is a <strong>ratchet</strong>, not a slide.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Ruling out the usual suspects</h2>
+  <p>
+    Each variant below changes exactly one thing against the same baseline and runs the same 900 frames.
+    The headline is how little most of them do.
+  </p>
+
+  <h3>It is not the collision pipeline</h3>
+  <p>
+    The example calls <code>collision_pipeline.collide()</code> once per 60&nbsp;Hz frame while the solver takes
+    16 substeps at 1/960 — the obvious suspect. It is not the cause. Refreshing contacts every substep
+    (960&nbsp;Hz) changes the drift by 0.02&nbsp;%. Handing contact generation to MuJoCo entirely
+    (<code>use_mujoco_contacts=True</code>) changes it by 0.08&nbsp;%.
+  </p>
+
+  <table>
+    <tr><th>Contact source</th><th class="num">Drift [mm/s]</th><th class="num">Slip after 11.5 s [mm]</th></tr>
+    <tr><td>Newton pipeline @ 60 Hz (baseline)</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>Newton pipeline @ 240 Hz</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>Newton pipeline @ 960 Hz (every substep)</td><td class="num">0.5086</td><td class="num">6.36</td></tr>
+    <tr><td>MuJoCo native contacts</td><td class="num">0.5083</td><td class="num">6.36</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>On "box or convex mesh collisions".</strong> This scene is boxes throughout — the FR3 fingers
+    import as four box colliders each, and the cube is a box. I did not run a convex-mesh variant, so I
+    cannot report a measured number for it. But the drift is identical whether Newton's narrow phase or
+    MuJoCo's own produces the contacts, and it responds only to the contact <em>constraint</em> parameters,
+    which live on the shape's material rather than on its geometry type. A convex-mesh pad would inherit the
+    same <code>ShapeConfig</code> stiffness default, so the same diagnosis and the same fix should apply —
+    treat that as a reasoned expectation, not a measurement.
+  </div>
+
+  <h3>It is not friction</h3>
+  <p>
+    Sweeping the friction coefficient across two orders of magnitude — 0.2 to 20 on the geoms that actually
+    own the contact — leaves the drift unchanged to four significant figures.
+  </p>
+
+  <table>
+    <tr><th>Friction</th><th class="num">Drift [mm/s]</th><th class="num">Slip [mm]</th><th>Note</th></tr>
+    <tr><td>finger mu 0.2</td><td class="num">0.5083</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>finger mu 0.5</td><td class="num">0.5086</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>finger mu 1.0 (baseline)</td><td class="num">0.5087</td><td class="num">6.36</td><td>imported default</td></tr>
+    <tr><td>finger mu 3.0</td><td class="num">0.5086</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>finger mu 10.0</td><td class="num">0.5087</td><td class="num">6.36</td><td></td></tr>
+    <tr><td>cube mu 0.3</td><td class="num">0.5088</td><td class="num">6.36</td><td>no effect — discarded by priority</td></tr>
+    <tr><td>cube mu 20.0</td><td class="num">0.5082</td><td class="num">6.35</td><td>no effect — discarded by priority</td></tr>
+  </table>
+
+  <h3>It is not solver effort</h3>
+  <p>
+    Newton's <a href="https://newton-physics.github.io/newton/latest/concepts/simulation_tuning_mujoco.html">MuJoCo tuning guide</a>
+    suggests an elliptic cone and <code>impratio</code> for stick-slip. Neither helps here, and neither does
+    throwing 13&times; more solver iterations or a solver tolerance of 1e-10 at it.
+  </p>
+
+  <table>
+    <tr><th>Solver setting</th><th class="num">Drift [mm/s]</th><th class="num">Slip [mm]</th></tr>
+    <tr><td>iterations 15 (baseline)</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>iterations 200</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>tolerance / ls_tolerance 1e-10</td><td class="num">0.5087</td><td class="num">6.36</td></tr>
+    <tr><td>impratio 50 &rarr; 1000</td><td class="num">0.5082</td><td class="num">6.43</td></tr>
+  </table>
+
+  <figure>
+    <img src="media/plot_variants.png" alt="Every variant tested, sorted by group; only contact compliance changes the result">
+    <figcaption>
+      Every variant run for this report. The dashed line is the baseline. Contact source, friction, solver
+      effort, cone hardness and speculative gap are all flat; only the contact-compliance group moves.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Where the motion actually is</h2>
+  <p>
+    Before blaming contacts, I checked that the arm itself is rigid — a soft weld between the hand and the
+    TCP frame would produce the same signature. It is not that. Decomposing the drift frame by frame over the
+    same 11.5&nbsp;s:
+  </p>
+
+  <table>
+    <tr><th>Relative pose</th><th class="num">Total drift [mm]</th><th>Reading</th></tr>
+    <tr><td>cube in TCP frame</td><td class="num">6.3627</td><td class="bad">the observed slip</td></tr>
+    <tr><td>cube in hand frame</td><td class="num">6.3627</td><td>same motion</td></tr>
+    <tr><td>cube in left-finger frame</td><td class="num">6.3626</td><td class="bad">real motion across the pad</td></tr>
+    <tr><td>cube in right-finger frame</td><td class="num">6.3626</td><td>mirrored, same magnitude</td></tr>
+    <tr><td>TCP in hand frame</td><td class="num">0.00002</td><td class="ok">rigid</td></tr>
+    <tr><td>left finger in hand frame</td><td class="num">0.0070</td><td class="ok">rigid (fingers hold position)</td></tr>
+    <tr><td>hand in link7 frame</td><td class="num">0.00005</td><td class="ok">rigid</td></tr>
+  </table>
+
+  <p>
+    The articulation is exact to within 20&nbsp;nm. The cube genuinely traverses the pads by 6.4&nbsp;mm —
+    16&nbsp;% of its own width.
+  </p>
+</section>
+
+<section>
+  <h2>What the contacts are actually doing</h2>
+  <p>
+    Reading MuJoCo's live constraint rows (<code>d.contact</code> and <code>d.efc.force</code>) mid-shake
+    settles it. Three sample frames, all identical:
+  </p>
+
+  <pre><code>frame 300  phase=SHAKE  contact rows for cube&harr;fingers: 28   rows carrying force: 8
+    total normal force      22.52 N
+    total tangential force   0.335 N     (cube weight = 0.31 N)
+    max friction-cone use    0.021       (1.0 = sliding)
+    condim 3, mu 1.0, penetration at loaded contacts -1.9 mm</code></pre>
+
+  <div class="note key">
+    <strong>The decisive number: the grasp uses 2.1&nbsp;% of its friction capacity.</strong>
+    Coulomb friction is not saturating, not even close — which is exactly why <code>mu</code> did nothing.
+    The cube is nevertheless walking out of the gripper.
+  </div>
+
+  <p>
+    The other number that matters is <strong class="ink">1.9&nbsp;mm of penetration</strong> at 2.8&nbsp;N per
+    contact — an effective normal stiffness around 1.5&nbsp;kN/m. That is a very soft pad for a 32&nbsp;g cube.
+  </p>
+</section>
+
+<section>
+  <h2>Root cause: compliance rectified by cyclic load</h2>
+  <p>
+    Two more measurements pin the mechanism down.
+  </p>
+  <p>
+    <strong class="ink">Hold the arm still and the drift disappears.</strong> Running the identical scene with
+    <code>--shake-amplitude 0</code> — same grasp, same duration, same gravity — gives
+    <strong class="ok">0.56&nbsp;mm</strong> of total wander with a drift rate of &minus;0.024&nbsp;mm/s,
+    twenty-one times smaller and not monotonic. There is no static creep. The drift needs the load cycle.
+  </p>
+  <p>
+    <strong class="ink">The friction rows have nothing to hold the cube in place with.</strong> Printing the
+    three constraint rows of a loaded finger&harr;cube contact shows the asymmetry directly:
+  </p>
+
+  <pre><code>row 0 [normal]     efc_pos = -1.868e-03   efc_vel = -4.750e-04   force = +2.80197
+row 1 [friction1]  efc_pos = +0.000e+00   efc_vel = -2.918e-04   force = +0.04482
+row 2 [friction2]  efc_pos = +0.000e+00   efc_vel = +1.554e-04   force = -0.01071</code></pre>
+
+  <p>
+    The normal row carries a position residual — the 1.9&nbsp;mm of penetration — so it pushes back toward
+    where the surfaces should be. Both friction rows carry <strong class="ink"><code>efc_pos</code> = exactly
+    zero</strong>. Friction here is a velocity-level constraint: it opposes tangential <em>velocity</em>, but
+    nothing remembers where the cube was, so nothing pulls it back. Whatever tangential velocity survives the
+    solve is integrated into permanent displacement.
+  </p>
+  <p>
+    And some always survives: the friction rows sit at a residual sliding velocity of roughly
+    <strong class="ink">3&times;10<sup>&minus;4</sup>&nbsp;m/s</strong> while the normal force cycles with the
+    shake. Sustained over the 11.5&nbsp;s run that is about 3.4&nbsp;mm — the same order as the 6.4&nbsp;mm
+    actually measured. The contact is compliant enough (1.9&nbsp;mm deep) that the cyclic load keeps
+    re-establishing that residual instead of cancelling it out.
+  </p>
+
+  <div class="note">
+    <strong>Scope of that claim.</strong> Everything above says this is the soft-constraint contact model
+    behaving as configured rather than anything specific to Newton's plumbing: the same drift appears through
+    MuJoCo's own contact generation, at every contact refresh rate tested, at every solver tolerance tested,
+    and it responds only to contact stiffness. The one check I did <em>not</em> run is a side-by-side against
+    upstream MuJoCo's C implementation on an equivalent model, which would be needed to rule out a
+    MuJoCo&nbsp;Warp-specific discrepancy outright. Given that the fix is a material parameter and the
+    response to it is clean and monotonic, that seems unlikely — but it is stated here as an open thread
+    rather than a settled one.
+  </div>
+</section>
+
+<section>
+  <h2>The fix</h2>
+  <p>
+    Stiffen the geoms that actually own the contact. Because the example sets
+    <code>mujoco:geom_priority&nbsp;=&nbsp;1</code> on the finger shapes, those are the finger geoms — and they
+    are still carrying <code>ShapeConfig</code>'s import default of <code>ke&nbsp;=&nbsp;2.5e3&nbsp;N/m</code>,
+    <code>kd&nbsp;=&nbsp;100</code>.
+  </p>
+
+  <figure>
+    <img src="media/plot_stiffness.png" alt="Slip falls roughly as 1/ke then saturates">
+    <figcaption>
+      Drift falls roughly as 1/<code>ke</code> and then saturates: <code>2.5e6</code> is indistinguishable from
+      <code>2.5e5</code>. <code>ke&nbsp;=&nbsp;2.5e5</code> is the knee — no reason to go stiffer.
+    </figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Finger pad stiffness</th><th class="num">Slip after 11.5 s [mm]</th><th class="num">vs baseline</th></tr>
+    <tr><td><code>ke</code> 2.5e3 (import default)</td><td class="num">6.36</td><td class="num">&mdash;</td></tr>
+    <tr><td><code>ke</code> 2.5e4, <code>kd</code> 3e2</td><td class="num">1.87</td><td class="num ok">3.4&times; better</td></tr>
+    <tr><td><code>ke</code> 2.5e5, <code>kd</code> 1e3</td><td class="num">0.31</td><td class="num ok">20&times; better</td></tr>
+    <tr><td><code>ke</code> 2.5e6, <code>kd</code> 3e3</td><td class="num">0.31</td><td class="num">saturated</td></tr>
+  </table>
+
+  <p>
+    The saturation has a concrete cause, visible in the contact rows. Stiffening the pads collapses the
+    penetration, and once there is no penetration left there is no compliance left to rectify:
+  </p>
+
+  <table>
+    <tr><th>Finger pad <code>ke</code></th><th class="num">Resolved contact solref</th><th class="num">Penetration at load</th><th class="num">Normal force</th><th class="num">Slip [mm]</th></tr>
+    <tr><td>2.5e3 (default)</td><td class="num">(0.02, 1.0)</td><td class="num">1.868 mm</td><td class="num">2.80 N</td><td class="num">6.36</td></tr>
+    <tr><td>2.5e5</td><td class="num">(0.002, 1.0)</td><td class="num ok">0.061 mm</td><td class="num">2.83 N</td><td class="num ok">0.31</td></tr>
+    <tr><td>2.5e6</td><td class="num">(0.00067, 0.95)</td><td class="num">0.059 mm</td><td class="num">2.83 N</td><td class="num">0.31</td></tr>
+  </table>
+
+  <p>
+    A 30&times; reduction in penetration buys a 20&times; reduction in drift; the last 10&times; of stiffness
+    buys nothing, because penetration is already down to 59&nbsp;µm. Note also what the default actually is:
+    a contact <code>timeconst</code> of <strong class="ink">20&nbsp;ms</strong>, against a 1.04&nbsp;ms
+    substep. The contact was being asked to correct its error twenty times more slowly than the solver was
+    stepping.
+  </p>
+
+  <p>In the repro's <code>_build_franka()</code>, alongside the existing <code>solimp</code>/<code>priority</code> block:</p>
+
+  <pre><code># The finger geoms carry geom_priority = 1, so THEY supply friction and
+# solref/solimp for every finger-object pair. Anything set on the object is
+# discarded. Tune the pads, not the cube.
+for shape_index, body_index in enumerate(builder.shape_body):
+    if body_index in (12, 13):            # fr3_leftfinger, fr3_rightfinger
+        builder.shape_material_ke[shape_index] = 2.5e5   # was 2.5e3 (ShapeConfig default)
+        builder.shape_material_kd[shape_index] = 1.0e3   # was 1.0e2</code></pre>
+
+  <p>
+    <code>kd</code> is scaled as <code>&radic;ke</code> across the sweep (100 &rarr; 300 &rarr; 1000 &rarr; 3000)
+    so the contact's damping ratio stays roughly fixed while stiffness changes — otherwise the sweep would be
+    confounding two knobs at once. The guide's warning applies: on Newton's positive conversion, raising
+    <code>kd</code> also moves the mapped <code>dampratio</code>, so they have to be chosen together.
+  </p>
+
+  <details class="code-drop">
+    <summary>The complete fixed <code>franka_cube_shake.py</code> <small>&mdash; 567 lines, two changes marked <code># FIX</code> &middot; <a href="scripts/franka_cube_shake_fixed.py" download>download</a></small></summary>
+<pre><code># SPDX-FileCopyrightText: Copyright (c) 2026 The Newton Developers
+# SPDX-License-Identifier: Apache-2.0
+
+"""Franka cube grasp and shake-test environment (tuned for shake tests).
+
+The scene and controller follow Newton's ``brick_stacking`` example: a fixed
+FR3 is position controlled by analytical IK while a MuJoCo solver advances the
+articulation and a Newton collision pipeline handles contacts.
+
+This is the original ``franka_cube_shake.py`` with two changes, both marked
+``# FIX`` below. Together they take the cube's drift during a 3 cm / 1 Hz shake
+from 6.36 mm to 0.31 mm over 11.5 s, at unchanged step cost:
+
+1. Contact stiffness is raised on the *finger* geoms. Because this scene sets
+   ``mujoco:geom_priority = 1`` on the finger shapes, MuJoCo takes friction and
+   solref/solimp for every finger-object pair from the fingers alone -- the
+   ``ke``/``kd``/``mu`` authored on the cube never reach the solver. The fingers
+   were still carrying ``ShapeConfig``'s import default of ke = 2.5e3 N/m, soft
+   enough to penetrate 1.9 mm under a 22.5 N grip. That compliance is what the
+   shake rectifies into a per-cycle ratchet.
+
+2. The cube gets an explicit ``gap``. ``ModelBuilder.rigid_gap`` defaults to
+   0.1 m and applies per builder; the robot builder overrides it but the scene
+   builder that owns the cube did not, leaving the cube with a 10 cm
+   speculative contact gap. This does not affect the drift, but it inflates the
+   grasp from 23 to 57 contact rows and therefore per-world nconmax/njmax
+   pressure in batched runs.
+
+See https://reports.eric-heiden.com/grasp-shake-drift/ for the measurements.
+"""
+
+from __future__ import annotations
+
+import enum
+import math
+
+import numpy as np
+import warp as wp
+
+import newton
+import newton.examples
+import newton.ik as ik
+
+
+CUBE_SIZE = 0.04
+CUBE_DENSITY = 500.0
+GRIPPER_OPEN = 0.035
+GRIPPER_CLOSED = -0.01
+
+class Phase(enum.IntEnum):
+    """Phases of the scripted grasp-and-shake task."""
+
+    APPROACH = 0
+    DESCEND = 1
+    GRASP = 2
+    LIFT = 3
+    SHAKE = 4
+
+
+@wp.kernel(enable_backward=False)
+def update_task_targets(
+    phase_durations: wp.array[wp.float32],
+    phase_index: wp.array[wp.int32],
+    phase_time: wp.array[wp.float32],
+    frame_dt: wp.float32,
+    phase_start_body_q: wp.array[wp.transform],
+    body_q: wp.array[wp.transform],
+    ee_index: wp.int32,
+    cube_index: wp.int32,
+    approach_height: wp.float32,
+    lift_height: wp.float32,
+    shake_amplitude: wp.float32,
+    shake_frequency: wp.float32,
+    # outputs
+    ee_pos_target: wp.array[wp.vec3],
+    ee_pos_interpolated: wp.array[wp.vec3],
+    ee_rot_target: wp.array[wp.vec4],
+    ee_rot_interpolated: wp.array[wp.vec4],
+    gripper_target: wp.array2d[wp.float32],
+):
+    """Create a smooth Cartesian target for the current task phase."""
+    phase = phase_index[0]
+    phase_time[0] = phase_time[0] + frame_dt
+
+    duration = phase_durations[phase]
+    t_linear = wp.min(1.0, phase_time[0] / duration)
+    t = t_linear * t_linear * (3.0 - 2.0 * t_linear)
+
+    ee_start = phase_start_body_q[ee_index]
+    start_pos = wp.transform_get_translation(ee_start)
+    start_quat = wp.transform_get_rotation(ee_start)
+    cube_pos = wp.transform_get_translation(body_q[cube_index])
+    down_quat = wp.quat_from_axis_angle(wp.vec3(1.0, 0.0, 0.0), wp.pi)
+
+    target_pos = start_pos
+    target_quat = down_quat
+    gripper_pos = GRIPPER_OPEN
+
+    if phase == Phase.APPROACH.value:
+        target_pos = cube_pos + wp.vec3(0.0, 0.0, approach_height)
+    elif phase == Phase.DESCEND.value:
+        target_pos = cube_pos
+    elif phase == Phase.GRASP.value:
+        target_pos = start_pos
+        target_quat = start_quat
+        gripper_pos = GRIPPER_OPEN * (1.0 - t) + GRIPPER_CLOSED * t
+    elif phase == Phase.LIFT.value:
+        target_pos = start_pos + wp.vec3(0.0, 0.0, lift_height)
+        target_quat = start_quat
+        gripper_pos = GRIPPER_CLOSED
+    elif phase == Phase.SHAKE.value:
+        # A three-axis Lissajous-style path exercises the grasp in more than
+        # one direction without introducing discontinuities at frame edges.
+        omega_t = 2.0 * wp.pi * shake_frequency * phase_time[0]
+        target_pos = start_pos + wp.vec3(
+            shake_amplitude * wp.sin(omega_t),
+            0.65 * shake_amplitude * wp.sin(2.0 * omega_t),
+            0.35 * shake_amplitude * wp.sin(1.5 * omega_t),
+        )
+        target_quat = start_quat
+        gripper_pos = GRIPPER_CLOSED
+        t = 1.0
+    ee_pos_target[0] = target_pos
+    ee_pos_interpolated[0] = start_pos * (1.0 - t) + target_pos * t
+    ee_rot_target[0] = target_quat[:4]
+    ee_rot_interpolated[0] = wp.quat_slerp(start_quat, target_quat, t)[:4]
+    gripper_target[0, 0] = gripper_pos
+    gripper_target[0, 1] = gripper_pos
+
+
+@wp.kernel(enable_backward=False)
+def advance_task_phase(
+    phase_durations: wp.array[wp.float32],
+    ee_pos_target: wp.array[wp.vec3],
+    ee_rot_target: wp.array[wp.vec4],
+    body_q: wp.array[wp.transform],
+    ee_index: wp.int32,
+    # outputs
+    phase_index: wp.array[wp.int32],
+    phase_time: wp.array[wp.float32],
+    phase_start_body_q: wp.array[wp.transform],
+):
+    """Advance settled setup phases, then remain in SHAKE forever."""
+    phase = phase_index[0]
+    if phase &gt;= Phase.SHAKE.value or phase_time[0] &lt; phase_durations[phase]:
+        return
+
+    ee_q = body_q[ee_index]
+    ee_pos = wp.transform_get_translation(ee_q)
+    ee_quat = wp.transform_get_rotation(ee_q)
+    target_quat = wp.quaternion(ee_rot_target[0][:3], ee_rot_target[0][3])
+
+    pos_error = wp.length(ee_pos_target[0] - ee_pos)
+    quat_error = ee_quat * wp.quat_inverse(target_quat)
+    rot_error = wp.degrees(2.0 * wp.acos(wp.clamp(wp.abs(quat_error[3]), 0.0, 1.0)))
+
+    # Setup phases wait until the arm has reached their final pose. SHAKE is
+    # handled by the early return above and continues until the viewer closes.
+    ready = pos_error &lt; 0.005 and rot_error &lt; 2.0
+    if ready:
+        phase_index[0] = phase + 1
+        phase_time[0] = 0.0
+        for body_index in range(wp.len(body_q)):
+            phase_start_body_q[body_index] = body_q[body_index]
+
+
+def create_parser():
+    """Create the standard Newton example CLI with shake-test options."""
+    parser = newton.examples.create_parser()
+    parser.set_defaults(num_frames=900)
+    parser.add_argument(
+        "--shake-amplitude",
+        type=float,
+        default=0.03,
+        help="Peak side-to-side shake displacement in meters.",
+    )
+    parser.add_argument(
+        "--shake-frequency",
+        type=float,
+        default=1.0,
+        help="Base shake frequency in hertz.",
+    )
+    return parser
+
+
+class FrankaCubeShake:
+    """Newton example/environment that grasps, lifts, and shakes one cube."""
+
+    create_parser = staticmethod(create_parser)
+
+    def __init__(self, viewer, args=None):
+        newton.use_coord_layout_targets = True
+        if args is None:
+            args = newton.examples.default_args(create_parser())
+        if args.shake_amplitude &lt; 0.0:
+            raise ValueError("shake amplitude must be non-negative")
+        if args.shake_frequency &lt;= 0.0:
+            raise ValueError("shake frequency must be positive")
+        self.viewer = viewer
+        self.sim_time = 0.0
+        self.frame_dt = 1.0 / 60.0
+        self.sim_substeps = 16
+        self.sim_dt = self.frame_dt / self.sim_substeps
+
+        self.cube_size = CUBE_SIZE
+        self.robot_base_pos = wp.vec3(-0.5, -0.5, 0.0)
+        self.cube_start_pos = wp.vec3(0.0, -0.44, 0.5 * self.cube_size)
+
+        self.approach_height = 0.10
+        self.lift_height = 0.20
+        self.shake_amplitude = float(args.shake_amplitude)
+        self.shake_frequency = float(args.shake_frequency)
+
+        robot_builder = self._build_franka()
+        self.model_ik = robot_builder.finalize()
+        self.ee_index = self._body_index(self.model_ik, "fr3_hand_tcp")
+
+        # Starting at the approach pose makes the grasp deterministic and keeps
+        # the first visible motion focused on the object.
+        initial_arm_q = self._solve_initial_approach()
+        robot_builder.joint_q[:7] = initial_arm_q.tolist()
+        robot_builder.joint_q[7:9] = [GRIPPER_OPEN, GRIPPER_OPEN]
+        robot_builder.joint_target_q[:9] = robot_builder.joint_q[:9]
+
+        scene = newton.ModelBuilder()
+        scene.add_builder(robot_builder)
+        self.cube_index = self._add_cube(scene)
+        scene.add_ground_plane(
+            color=(0.45, 0.45, 0.45),
+            cfg=newton.ModelBuilder.ShapeConfig(mu=0.8, gap=0.005),
+        )
+        self.model = scene.finalize()
+
+        contact_max = 4096
+        self.model.rigid_contact_max = contact_max
+        self.collision_pipeline = newton.CollisionPipeline(
+            self.model,
+            reduce_contacts=True,
+            rigid_contact_max=contact_max,
+            broad_phase="nxn",
+        )
+        self.contacts = self.collision_pipeline.contacts()
+        self.solver = newton.solvers.SolverMuJoCo(
+            self.model,
+            solver="newton",
+            integrator="implicitfast",
+            iterations=15,
+            ls_iterations=100,
+            nconmax=contact_max,
+            njmax=contact_max * 2,
+            cone="elliptic",
+            impratio=50.0,
+            use_mujoco_contacts=False,
+        )
+
+        self.state_0 = self.model.state()
+        self.state_1 = self.model.state()
+        self.control = self.model.control()
+        newton.eval_fk(self.model, self.model.joint_q, self.model.joint_qd, self.state_0)
+        wp.copy(self.control.joint_target_q[:9], self.model.joint_q[:9])
+
+        self._setup_ik()
+        self._setup_task()
+
+        self.viewer.set_model(self.model)
+        # Viewer picking feeds drag forces into ``viewer.apply_forces`` in the
+        # simulation loop, so the robot and cube can be perturbed interactively.
+        self.viewer.picking_enabled = True
+        camera_pos = wp.vec3(0.35, -0.85, 0.30)
+        self.viewer.set_camera(pos=camera_pos, pitch=-25.0, yaw=135.0)
+        self._capture_graphs()
+
+    @staticmethod
+    def _body_index(model, short_label: str) -&gt; int:
+        for index, label in enumerate(model.body_label):
+            if label.rsplit("/", 1)[-1] == short_label:
+                return index
+        raise ValueError(f"body {short_label!r} not found in Franka model")
+
+    def _build_franka(self):
+        builder = newton.ModelBuilder()
+        builder.rigid_gap = 0.005
+        newton.solvers.SolverMuJoCo.register_custom_attributes(builder)
+        builder.add_urdf(
+            newton.utils.download_asset("franka_emika_panda") / "urdf/fr3_franka_hand.urdf",
+            xform=wp.transform(self.robot_base_pos, wp.quat_identity()),
+            floating=False,
+            enable_self_collisions=False,
+            parse_visuals_as_colliders=False,
+        )
+
+        ready_q = [0.0, 0.5, 0.0, -1.5, 0.0, 2.0, math.pi / 4.0, GRIPPER_OPEN, GRIPPER_OPEN]
+        builder.joint_q[:9] = ready_q
+        builder.joint_target_q[:9] = ready_q
+        builder.joint_target_ke[:9] = [400.0] * 7 + [400.0, 400.0]
+        builder.joint_target_kd[:9] = [40.0] * 7 + [40.0, 40.0]
+        builder.joint_effort_limit[:9] = [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0, 100.0, 100.0]
+        builder.joint_armature[:9] = [0.3] * 4 + [0.11] * 3 + [0.15] * 2
+
+        joint_gravity = builder.custom_attributes["mujoco:jnt_actgravcomp"]
+        joint_gravity.values = joint_gravity.values or {}
+        for dof_index in range(7):
+            joint_gravity.values[dof_index] = True
+
+        body_gravity = builder.custom_attributes["mujoco:gravcomp"]
+        body_gravity.values = body_gravity.values or {}
+        for body_index in range(2, 14):
+            body_gravity.values[body_index] = 1.0
+
+        # Give finger contacts priority so both pads maintain a firm grasp.
+        solimp = builder.custom_attributes.get("mujoco:geom_solimp")
+        priority = builder.custom_attributes.get("mujoco:geom_priority")
+        if solimp is not None and priority is not None:
+            solimp.values = solimp.values or {}
+            priority.values = priority.values or {}
+            for shape_index, body_index in enumerate(builder.shape_body):
+                if body_index in (12, 13):
+                    solimp.values[shape_index] = (0.7, 0.95, 0.0001, 0.5, 2.0)
+                    priority.values[shape_index] = 1
+
+        # FIX 1: the finger geoms above carry geom_priority = 1, so THEY supply
+        # friction and solref/solimp for every finger-object pair and anything
+        # authored on the grasped object is discarded. They were still on the
+        # ShapeConfig import default of ke = 2.5e3 N/m, which penetrates 1.9 mm
+        # under this grasp; the cyclic shake load rectifies that compliance into
+        # ~0.5 mm of drift per cycle. kd is scaled as sqrt(ke) to hold the
+        # contact's damping ratio roughly fixed.
+        for shape_index, body_index in enumerate(builder.shape_body):
+            if body_index in (12, 13):
+                builder.shape_material_ke[shape_index] = 2.5e5
+                builder.shape_material_kd[shape_index] = 1.0e3
+
+        return builder
+
+    def _add_cube(self, scene) -&gt; int:
+        cube_cfg = newton.ModelBuilder.ShapeConfig(
+            density=CUBE_DENSITY,
+            ke=8.0e4,
+            kd=8.0e2,
+            mu=1.2,
+            # FIX 2: this builder never overrode ModelBuilder.rigid_gap, so the
+            # cube would otherwise inherit the 0.1 m default and generate ~38
+            # inert speculative contact rows. Match the robot's 5 mm gap.
+            gap=0.005,
+        )
+        # NOTE: ke/kd/mu above are inert for finger-cube contacts -- the finger
+        # geoms hold geom_priority = 1 and supply those values for the pair.
+        # They still apply to cube-ground and cube-cube contacts.
+        cube_index = scene.add_body(
+            xform=wp.transform(self.cube_start_pos, wp.quat_identity()),
+            label="shake_cube",
+        )
+        scene.add_shape_box(
+            body=cube_index,
+            hx=0.5 * self.cube_size,
+            hy=0.5 * self.cube_size,
+            hz=0.5 * self.cube_size,
+            cfg=cube_cfg,
+            color=(0.15, 0.45, 0.9),
+        )
+        return cube_index
+
+    def _solve_initial_approach(self) -&gt; np.ndarray:
+        target_pos = self.cube_start_pos + wp.vec3(0.0, 0.0, self.approach_height)
+        down_quat = wp.quat_from_axis_angle(wp.vec3(1.0, 0.0, 0.0), wp.pi)
+        dof_count = self.model_ik.joint_coord_count
+        seed = np.array([0.0, 0.5, 0.0, -1.5, 0.0, 2.0, math.pi / 4.0, GRIPPER_OPEN, GRIPPER_OPEN], dtype=np.float32)
+        joint_q = wp.array(seed.reshape(1, dof_count), dtype=wp.float32)
+        solver = ik.IKSolver(
+            model=self.model_ik,
+            n_problems=1,
+            objectives=[
+                ik.IKObjectivePosition(
+                    link_index=self.ee_index,
+                    link_offset=wp.vec3(0.0, 0.0, 0.0),
+                    target_positions=wp.array([target_pos], dtype=wp.vec3),
+                ),
+                ik.IKObjectiveRotation(
+                    link_index=self.ee_index,
+                    link_offset_rotation=wp.quat_identity(),
+                    target_rotations=wp.array([down_quat[:4]], dtype=wp.vec4),
+                ),
+                ik.IKObjectiveJointLimit(
+                    joint_limit_lower=self.model_ik.joint_limit_lower[:dof_count],
+                    joint_limit_upper=self.model_ik.joint_limit_upper[:dof_count],
+                    weight=10.0,
+                ),
+            ],
+            lambda_initial=0.1,
+            jacobian_mode=ik.IKJacobianType.ANALYTIC,
+        )
+        for _ in range(30):
+            solver.step(joint_q, joint_q, iterations=24)
+        return joint_q.flatten().numpy()[:7]
+
+    def _setup_ik(self):
+        state = self.model.state()
+        newton.eval_fk(self.model, self.model.joint_q, self.model.joint_qd, state)
+        ee_q = state.body_q.numpy()[self.ee_index]
+        self.position_objective = ik.IKObjectivePosition(
+            link_index=self.ee_index,
+            link_offset=wp.vec3(0.0, 0.0, 0.0),
+            target_positions=wp.array([wp.vec3(*ee_q[:3])], dtype=wp.vec3),
+        )
+        self.rotation_objective = ik.IKObjectiveRotation(
+            link_index=self.ee_index,
+            link_offset_rotation=wp.quat_identity(),
+            target_rotations=wp.array([wp.vec4(*ee_q[3:7])], dtype=wp.vec4),
+        )
+
+        dof_count = self.model_ik.joint_coord_count
+        limit_objective = ik.IKObjectiveJointLimit(
+            joint_limit_lower=wp.clone(self.model_ik.joint_limit_lower[:dof_count]),
+            joint_limit_upper=wp.clone(self.model_ik.joint_limit_upper[:dof_count]),
+            weight=10.0,
+        )
+        self.joint_q_ik = wp.clone(self.model.joint_q[:dof_count].reshape((1, dof_count)))
+        self.ik_iterations = 24
+        self.ik_solver = ik.IKSolver(
+            model=self.model_ik,
+            n_problems=1,
+            objectives=[self.position_objective, self.rotation_objective, limit_objective],
+            lambda_initial=0.1,
+            jacobian_mode=ik.IKJacobianType.ANALYTIC,
+        )
+
+    def _setup_task(self):
+        self.phase_durations = wp.array(
+            [0.25, 1.0, 0.75, 1.5, 1.0],
+            dtype=wp.float32,
+        )
+        self.phase_index = wp.zeros(1, dtype=wp.int32)
+        self.phase_time = wp.zeros(1, dtype=wp.float32)
+        self.phase_start_body_q = wp.clone(self.state_0.body_q)
+        self.ee_pos_target = wp.zeros(1, dtype=wp.vec3)
+        self.ee_pos_interpolated = wp.zeros(1, dtype=wp.vec3)
+        self.ee_rot_target = wp.zeros(1, dtype=wp.vec4)
+        self.ee_rot_interpolated = wp.zeros(1, dtype=wp.vec4)
+        self.gripper_target = wp.zeros((1, 2), dtype=wp.float32)
+
+    def _set_joint_targets(self):
+        wp.launch(
+            update_task_targets,
+            dim=1,
+            inputs=[
+                self.phase_durations,
+                self.phase_index,
+                self.phase_time,
+                self.frame_dt,
+                self.phase_start_body_q,
+                self.state_0.body_q,
+                self.ee_index,
+                self.cube_index,
+                self.approach_height,
+                self.lift_height,
+                self.shake_amplitude,
+                self.shake_frequency,
+            ],
+            outputs=[
+                self.ee_pos_target,
+                self.ee_pos_interpolated,
+                self.ee_rot_target,
+                self.ee_rot_interpolated,
+                self.gripper_target,
+            ],
+        )
+        self.position_objective.set_target_positions(self.ee_pos_interpolated)
+        self.rotation_objective.set_target_rotations(self.ee_rot_interpolated)
+        if self.ik_graph is not None:
+            wp.capture_launch(self.ik_graph)
+        else:
+            self.ik_solver.step(self.joint_q_ik, self.joint_q_ik, iterations=self.ik_iterations)
+
+        wp.copy(self.control.joint_target_q[:7], self.joint_q_ik.flatten()[:7])
+        wp.copy(self.control.joint_target_q[7:9], self.gripper_target.flatten())
+        wp.launch(
+            advance_task_phase,
+            dim=1,
+            inputs=[
+                self.phase_durations,
+                self.ee_pos_target,
+                self.ee_rot_target,
+                self.state_0.body_q,
+                self.ee_index,
+            ],
+            outputs=[self.phase_index, self.phase_time, self.phase_start_body_q],
+        )
+
+    def _simulate(self):
+        self.collision_pipeline.collide(self.state_0, self.contacts)
+        for _ in range(self.sim_substeps):
+            self.state_0.clear_forces()
+            self.viewer.apply_forces(self.state_0)
+            self.solver.step(self.state_0, self.state_1, self.control, self.contacts, self.sim_dt)
+            self.state_0, self.state_1 = self.state_1, self.state_0
+
+    def _capture_graphs(self):
+        self.sim_graph = None
+        self.ik_graph = None
+        if wp.get_device().is_cuda:
+            with wp.ScopedCapture() as capture:
+                self._simulate()
+            self.sim_graph = capture.graph
+            with wp.ScopedCapture() as capture:
+                self.ik_solver.step(self.joint_q_ik, self.joint_q_ik, iterations=self.ik_iterations)
+            self.ik_graph = capture.graph
+
+    def reset(self):
+        """Restore the initial scene and restart the scripted task."""
+        self.sim_time = 0.0
+        self.state_0 = self.model.state()
+        self.state_1 = self.model.state()
+        newton.eval_fk(self.model, self.model.joint_q, self.model.joint_qd, self.state_0)
+        wp.copy(self.control.joint_target_q[:9], self.model.joint_q[:9])
+        dof_count = self.model_ik.joint_coord_count
+        self.joint_q_ik = wp.clone(self.model.joint_q[:dof_count].reshape((1, dof_count)))
+        self._setup_task()
+        self._capture_graphs()
+
+    def step(self):
+        """Advance the controller and physics by one 60 Hz frame."""
+        self._set_joint_targets()
+        if self.sim_graph is not None:
+            wp.capture_launch(self.sim_graph)
+        else:
+            self._simulate()
+        self.sim_time += self.frame_dt
+
+    def render(self):
+        self.viewer.begin_frame(self.sim_time)
+        self.viewer.log_state(self.state_0)
+        self.viewer.log_contacts(self.contacts, self.state_0)
+        self.viewer.end_frame()
+
+    def test_final(self):
+        """Assert that the ongoing shake has started without dropping the cube."""
+        phase = int(self.phase_index.numpy()[0])
+        if phase != Phase.SHAKE.value:
+            raise ValueError(f"shake sequence incomplete: reached {Phase(phase).name}, expected SHAKE")
+        shake_time = float(self.phase_time.numpy()[0])
+        if shake_time &lt; 5.0:
+            raise ValueError(f"shake ran for only {shake_time:.2f} s; expected at least 5.0 s")
+
+        body_q = self.state_0.body_q.numpy()
+        cube_pos = body_q[self.cube_index, :3]
+        ee_pos = body_q[self.ee_index, :3]
+        if not np.all(np.isfinite(cube_pos)):
+            raise ValueError(f"cube has a non-finite pose: {cube_pos}")
+
+        separation = float(np.linalg.norm(cube_pos - ee_pos))
+        if separation &gt; 0.08:
+            raise ValueError(f"cube was dropped during shake: cube/TCP separation is {separation:.3f} m")
+        if cube_pos[2] &lt; self.cube_size:
+            raise ValueError(f"cube was not lifted after shake: cube height is {cube_pos[2]:.3f} m")
+
+
+# Newton's runner and example browser conventionally look for ``Example``.
+Example = FrankaCubeShake
+
+
+def main():
+    viewer, args = newton.examples.init(create_parser())
+    newton.examples.run(FrankaCubeShake(viewer, args), args)
+
+
+if __name__ == "__main__":
+    main()
+</code></pre>
+  </details>
+
+  <p>
+    Verified as a standalone file, not just as a patch in the harness: run directly at 3&nbsp;cm / 1&nbsp;Hz for
+    900 frames it reports <strong class="ok">0.31&nbsp;mm</strong> of final slip against the original's
+    6.36&nbsp;mm, drops the grasp from 57 to 23 contact rows, and passes the example's own
+    <code>test_final()</code> assertions.
+  </p>
+
+  <div class="note">
+    <strong>Do not reach for <code>solimp</code> here.</strong> I tried: raising <code>dmax</code> from 0.95 to
+    0.99 and 0.9999 made the drift <em>worse</em> (6.71 and 6.81&nbsp;mm). Per the tuning guide, the reference
+    gains are normalised by <code>dmax</code> — <code>k&#8320; &prop; 1/dmax&sup2;</code> — so raising it lowers the
+    effective stiffness even as it hardens the impedance plateau. <code>ke</code> is the right knob.
+  </div>
+
+  <figure>
+    <video src="media/fixed.mp4" controls loop muted playsinline poster="media/fixed.jpg"></video>
+    <figcaption>
+      <strong>Stiffened pads, same 3&nbsp;cm / 1&nbsp;Hz shake, same timestep.</strong> The overlay stays
+      essentially flat for the whole run.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>How bad does it get, and does the fix hold?</h2>
+  <p>
+    Amplitude, not frequency, is what breaks the grasp. Drift grows roughly with the square of the shake
+    amplitude while flattening out above ~2&nbsp;Hz.
+  </p>
+
+  <figure>
+    <img src="media/plot_severity.png" alt="Drift versus shake frequency and amplitude, before and after the fix">
+    <figcaption>
+      Each point is an independent 660-frame run (~8&nbsp;s of shaking). Left: frequency sweep at 3&nbsp;cm.
+      Right: amplitude sweep at 1&nbsp;Hz. The stiffened configuration is flat across both.
+    </figcaption>
+  </figure>
+
+  <table>
+    <tr>
+      <th>Shake</th>
+      <th class="num">As shipped — slip [mm]</th>
+      <th class="num">Final cube height [m]</th>
+      <th class="num">Stiffened pads — slip [mm]</th>
+      <th class="num">Final cube height [m]</th>
+      <th class="num">Improvement</th>
+    </tr>
+    <tr><td>3 cm @ 0.5 Hz</td><td class="num">1.59</td><td class="num">0.217</td><td class="num">0.08</td><td class="num">0.217</td><td class="num ok">19.5&times;</td></tr>
+    <tr><td>3 cm @ 1 Hz</td><td class="num">4.10</td><td class="num">0.218</td><td class="num">0.20</td><td class="num">0.216</td><td class="num ok">20.6&times;</td></tr>
+    <tr><td>3 cm @ 2 Hz</td><td class="num">5.28</td><td class="num">0.222</td><td class="num">0.26</td><td class="num">0.218</td><td class="num ok">20.2&times;</td></tr>
+    <tr><td>3 cm @ 3 Hz</td><td class="num">5.66</td><td class="num">0.227</td><td class="num">0.29</td><td class="num">0.222</td><td class="num ok">19.7&times;</td></tr>
+    <tr><td>1 cm @ 1 Hz</td><td class="num">0.41</td><td class="num">0.217</td><td class="num">0.03</td><td class="num">0.217</td><td class="num ok">15.9&times;</td></tr>
+    <tr><td>6 cm @ 1 Hz</td><td class="num">17.01</td><td class="num">0.221</td><td class="num">0.87</td><td class="num">0.214</td><td class="num ok">19.5&times;</td></tr>
+    <tr><td>10 cm @ 1 Hz</td><td class="num bad">304.57</td><td class="num bad">0.020 &mdash; dropped</td><td class="num">2.50</td><td class="num ok">0.210 &mdash; held</td><td class="num ok">121.9&times;</td></tr>
+  </table>
+
+  <div class="note key">
+    The improvement is a consistent <strong>~20&times;</strong> across the whole envelope — and at 10&nbsp;cm it is
+    the difference between <strong>dropping the cube on the table</strong> (final height 0.020&nbsp;m, i.e. back
+    at its spawn height) and <strong>holding it</strong> with 2.5&nbsp;mm of residual creep.
+  </div>
+
+  <div class="video-grid">
+    <figure class="video-card">
+      <video src="media/drop.mp4" controls loop muted playsinline poster="media/drop.jpg"></video>
+      <figcaption>
+        <strong>10 cm / 1 Hz, as shipped.</strong> The cube walks clear of the pads and falls back to the
+        table — the same ratchet, given enough amplitude to run out of pad. This is the failure the report
+        describes.
+      </figcaption>
+    </figure>
+    <figure class="video-card">
+      <video src="media/drop_fixed.mp4" controls loop muted playsinline poster="media/drop_fixed.jpg"></video>
+      <figcaption>
+        <strong>10 cm / 1 Hz, stiffened pads.</strong> Same trajectory, same timestep, one material parameter
+        changed. The cube stays put, with 3.9&nbsp;mm of residual creep over the full 11.5&nbsp;s — less than
+        the shipped configuration accumulates at a third of this amplitude.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>Two other things worth fixing in the scene</h2>
+
+  <h3>The cube is carrying a 10 cm speculative contact gap</h3>
+  <p>
+    <code>ModelBuilder.rigid_gap</code> defaults to <strong class="ink">0.1&nbsp;m</strong>. The repro sets
+    <code>builder.rigid_gap&nbsp;=&nbsp;0.005</code> on the <em>robot</em> builder (copied from the upstream
+    example) but the cube is added to a second, fresh <code>ModelBuilder</code> that keeps the default. The
+    result, read straight out of the MuJoCo model:
+  </p>
+  <pre><code>geom 13 (finger)  gap = 0.0050
+geom 18 (cube)    gap = 0.1000</code></pre>
+  <p>
+    That is why 28 contact rows exist for the grasp while only 8 carry force — 20 of them sit between 5&nbsp;mm
+    and 22&nbsp;mm away. Setting the cube's gap to 0.005 drops the mean contact count from
+    <strong class="ink">57 to 23</strong> (zeroing every gap in the scene takes it to 19), and it does
+    not change the drift (0.5081 vs 0.5087&nbsp;mm/s) —
+    the speculative rows are inert.
+  </p>
+  <div class="note warn">
+    <strong>It is not, however, free speed — I measured and it is not.</strong> Cutting the contact count by
+    3&times; produced no wall-clock improvement in this scene (see the benchmark below); the differences are
+    inside run-to-run variation. The real argument for fixing it is capacity, not throughput: the
+    <a href="https://newton-physics.github.io/newton/latest/concepts/simulation_tuning_mujoco.html">tuning guide</a>
+    warns that positive gaps inflate <code>nconmax</code>/<code>njmax</code> pressure, and those buffers are
+    allocated <em>per world</em>. In a single-world debugging scene that costs nothing measurable; across a few
+    thousand RL worlds it is memory you are paying for 38 inert rows per grasp.
+  </div>
+
+  <h3>geom_priority silently discards the object's contact parameters</h3>
+  <p>
+    This is the one that cost the most debugging time, so it is worth stating plainly. The scene sets:
+  </p>
+  <pre><code>cube_cfg = newton.ModelBuilder.ShapeConfig(density=500.0, ke=8.0e4, kd=8.0e2, mu=1.2)</code></pre>
+  <p>
+    None of <code>ke</code>, <code>kd</code> or <code>mu</code> reaches the solver for finger&harr;cube contacts.
+    MuJoCo's priority rule means the finger geoms supply friction and solref/solimp for the pair, and the
+    fingers were imported from URDF with defaults. Confirmed two ways. First, straight out of the model: the
+    loaded contacts report <code>mu&nbsp;=&nbsp;1.0</code> (the finger's), never 1.2. Second, the cleanest A/B
+    in the whole investigation — the <em>same</em> 100&times; stiffness swing applied to the two geoms:
+  </p>
+
+  <table>
+    <tr><th>Which geom gets the stiffness</th><th class="num">ke</th><th class="num">Slip [mm]</th><th>Effect</th></tr>
+    <tr><td>cube (what the scene authors)</td><td class="num">8.0e3</td><td class="num">6.37</td><td rowspan="3" class="bad">100&times; swing, no effect whatsoever</td></tr>
+    <tr><td>cube</td><td class="num">8.0e4 <em>(as written)</em></td><td class="num">6.36</td></tr>
+    <tr><td>cube</td><td class="num">8.0e5</td><td class="num">6.36</td></tr>
+    <tr><td>finger pads (what MuJoCo uses)</td><td class="num">2.5e3 <em>(default)</em></td><td class="num">6.36</td><td rowspan="3" class="ok">100&times; swing, 20&times; less drift</td></tr>
+    <tr><td>finger pads</td><td class="num">2.5e4</td><td class="num">1.87</td></tr>
+    <tr><td>finger pads</td><td class="num">2.5e5</td><td class="num">0.31</td></tr>
+  </table>
+  <p>
+    Dropping <code>priority</code> back to 0 lets MuJoCo mix both geoms' parameters and halves the drift on its
+    own (6.36&nbsp;&rarr;&nbsp;3.42&nbsp;mm) — but the upstream example raises priority deliberately, to keep
+    the pads' <code>solimp</code> in charge during brick stacking. Keeping priority and tuning the pads is the
+    better answer; just be aware that with priority set, the object's material is decoration.
+  </p>
+</section>
+
+<section>
+  <h2>What about simulation speed?</h2>
+  <p>
+    The fix does not touch <code>sim_dt</code>, substeps, iterations or the cone, so the step cost should be
+    unchanged — and measuring 600 frames after a 240-frame warm-up confirms it:
+  </p>
+
+  <table>
+    <tr><th>Configuration</th><th class="num">ms / frame</th><th class="num">frames/s</th><th class="num">vs realtime</th></tr>
+    <tr><td>baseline</td><td class="num">6.126</td><td class="num">163.2</td><td class="num">2.72&times;</td></tr>
+    <tr><td>stiffened pads + cube gap fixed ("fixed")</td><td class="num">6.195</td><td class="num">161.4</td><td class="num">2.69&times;</td></tr>
+    <tr><td>stiffened pads only</td><td class="num">6.350</td><td class="num">157.5</td><td class="num">2.62&times;</td></tr>
+    <tr><td>all gaps zeroed</td><td class="num">6.461</td><td class="num">154.8</td><td class="num">2.58&times;</td></tr>
+  </table>
+
+  <p>
+    Everything is within about 5&nbsp;% — one measurement each, so treat the ordering as noise rather than
+    signal. The point is that the recommended change does not cost a meaningful amount of time, and notably
+    that zeroing the gaps does not <em>buy</em> any either.
+  </p>
+
+  <p>The knobs that <em>would</em> have cost real speed all turned out not to help anyway:</p>
+  <ul>
+    <li><strong class="ink">More substeps do not fix it.</strong> 4&nbsp;&rarr;&nbsp;16&nbsp;&rarr;&nbsp;64
+      substeps gives 5.10, 6.36, 6.64&nbsp;mm. The drift converges to a finite value as
+      <code>dt&nbsp;&rarr;&nbsp;0</code>, which is what you would expect from a continuous-time contact-model
+      effect rather than an integration artefact. Paying 4&times; the compute makes it slightly
+      <em>worse</em>.</li>
+    <li><strong class="ink">More iterations do not fix it</strong> (15&nbsp;&rarr;&nbsp;200: no change), and
+      neither does a tighter tolerance.</li>
+    <li><strong class="ink">Fixing the cube's <code>gap</code></strong> cuts contact rows by 3&times; but does
+      not speed anything up here — it is a per-world memory argument for batched training, not a throughput
+      one.</li>
+  </ul>
+  <p>
+    So your current budget — <code>sim_dt&nbsp;=&nbsp;1/960</code>, control at 60&nbsp;Hz, 15 iterations,
+    elliptic cone — is fine. Keep it.
+  </p>
+</section>
+
+<section>
+  <h2>Reproduce it</h2>
+  <pre><code>git clone https://github.com/StoneT2000/newton-tests &amp;&amp; cd newton-tests
+uv sync
+
+# baseline, as reported
+uv run python src/newtontests/franka_cube_shake.py --viewer gl \
+    --shake-amplitude 0.03 --shake-frequency 1.0
+
+# headless, with slip instrumentation (scripts from this report)
+uv run python -m newtontests.measure    --frames 900 --tag baseline
+uv run python -m newtontests.experiments finger_ke_2p5e5 fixed --frames 900
+uv run python -m newtontests.frames     --frames 900          # frame decomposition
+uv run python -m newtontests.contact_dump --frames 760        # live efc forces</code></pre>
+  <p>
+    The measurement, variant, frame-decomposition, contact-dump and plotting scripts used for this report are
+    in <a href="scripts/">scripts/</a>; the raw per-frame data is in <a href="data/">data/</a>.
+  </p>
+</section>
+
+<section>
+  <h2>References and where to raise this</h2>
+  <ul>
+    <li><a href="https://newton-physics.github.io/newton/latest/concepts/simulation_tuning_mujoco.html">MuJoCo-Warp Contact Tuning</a>
+      — the <em>Grasping / Holding</em> template is the right checklist, and its first step ("check commanded
+      and clamped gripping force") passes here: 22.5&nbsp;N against a 0.31&nbsp;N load.</li>
+    <li><a href="https://newton-physics.github.io/newton/latest/concepts/collisions.html">Collisions</a>
+      — contact reduction, <code>gap</code>/<code>margin</code> semantics, and the
+      <code>use_mujoco_contacts=False</code> pipeline.</li>
+    <li><a href="https://newton-physics.github.io/newton/latest/solvers/mujoco.html">MuJoCo Solver</a>
+      — margin/gap forwarding and the margin-zeroing rule for box geoms.</li>
+    <li><a href="https://mujoco.readthedocs.io/en/stable/computation/index.html#constraint-model">MuJoCo constraint model</a>
+      and <a href="https://mujoco.readthedocs.io/en/stable/modeling.html#solver-parameters">solver parameters</a>
+      — the authoritative treatment of <code>solref</code>/<code>solimp</code> and of the priority rule.</li>
+  </ul>
+  <p>
+    Per Newton's <a href="https://github.com/newton-physics/newton/blob/main/CONTRIBUTING.md">contributing guide</a>,
+    a tuning question like this belongs in
+    <a href="https://github.com/newton-physics/newton/discussions">GitHub Discussions</a> rather than Issues —
+    Issues are reserved for bugs and features that result in a code or documentation change. That said, there
+    are two things here that arguably <em>are</em> documentation changes worth an Issue: the
+    <code>rigid_gap&nbsp;=&nbsp;0.1</code> default silently applying to a second builder, and the absence of a
+    warning when <code>geom_priority</code> causes authored <code>ke</code>/<code>kd</code>/<code>mu</code> to be
+    discarded.
+  </p>
+</section>
+
+</main>
+</body>
+</html>

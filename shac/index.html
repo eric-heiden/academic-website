@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-template="aperture">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Training quadruped and humanoid locomotion with analytic MuJoCo Warp gradients: implicit integration, timestep and gradient horizon, SHAC and SAPO, action saturation, gait priors, and gait quality.">
+  <title>SHAC and SAPO locomotion with the MuJoCo Warp adjoint</title>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="stylesheet" href="shared.css">
+  <link rel="stylesheet" href="shac.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex-swap.min.css" integrity="sha384-GiTJOrt1vBIOkt46uJewl8dAj3Rh/j00JmIAhm7ewwCBpZAmt5FIm6yEvop7Cn0N" crossorigin="anonymous">
+  <script>
+    (function () {
+      document.documentElement.dataset.template = "aperture";
+      try { document.documentElement.dataset.theme = localStorage.getItem("report-theme") || "light"; }
+      catch (_) { document.documentElement.dataset.theme = "light"; }
+    })();
+  </script>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to article</a>
+<header class="site-nav">
+  <div class="nav-inner">
+    <a class="brand" href="../" aria-label="Back to all reports"><span class="brand-mark" aria-hidden="true">N</span><span>Newton / SHAC</span></a>
+    <nav class="nav-links" aria-label="Report sections">
+      <a href="#method" data-section-link>Method</a>
+      <a href="#simulator" data-section-link>Simulator</a>
+      <a href="#quadrupeds" data-section-link>Quadrupeds</a>
+      <a href="#humanoids" data-section-link>Humanoids</a>
+      <a href="#cost" data-section-link>Cost</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false"><span class="theme-icon" aria-hidden="true">☀</span><span class="theme-label">Bright</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="report-shell">
+<main class="report" id="main-content">
+
+<section class="report-hero" id="overview">
+  <div class="report-dates" aria-label="Report dates">
+    <span>Created <time datetime="2026-06-15">2026-06-15</time></span>
+    <span>Modified <time datetime="2026-10-02">2026-10-02</time></span>
+  </div>
+  <p class="paper-series">Technical report</p>
+  <h1>SHAC and SAPO locomotion with the MuJoCo Warp adjoint</h1>
+  <p class="paper-affiliation">Timestep, gradient horizon, action saturation, and gait quality when training Go1, H1, G1, and the MuJoCo Humanoid with the analytic step adjoint of MuJoCo Warp pull request #1535</p>
+  <dl class="paper-meta" aria-label="Report metadata">
+    <div><dt>Simulator</dt><dd><a href="https://github.com/google-deepmind/mujoco_warp/pull/1535">MuJoCo Warp PR #1535</a> at <a href="https://github.com/google-deepmind/mujoco_warp/commit/357a75d60a56d67d476942a1b6e54b3045ee8e87"><code>357a75d</code></a></dd></div>
+    <div><dt>Software</dt><dd>Warp 1.15.0 · MuJoCo 3.12.1.dev · PyTorch 2.11.0</dd></div>
+    <div><dt>Hardware</dt><dd>One quarter of an RTX PRO 6000 Blackwell GPU (Multi-Instance GPU partition 1g.24gb) · 4 CPU cores</dd></div>
+  </dl>
+  <div class="abstract-block">
+    <h2>Abstract</h2>
+    <!-- ABSTRACTSTART -->
+<p>Short-Horizon Actor-Critic (SHAC) trains locomotion policies by back-propagating short simulated rollouts through a differentiable simulator; SAPO adds a normalized policy entropy to its rewards. This report trains both on the analytic step adjoint of MuJoCo Warp pull request #1535 at commit <code>357a75d</code>. Implicit treatment of joint damping removes the explicit-damping instability (Go1 at 20 ms, MuJoCo Humanoid at 10 ms), and 10 ms steps produce 4.8–4.9 times more simulated time per second than 2 ms. Larger steps, however, made epochs of the first SHAC trainer only 2.3–2.7 times faster, shorten the horizon over which the policy gradient is informative, and change the dynamics enough that 20 ms Go1 policies fail in a 1 ms simulator. On Isaac Lab's Go1 velocity task, SHAC stood still because its tanh-squashed actions saturated: 97% of the action components, with a mean squash derivative of 0.02. SAPO's entropy terms, whose log-density penalizes saturation, prevented this, and every tested SAPO seed learned the full command set with a tracking error of 0.05 m/s; adding only a saturation penalty to SHAC also let it learn the task, about five times more slowly. With SHAC and without a gait prior, H1 walked only once the target critic followed the trained critic quickly; with that critic and added joint damping, the MuJoCo Humanoid ran. Without a gait prior, SAPO's G1 policies tracked commands but limped and crossed their feet; with a differentiable gait prior on foot heights and placement and with collisions between the feet, they walked with symmetric alternating steps (tracking error 0.09–0.10 m/s, three seeds). Per-foot gait measurements, not tracking error, revealed the difference.</p>
+
+<!-- ABSTRACTEND -->
+  </div>
+</section>
+
+<!-- BODYSTART -->
+<nav class="article-contents" aria-label="Article contents"><strong>Contents</strong><ol>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#method">Method</a></li>
+<li><a href="#simulator">Timestep, throughput, and gradient horizon</a></li>
+<li><a href="#quadrupeds">Quadrupeds</a></li>
+<li><a href="#humanoids">Humanoids</a></li>
+<li><a href="#cost">Training cost</a></li>
+<li><a href="#limitations">Limitations</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#reproduction">Reproduction and data</a></li>
+<li><a href="#appendix">Appendix: additional results</a></li>
+</ol></nav>
+
+<section class="report-section" id="introduction">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">1.</span> Introduction</h2>
+<p class="section-intro">Can a policy for legged locomotion be trained from scratch by differentiating through MuJoCo Warp, and what does it take?</p>
+</div></div>
+<p>A differentiable simulator returns the derivative of the next state with respect to the current state and control. Short-Horizon Actor-Critic (SHAC) uses these derivatives to train a policy by back-propagating short simulated rollouts, and a learned value function summarizes everything beyond the rollout <a href="https://arxiv.org/abs/2204.07137">[Xu et al. 2022]</a>. Compared with reinforcement learning from sampled returns, this can need far fewer simulated steps, but only if the gradients stay informative through contact over the rollout. This report tests SHAC and its maximum-entropy variant SAPO <a href="https://arxiv.org/abs/2412.12089">[Xing et al. 2025]</a> on the analytic step adjoint of MuJoCo Warp, the GPU implementation of MuJoCo, as proposed in pull request #1535 at commit <code>357a75d</code>.</p>
+<p>The study has two parts. The first asks whether the pull request's implicit time integration allows larger physics timesteps, and what larger timesteps do to throughput, gradient quality, and the learned policies, on the reference running tasks of the original SHAC work. The second trains velocity-tracking policies on tasks that follow Isaac Lab's locomotion environments, for the Unitree Go1 quadruped and the Unitree H1 and G1 humanoids, and returns to the classic MuJoCo Humanoid's running task. It identifies what prevented learning and what fixed it. Figures 1–4 show four of the resulting policies in a simulator with a finer timestep than the one they were trained in.</p>
+<div class="video-grid two-up">
+<figure class="video-card">
+<video controls muted loop playsinline preload="metadata" poster="tuning/media/tuning_go1_omni_sapo_poster.jpg" aria-label="Go1 quadruped following forward, lateral, turning, backward, diagonal and zero velocity commands">
+<source src="tuning/media/tuning_go1_omni_sapo.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 1.</span> Go1, SAPO, full velocity-command set: forward, sideways, turning, backward, diagonal, standing (16 s).</figcaption>
+</figure>
+<figure class="video-card">
+<video controls muted loop playsinline preload="metadata" poster="tuning/media/tuning_g1_walk_seq_poster.jpg" aria-label="G1 humanoid walking forward, sideways and turning, then standing">
+<source src="tuning/media/tuning_g1_walk_seq.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 2.</span> G1, SAPO with a gait prior and colliding feet: forward, turning while walking, sideways, standing (12 s).</figcaption>
+</figure>
+<figure class="video-card">
+<video controls muted loop playsinline preload="metadata" poster="tuning/media/tuning_h1_sapo_seq_poster.jpg" aria-label="H1 humanoid walking forward at two speeds, turning while walking, turning in place, and standing">
+<source src="tuning/media/tuning_h1_sapo_seq.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 3.</span> H1, SAPO without a gait prior: 0.5 and 1 m/s forward, turning while walking and in place, standing (14 s).</figcaption>
+</figure>
+<figure class="video-card">
+<video controls muted loop playsinline preload="metadata" poster="tuning/media/tuning_humanoid_run_poster.jpg" aria-label="MuJoCo Humanoid running forward">
+<source src="tuning/media/tuning_humanoid_run.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 4.</span> MuJoCo Humanoid, SHAC with added joint damping and a faster target critic, running (seed 0; 2.5 m/s mean speed in evaluation; 10 s).</figcaption>
+</figure>
+</div>
+<p>The main findings are as follows. Implicit damping removes the explicit-damping instability, but larger timesteps shorten the horizon over which the policy gradient is informative and change the dynamics enough that 20 ms policies fail at 1 ms (Sections 3 and 4). On the velocity-tracking tasks, SHAC's tanh-squashed actions saturate, which multiplies the analytic action gradient by about 0.02; SAPO's entropy terms contain a correction that penalizes saturation, and with them every tested seed learned the full Go1 command set; the correction alone also sufficed, but learned about five times more slowly (Section 4). With SHAC and without a gait prior, H1 needed a target critic that follows the trained critic quickly; the G1 walked cleanly only with SAPO and a differentiable gait prior on foot heights and placement, whereas without the prior it tracked the commands with a limp (Section 5).</p>
+</section>
+
+<section class="report-section" id="method">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">2.</span> Method</h2>
+<p class="section-intro">Both training algorithms differentiate short simulated rollouts through the MuJoCo Warp step adjoint. SAPO adds a normalized entropy to the rewards, and the tanh correction in that entropy turns out to matter for position-controlled robots.</p>
+</div></div>
+
+<h3>Analytic step gradients in MuJoCo Warp</h3>
+<p>MuJoCo Warp (MJWarp) is a GPU implementation of MuJoCo. <a href="https://github.com/google-deepmind/mujoco_warp/pull/1535">Pull request #1535</a> adds an analytic backward pass for one simulation step. MuJoCo computes accelerations by solving a convex constraint problem for contacts, joint limits, and friction. The pull request differentiates the converged solution with the implicit function theorem instead of differentiating the solver iterations. At commit <code>357a75d</code> it supports the Newton constraint solver, elliptic and pyramidal friction cones, the Euler and <code>implicitfast</code> integrators, and eleven primitive collision pairs. Other pairs, such as capsule–cylinder, contribute no gradient. The velocity-tracking tasks therefore let robot geometry collide only with the floor, as Isaac Lab does for the robots used here; the final G1 configuration additionally lets its two feet collide with each other (Section 5).</p>
+<p>The training harness captures each physics step and its adjoint as CUDA graphs and keeps the completed forward data of every physics step in a window, so that the backward pass applies the step adjoints in reverse order without recomputing the forward steps (Figure 5). The policy, written in PyTorch, and the simulator share one CUDA stream, and an epoch needs one host synchronization. The adjoint of the control input ignores actuator force limits. The harness therefore sets the control derivative of saturated actuators to zero.</p>
+<figure class="diagram-panel">
+<div class="mermaid-shell" role="img" aria-label="The policy produces a control; the control is held for K captured physics steps whose forward data are stored; the reward and value are computed; back-propagation applies the captured step adjoints in reverse order using the stored data." data-mermaid-source="flowchart LR
+  P[Policy network] -->|control u| F[K captured forward steps]
+  F -->|state| R[Reward and value]
+  F -.->|forward data| C[(Stored steps)]
+  R -.->|adjoint| B[K captured step adjoints]
+  C -.-> B
+  B -.->|gradient| P"></div>
+<figcaption class="diagram-caption"><span><span class="caption-label">Figure 5.</span> One control step of the training harness. Solid arrows are the forward pass; dashed arrows are back-propagation.</span></figcaption>
+</figure>
+
+<h3>Time integration</h3>
+<p>MuJoCo advances generalized positions \(q\) and velocities \(v\) with a physics timestep \(h\). The integrators considered here are semi-implicit: the new velocity updates the position, \(q_{k+1} = q_k \oplus h\,v_{k+1}\), where \(\oplus\) denotes integration on the configuration manifold. They differ in the acceleration used in \(v_{k+1} = v_k + h\,a_k\):</p>
+<div class="display-equation">\[\begin{aligned}
+\text{explicit:}&\quad M a_k = f_k,\\
+\text{implicit damping:}&\quad (M + hB)\,a_k = f_k,\\
+\texttt{implicitfast}\text{:}&\quad \big(M - h\,\tfrac{\partial f}{\partial v}\big)\,a_k = f_k.
+\end{aligned}\]</div>
+<p>Here \(M\) is the joint-space inertia matrix, \(f_k = f(q_k, v_k, u_k)\) collects all applied, passive, bias, and constraint forces, \(u_k\) is the actuator control, and \(B\) is the diagonal matrix of joint damping coefficients. MuJoCo's Euler integrator uses the middle form by default. <code>implicitfast</code> also treats actuator velocity gains, such as the derivative gain of a position servo, implicitly, and omits Coriolis derivatives. For a joint with effective inertia \(I\) and damping \(b\), the explicit form multiplies the velocity by \(1 - hb/I\) per step and is unstable for \(h > h_\text{crit} = 2I/b\). Joints with small inertia and large damping therefore bound the timestep of explicit integration. The policy acts every \(\Delta t_c = 20\) ms and holds its control for \(K = \Delta t_c / h\) physics steps, so all objectives and metrics live on the same 20 ms control grid.</p>
+
+<h3>Short-Horizon Actor-Critic</h3>
+<p>SHAC <a href="https://arxiv.org/abs/2204.07137">[Xu et al. 2022]</a> trains a stochastic policy \(\pi_\theta\) with parameters \(\theta\) on \(N\) parallel environments. Each epoch continues every environment for a window of \(T\) control steps from the states reached in the previous epoch and minimizes</p>
+<div class="display-equation">\[L(\theta) = -\frac{1}{NT}\sum_{n=1}^{N}\left[\sum_{t=0}^{T-1}\gamma^{t} r_t^{n} + \gamma^{T} V_{\bar\phi}\!\left(s_T^{n}\right)\right],\]</div>
+<p>where \(r_t^n\) is the reward of environment \(n\) at step \(t\), \(\gamma = 0.99\) the discount factor, \(s_T^n\) the state at the end of the window, and \(V_{\bar\phi}\) a target critic. The gradient \(\nabla_\theta L\) is obtained by back-propagating through the policy and through every simulation step of the window. If an environment terminates inside the window, its sum stops there without a value term. The critic \(V_\phi\) regresses TD(\(\lambda\)) targets with \(\lambda = 0.95\), and the target critic follows it once per epoch with the Polyak update \(\bar\phi \leftarrow \alpha\,\bar\phi + (1 - \alpha)\,\phi\). The factor \(\alpha\) sets how quickly the bootstrapped value at the window end reflects the current critic: the original humanoid setting \(\alpha = 0.995\) gives the target a half-life of 138 epochs, \(\alpha = 0.9\) a half-life of 6.6 epochs. A longer window \(T\) exposes more consequences of an action to the gradient, but back-propagating through contact over many steps produces large and inconsistent gradients (Section 3).</p>
+<p>The policy samples a pre-squash action \(u = \mu_\theta(s) + \sigma_\theta \odot \epsilon\) with \(\epsilon \sim \mathcal{N}(0, I)\) and applies \(a = \tanh(u) \in (-1, 1)^d\), where \(d\) is the action dimension. For the position-controlled robots, \(a\) sets the targets \(q_\text{target} = \bar q + s_a\,a\) of proportional-derivative servos around a default pose \(\bar q\), with action scale \(s_a = 0.5\) rad. SHAC learns a state-independent standard deviation \(\sigma_\theta\), uses ELU networks with layer normalization, Adam, gradient-norm clipping at 1, and learning rates that decay linearly to \(10^{-5}\).</p>
+
+<h3>SAPO: entropy in the returns</h3>
+<p>Soft analytic policy optimization (SAPO) <a href="https://arxiv.org/abs/2412.12089">[Xing et al. 2025]</a> keeps SHAC's window objective but replaces each reward by an entropy-augmented reward,</p>
+<div class="display-equation">\[\begin{aligned}
+\tilde r_t &= r_t + \alpha_H\,\hat h_t,\\
+\hat h_t &= \tfrac{1}{d}\big(-\log \pi_\theta + d/2\big),\\
+\log \pi_\theta &= \textstyle\sum_j \big[\log \mathcal{N}_j(u_j) - \log(1 - a_j^2)\big].
+\end{aligned}\]</div>
+<p>Here \(\pi_\theta\) is evaluated at the sampled action \(a_t\) in state \(s_t\), \(\mathcal{N}_j\) is the Gaussian density with mean \(\mu_j\) and standard deviation \(\sigma_j\), and the second term accounts for the squashing. The one-sample entropy estimate \(-\log \pi_\theta\) is shifted by the target entropy \(\bar{\mathcal{H}} = -d/2\) and scaled by \(d\), so that \(\hat h_t\) lies roughly in \([0, 1]\) and is comparable across robots. The temperature \(\alpha_H\) starts at 1 and is adjusted by gradient steps on \(-\log \alpha_H \,\big(\mathbb{E}[\log \pi_\theta] + \bar{\mathcal{H}}\big)\), which lowers it when the policy's entropy exceeds the target. The augmented reward \(\tilde r_t\) enters both the actor objective \(L(\theta)\) and the critic's TD targets. SAPO further uses a state-dependent standard deviation \(\sigma_\theta(s)\) with \(\log \sigma \in [-5, 2]\), two critics whose mean bootstraps the actor and whose minimum enters the targets, no target network, SiLU activations, AdamW, gradient clipping at 0.5, and learning rates of \(2 \cdot 10^{-3}\) (actor) and \(5 \cdot 10^{-4}\) (critic). All other settings are those of SHAC.</p>
+
+<h3>Saturated actions and the analytic gradient</h3>
+<p>Every analytic gradient that reaches the policy passes through the squashing function:</p>
+<div class="display-equation">\[\frac{\partial L}{\partial u_j} = \frac{\partial L}{\partial a_j}\,\big(1 - a_j^2\big).\]</div>
+<p>When an action component saturates, \(|a_j| \to 1\), the factor \(1 - a_j^2\) goes to zero and the simulator gradient no longer moves that component, however informative it is. The squash term of the log-density does the opposite in SAPO: since \(-\log \pi_\theta\) contains \(+\sum_j \log(1 - a_j^2)\), which tends to \(-\infty\) at saturation, the entropy reward penalizes saturated actions and its gradient pushes them back. To test this mechanism in isolation, a squash penalty adds only this term to SHAC's reward,</p>
+<div class="display-equation">\[r_t \leftarrow r_t + \frac{w_\text{sq}}{d}\sum_{j=1}^{d}\log\big(1 - a_{t,j}^2\big),\]</div>
+<p>with a fixed weight \(w_\text{sq} = 0.3\). Unlike the entropy reward, it does not reward a larger standard deviation.</p>
+
+<h3>Tasks</h3>
+<p>Table 1 lists the robots. Section 3 and the first part of Section 4 use the SHAC reference tasks: forward velocity plus uprightness, heading, and height terms, with the Go1's velocity reward capped at 1.5 m/s. The velocity-tracking tasks of Sections 4 and 5 follow Isaac Lab's flat-terrain locomotion environments. The policy observes the base linear and angular velocities and the gravity direction in the body frame, the command \(c = (c_x, c_y, c_\omega)\) of forward, lateral, and yaw velocity, the joint positions relative to \(\bar q\), the joint velocities, and the previous action. Isaac Lab's tracking rewards are the kernels \(\exp(-\lVert c_{xy} - v_{xy}\rVert^2/\sigma_c^2)\) on the planar base velocity \(v_{xy}\) and \(\exp(-(c_\omega - \omega_z)^2/\sigma_c^2)\) on the yaw rate \(\omega_z\), with \(\sigma_c = 0.5\), plus Isaac Lab's penalties on vertical velocity, roll and pitch rates, tilt, torques, accelerations, action changes, joint limits, hip deviations, and a foot air-time reward. Episodes last 20 s and commands are resampled every 10 s. The humanoids terminate when the torso touches the floor; initial states come from a bank of states checked for penetration, with random heading and base velocities of up to 0.5 m/s.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Robot models">
+<table aria-describedby="table-caption-1" class="comparison-table">
+<thead><tr><th scope="col">Robot</th><th scope="col">DoF</th><th scope="col">Actuation</th><th scope="col">Tasks</th></tr></thead>
+<tbody>
+<tr><th scope="row">Ant (Gym)</th><td>14</td><td>8 torque motors</td><td>SHAC reference</td></tr>
+<tr><th scope="row">Go1 (Menagerie)</th><td>18</td><td>12 position servos, \(k_p = 100\) N·m/rad</td><td>SHAC reference</td></tr>
+<tr><th scope="row">Go1, Isaac Lab equivalent</th><td>18</td><td>12 position servos, \(k_p = 25\) N·m/rad, \(k_v = 0.5\) N·m·s/rad</td><td>Isaac Lab and mjlab velocity tracking</td></tr>
+<tr><th scope="row">Humanoid (MuJoCo)</th><td>27</td><td>21 torque motors</td><td>SHAC reference</td></tr>
+<tr><th scope="row">H1 (Unitree)</th><td>25</td><td>19 position servos, Isaac Lab gains</td><td>Isaac Lab velocity tracking</td></tr>
+<tr><th scope="row">G1 (Unitree, mjlab model)</th><td>35</td><td>12 leg servos controlled, Isaac Lab gains; waist and arms hold their default pose</td><td>Isaac Lab velocity tracking</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-1">Table 1. Robot models. DoF counts include the six floating-base coordinates. Menagerie is DeepMind's collection of MuJoCo robot models. The Isaac Lab equivalent Go1 has Isaac Lab's default pose, servo gains of its Go2 motor model, armature 0.02 kg·m², no joint damping or friction loss, and sliding-only foot friction.</p>
+<p>For the Go1, a second reward follows mjlab's velocity task as used in a Go2 environment built on Rewarped: Gaussian kernels on the planar velocity error plus the squared vertical velocity (weight 2, variance 0.25 (m/s)²) and on the yaw-rate error plus the squared roll and pitch rates (weight 2, variance 0.5 (rad/s)²), an uprightness kernel and a default-pose kernel (weight 1 each), and penalties on action changes (weight 0.1) and soft joint-limit violations (weight 1). It is called the mjlab reward below.</p>
+
+<h3>Gait prior</h3>
+<p>The analytic gradient treats the contact set as fixed within a step, so it cannot value a foot that is about to lift off or touch down. A gait clock with period \(P = 0.8\) s gives foot \(i\) at control step \(t\) the phase \(\psi_i = (t\,\Delta t_c/P + \delta_i) \bmod 1\), with offsets \(\delta = (0, 0.5)\) for the left and right foot. A foot is in stance while \(\psi_i &lt; D\), with duty factor \(D = 0.6\), and otherwise in swing with progress \(\rho_i = (\psi_i - D)/(1 - D) \in [0, 1)\). With \(p_i\) a point under the sole of foot \(i\), computed by differentiable forward kinematics, three terms are added to the reward:</p>
+<div class="display-equation">\[\begin{aligned}
+r_\text{gait} = &-w_h \textstyle\sum_i \big(p_{i,z} - z_i^\text{ref}\big)^2\\
+&- w_s \textstyle\sum_{i:\,\psi_i &lt; D} \lVert \dot p_{i,xy} \rVert^2\\
+&- w_r \textstyle\sum_{i:\,\rho_i \ge 0.5} \lVert e_i \rVert^2,\\
+z_i^\text{ref} = &\; z_0 + z_\text{sw} \sin(\pi \rho_i)\,[\psi_i \ge D],\\
+e_i = &\; \tilde p_{i,xy} - \bar p_{i,xy} - \kappa_v v_b - \kappa_e (v_b - c_{xy}).
+\end{aligned}\]</div>
+<p>The first term asks the foot to follow a swing arc of height \(z_\text{sw} = 0.08\) m above its standing height \(z_0\); \([\cdot]\) is 1 when its condition holds. The second penalizes the horizontal speed \(\dot p_{i,xy}\) of feet in clock stance, computed from the displacement over one control step. The third is a Raibert-type placement rule for the second half of the swing, with placement error \(e_i\): \(\tilde p_{i,xy}\) is the foot position relative to the base in the heading frame, \(\bar p_{i,xy}\) its position in the default pose, \(v_b\) the planar base velocity in that frame, and \(\kappa_v = \kappa_e = 0.1\) s. Placing the foot ahead in proportion to the velocity arrests a fall; the term in \(v_b - c_{xy}\) shifts the step to accelerate or brake. The policy observes \(\sin(2\pi t\Delta t_c/P)\) and \(\cos(2\pi t\Delta t_c/P)\). H1 uses \(w_h = 40\), \(w_s = 2\), \(w_r = 10\); the G1 uses \(w_h = 120\) and \(w_r = 20\) (units m⁻² for \(w_h\) and \(w_r\), s²/m² for \(w_s\)). In the SAPO configurations of the G1, commands with planar speed and yaw rate below 0.1 hold both feet in clock stance, so the prior asks the robot to stand rather than step in place.</p>
+
+<h3>Evaluation</h3>
+<p>Policies are evaluated deterministically (\(a = \tanh(\mu_\theta)\)) in a reference simulator, <code>implicitfast</code> with \(h = 1\) ms and the robot's original contact parameters, from 256 randomized starts for 10 s, with commands drawn as in training. The tracking error is the mean norm of the difference between the commanded and the measured planar base velocity; a policy walks when this error is below 0.3 m/s, since standing still gives 0.5–1.0 m/s. Gait quality is measured per foot under fixed commands from the simulator's foot–floor contacts and the foot positions: the duration and clearance of airborne phases, the stride between touchdowns, and the share of a foot's horizontal travel that happens while it is in contact, called the drag share. The alternation is the share of consecutive touchdowns made by different feet.</p>
+</section>
+
+<section class="report-section" id="simulator">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">3.</span> Timestep, throughput, and gradient horizon</h2>
+<p class="section-intro">Implicit damping removes the explicit-damping stability limit and larger timesteps make the simulator faster, but they shorten the horizon over which the policy gradient stays informative.</p>
+</div></div>
+
+<h3>Stability and accuracy</h3>
+<p>For five robots (Ant, Go1, Go1 with its damping moved into the servos as an actuator velocity gain, the MuJoCo Humanoid, and H1 with its original torque motors) and each timestep \(h \in \{1, 2, 4, 5, 10, 20\}\) ms, 1024 worlds received the same temporally correlated random actions, \(u_t = \operatorname{clip}(0.9\,u_{t-1} + 0.45\,\xi_t, -1, 1)\) with standard normal \(\xi_t\), for 10 s. A world diverged when its state became non-finite, a velocity exceeded \(10^3\), or the root left the height band from −1 to 20 m. The explicit-damping bound \(h_\text{crit}\) predicts every damping-driven divergence (Table 2): the Go1 (\(h_\text{crit} = 14.7\) ms) is stable at 10 ms and diverges at 20 ms, and the Humanoid (\(h_\text{crit} = 10.1\) ms) diverges at 10 ms. Implicit damping removes these divergences. It does not make 20 ms safe in general: 1.9% of Humanoid worlds and about 70% of H1 worlds diverge at 20 ms with either implicit form, from stiff dynamics other than damping.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Divergence by integrator">
+<table aria-describedby="table-caption-2" class="comparison-table">
+<thead><tr><th scope="col">Robot</th><th scope="col">\(h_\text{crit}\) (ms)</th><th scope="col">Explicit damping, 10 ms ↓</th><th scope="col">Explicit damping, 20 ms ↓</th><th scope="col">Implicit, 10 ms ↓</th><th scope="col">Implicit, 20 ms ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">Ant</th><td>2010</td><td>0%</td><td>0%</td><td>0%</td><td>0%</td></tr>
+<tr><th scope="row">Go1</th><td>14.7</td><td>0%</td><td class="status-fail">100%</td><td>0%</td><td>0%</td></tr>
+<tr><th scope="row">Humanoid</th><td>10.1</td><td class="status-fail">99.9%</td><td class="status-fail">100%</td><td>0%</td><td class="status-fail">1.9%</td></tr>
+<tr><th scope="row">H1 (torque motors)</th><td>209</td><td>0.1%</td><td class="status-fail">88%</td><td>0.1%</td><td class="status-fail">71%</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-2">Table 2. Share of 1024 worlds that diverged within 10 s under random actions. “Implicit” is <code>implicitfast</code>; Euler with implicit damping gives the same shares except for H1 at 20 ms (68%). Shares above 1% are marked.</p>
+<p>Euler with implicit damping and <code>implicitfast</code> give identical trajectories for these robots, because their only velocity-dependent smooth force is joint damping. When the Go1's damping is moved into its servos, only <code>implicitfast</code> treats it implicitly and halves the joint error. Accuracy degrades in proportion to the timestep (Figure 6): the median joint error after one 20 ms control step, measured against a 0.25 ms reference from 4096 sampled states, grows for the Go1 from 0.066° at 1 ms to 0.90° at 10 ms and 2.1° at 20 ms.</p>
+<figure class="chart-panel">
+<div class="chart-toolbar"><div>
+<h3 class="chart-title">One-control-step joint error by physics timestep</h3>
+<p class="chart-subtitle">Median over 4096 sampled states · both axes logarithmic · crosses mark configurations in which more than 1% of worlds diverged</p>
+</div></div>
+<div class="choice-row" role="group" aria-label="Robot model">
+<span class="choice-label">Robot</span>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="ant" aria-pressed="false">Ant</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="go1" aria-pressed="true">Go1</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="go1_kv" aria-pressed="false">Go1, damping in servos</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="humanoid" aria-pressed="false">Humanoid</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="h1" aria-pressed="false">H1</button>
+</div>
+<div class="series-key" aria-hidden="true">
+<span><i class="dotted" style="--c:var(--series-explicit)"></i>Euler, explicit damping</span>
+<span><i class="dashed" style="--c:var(--series-dt5)"></i>Euler, implicit damping</span>
+<span><i style="--c:var(--series-dt20)"></i>Implicitfast</span>
+</div>
+<div class="plotly-chart" id="fig-integrators" role="img" aria-label="Median joint-angle error after one 20 millisecond control step versus physics timestep for three integrators; the selected robot is shown."></div>
+<figcaption class="figure-caption"><span class="caption-label">Figure 6.</span> Local integration error after one control step, from the same sampled states for every configuration. The two implicit forms coincide except when the damping is in the servos.</figcaption>
+</figure>
+
+<h3>Throughput</h3>
+<p>These measurements use the first version of the harness, whose backward pass recomputes each step before applying its adjoint (Section 6). Replaying captured CUDA graphs is 2.7–4.7 times faster than launching each kernel from Python for a forward and backward step. A recomputed step with its adjoint costs 5–6 forward steps, and <code>implicitfast</code> costs 11–17% more than Euler, mostly in the backward pass. Between 2 and 10 ms the cost of one physics step barely changes, so 10 ms produces 4.8–4.9 times more simulated time per second than 2 ms. A SHAC epoch, however, also pays for the policy, the rewards, and the critic update, which do not shrink with the timestep: with 256 environments an epoch at 10 ms is only 2.3 (Ant) and 2.4 (Go1) times faster than at 2 ms, and 2.6–2.7 times with 1024 environments.</p>
+
+<h3>Gradient horizon</h3>
+<p>The step adjoint agrees with central finite differences where the dynamics are smooth: over five control steps it is within 5% of the finite difference in 73% (Humanoid) to 89% (Go1) of worlds, with median relative errors of 0.05–0.3%. In the other worlds the finite difference does not converge as the perturbation shrinks, which marks a contact activating, a stick–slip transition, or a joint limit engaging inside the perturbation. What SHAC needs is the gradient of a multi-step return. For a fixed policy and 256 start states, the return over \(T\) control steps is</p>
+<div class="display-equation">\[J_T(\theta) = \frac{1}{N}\sum_{n=1}^{N}\sum_{t=0}^{T-1}\gamma^t r_t^n\,\chi_t^n ,\]</div>
+<p>with \(\chi_t^n \in \{0, 1\}\) equal to 1 until environment \(n\) terminates. The half-batch cosine compares \(\nabla_\theta J_T\) computed on two disjoint halves of the batch. It is near 1 when the gradient direction is a property of the policy and the task, and near 0 when a few chaotic or discontinuous rollouts dominate. Figure 7 shows that the timestep dominates beyond 8 control steps. For the Go1 at 2 ms the gradient stays consistent (cosine ≥ 0.97) to 32 steps, with the analytic slope equal to the finite-difference slope; at 20 ms the cosine is 0.41 at 8 steps and near zero at 16. On the fall-dominated states visited by a learning MuJoCo Humanoid, the gradient is consistent for only about four steps. Softer contacts and a fourfold solver budget did not restore consistency at 10 ms. A plausible explanation, not confirmed here, is that contact sets and stick–slip states are fixed per physics step, so a larger step changes the discrete dynamics by a larger jump that the local gradient misses. Most training therefore uses windows of 8 or 16 control steps.</p>
+<figure class="chart-panel">
+<div class="chart-toolbar"><div>
+<h3 class="chart-title">Consistency of the policy gradient by horizon</h3>
+<p class="chart-subtitle">Mean over two sets of 256 start states · horizon on a logarithmic scale</p>
+</div></div>
+<div class="choice-row" role="group" aria-label="Robot model">
+<span class="choice-label">Robot</span>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="ant" aria-pressed="true">Ant</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="go1" aria-pressed="false">Go1</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="humanoid" aria-pressed="false">Humanoid</button>
+</div>
+<div class="choice-row" role="group" aria-label="Metric">
+<span class="choice-label">Metric</span>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="cosine" aria-pressed="true">Half-batch cosine</button>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="ratio" aria-pressed="false">Analytic / finite difference</button>
+</div>
+<div class="series-key" aria-hidden="true">
+<span><i class="dotted" style="--c:var(--series-explicit)"></i>Explicit Euler, 2 ms</span>
+<span><i style="--c:var(--series-dt2)"></i>Implicit, 2 ms</span>
+<span><i style="--c:var(--series-dt5)"></i>5 ms</span>
+<span><i style="--c:var(--series-dt10)"></i>10 ms</span>
+<span><i style="--c:var(--series-dt20)"></i>20 ms</span>
+</div>
+<div class="plotly-chart" id="fig-gradients" role="img" aria-label="Half-batch cosine of the policy gradient versus rollout horizon for five simulator configurations; the selected robot is shown."></div>
+<figcaption class="figure-caption"><span class="caption-label">Figure 7.</span> Policy-gradient consistency of a fixed trained policy in each simulator configuration. The ratio view shows \(\log_{10}\) of the analytic-to-finite-difference slope ratio; 0 is perfect agreement.</figcaption>
+</figure>
+</section>
+
+<section class="report-section" id="quadrupeds">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">4.</span> Quadrupeds</h2>
+<p class="section-intro">SHAC learns the reference running tasks at every timestep, but only small-step policies transfer. On Isaac Lab's Go1 velocity task it stands still because its squashed actions saturate; SAPO's entropy terms prevent this.</p>
+</div></div>
+
+<h3>Reference tasks and the timestep</h3>
+<p>Ant and Go1 were trained with SHAC on the reference tasks with explicit Euler at 2 ms and with <code>implicitfast</code> at 2, 5, 10, and 20 ms, three seeds each, 1000 epochs of 256 environments and an 8-step window. Only the simulator differs between configurations. Per epoch, the 2 ms configurations learned best, and explicit and implicit integration at 2 ms gave similar results (Figure 8, Table 3). The Ant's speed in the reference simulator fell from 6.3–6.4 m/s at 2 ms to 2.7 m/s at 10 ms, in the order of gradient quality. The Go1's reward saturates at 1.5 m/s, and its 2, 5, and 10 ms policies reached that speed and kept it in the reference simulator.</p>
+<figure class="chart-panel">
+<div class="chart-toolbar"><div>
+<h3 class="chart-title">Training on the reference tasks</h3>
+<p class="chart-subtitle">Mean over three seeds of the last 200 training episodes · bands show ±1 standard deviation across seeds</p>
+</div></div>
+<div class="choice-row" role="group" aria-label="Robot model">
+<span class="choice-label">Robot</span>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="ant" aria-pressed="true">Ant</button>
+<button class="choice-button" type="button" data-choice-group="robot" data-choice="go1" aria-pressed="false">Go1</button>
+</div>
+<div class="choice-row" role="group" aria-label="Horizontal axis">
+<span class="choice-label">Axis</span>
+<button class="choice-button" type="button" data-choice-group="axis" data-choice="epochs" aria-pressed="true">Epochs</button>
+<button class="choice-button" type="button" data-choice-group="axis" data-choice="wall" aria-pressed="false">Wall-clock</button>
+</div>
+<div class="choice-row" role="group" aria-label="Metric">
+<span class="choice-label">Metric</span>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="speed" aria-pressed="true">Forward speed</button>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="length" aria-pressed="false">Episode length</button>
+</div>
+<div class="series-key" aria-hidden="true">
+<span><i class="dotted" style="--c:var(--series-explicit)"></i>Explicit Euler, 2 ms</span>
+<span><i style="--c:var(--series-dt2)"></i>Implicit, 2 ms</span>
+<span><i style="--c:var(--series-dt5)"></i>5 ms</span>
+<span><i style="--c:var(--series-dt10)"></i>10 ms</span>
+<span><i style="--c:var(--series-dt20)"></i>20 ms</span>
+<span><i class="dashed" style="--c:var(--series-dt10)"></i>10 ms, 4000 epochs (wall-clock view)</span>
+</div>
+<div class="plotly-chart" id="fig-learning" role="img" aria-label="Mean episode forward speed or episode length during SHAC training for five simulator configurations; the selected robot and axis are shown."></div>
+<figcaption class="figure-caption"><span class="caption-label">Figure 8.</span> SHAC on the reference tasks, measured in the training simulator. The wall-clock axis multiplies the epoch count by the isolated median epoch time. The Go1's velocity reward is capped at 1.5 m/s.</figcaption>
+</figure>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value per robot at the displayed precision. † = lost more than a quarter of its training-simulator speed in the reference simulator; not ranked. Go1 speed is not ranked because its reward targets 1.5 m/s.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Reference-task results">
+<table aria-describedby="table-caption-3" class="comparison-table">
+<thead><tr><th scope="col">Robot / training simulator</th><th scope="col">Speed, reference (m/s) ↑</th><th scope="col">Speed, training simulator (m/s)</th><th scope="col">Survival, reference ↑</th><th scope="col">Training time (min) ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">Ant / explicit Euler, 2 ms</th><td>6.26 ± 0.06</td><td>6.10 ± 0.10</td><td>94% ± 0</td><td>3.3</td></tr>
+<tr><th scope="row">Ant / implicit, 2 ms</th><td class="metric-best"><strong>6.37 ± 0.10</strong></td><td>6.19 ± 0.11</td><td class="metric-best"><strong>95% ± 2</strong></td><td>3.6</td></tr>
+<tr><th scope="row">Ant / implicit, 5 ms</th><td>5.18 ± 0.46</td><td>4.79 ± 0.27</td><td>92% ± 2</td><td>2.1</td></tr>
+<tr><th scope="row">Ant / implicit, 10 ms</th><td>2.72 ± 0.14</td><td>2.68 ± 0.11</td><td>89% ± 5</td><td>1.6</td></tr>
+<tr><th scope="row">Ant / implicit, 20 ms</th><td>3.47 ± 0.34</td><td>3.25 ± 0.24</td><td class="metric-best"><strong>95% ± 2</strong></td><td class="metric-best"><strong>1.4</strong></td></tr>
+<tr><th scope="row">Ant / implicit, 10 ms, 4000 epochs (2 seeds) †</th><td>2.66 ± 0.26</td><td>5.61 ± 0.63</td><td>82% ± 17</td><td>6.4</td></tr>
+</tbody>
+<tbody>
+<tr><th scope="row">Go1 / explicit Euler, 2 ms</th><td>1.58 ± 0.06</td><td>1.58 ± 0.05</td><td>95% ± 2</td><td>5.4</td></tr>
+<tr><th scope="row">Go1 / implicit, 2 ms</th><td>1.56 ± 0.08</td><td>1.56 ± 0.08</td><td class="metric-best"><strong>96% ± 1</strong></td><td>6.0</td></tr>
+<tr><th scope="row">Go1 / implicit, 5 ms</th><td>1.53 ± 0.02</td><td>1.54 ± 0.03</td><td>95% ± 1</td><td>3.5</td></tr>
+<tr><th scope="row">Go1 / implicit, 10 ms</th><td>1.56 ± 0.01</td><td>1.60 ± 0.02</td><td class="metric-best"><strong>96% ± 1</strong></td><td class="metric-best"><strong>2.5</strong></td></tr>
+<tr><th scope="row">Go1 / implicit, 20 ms †</th><td>0.84 ± 0.55</td><td>1.55 ± 0.47</td><td>95% ± 2</td><td>2.1</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-3">Table 3. Reference tasks, deterministic evaluation over 20 s from 256 randomized starts; mean ± standard deviation over three seeds. The reference simulator is <code>implicitfast</code> at 1 ms. Training time is the number of epochs times the isolated median epoch time.</p>
+<p>The 20 ms Go1 policies did not transfer: 1.55 m/s in their training simulator, 0.84 m/s with 2.6 m of lateral drift in the reference simulator, where the seed-0 policy settles into a crouch (Figure 11). A larger timestep also does not buy accuracy with more epochs: the Ant trained for 4000 epochs at 10 ms, 1.8 times the wall-clock time of a 2 ms run, reached 5.6 m/s in its training simulator but only 2.7 m/s in the reference simulator. Go1 policies trained at 10 ms or less behaved almost identically at every evaluation timestep up to 10 ms (Table A2), so below this limit the simulated dynamics are effectively converged; above it, training optimizes a different physical system.</p>
+<div class="video-grid two-up">
+<figure class="video-card">
+<video controls muted loop playsinline preload="metadata" poster="implicit/media/ant_2ms_ref_poster.jpg" aria-label="Ant policy trained at 2 ms running in the reference simulator">
+<source src="implicit/media/ant_2ms_ref.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 9.</span> Ant, trained at 2 ms, in the reference simulator.</figcaption>
+</figure>
+<figure class="video-card">
+<video controls muted loop playsinline preload="metadata" poster="implicit/media/go1_10ms_ref_poster.jpg" aria-label="Go1 policy trained at 10 ms trotting in the reference simulator">
+<source src="implicit/media/go1_10ms_ref.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 10.</span> Go1, trained at 10 ms, trotting at its 1.5 m/s target in the reference simulator.</figcaption>
+</figure>
+</div>
+<figure class="video-card wide">
+<video controls muted loop playsinline preload="metadata" poster="implicit/media/go1_20ms_train_vs_ref_poster.jpg" aria-label="Go1 policy trained at 20 ms: walking in its training simulator on the left, crouching in place in the reference simulator on the right">
+<source src="implicit/media/go1_20ms_train_vs_ref.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 11.</span> One Go1 policy trained at 20 ms, from the same start state. Left: its 20 ms training simulator, where it walks. Right: the 1 ms reference simulator, where it crouches and barely moves.</figcaption>
+</figure>
+
+<h3>Velocity tracking: the standing optimum</h3>
+<p>On Isaac Lab's Go1 task, which commands forward, lateral, and yaw velocities from \([-1, 1]\) (m/s or rad/s) and the Isaac Lab equivalent Go1 of Table 1, SHAC learned to stand: 95% survival and a tracking error of 0.77 m/s, close to the 0.75 m/s expected magnitude of the commanded velocity. Restricting the commands, changing the robot model, the tracking kernel, the action range, or the window, adding a trot-pattern gait prior, or a command curriculum did not help (Table A3). Proximal policy optimization (PPO), a reinforcement-learning method that uses no simulator gradients, learned the task with Isaac Lab's settings, including unbounded Gaussian actions scaled by 0.25 rad; with SHAC's scale of 0.5 rad, PPO also stood still.</p>
+<p>Two problems were found. The first is in the robot model. The analytic adjoint occasionally gave a single world a gradient 10 to more than 100 times the median over worlds, which can dominate a batch update. The spikes come from the impedance of the Menagerie Go1 feet, which rises to its maximum \(d_\text{max} = 1\) at 23 mm of penetration. MuJoCo regularizes a contact in proportion to \((1 - d)/d\) and clamps \(d\) at 0.9999, so the constraint becomes nearly rigid. With \(d_\text{max} = 0.95\) in training (evaluation keeps the original feet), the spikes disappeared (Table A4), and SHAC learned the forward-command variant with all four seeds, against none without the change. It still stood on the full command set, with 512 and with 2048 environments (Table 4).</p>
+<p>The second problem is in the policy parameterization. Figure 12 follows the training tracking error and the saturation of the sampled actions. Within 50 epochs, SHAC drove 52% of the action components to \(|a| > 0.95\), and 97% by the end. The mean squash derivative \(1 - a^2\), which multiplies every analytic action gradient, fell to 0.02: the joint targets sit at the ends of their ±0.5 rad range, where the gradient that could move the policy away from standing nearly vanishes. SAPO kept saturation at 2% or less and the derivative between 0.72 and 0.80, and learned the full task with both seeds (tracking error 0.05 m/s).</p>
+<figure class="chart-panel">
+<div class="chart-toolbar"><div>
+<h3 class="chart-title">Go1 on the full command set</h3>
+<p class="chart-subtitle">Tracking error: mean over seeds of the training episodes, in bins of 25 epochs · saturation: seed 0, sampled actions over 100 control steps from 256 resets</p>
+</div></div>
+<div class="choice-row" role="group" aria-label="Metric">
+<span class="choice-label">Metric</span>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="track" aria-pressed="true">Tracking error</button>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="sat" aria-pressed="false">Saturated actions</button>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="deriv" aria-pressed="false">Squash derivative</button>
+</div>
+<div class="series-key" aria-hidden="true">
+<span><i style="--c:var(--loco-shac)"></i>SHAC</span>
+<span><i class="dotted" style="--c:var(--loco-noent)"></i>SAPO without entropy terms</span>
+<span><i style="--c:var(--loco-sapo)"></i>SAPO</span>
+<span><i class="dashed" style="--c:var(--loco-shacent)"></i>SHAC + entropy terms</span>
+<span><i class="dashed" style="--c:var(--loco-squash)"></i>SHAC + squash penalty</span>
+</div>
+<div class="plotly-chart" id="fig-go1-full" role="img" aria-label="Training tracking error, share of saturated actions, or mean squash derivative versus training epoch for SHAC, SAPO, and three variants on the full Go1 command set."></div>
+<figcaption class="figure-caption"><span class="caption-label">Figure 12.</span> SHAC and SAPO on the full Isaac Lab Go1 task (Isaac Lab reward, 512 environments, 0.16 s window). A tracking error near 0.77 m/s is standing still. Saturated actions have \(|a| > 0.95\); the squash derivative is the mean of \(1 - a^2\).</figcaption>
+</figure>
+<p>Table 4 separates the causes. Removing SAPO's entropy terms brought back the standing optimum, and SAPO's optimizer settings alone (activations, AdamW, clipping, learning rates, no target network) did not escape it. The state-dependent standard deviation and the second critic were not needed. Adding only the entropy terms to SHAC, or only the squash penalty, made SHAC learn the task with both seeds. The squash penalty does not reward a larger standard deviation, and with it the standard deviation fell from 0.37 to 0.11 during training, below SHAC's 0.30. Saturation therefore explains the standing optimum. The noise scale may explain the speed: with the squash penalty alone, the training tracking error fell below 0.3 m/s only after 1090 and 1217 epochs, against 200 and 215 epochs with the entropy terms, whose Gaussian part raised the standard deviation to about 0.4 early in training, and 181 with SAPO (Figure 12). Removing the tanh did not help: the unbounded actions grew to a mean magnitude of 9–29, so the joint targets lay beyond the joint ranges, where MuJoCo clamps the control and its gradient is zero.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = largest share of seeds that walk (tracking error below 0.3 m/s).</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Go1 full command set: trainers and ablation">
+<table aria-describedby="table-caption-4" class="comparison-table">
+<thead><tr><th scope="col">Go1, full command set</th><th scope="col">Seeds that walk ↑</th><th scope="col">Tracking error per seed (m/s) ↓</th><th scope="col">Survival</th></tr></thead>
+<tbody>
+<tr><th colspan="4" scope="rowgroup">Isaac Lab reward</th></tr>
+<tr><th scope="row">SHAC</th><td>0 of 4</td><td>0.78 / 0.77 / 0.77 / 0.78</td><td>98.3%</td></tr>
+<tr><th scope="row">SHAC, 2048 environments</th><td>0 of 4</td><td>0.77 / 0.77 / 0.78 / 0.52</td><td>98.6%</td></tr>
+<tr><th scope="row">SHAC, original foot contact, per-world clipping, 2048 environments</th><td>1 of 4</td><td>0.75 / 0.09 / 0.70 / 0.78</td><td>97.8%</td></tr>
+<tr><th scope="row">SHAC + entropy terms</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.06 / 0.06</td><td>99.6%</td></tr>
+<tr><th scope="row">SHAC + squash penalty</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.11 / 0.07</td><td>98.6%</td></tr>
+<tr><th scope="row">SHAC without tanh</th><td>0 of 2</td><td>0.77 / 0.78</td><td>89.8%</td></tr>
+<tr><th scope="row">SAPO</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.05 / 0.05</td><td>99.2%</td></tr>
+<tr><th scope="row">SAPO without entropy terms</th><td>0 of 2</td><td>0.77 / 0.77</td><td>98.8%</td></tr>
+<tr><th scope="row">SAPO, state-independent \(\sigma\)</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.05 / 0.06</td><td>99.6%</td></tr>
+<tr><th scope="row">SAPO, one critic</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.05 / 0.05</td><td>99.8%</td></tr>
+<tr><th scope="row">SAPO's optimizer settings only</th><td>0 of 2</td><td>0.77 / 0.80</td><td>99.8%</td></tr>
+<tr><th colspan="4" scope="rowgroup">mjlab reward</th></tr>
+<tr><th scope="row">SHAC</th><td>1 of 2</td><td>0.78 / 0.05</td><td>100.0%</td></tr>
+<tr><th scope="row">SAPO</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.05 / 0.05</td><td>100.0%</td></tr>
+<tr><th scope="row">SAPO, 0.54 s window</th><td class="metric-best"><strong>2 of 2</strong></td><td>0.05 / 0.05</td><td>100.0%</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-4">Table 4. Go1 on the full Isaac Lab command set after 1600 epochs (5 ms physics, 512 environments and a 0.16 s window unless stated, foot impedance maximum 0.95 in training unless stated), evaluated in the reference simulator. “SHAC + entropy terms” and “SHAC + squash penalty” keep all other SHAC settings.</p>
+<p>The SAPO policy that was swept followed every tested command. Held fixed for 10 s, eleven commands, including 1 m/s backward, 0.5 m/s sideways, diagonal motion, and turning in place at 1 rad/s, were tracked with a planar error of at most 0.02 m/s and a yaw-rate error of at most 0.01 rad/s (Table A5; Figure 1). One of 64 rollouts fell at 1 m/s forward.</p>
+
+<h3>Reward and window</h3>
+<p>The reference reward that rewards forward speed up to a cap trained the Go1 to move, but not to walk well. Under a fixed 1 m/s command, Table 5 compares it with the mjlab reward. With the capped reward the robot ran at 1.73 m/s, above the cap, with a vertical base speed of 0.19 m/s and roll and pitch rates of 1.54 rad/s; with the mjlab reward, SHAC tracked the command with an error of 0.09 m/s at a vertical speed of 0.06 m/s and roll and pitch rates of 0.11 rad/s, and SAPO walked as steadily (Figure 13). Despite the five times stronger action-change penalty, SHAC's action change rose; SAPO lowered it by a factor of five and the tracking error from 0.09 to 0.05 m/s, at 1.1 times SHAC's epoch time. A 0.54 s window instead of 0.16 s, the closest match to the 0.53 s window of the Go2 environment that motivated the comparison, gave SAPO the same tracking error at three times the epoch time; with SHAC, one of two seeds stood still at this window after its actor gradient norm reached 2247. On the full command set, the mjlab reward gave SAPO's policies lower roll and pitch rates than the Isaac Lab reward (0.06 against 0.21 rad/s).</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value among policies that walk.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Reward and window comparison on Go1">
+<table aria-describedby="table-caption-5" class="comparison-table">
+<thead><tr><th scope="col">Go1, fixed 1 m/s command</th><th scope="col">Forward speed (m/s)</th><th scope="col">Tracking error (m/s) ↓</th><th scope="col">Survival ↑</th><th scope="col">Vertical speed (m/s) ↓</th><th scope="col">Roll and pitch rate (rad/s) ↓</th><th scope="col">Yaw-rate error (rad/s) ↓</th><th scope="col">Action change ↓</th><th scope="col">Pose deviation (rad) ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">Capped forward-speed reward, SHAC, 0.16 s (2 seeds)</th><td>1.73</td><td>–</td><td class="metric-best"><strong>100.0%</strong></td><td>0.192</td><td>1.54</td><td>0.27</td><td>0.77</td><td>0.39</td></tr>
+<tr><th scope="row">mjlab reward, SHAC, 0.16 s (2 seeds)</th><td>0.97</td><td>0.09</td><td class="metric-best"><strong>100.0%</strong></td><td>0.060</td><td>0.11</td><td>0.07</td><td>1.76</td><td>0.13</td></tr>
+<tr><th scope="row">mjlab reward, SHAC, 0.54 s (2 seeds)</th><td>0.46</td><td>0.54</td><td>97.5%</td><td>0.056</td><td>0.19</td><td>0.17</td><td>0.72</td><td>0.35</td></tr>
+<tr><th scope="row">mjlab reward, SAPO, 0.16 s (2 seeds)</th><td>0.98</td><td class="metric-best"><strong>0.05</strong></td><td>99.8%</td><td class="metric-best"><strong>0.030</strong></td><td>0.06</td><td class="metric-best"><strong>0.04</strong></td><td>0.36</td><td class="metric-best"><strong>0.10</strong></td></tr>
+<tr><th scope="row">mjlab reward, SAPO, 0.54 s (2 seeds)</th><td>0.98</td><td class="metric-best"><strong>0.05</strong></td><td>99.8%</td><td>0.031</td><td class="metric-best"><strong>0.04</strong></td><td class="metric-best"><strong>0.04</strong></td><td class="metric-best"><strong>0.32</strong></td><td class="metric-best"><strong>0.10</strong></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-5">Table 5. Go1 after 400 epochs, two seeds per row, evaluated in the reference simulator over the alive steps of 256 rollouts: base speeds in the body frame, the norm of the roll and pitch rates, the root mean square of the yaw-rate error, the action change \(\sum_j (\Delta a_j)^2\) per control step, and the root mean square joint deviation from the default pose. The capped reward has no command, so its tracking error is not defined. Windows of 0.16 and 0.54 s are 8 and 27 control steps.</p>
+<figure class="video-card wide">
+<video controls muted playsinline preload="metadata" poster="tuning/media/tuning_go1_reward_compare_poster.jpg" aria-label="Two Go1 policies side by side: the capped forward-speed reward and the mjlab reward with SAPO">
+<source src="tuning/media/tuning_go1_reward_compare.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 13.</span> Left: capped forward-speed reward with SHAC, moving at about 1.7 m/s with strong vertical and rocking motion. Right: mjlab reward with SAPO at its 1 m/s command. Reference simulator, 6 s.</figcaption>
+</figure>
+</section>
+
+<section class="report-section" id="humanoids">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">5.</span> Humanoids</h2>
+<p class="section-intro">Balance requires stepping, which the local gradient cannot value. A fast target critic, joint damping, a gait prior, and SAPO each address part of this; the G1 needs the prior for a clean gait.</p>
+</div></div>
+
+<h3>Why the reference tasks fail</h3>
+<p>On the SHAC reference task, no tested configuration taught the MuJoCo Humanoid to balance. Seventeen variants, with timesteps of 2, 5, and 10 ms, windows of 8 to 32 steps, stronger actuators, a standing task, softer contacts, lower learning rates, clipped adjoints, and full-episode back-propagation, ended with mean episodes of 0.77–1.21 s, barely longer than the 0.66–0.82 s of the idle robot (Table A1). With the velocity term, the policies converged to a forward dive (Figure 14). The critic was informative, and the step adjoint was accurate, but on the falling states these policies visit, the policy gradient stays consistent for only about four control steps (Section 3). A humanoid also cannot stand by stiffening: holding H1 upright as an inverted pendulum about the ankle would need an ankle stiffness near \(mgl \approx 500\) N·m/rad, where \(m\) is the mass, \(g\) gravitational acceleration, and \(l\) the height of the center of mass, and H1's ankle provides at most 40 N·m. Balance therefore requires stepping, which changes the set of active contacts. The adjoint differentiates the solution for the current contact set and cannot represent the benefit of a foot contact that does not exist yet.</p>
+<figure class="video-card narrow">
+<video controls muted playsinline preload="metadata" poster="implicit/media/humanoid_dive_poster.jpg" aria-label="Humanoid policy stiffening and falling forward">
+<source src="implicit/media/humanoid_dive.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 14.</span> MuJoCo Humanoid after 700 epochs on the reference task: the body stiffens and topples forward (0.98 s until termination).</figcaption>
+</figure>
+
+<h3>What made the humanoids learn</h3>
+<p>The Isaac Lab tasks of Section 2 changed four things for H1 and G1 together: torso–floor contact instead of a height threshold as termination, floor-only collisions (the Menagerie H1 has 127 self-collision pairs without adjoint support), initial states without penetration (half of the reference task's Humanoid resets started up to 14 cm inside the floor), and Isaac Lab's servo gains. With SHAC's original target critic (\(\alpha = 0.995\)), H1 then walked with the gait prior, and not without it (one seed, 600 epochs). With \(\alpha = 0.9\), the bootstrapped value at the window end follows the critic within a few epochs instead of about a hundred, and H1 learned 1.7–2.3 times as fast per epoch with the prior and also walked without it (Table 6, Figure 15). The MuJoCo Humanoid ran only when two changes were combined (Figure 4, Table A8): \(\alpha = 0.9\) and a joint damping of 10 N·m·s/rad, which the original SHAC simulator applies to every joint. Damping raised the half-batch cosine of a random policy's gradient at 32 control steps from 0.09 to 0.82 (Table A9).</p>
+<p>SAPO walked on H1 without the prior as accurately as SHAC (0.10 ± 0.04 against 0.12 ± 0.02 m/s). On the G1, SHAC balanced but did not walk, both without the prior and with H1's prior weights; with stronger prior weights (\(w_h = 120\), \(w_r = 20\)) and without lateral commands it walked with two of three seeds. SAPO without the prior tracked the full command set with errors of 0.21 / 0.14 m/s. Tracking error, however, does not show how the robot walks.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value per robot among policies that walk (mean tracking error below 0.3 m/s). † = not ranked: its feet cross or pass into each other (Table 7).</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Humanoid results">
+<table aria-describedby="table-caption-6" class="comparison-table">
+<thead><tr><th scope="col">Training</th><th scope="col">Epochs</th><th scope="col">Seeds</th><th scope="col">Survival over 10 s ↑</th><th scope="col">Tracking error (m/s) ↓</th></tr></thead>
+<tbody>
+<tr><th colspan="5" scope="rowgroup">H1</th></tr>
+<tr><th scope="row">SHAC, \(\alpha = 0.995\)</th><td>600</td><td>1</td><td>0.0%</td><td>0.88</td></tr>
+<tr><th scope="row">SHAC, \(\alpha = 0.995\), gait prior</th><td>1500</td><td>3</td><td class="metric-best"><strong>99.5 ± 0.6%</strong></td><td>0.15 ± 0.02</td></tr>
+<tr><th scope="row">SHAC, \(\alpha = 0.9\), gait prior</th><td>600</td><td>3</td><td>99.3 ± 0.8%</td><td>0.14 ± 0.01</td></tr>
+<tr><th scope="row">SHAC, \(\alpha = 0.9\)</th><td>1500</td><td>3</td><td>98.4 ± 1.0%</td><td>0.12 ± 0.02</td></tr>
+<tr><th scope="row">SAPO</th><td>1500</td><td>2</td><td>99.4 ± 0.8%</td><td class="metric-best"><strong>0.10 ± 0.04</strong></td></tr>
+<tr><th colspan="5" scope="rowgroup">G1</th></tr>
+<tr><th scope="row">SHAC, \(\alpha = 0.9\)</th><td>1500</td><td>1</td><td>93.0%</td><td>0.49</td></tr>
+<tr><th scope="row">SHAC, \(\alpha = 0.9\), gait prior, forward and yaw commands only</th><td>1000</td><td>3</td><td>98.3 ± 2.0%</td><td>0.27 ± 0.13</td></tr>
+<tr><th scope="row">SAPO †</th><td>1500</td><td>2</td><td>96.7 ± 1.9%</td><td>0.17 ± 0.05</td></tr>
+<tr><th scope="row">SAPO, gait prior, floor-only collisions †</th><td>2000</td><td>2</td><td>100.0 ± 0.0%</td><td>0.08 ± 0.00</td></tr>
+<tr><th scope="row">SAPO, gait prior, colliding feet</th><td>2000</td><td>3</td><td class="metric-best"><strong>99.0 ± 0.6%</strong></td><td class="metric-best"><strong>0.10 ± 0.00</strong></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-6">Table 6. H1 and G1 on the Isaac Lab velocity tasks (5 ms physics, 16-step window, 512 environments), evaluated in the reference simulator from 256 randomized starts with commands drawn as in training; mean ± standard deviation over seeds. \(\alpha\) is the Polyak factor of the target critic; SAPO has no target network. All G1 rows except the SHAC row with the gait prior use the full Isaac Lab G1 command set, including lateral commands of ±0.5 m/s and 10% standing commands. H1 is commanded forward and yaw velocities only, as in Isaac Lab.</p>
+<figure class="chart-panel">
+<div class="chart-toolbar"><div>
+<h3 class="chart-title">Humanoid training</h3>
+<p class="chart-subtitle">Mean over seeds of the training episodes in bins of 10 epochs · environment steps on a logarithmic scale</p>
+</div></div>
+<div class="choice-row" role="group" aria-label="Robot">
+<span class="choice-label">Robot</span>
+<button class="choice-button" type="button" data-choice-group="group" data-choice="h1" aria-pressed="true">H1</button>
+<button class="choice-button" type="button" data-choice-group="group" data-choice="g1" aria-pressed="false">G1</button>
+<button class="choice-button" type="button" data-choice-group="group" data-choice="hum" aria-pressed="false">MuJoCo Humanoid</button>
+</div>
+<div class="choice-row" role="group" aria-label="Metric">
+<span class="choice-label">Metric</span>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="length" aria-pressed="true">Episode length</button>
+<button class="choice-button" type="button" data-choice-group="metric" data-choice="track" aria-pressed="false">Tracking error</button>
+</div>
+<div class="plotly-chart" id="fig-tuning" role="img" aria-label="Training curves on the humanoid tasks: mean episode length or tracking error against environment steps; series are named in the legend below the plot."></div>
+<figcaption class="figure-caption"><span class="caption-label">Figure 15.</span> Training on the humanoid tasks, measured in the training simulator. Episodes end after 20 s. The MuJoCo Humanoid task has no velocity command.</figcaption>
+</figure>
+
+<h3>Gait quality</h3>
+<p>Under fixed commands, the per-foot measurements of Section 2 expose the difference (Table 7, Figure 16). Without the prior, both SAPO policies limp: one foot swings for 0.24 s and clears the floor by 3 cm, while the other leaves the floor for only 0.06 s at 0.4–0.5 cm and is dragged for 25–31% of its travel; at zero command their feet slide or shuffle instead of standing still (foot speed in contact up to 0.09–0.19 m/s). Without collisions between the legs, they also crossed their feet: the left foot was not to the left of the right foot in up to 38–83% of the steps of a command. The SHAC policy with the prior alternated its feet but lifted one foot lower and shorter than the other, and fell under lateral commands, on which it was not trained.</p>
+<p>With the gait prior and SAPO on the full command set, all three seeds of the final configuration alternate their feet (alternation 1.00) with symmetric swings (symmetry 0.88–0.94), clearances of 7–8 cm, and drag shares of at most 5%. Over the fixed commands, including 0.3 m/s sideways and turning while walking, the largest planar error was 0.09 m/s; one of three seeds lost one of 16 rollouts in at least one command. At zero command, two of three seeds stand without stepping, while the other keeps tapping one foot; over 128 standing rollouts per seed, 383 of 384 stayed up. With commands drawn as in training, the tracking error was 0.10 / 0.09 / 0.10 m/s at 98.4–99.6% survival (Table 6). The same configuration with floor-only collisions, as for all other robots (two seeds), let the feet pass into each other while stepping sideways, in up to 11–13% of the steps and by up to 2 cm. Letting the foot capsules of the two feet collide, a capsule–capsule pair that the adjoint supports, reduced this to at most 0.3% without changing the gait (Table 7). With randomly drawn commands, the floor-only policies survived 100% of the rollouts at a tracking error of 0.08 m/s; physical contact between the feet thus costs a little survival and accuracy. Zeroing the clock observation for standing commands, which was also tried, made one of two seeds fall in 4% of the standing rollouts, so the final configuration keeps the clock running. Figure 2 shows a final policy (seed 2) under a command sequence, and Figure 17 compares it with a policy trained without the prior.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value in the column. † = not ranked: its feet cross or pass into each other. ‡ = evaluated on forward and turning commands only, which it was trained on; not ranked in the feet columns.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Gait quality of the humanoid policies">
+<table aria-describedby="table-caption-7" class="comparison-table">
+<thead><tr><th scope="col">Policy, 0.5 m/s forward command</th><th scope="col">Alternation ↑</th><th scope="col">Swing duration, left / right (s)</th><th scope="col">Clearance, left / right (cm)</th><th scope="col">Drag share, left / right (%) ↓</th><th scope="col">Symmetry ↑</th><th scope="col">Crossed feet (%) ↓</th><th scope="col">Overlapping feet (%) ↓</th><th scope="col">Tracking error (m/s) ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">H1, SAPO, no prior</th><td class="metric-best"><strong>1.00</strong></td><td>0.40 / 0.62</td><td>7.5 / 8.5</td><td class="metric-best"><strong>2 / 2</strong></td><td>0.64</td><td class="metric-best"><strong>0</strong></td><td class="metric-best"><strong>0</strong></td><td>0.04</td></tr>
+<tr><th scope="row">G1, SAPO, no prior, seed 0 †</th><td>0.87</td><td>0.24 / 0.06</td><td>2.9 / 0.4</td><td>9 / 31</td><td>0.13</td><td>83</td><td>0</td><td>0.07</td></tr>
+<tr><th scope="row">G1, SAPO, no prior, seed 1 †</th><td>0.89</td><td>0.24 / 0.06</td><td>3.5 / 0.5</td><td>10 / 25</td><td>0.15</td><td>38</td><td>6</td><td>0.03</td></tr>
+<tr><th scope="row">G1, SHAC, prior ‡</th><td class="metric-best"><strong>1.00</strong></td><td>0.22 / 0.34</td><td>4.6 / 7.3</td><td>13 / 7</td><td>0.64</td><td>0</td><td>0</td><td>0.03</td></tr>
+<tr><th scope="row">G1, SAPO, prior, seed 0 †</th><td>1.00</td><td>0.32 / 0.34</td><td>7.6 / 7.7</td><td>3 / 3</td><td>0.94</td><td>0</td><td>11</td><td>0.02</td></tr>
+<tr><th scope="row">G1, SAPO, prior, seed 1 †</th><td>1.00</td><td>0.34 / 0.34</td><td>7.4 / 7.4</td><td>2 / 2</td><td>1.00</td><td>0</td><td>13</td><td>0.02</td></tr>
+<tr><th scope="row">G1, SAPO, prior, colliding feet, seed 0</th><td class="metric-best"><strong>1.00</strong></td><td>0.30 / 0.34</td><td>7.0 / 7.8</td><td>4 / 2</td><td>0.88</td><td class="metric-best"><strong>0</strong></td><td class="metric-best"><strong>0</strong></td><td class="metric-best"><strong>0.01</strong></td></tr>
+<tr><th scope="row">G1, SAPO, prior, colliding feet, seed 1</th><td class="metric-best"><strong>1.00</strong></td><td>0.30 / 0.32</td><td>7.1 / 7.6</td><td>5 / 3</td><td class="metric-best"><strong>0.94</strong></td><td>2</td><td class="metric-best"><strong>0</strong></td><td>0.02</td></tr>
+<tr><th scope="row">G1, SAPO, prior, colliding feet, seed 2</th><td class="metric-best"><strong>1.00</strong></td><td>0.30 / 0.34</td><td>7.5 / 7.5</td><td>4 / 2</td><td>0.88</td><td class="metric-best"><strong>0</strong></td><td class="metric-best"><strong>0</strong></td><td class="metric-best"><strong>0.01</strong></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-7">Table 7. Gait under a fixed forward command of 0.5 m/s in the reference simulator, 16 rollouts of 10 s measured after a 2 s transient. “Prior” is the gait prior of Section 2; “colliding feet” lets the G1's two feet collide with each other, whereas otherwise robot geometry collides only with the floor. Alternation is the share of consecutive touchdowns made by different feet; clearance is the mean peak height of the foot body above its stance height during airborne phases; the drag share is the share of a foot's horizontal travel that happens while it is in contact; symmetry is the smaller of the left/right ratios of swing duration and clearance (1 is symmetric). Crossed and overlapping feet are the largest shares, over 300 control steps of 8 rollouts per command, of steps in which the left foot is not to the left of the right foot in the heading frame, and in which the foot collision capsules of the two feet interpenetrate; the commands are 0.3 m/s to either side, 1 m/s forward, and 0.5 m/s forward while turning at 0.5 rad/s (H1: 0.5 and 1 m/s forward, turning while walking and in place; G1 with SHAC: forward and turning only).</p>
+<figure class="chart-panel">
+<div class="chart-toolbar"><div>
+<h3 class="chart-title">Gait diagram</h3>
+<p class="chart-subtitle">One rollout, first 4 s after the transient, 0.5 m/s forward command · top: foot-body height above its lowest value · bottom: foot–floor contact</p>
+</div></div>
+<div class="choice-row" role="group" aria-label="Policy">
+<span class="choice-label">Policy</span>
+<button class="choice-button" type="button" data-choice-group="policy" data-choice="g1_noprior" aria-pressed="false">G1, SAPO, no prior</button>
+<button class="choice-button" type="button" data-choice-group="policy" data-choice="g1_prior" aria-pressed="false">G1, SHAC, prior</button>
+<button class="choice-button" type="button" data-choice-group="policy" data-choice="g1_walk" aria-pressed="true">G1, SAPO, prior, colliding feet</button>
+<button class="choice-button" type="button" data-choice-group="policy" data-choice="h1" aria-pressed="false">H1, SAPO</button>
+</div>
+<div class="series-key" aria-hidden="true">
+<span><i class="thick" style="--c:var(--loco-left)"></i>Left foot</span>
+<span><i class="thick" style="--c:var(--loco-right)"></i>Right foot</span>
+</div>
+<div class="plotly-chart" id="fig-gait" role="img" aria-label="Foot heights and foot-floor contact intervals of the left and right foot over four seconds for the selected humanoid policy."></div>
+<figcaption class="figure-caption"><span class="caption-label">Figure 16.</span> Gait diagrams. A clean walking gait alternates contact bars of similar length on both feet, with both feet lifting between them.</figcaption>
+</figure>
+<figure class="video-card wide">
+<video controls muted playsinline preload="metadata" poster="tuning/media/tuning_g1_compare_poster.jpg" aria-label="Two G1 policies side by side under the same commands: SAPO without a gait prior on the left, SAPO with the gait prior on the right">
+<source src="tuning/media/tuning_g1_compare.mp4" type="video/mp4"></video>
+<figcaption class="video-copy"><span class="caption-label">Figure 17.</span> G1 under the same command sequence (0.5 m/s forward, then turning while walking, then standing). Left: SAPO without the gait prior (seed 0), which drags its right foot and crosses its feet. Right: SAPO with the gait prior and colliding feet (seed 2).</figcaption>
+</figure>
+</section>
+
+<section class="report-section" id="cost">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">6.</span> Training cost</h2>
+<p class="section-intro">Keeping each physics step's forward data removes the recomputation in the backward pass. With the 0.16 s window, SAPO adds about 10% to a SHAC epoch.</p>
+</div></div>
+<p>The first version of the harness recomputed every physics step during the backward pass before applying its adjoint. The step adjoint needs only the step's input and its completed forward data, so the final trainer keeps one simulator state buffer per physics step of the window, each with its own captured forward and backward graph. On identical inputs, the action gradients of a 4-step window then differ from the recomputing backward by a relative norm of \(1.1 \cdot 10^{-2}\) for the Go1 and \(4.9 \cdot 10^{-6}\) for H1; two recomputing runs differ by as much, because the GPU's contact detection is not deterministic. The backward pass no longer runs the constraint solver, which saves the most when many physics steps make up one control step (Table 8). Together with a captured critic update, resets without host synchronization, and batched forward kinematics, the final trainer runs an epoch of the reference-task Ant and Go1 configurations 1.75 times faster at 2 ms.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Epoch times">
+<table aria-describedby="table-caption-8" class="comparison-table">
+<thead><tr><th scope="col">Configuration</th><th scope="col">Control steps per epoch</th><th scope="col">Epoch (ms) ↓</th><th scope="col">Thousand steps per second ↑</th></tr></thead>
+<tbody>
+<tr><th scope="row">Ant, reference task, 2 ms, 256 environments: first / final trainer</th><td>2,048</td><td>218 / 124</td><td>9 / 16</td></tr>
+<tr><th scope="row">Go1, reference task, 2 ms, 256 environments: first / final trainer</th><td>2,048</td><td>358 / 204</td><td>6 / 10</td></tr>
+<tr><th scope="row">MuJoCo Humanoid, 2 ms: recomputing / stored forward steps</th><td>8,192</td><td>1050 / 411</td><td>8 / 20</td></tr>
+<tr><th scope="row">H1, Isaac Lab task: recomputing / stored</th><td>8,192</td><td>248 / 194</td><td>33 / 42</td></tr>
+<tr><th scope="row">G1, Isaac Lab task: recomputing / stored</th><td>8,192</td><td>389 / 289</td><td>21 / 28</td></tr>
+</tbody>
+<tbody>
+<tr><th scope="row">Go1, mjlab reward, 0.16 s window: SHAC / SAPO</th><td>4,096</td><td>85 / 95</td><td>48 / 43</td></tr>
+<tr><th scope="row">Go1, mjlab reward, 0.54 s window: SHAC / SAPO</th><td>13,824</td><td>218 / 293</td><td>63 / 47</td></tr>
+</tbody>
+<tbody>
+<tr><th scope="row">PPO, Go1, 4096 environments × 24 steps</th><td>98,304</td><td>444</td><td>221</td></tr>
+<tr><th scope="row">PPO, H1, 4096 environments × 24 steps</th><td>98,304</td><td>351</td><td>280</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-8">Table 8. Median epoch time with this study's other jobs paused, including the critic update; 512 environments, 5 ms physics timestep, 8-step (Go1, Ant) or 16-step (humanoids) windows unless stated. The SAPO comparison is the fastest of three interleaved repeats. Rows describe different configurations, so no value is ranked.</p>
+<p>SAPO's epoch costs 1.1 times SHAC's with the 0.16 s window and 1.3 times with the 0.54 s window; with the 0.16 s window most of the difference is its second critic, without which a SAPO epoch takes 89 ms. Proximal policy optimization needs no backward pass through the simulator and runs eight times as many environments, so it processes about 5–7 times more environment steps per second than SHAC. It also needs far more of them: 29.5 million steps for the Go1 task and 98 million for H1 walking, against 4.9 million for SHAC with the gait prior on H1 (2.3 minutes of training) and 6.6 million for SAPO on the full Go1 task.</p>
+<p>Two trainer variants reduced the number of epochs on the H1 task. Reusing the stored per-sample action gradients for four further actor updates without simulator work, following reparameterization proximal policy optimization <a href="https://arxiv.org/abs/2508.06214">[Zhong et al. 2025]</a>, reached a fixed training-quality threshold after 181, 169, and 213 epochs, against 388, 315, and 285 without reuse, at the same epoch cost and with similar final policies. A 10 ms timestep with 1024 environments and reuse reached it in 0.6 minutes (Table A6).</p>
+</section>
+
+<section class="report-section" id="limitations">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">7.</span> Limitations</h2>
+</div></div>
+<ul>
+<li><strong>Seeds.</strong> The reference-task results use three seeds per configuration, and the velocity-tracking comparisons one to four; several screening rows in the appendix use one seed. Shares such as “two of two seeds” separate configurations that always or never walk, but they are not reliable success rates for configurations in between, such as SHAC with the mjlab reward (one of two) or per-world clipping on the full Go1 task (one of four).</li>
+<li><strong>Mechanism.</strong> The saturation measurements of Figure 12 use one seed per configuration. The squash penalty was tested with one weight (0.3). That saturation is the cause of the standing optimum is supported by the ablation, but other effects of the entropy terms, for example on the critic targets, were not separated.</li>
+<li><strong>Stability and accuracy protocol.</strong> Divergence was measured under random actions from near-standing states, and accuracy over one control step. Trained policies visit fewer states, and long-horizon differences between timesteps are dominated by chaotic divergence.</li>
+<li><strong>Task fidelity.</strong> The tasks follow Isaac Lab's definitions but omit observation noise, mass randomization, pushes, and the heading controller. The Go1 servo model approximates Isaac Lab's learned actuator network. The G1 policy controls only the legs; its waist and arms hold their default pose. The Go2 environment that motivated the mjlab reward and the 0.54 s window was not reproduced: it uses a different robot, servo gains, control rate (60 Hz), and Newton's Featherstone solver.</li>
+<li><strong>Robot models.</strong> The running MuJoCo Humanoid uses a joint damping of 10 N·m·s/rad, as in the original SHAC work but not in MuJoCo's model. The Go1 was trained with a foot impedance maximum of 0.95 instead of the Menagerie value of 1 and evaluated with the original feet. On the velocity-tracking tasks, except for the final G1's feet, robot geometry collides only with the floor, so legs can pass through each other; the H1 policy's feet almost never overlapped (in less than 0.1% of steps), and the Go1's legs were not checked. The gait prior fixes the step period (0.8 s) and duty factor, so the G1 cannot adapt its cadence to the commanded speed. With colliding feet, the G1 policies survived 98.4–99.6% of rollouts with random commands, and one of three seeds taps a foot when commanded to stand; three seeds do not establish a failure rate.</li>
+<li><strong>Adjoint of the tested commit.</strong> The control derivative ignores actuator force limits (corrected in the harness); mesh collisions, tendons, and equality constraints are unsupported; collision pairs outside the eleven supported primitive pairs contribute no gradient without a warning; and the commit has no adjoint tests. For Euler with implicit joint damping, the velocity derivative with respect to joint positions omits the configuration dependence of the mass matrix (56% and 430% relative error on a damped two-link pendulum); the training runs used <code>implicitfast</code> or explicit Euler, which are not affected.</li>
+<li><strong>Hardware and timing.</strong> All timings come from one MIG 1g.24gb partition, a quarter of an RTX PRO 6000 Blackwell GPU, with four CPU cores. Processes outside this study were not controlled; two timing runs gave bimodal epoch times (about 90 or 190 ms for the same configuration) and were discarded.</li>
+</ul>
+</section>
+
+<section class="report-section conclusion" id="conclusion">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">8.</span> Conclusion</h2>
+</div></div>
+<p>The MuJoCo Warp step adjoint at commit <code>357a75d</code> is accurate where the dynamics are smooth, and its implicit integration removes the damping instability that limited explicit integration to about 10 ms for the Go1 and 5 ms for the Humanoid. Larger timesteps nevertheless pay off less than the simulator speedup suggests. A SHAC epoch of the first trainer at 10 ms is only 2.3–2.7 times faster than at 2 ms, the policy gradient stays informative over fewer control steps, and policies trained at 20 ms exploit dynamics that a 1 ms simulator does not reproduce. In this study, 5 ms with windows of 8–16 control steps was a safe operating point.</p>
+<p>On velocity tracking, the main obstacle was not the simulator gradient but the policy parameterization. SHAC's tanh-squashed actions saturated within a few dozen epochs on the Isaac Lab Go1 task, and the factor \(1 - a^2\) then suppressed the analytic gradient by about fifty times; the policy stood still. SAPO's entropy terms contain the tanh correction of the log-density, which penalizes saturation. With SAPO, every tested seed learned the full Go1 command set, with either reward. The ablation and the squash penalty indicate that this correction removes the standing optimum: SAPO without its entropy terms stood still, and SHAC with only the squash penalty learned the task. With the full entropy terms, which also keep the exploration noise larger early in training, learning was about five times faster. SHAC implementations with bounded actions may need such terms. A rigid foot contact in the Menagerie Go1 model, with impedance maximum 1, separately caused rare per-world gradient spikes.</p>
+<p>The humanoids needed more. With SHAC, H1 walked without a gait prior only once the target critic followed the trained critic quickly (Polyak factor 0.9 instead of 0.995); SAPO, which has no target network, also walked without the prior. Joint damping as in the original SHAC simulator, together with the faster target critic, made the MuJoCo Humanoid run. The G1 tracked commands without a prior but limped, dragging one foot and crossing its feet. A differentiable gait prior on foot heights and placement, which tells the gradient when each foot should be in the air, gave it a symmetric alternating gait on the full command set, and letting its feet collide reduced foot interpenetration to at most 0.3% of the steps at a small cost in survival. Tracking accuracy alone did not reveal these gait defects; per-foot gait measurements did.</p>
+</section>
+
+<section class="report-section" id="reproduction">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">9.</span> Reproduction and data</h2>
+<p class="section-intro">All scripts, raw results, and selected trained checkpoints are published with this report.</p>
+</div></div>
+<p>The environment is the pull request's locked Python environment (<code>uv sync</code> at commit <code>357a75d</code>) with PyTorch 2.11.0 for CUDA 12.8 added. Go1 and H1 come from <a href="https://github.com/google-deepmind/mujoco_menagerie/tree/2cd6b7b">MuJoCo Menagerie at 2cd6b7b</a>; the Ant, Humanoid, Go1-kv, and H1-PD models are included under <code>implicit/models/</code>, and the G1 model from mjlab under <code>tuning/models/g1_mjlab/</code>. The main entry points are listed below; the velocity-tracking commands write to <code>runs/loop/</code> and <code>results/loop/</code>, whose published copies are under <code>tuning/checkpoints/</code> and <code>tuning/results/</code>.</p>
+<div class="code-shell">
+<div class="code-header"><span>Listing 1. Reproduction commands</span><button class="copy-button" type="button" data-copy-target="repro-code">Copy code</button></div>
+<pre><code class="code-block" id="repro-code"># integrator stability and one-step accuracy (Section 3), per robot
+python integrator_sweep.py --robot go1 --nworld 1024 --duration 10 --out results/e1_go1.json
+# simulator and SHAC epoch throughput (Sections 3 and 6)
+python bench.py --eager --out results/bench_dt10.json
+python bench.py --integrators implicitfast --nworlds 1024 --dt 0.002 --substeps 10 --out results/bench_dt2.json
+python bench.py --integrators implicitfast --nworlds 1024 --dt 0.02 --substeps 1 --out results/bench_dt20.json
+python time_epochs.py --robots ant go1 --num-envs 256 1024 --out results/epoch_timing.json
+# policy-gradient quality for a fixed trained policy (Section 3)
+python run_e3.py --robots ant go1 --checkpoint-config explicit_2ms
+python run_e3.py --robots humanoid --checkpoint checkpoints/HA_ref_2ms_T16.pt --warmup 10
+# reference-task training matrix, time-matched runs, and evaluation (Section 4)
+python run_matrix.py --robots ant go1 --epochs 1000 --horizon 8 --tag e4
+python run_matrix.py --robots ant go1 --configs implicit_10ms --seeds 0 1 --epochs 4000 --tag e5
+python eval_matrix.py --tag e4 &amp;&amp; python eval_matrix.py --tag e5
+python summarize_e4.py --tag e4 &amp;&amp; python summarize_e4.py --tag e5
+python transfer_matrix.py
+# velocity-tracking tasks (Sections 4 and 5), run from tuning/: training, reference evaluation, sweeps, gait, saturation
+python shac2.py --task go1_vel --out runs/loop/ilfull_sapo_T8_s0 --set num_envs=512 horizon=8 epochs=1600 dt=0.005 seed=0 sapo=true geom_solimp=[0.015,0.95,0.023,0.5,2]
+python shac2.py --task go1_vel --out runs/loop/abl_squash03_s0 --set num_envs=512 horizon=8 epochs=1600 dt=0.005 seed=0 squash_reg=0.3 geom_solimp=[0.015,0.95,0.023,0.5,2]
+python shac2.py --task go1_rw_full --out runs/loop/rwfull_sapo_T8_s0 --set num_envs=512 horizon=8 epochs=1600 dt=0.005 seed=0 sapo=true geom_solimp=[0.015,0.95,0.023,0.5,2]
+python shac2.py --task h1_vel --out runs/loop/h1vel_sapo_s0 --set num_envs=512 horizon=16 epochs=1500 dt=0.005 seed=0 sapo=true
+python shac2.py --task g1_walk --out runs/loop/g1walk3_sapo_s2 --set num_envs=512 horizon=16 epochs=2000 dt=0.005 seed=2 sapo=true nconmax=32 njmax=160 model_edit=floor_only+g1_feet3+g1_il+g1_footpair
+python gait_eval.py --ckpt runs/loop/g1walk3_sapo_s2.pt --out results/loop/gait/g1walk3_sapo_s2.json
+./foot_sep_eval.sh g1walk3_sapo_s2 floor_only+g1_feet3+g1_il+g1_footpair
+./make_g1_videos.sh runs/loop/g1walk3_sapo_s2.pt runs/loop/g1vel_sapo_s0.pt
+python shac2.py --task h1_gait --out runs/loop/a11_h1gait_ta09 --set num_envs=512 horizon=16 epochs=600 dt=0.005 target_alpha=0.9
+python shac2.py --task humanoid_clean --out runs/loop/hd3_humref_d10_2ms_T16_ta09 --set num_envs=512 horizon=16 epochs=800 dt=0.002 model_edit=floor_only+damp10 nconmax=24 njmax=96 target_alpha=0.9 --tset robot=humanoid_ref
+python eval2.py --sim ref --ckpt runs/loop/ilfull_sapo_T8_s0.pt --out results/loop/eval/ilfull_sapo_T8_s0.json
+python cmd_sweep.py --ckpt runs/loop/rwfull_sapo_T8_s0.pt --out results/loop/cmd_rwfull_sapo_T8_s0.json
+python gait_eval.py --ckpt runs/loop/h1vel_sapo_s0.pt --out results/loop/gait/h1vel_sapo_s0.json
+python sat_check.py --runs s95_go1vel_s0 abl_noent_s0 abl_shacent_s0 abl_squash03_s0 ilfull_sapo_T8_s0 --epochs 0 50 100 150 200 300 400 600 800 1000 1200 1400 1550 --out results/loop/sat_curve.json
+python ppo.py --task go1_vel --out runs/loop/ppo_go1vel_5ms_s025 --set iterations=300 dt=0.005 --tset action_scale=0.25
+python time_suite.py --suite suites/timing9.json --out results/loop/timing9.json --epochs 40 --skip 10
+</code></pre>
+</div>
+<ul>
+<li>Source: <a href="implicit/diffsim.py">simulator wrapper</a>, <a href="implicit/locomotion.py">environments</a>, <a href="implicit/shac.py">SHAC</a>, <a href="implicit/robots.py">robot definitions</a>, and the experiment drivers listed in the <a href="implicit/manifest.json">artifact manifest</a>, which gives the size and SHA-256 hash of every published file.</li>
+<li>Results: <a href="implicit/results/e1_summary.json">integrator sweep</a>, <a href="implicit/results/bench_dt10.json">simulator throughput</a>, <a href="implicit/results/epoch_timing.json">SHAC epoch timing</a>, <a href="implicit/results/e4_summary.json">training summary</a>, <a href="implicit/results/transfer_matrix.json">cross-evaluation</a>, <a href="implicit/results/humanoid_variants.json">humanoid variants</a>, and gradient checks under <code>implicit/results/e3/</code>. Per-epoch training histories are stored gzip-compressed under <code>implicit/results/runs/</code>.</li>
+<li>Checkpoints of the seed-0 policies and of the humanoid runs are under <code>implicit/checkpoints/</code> (see the manifest).</li>
+<li>Velocity-tracking study (Sections 4–6): <a href="tuning/shac2.py">trainer</a>, <a href="tuning/tasks.py">tasks</a>, <a href="tuning/fk.py">forward kinematics</a>, <a href="tuning/diffsim.py">simulator wrapper with stored forward steps</a>, <a href="tuning/robots.py">robot models and edits</a>, <a href="tuning/ppo.py">PPO baseline</a>, evaluation scripts, results under <code>tuning/results/</code>, training histories under <code>tuning/results/runs/</code>, and selected checkpoints under <code>tuning/checkpoints/</code>, all listed in the <a href="tuning/manifest.json">manifest</a>.</li>
+<li><a href="data/figures.json">Figure data</a>, <a href="data/tuning.json">humanoid training curves</a>, and <a href="data/locomotion.json">Go1 and gait figure data</a> used by the interactive plots.</li>
+<li><a href="archive-2026-09-05.html">Earlier version of this report</a> (hybrid policies, pull request commit <code>02d09b1</code>, explicit damping), with its artifacts under <code>pr1535/</code>.</li>
+</ul>
+</section>
+
+<section class="report-section" id="appendix">
+<div class="section-heading"><div class="section-title-wrap">
+<h2><span class="section-number">10.</span> Appendix: additional results</h2>
+<p class="section-intro">Screens and diagnostics referenced in the text. Each block expands on selection.</p>
+</div></div>
+<details class="appendix-block">
+<summary>Humanoid variants on the reference task (Table A1)</summary>
+<p>Seventeen SHAC configurations on the MuJoCo Humanoid with the reference reward or a standing task, trained for 81 to 741 epochs. None balanced: the mean episode length stayed between 0.77 and 1.21 s, against 0.66–0.82 s for the idle robot. With the velocity term, the policies converge to a forward dive (Figure 14).</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Humanoid variants">
+<table aria-describedby="table-caption-9" class="comparison-table">
+<thead><tr><th scope="col">Variant</th><th scope="col">Epochs</th><th scope="col">Mean episode (s) ↑</th></tr></thead>
+<tbody id="humanoid-variant-rows">
+<tr><th scope="row">Reference reward, 10 ms, \(T = 8\)</th><td>741</td><td>0.82</td></tr>
+<tr><th scope="row">Reference reward, 2 ms, \(T = 16\)</th><td>721</td><td>1.01</td></tr>
+<tr><th scope="row">Reference reward, 2 ms, \(T = 8\)</th><td>281</td><td>0.79</td></tr>
+<tr><th scope="row">Reference reward, 1.75x gear, 2 ms, \(T = 16\)</th><td>261</td><td>0.78</td></tr>
+<tr><th scope="row">Reference reward, 512 envs, 2 ms, \(T = 16\)</th><td>461</td><td>0.77</td></tr>
+<tr><th scope="row">Shaped reward, 512 envs, 5 ms, \(T = 16\)</th><td>541</td><td>0.86</td></tr>
+<tr><th scope="row">Standing, 2 ms, \(T = 16\)</th><td>381</td><td>1.01</td></tr>
+<tr><th scope="row">Standing, actor learning rate \(5 \cdot 10^{-4}\)</th><td>141</td><td>0.95</td></tr>
+<tr><th scope="row">Standing, fast target critic (Polyak factor 0.2, critic learning rate \(2 \cdot 10^{-3}\))</th><td>300</td><td>1.07</td></tr>
+<tr><th scope="row">Standing, 1/4 reset noise</th><td>300</td><td>1.11</td></tr>
+<tr><th scope="row">Standing, contact time constant 50 ms</th><td>281</td><td>1.02</td></tr>
+<tr><th scope="row">Standing, contact time constant 100 ms</th><td>281</td><td>0.94</td></tr>
+<tr><th scope="row">Standing, \(T = 32\)</th><td>101</td><td>0.81</td></tr>
+<tr><th scope="row">Standing, uprightness 1.0 + angular-rate penalty</th><td>300</td><td>1.21</td></tr>
+<tr><th scope="row">Standing, clipped adjoint, \(T = 32\)</th><td>141</td><td>1.01</td></tr>
+<tr><th scope="row">Standing, full-episode backpropagation (50 steps), clipped</th><td>81</td><td>0.84</td></tr>
+<tr><th scope="row">Reference reward, soft contact (100 ms), 512 envs, 5 ms, \(T = 16\)</th><td>281</td><td>0.88</td></tr>
+<tr><th scope="row">H1-PD, gait clock, 512 envs, 5 ms, \(T = 16\) (idle H1-PD: 1.3 s)</th><td>281</td><td>1.22</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-9">Table A1. SHAC variants on the MuJoCo Humanoid: mean length of the last 200 training episodes; 20 s would mean no falls. “Soft contact” raises the constraint time constant; “clipped adjoint” caps each world’s state adjoint at three times the median.</p>
+</details>
+<details class="appendix-block">
+<summary>Cross-evaluation across timesteps (Table A2)</summary>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Cross-evaluation across timesteps">
+<table aria-describedby="table-caption-10" class="comparison-table">
+<thead><tr><th scope="col">Robot / training timestep</th><th scope="col">Eval 20 ms</th><th scope="col">10 ms</th><th scope="col">5 ms</th><th scope="col">2 ms</th><th scope="col">1 ms</th></tr></thead>
+<tbody>
+<tr><th scope="row">Ant / trained at 2 ms</th><td>1.47 <span class="survival">(23%)</span></td><td>1.46 <span class="survival">(15%)</span></td><td>4.01 <span class="survival">(73%)</span></td><td><u>6.01 <span class="survival">(97%)</span></u></td><td>6.10 <span class="survival">(95%)</span></td></tr>
+<tr><th scope="row">Ant / trained at 5 ms</th><td>1.76 <span class="survival">(5%)</span></td><td>1.89 <span class="survival">(11%)</span></td><td><u>4.00 <span class="survival">(84%)</span></u></td><td>4.12 <span class="survival">(91%)</span></td><td>4.11 <span class="survival">(92%)</span></td></tr>
+<tr><th scope="row">Ant / trained at 10 ms</th><td>2.32 <span class="survival">(18%)</span></td><td><u>2.50 <span class="survival">(73%)</span></u></td><td>2.75 <span class="survival">(91%)</span></td><td>2.57 <span class="survival">(90%)</span></td><td>2.46 <span class="survival">(91%)</span></td></tr>
+<tr><th scope="row">Ant / trained at 20 ms</th><td><u>3.58 <span class="survival">(75%)</span></u></td><td>2.43 <span class="survival">(28%)</span></td><td>3.58 <span class="survival">(95%)</span></td><td>3.75 <span class="survival">(96%)</span></td><td>3.69 <span class="survival">(95%)</span></td></tr>
+<tr><th scope="row">Ant / trained at 10 ms, 4000 epochs</th><td>2.57 <span class="survival">(5%)</span></td><td><u>5.44 <span class="survival">(70%)</span></u></td><td>3.52 <span class="survival">(71%)</span></td><td>3.10 <span class="survival">(82%)</span></td><td>2.82 <span class="survival">(78%)</span></td></tr>
+</tbody>
+<tbody>
+<tr><th scope="row">Go1 / trained at 2 ms</th><td>1.41 <span class="survival">(20%)</span></td><td>1.65 <span class="survival">(98%)</span></td><td>1.65 <span class="survival">(98%)</span></td><td><u>1.65 <span class="survival">(98%)</span></u></td><td>1.65 <span class="survival">(98%)</span></td></tr>
+<tr><th scope="row">Go1 / trained at 5 ms</th><td>1.47 <span class="survival">(73%)</span></td><td>1.59 <span class="survival">(98%)</span></td><td><u>1.57 <span class="survival">(98%)</span></u></td><td>1.55 <span class="survival">(97%)</span></td><td>1.55 <span class="survival">(97%)</span></td></tr>
+<tr><th scope="row">Go1 / trained at 10 ms</th><td>1.66 <span class="survival">(2%)</span></td><td><u>1.59 <span class="survival">(99%)</span></u></td><td>1.56 <span class="survival">(98%)</span></td><td>1.54 <span class="survival">(97%)</span></td><td>1.54 <span class="survival">(97%)</span></td></tr>
+<tr><th scope="row">Go1 / trained at 20 ms</th><td><u>0.79 <span class="survival">(85%)</span></u></td><td>0.17 <span class="survival">(88%)</span></td><td>0.12 <span class="survival">(91%)</span></td><td>0.09 <span class="survival">(91%)</span></td><td>0.08 <span class="survival">(91%)</span></td></tr>
+<tr><th scope="row">Go1 / trained at 10 ms, 4000 epochs</th><td>1.55 <span class="survival">(11%)</span></td><td><u>1.50 <span class="survival">(99%)</span></u></td><td>1.49 <span class="survival">(98%)</span></td><td>1.47 <span class="survival">(98%)</span></td><td>1.47 <span class="survival">(98%)</span></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-10">Table A2. Forward speed (m/s) and survival (%) of the seed-0 reference-task policies of Table 3 evaluated for 10 s from 128 randomized starts with <code>implicitfast</code> at each timestep. The underlined cell is the policy’s own training timestep.</p>
+</details>
+<details class="appendix-block">
+<summary>Go1 model variants and command sets with SHAC (Table A3)</summary>
+<p>With the Isaac Lab reward restricted to forward commands, even the unmodified Menagerie Go1 walked with only some seeds; the model variants differ at most modestly in how often SHAC escapes standing. With per-world clipping, which caps each world’s state adjoint and control gradient at 10 times the median over worlds, every command set with a single direction of motion was learned, and every set in which the commanded direction varies ended standing with 512 environments. Other changes screened on the full task also ended standing: a tracking kernel with \(\sigma_c = 1\) m/s, a 16-step window, a trot-pattern gait prior, an action scale of 0.25 rad, and a curriculum from the forward-command policies.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = largest share of seeds that walk among the several-seed rows with forward commands and the original foot contact.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Go1 model variants over seeds">
+<table aria-describedby="table-caption-11" class="comparison-table">
+<thead><tr><th scope="col">Go1 model and command set (Isaac Lab reward)</th><th scope="col">Seeds that walk ↑</th><th scope="col">Tracking error per seed (m/s) ↓</th><th scope="col">Survival, mean</th></tr></thead>
+<tbody>
+<tr><th colspan="4" scope="rowgroup">Forward commands, several seeds</th></tr>
+<tr><th scope="row">Menagerie Go1</th><td>2 of 4</td><td>0.11 / 0.73 / 0.18 / 0.73</td><td>98.3%</td></tr>
+<tr><th scope="row">Menagerie Go1, floor-only collisions</th><td>1 of 4</td><td>0.73 / 0.72 / 0.08 / 0.72</td><td>98.9%</td></tr>
+<tr><th scope="row">Isaac-Lab-equivalent Go1</th><td>0 of 4</td><td>0.72 / 0.72 / 0.65 / 0.72</td><td>98.4%</td></tr>
+<tr><th scope="row">Isaac-Lab-equivalent Go1, per-world clipping</th><td class="metric-best"><strong>4 of 4</strong></td><td>0.11 / 0.07 / 0.09 / 0.09</td><td>95.9%</td></tr>
+</tbody>
+<tbody>
+<tr><th colspan="4" scope="rowgroup">Forward commands, one change to the Menagerie Go1, seed 0 only</th></tr>
+<tr><th scope="row">Menagerie Go1 with \(k_p = 25\) N·m/rad, \(k_v = 0.5\) N·m·s/rad</th><td>1 of 1</td><td>0.09</td><td>99.6%</td></tr>
+<tr><th scope="row">Menagerie Go1 with armature 0.02 kg·m² (added rotor inertia)</th><td>1 of 1</td><td>0.10</td><td>99.6%</td></tr>
+<tr><th scope="row">Menagerie Go1 with the Isaac Lab default pose</th><td>1 of 1</td><td>0.27</td><td>99.6%</td></tr>
+<tr><th scope="row">Menagerie Go1 without joint friction loss (MuJoCo's dry joint friction)</th><td>0 of 1</td><td>0.73</td><td>100.0%</td></tr>
+<tr><th scope="row">Menagerie Go1 with sliding-only foot friction</th><td>0 of 1</td><td>0.71</td><td>77.7%</td></tr>
+<tr><th scope="row">Menagerie Go1 with joint damping moved into the servos</th><td>0 of 1</td><td>0.72</td><td>99.6%</td></tr>
+<tr><th scope="row">Menagerie Go1 with servo damping, no friction loss, and sliding-only foot friction</th><td>0 of 1</td><td>0.94</td><td>0.0%</td></tr>
+</tbody>
+<tbody>
+<tr><th colspan="4" scope="rowgroup">Isaac-Lab-equivalent Go1 with per-world clipping, by command set (500 epochs unless stated)</th></tr>
+<tr><th scope="row">Forward 0–1.5 m/s (400 epochs)</th><td>4 of 4</td><td>0.11 / 0.07 / 0.09 / 0.09</td><td>95.9%</td></tr>
+<tr><th scope="row">Forward 0–1.5 m/s, yaw rate ±1 rad/s</th><td>2 of 2</td><td>0.09 / 0.07</td><td>97.7%</td></tr>
+<tr><th scope="row">Backward 0–1 m/s</th><td>1 of 1</td><td>0.07</td><td>100.0%</td></tr>
+<tr><th scope="row">Lateral 0–1 m/s (one side)</th><td>1 of 1</td><td>0.07</td><td>98.4%</td></tr>
+<tr><th scope="row">Forward and backward ±1 m/s</th><td>0 of 2</td><td>0.49 / 0.48</td><td>94.9%</td></tr>
+<tr><th scope="row">Forward 0–1.5 m/s, lateral ±1 m/s</th><td>0 of 2</td><td>0.94 / 0.96</td><td>79.7%</td></tr>
+<tr><th scope="row">Forward 0–1 m/s, lateral 0–1 m/s</th><td>0 of 1</td><td>0.77</td><td>100.0%</td></tr>
+<tr><th scope="row">Full task (800 epochs)</th><td>0 of 2</td><td>0.77 / 0.81</td><td>84.6%</td></tr>
+<tr><th scope="row">Full task, 2048 environments (1600 epochs)</th><td>1 of 4</td><td>0.75 / 0.09 / 0.70 / 0.78</td><td>97.8%</td></tr>
+<tr><th scope="row">Full task, 2048 environments (1600 epochs), without clipping</th><td>0 of 2</td><td>0.79 / 0.79</td><td>74.2%</td></tr>
+</tbody>
+<tbody>
+<tr><th colspan="4" scope="rowgroup">Isaac-Lab-equivalent Go1 without clipping, modified foot contact (512 environments unless stated)</th></tr>
+<tr><th scope="row">Forward commands, maximum impedance 0.95 (400 epochs)</th><td>4 of 4</td><td>0.05 / 0.07 / 0.06 / 0.08</td><td>97.6%</td></tr>
+<tr><th scope="row">Full task, maximum impedance 0.95 (1600 epochs)</th><td>0 of 4</td><td>0.78 / 0.77 / 0.77 / 0.78</td><td>98.3%</td></tr>
+<tr><th scope="row">Full task, maximum impedance 0.95, 2048 environments (1600 epochs)</th><td>0 of 4</td><td>0.77 / 0.77 / 0.78 / 0.52</td><td>98.6%</td></tr>
+<tr><th scope="row">Full task, continuous onset, 5 mm width (1600 epochs)</th><td>1 of 4</td><td>0.10 / 0.78 / 0.77 / 0.78</td><td>98.7%</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-11">Table A3. Go1 after 400 epochs of SHAC (5 ms physics, 8-step window, 512 environments), evaluated in the reference simulator. A seed walks when its tracking error is below 0.3 m/s. Command-set rows use per-world clipping unless stated. Modified foot contacts set MuJoCo’s impedance parameters of all geoms to (0.015, 0.95, 23 mm) or (0, 0.95, 5 mm) during training; evaluation keeps the original feet.</p>
+</details>
+<details class="appendix-block">
+<summary>Gradient spikes and the foot impedance (Table A4)</summary>
+<p>From one Go1 state, 20 backward passes of a 4-step window were repeated with only the impedance parameters of the foot contacts changed. A pass counts as spiked when one environment’s action-gradient norm exceeds 10 times the median. The impedance \(d\) of a contact rises from \(d_\text{min}\) at onset to \(d_\text{max}\) at the stated penetration width.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = fewest spiked passes and smallest largest ratio.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Gradient spikes and contact impedance">
+<table aria-describedby="table-caption-12" class="comparison-table">
+<thead><tr><th scope="col">Go1 foot contact: <code>solimp</code> \(d_\text{min}\), \(d_\text{max}\), width</th><th scope="col">Passes with a spike ↓</th><th scope="col">Largest ratio over passes ↓</th><th scope="col">Batch gradient norm, median</th></tr></thead>
+<tbody>
+<tr><th scope="row">Menagerie foot contact: 0.015, 1, 23 mm</th><td>2 of 20</td><td>358.4</td><td>14.1</td></tr>
+<tr><th scope="row">Maximum impedance 0.95: 0.015, 0.95, 23 mm</th><td class="metric-best"><strong>0 of 20</strong></td><td class="metric-best"><strong>2.3</strong></td><td>14.0</td></tr>
+<tr><th scope="row">Continuous onset, narrow: 0, 0.95, 5 mm</th><td class="metric-best"><strong>0 of 20</strong></td><td>4.0</td><td>16.9</td></tr>
+<tr><th scope="row">Continuous onset: 0, 0.95, 23 mm</th><td class="metric-best"><strong>0 of 20</strong></td><td>2.4</td><td>14.1</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-12">Table A4. Gradient spikes by contact impedance (Go1, 64 environments, 4-step window, 20 passes from the same state, no clipping); midpoint 0.5 and power 2. The ratio is the largest environment’s action-gradient norm over the median.</p>
+</details>
+<details class="appendix-block">
+<summary>Fixed-command sweep on the full Go1 task (Table A5)</summary>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = lower planar tracking error of the two policies for the command.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Fixed-command sweep of two full-task Go1 policies">
+<table aria-describedby="table-caption-13" class="comparison-table">
+<thead><tr><th scope="col">Command \(v_x, v_y, \omega_z\) (m/s, m/s, rad/s)</th><th scope="col">Isaac Lab reward, clipping, 2048 environments: measured</th><th scope="col">Planar error (m/s) ↓</th><th scope="col">mjlab reward, SAPO, 512 environments: measured</th><th scope="col">Planar error (m/s) ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">0, 0, 0</th><td>-0.00, -0.00, -0.00</td><td class="metric-best"><strong>0.00</strong></td><td>-0.00, 0.00, -0.00</td><td>0.01</td></tr>
+<tr><th scope="row">0.5, 0, 0</th><td>0.51, -0.01, -0.01</td><td>0.02</td><td>0.49, -0.01, 0.00</td><td class="metric-best"><strong>0.01</strong></td></tr>
+<tr><th scope="row">1, 0, 0</th><td>0.99, -0.03, 0.01</td><td>0.03 (95% survival)</td><td>0.98, -0.01, 0.01</td><td class="metric-best"><strong>0.02 (98% survival)</strong></td></tr>
+<tr><th scope="row">-0.5, 0, 0</th><td>-0.51, -0.02, 0.01</td><td>0.02</td><td>-0.51, 0.01, -0.01</td><td class="metric-best"><strong>0.01</strong></td></tr>
+<tr><th scope="row">-1, 0, 0</th><td>-1.02, -0.01, 0.00</td><td>0.02</td><td>-1.00, 0.00, -0.01</td><td class="metric-best"><strong>0.00</strong></td></tr>
+<tr><th scope="row">0, 0.5, 0</th><td>0.02, 0.46, 0.02</td><td>0.05</td><td>-0.00, 0.50, -0.01</td><td class="metric-best"><strong>0.00</strong></td></tr>
+<tr><th scope="row">0, -0.5, 0</th><td>-0.01, -0.48, 0.06</td><td>0.02</td><td>-0.01, -0.50, 0.00</td><td class="metric-best"><strong>0.01</strong></td></tr>
+<tr><th scope="row">0.5, 0.5, 0</th><td>0.52, 0.49, 0.02</td><td>0.02</td><td>0.50, 0.49, 0.00</td><td class="metric-best"><strong>0.01</strong></td></tr>
+<tr><th scope="row">0, 0, 1</th><td>0.01, -0.01, 0.97</td><td>0.02</td><td>0.00, 0.00, 1.01</td><td class="metric-best"><strong>0.00</strong></td></tr>
+<tr><th scope="row">0, 0, -1</th><td>-0.02, -0.02, -1.04</td><td>0.03</td><td>-0.01, 0.00, -1.01</td><td class="metric-best"><strong>0.01</strong></td></tr>
+<tr><th scope="row">0.5, 0, 0.5</th><td>0.51, -0.01, 0.49</td><td class="metric-best"><strong>0.01 (97% survival)</strong></td><td>0.49, -0.00, 0.51</td><td class="metric-best"><strong>0.01</strong></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-13">Table A5. Commands held for 10 s in the reference simulator (64 starts each; mean body-frame velocity after a 2 s transient, and mean planar tracking error). Left: SHAC with per-world clipping, original foot contact, 2048 environments (Table 4, seed 1). Right: SAPO with the mjlab reward (Table 4, seed 0). Survival is 100% unless stated.</p>
+</details>
+<details class="appendix-block">
+<summary>H1 training configurations (Table A6)</summary>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value in the column among configurations that reached the threshold.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="H1 training efficiency">
+<table aria-describedby="table-caption-14" class="comparison-table">
+<thead><tr><th scope="col">H1 gait task configuration</th><th scope="col">Epoch (ms) ↓</th><th scope="col">Epochs to threshold ↓</th><th scope="col">Time to threshold (min) ↓</th><th scope="col">Final survival ↑</th><th scope="col">Final tracking error (m/s) ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">5 ms, 512 environments, 16-step window</th><td>232</td><td>388</td><td>1.5</td><td>99.6%</td><td>0.14</td></tr>
+<tr><th scope="row">5 ms, 512 environments, 8-step window, \(\alpha = 0.995\), 1200 epochs</th><td>122</td><td>not reached</td><td>–</td><td>0.0%</td><td>0.82</td></tr>
+<tr><th scope="row">10 ms, 512 environments</th><td>204</td><td>not reached</td><td>–</td><td>86.7%</td><td>0.52</td></tr>
+<tr><th scope="row">10 ms, 1024 environments</th><td class="metric-best"><strong>213</strong></td><td>311</td><td>1.1</td><td>99.6%</td><td>0.14</td></tr>
+<tr><th scope="row">5 ms, 512 environments, Newton capped at 10 iterations</th><td>232</td><td>343</td><td>1.3</td><td>96.5%</td><td>0.19</td></tr>
+<tr><th scope="row">5 ms, 512 environments, action-gradient reuse</th><td>232</td><td>181</td><td>0.7</td><td class="metric-best"><strong>100.0%</strong></td><td class="metric-best"><strong>0.13</strong></td></tr>
+<tr><th scope="row">10 ms, 1024 environments, action-gradient reuse</th><td>220</td><td class="metric-best"><strong>156</strong></td><td class="metric-best"><strong>0.6</strong></td><td class="metric-best"><strong>100.0%</strong></td><td class="metric-best"><strong>0.13</strong></td></tr>
+<tr><th scope="row">5 ms, 512 environments, \(\lambda_a\)-return actor objective</th><td>–</td><td>561</td><td>–</td><td>80.1%</td><td>0.54</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-14">Table A6. Training efficiency on the H1 task with the gait prior, seed 0 per configuration. The threshold is a mean training tracking error of at most 0.5 m/s with episodes of at least 16 s, smoothed over 20 epochs; survival and tracking error are reference-simulator evaluations after the last epoch. – marks configurations that did not reach the threshold or have no epoch-time measurement.</p>
+</details>
+<details class="appendix-block">
+<summary>H1 policies, prior ablations, and PPO (Table A7)</summary>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value in the column; training time is ranked only among policies with at least 90% survival and a tracking error of at most 0.5 m/s.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="H1 results">
+<table aria-describedby="table-caption-15" class="comparison-table">
+<thead><tr><th scope="col">H1 task / training</th><th scope="col">Survival over 10 s ↑</th><th scope="col">Mean time alive (s) ↑</th><th scope="col">Tracking error (m/s) ↓</th><th scope="col">Training time (min) ↓</th></tr></thead>
+<tbody>
+<tr><th scope="row">Isaac Lab task, \(\alpha = 0.995\)</th><td>0.0%</td><td>1.8</td><td>0.88</td><td>1.9</td></tr>
+<tr><th scope="row">Gait prior without foot placement, \(\alpha = 0.995\)</th><td>0.0%</td><td>1.5</td><td>0.89</td><td>2.3</td></tr>
+<tr><th scope="row">Isaac Lab task, \(\alpha = 0.9\) (3 seeds)</th><td>90.1 ± 7.0%</td><td>9.3 ± 0.4</td><td>0.34 ± 0.08</td><td class="metric-best"><strong>1.9</strong></td></tr>
+<tr><th scope="row">Isaac Lab task, \(\alpha = 0.9\), 1500 epochs (3 seeds)</th><td>98.4 ± 1.0%</td><td>9.9 ± 0.1</td><td>0.12 ± 0.02</td><td>4.7</td></tr>
+<tr><th scope="row">Gait prior, \(\alpha = 0.995\)</th><td class="metric-best"><strong>100.0%</strong></td><td class="metric-best"><strong>10.0</strong></td><td>0.42</td><td>2.3</td></tr>
+<tr><th scope="row">Gait prior, \(\alpha = 0.995\), 1500 epochs (3 seeds)</th><td>99.5 ± 0.6%</td><td class="metric-best"><strong>10.0 ± 0.0</strong></td><td>0.15 ± 0.02</td><td>5.8</td></tr>
+<tr><th scope="row">Gait prior, \(\alpha = 0.9\) (3 seeds)</th><td>99.3 ± 0.8%</td><td class="metric-best"><strong>10.0 ± 0.1</strong></td><td>0.14 ± 0.01</td><td>2.3</td></tr>
+<tr><th scope="row">Gait prior without foot height, \(\alpha = 0.9\)</th><td>97.3%</td><td>9.8</td><td>0.20</td><td>2.3</td></tr>
+<tr><th scope="row">Gait prior, \(\alpha = 0.9\), action-gradient reuse (3 seeds)</th><td>99.6 ± 0.4%</td><td class="metric-best"><strong>10.0 ± 0.0</strong></td><td>0.16 ± 0.02</td><td>2.3</td></tr>
+<tr><th scope="row">PPO, Isaac Lab task, 1000 iterations</th><td>99.6%</td><td class="metric-best"><strong>10.0</strong></td><td class="metric-best"><strong>0.06</strong></td><td>5.9</td></tr>
+<tr><th scope="row">PPO, gait prior, 1000 iterations</th><td class="metric-best"><strong>100.0%</strong></td><td class="metric-best"><strong>10.0</strong></td><td>0.18</td><td>6.4</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-15">Table A7. H1 policies (5 ms physics, 16-step window, 512 environments, 600 epochs unless stated) and PPO (4096 environments, 24 steps per iteration, Isaac Lab’s settings); one seed unless stated, otherwise mean ± standard deviation over seeds. \(\alpha\) is the Polyak factor of the target critic. Training time is the epoch or iteration count times the isolated epoch or iteration time.</p>
+</details>
+<details class="appendix-block">
+<summary>MuJoCo Humanoid: joint damping and target critic (Tables A8 and A9)</summary>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = best value in the column among runs whose policies survive.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="MuJoCo Humanoid: damping and target critic">
+<table aria-describedby="table-caption-16" class="comparison-table">
+<thead><tr><th scope="col">Joint damping, target critic</th><th scope="col">Survival over 10 s ↑</th><th scope="col">Mean time alive (s) ↑</th><th scope="col">Forward speed (m/s) ↑</th></tr></thead>
+<tbody>
+<tr><th scope="row">Model damping (0.2–5 N·m·s/rad), \(\alpha = 0.995\)</th><td>0%</td><td>1.0</td><td>1.67</td></tr>
+<tr><th scope="row">Damping 10 N·m·s/rad, \(\alpha = 0.995\)</th><td>0%</td><td>1.3</td><td>2.65</td></tr>
+<tr><th scope="row">Model damping (0.2–5 N·m·s/rad), \(\alpha = 0.9\)</th><td>0%</td><td>1.3</td><td>0.66</td></tr>
+<tr><th scope="row">Damping 10 N·m·s/rad, \(\alpha = 0.9\) (3 seeds)</th><td class="metric-best"><strong>89 ± 3%</strong></td><td class="metric-best"><strong>9.3 ± 0.2</strong></td><td class="metric-best"><strong>2.11 ± 0.47</strong></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-16">Table A8. MuJoCo Humanoid after 800 epochs of SHAC (2 ms physics, 16-step window, 512 environments, reference task with physical initial states, floor-only collisions, and gears scaled by 1.75), evaluated in the reference simulator with the training damping.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = highest cosine at each window length, and slope ratio closest to 1.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Humanoid gradient quality with damping">
+<table aria-describedby="table-caption-17" class="comparison-table">
+<thead><tr><th scope="col">MuJoCo Humanoid of Table A8</th><th scope="col">Half-batch cosine, \(T = 4 / 8 / 16 / 32\) ↑</th><th scope="col">\(T = 32\): analytic slope</th><th scope="col">\(T = 32\): FD slopes at \(10^{-2}\) / \(10^{-3}\) / \(10^{-4}\)</th><th scope="col">\(T = 32\): slope ratio (closer to 1 is better)</th></tr></thead>
+<tbody>
+<tr><th scope="row">No added damping</th><td>0.84 / 0.63 / 0.47 / 0.09</td><td>812</td><td>85 / 116 / −119</td><td>9.6</td></tr>
+<tr><th scope="row">Joint damping 10 N·m·s/rad</th><td><strong class="metric-best">0.95</strong> / <strong class="metric-best">0.95</strong> / <strong class="metric-best">0.84</strong> / <strong class="metric-best">0.82</strong></td><td>470</td><td>180 / 159 / 314</td><td class="metric-best"><strong>2.6</strong></td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-17">Table A9. Policy-gradient consistency for a random policy on the MuJoCo Humanoid of Table A8 (2 ms, 256 environments): half-batch cosine and the analytic slope along the normalized gradient against central finite differences at three step sizes. The slope ratio divides the analytic slope by the median finite-difference slope.</p>
+</details>
+<details class="appendix-block">
+<summary>Bundled contact gradients (Tables A10 and A11)</summary>
+<p>Bundled contact gradients <a href="https://arxiv.org/abs/2609.30951">[Aditya et al. 2026]</a> continue a rollout from the average of several perturbed copies of an environment when a contact force exceeds a threshold, which keeps the forward and backward passes consistent. The implementation here simulates \(N\) environments with \(B\) branches as \(NB\) worlds, perturbs the policy’s joint positions and velocities in antithetic pairs, and averages after every control step. The averaging does not remove single-world spikes, which are only divided by \(B\), and more branches give more chances for one (Table A10). At equal world count, bundled Go1 training did not walk with the original foot contact (Table A11); on the H1 task with the gait prior, 64 environments with 8 branches did not reach the threshold of Table A6 within 600 epochs (reference simulator: 73% survival, 0.57 m/s).</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = fewest spiked passes and lowest median ratio.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Gradient spikes with bundled contact gradients">
+<table aria-describedby="table-caption-18" class="comparison-table">
+<thead><tr><th scope="col">Go1, 4-step window</th><th scope="col">Passes with a spike ↓</th><th scope="col">Largest / median environment gradient, median over passes ↓</th><th scope="col">Largest ratio</th></tr></thead>
+<tbody>
+<tr><th scope="row">Unbundled (64 environments)</th><td>4 of 20</td><td class="metric-best"><strong>2.3</strong></td><td>232</td></tr>
+<tr><th scope="row">Unbundled, per-world clipping</th><td class="metric-best"><strong>0 of 20</strong></td><td class="metric-best"><strong>2.3</strong></td><td>8</td></tr>
+<tr><th scope="row">4 branches, no perturbation</th><td>10 of 20</td><td>6.3</td><td>180</td></tr>
+<tr><th scope="row">4 branches, joint perturbation 0.005 rad</th><td>14 of 20</td><td>37.8</td><td>292</td></tr>
+<tr><th scope="row">4 branches, joint perturbation 0.01 rad</th><td>13 of 20</td><td>36.8</td><td>146</td></tr>
+<tr><th scope="row">4 branches, joint perturbation 0.02 rad, per-branch clipping</th><td class="metric-best"><strong>0 of 20</strong></td><td class="metric-best"><strong>2.3</strong></td><td>6</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-18">Table A10. Per-environment action-gradient norms for 20 backward passes from the same Go1 state (64 environments, 4-step window). Branch perturbations use joint-position offsets with the stated standard deviation and joint-velocity offsets 2.5 times as large (rad/s); clipping caps each world’s state adjoint and control gradient at 10 times the median before the average.</p>
+<p class="metric-legend"><strong class="metric-best">Highlighted + bold</strong> = highest fraction of seeds that walk.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Go1 training with bundled contact gradients">
+<table aria-describedby="table-caption-19" class="comparison-table">
+<thead><tr><th scope="col">Go1, forward commands</th><th scope="col">Simulated worlds</th><th scope="col">Bundled steps</th><th scope="col">Seeds that walk ↑</th><th scope="col">Tracking error per seed (m/s) ↓</th><th scope="col">Survival, mean</th></tr></thead>
+<tbody>
+<tr><th colspan="6" scope="rowgroup">Default contact</th></tr>
+<tr><th scope="row">512 environments, per-world clipping</th><td>512</td><td>–</td><td class="metric-best"><strong>4 of 4</strong></td><td>0.11 / 0.07 / 0.09 / 0.09</td><td>95.9%</td></tr>
+<tr><th scope="row">512 environments, no clipping</th><td>512</td><td>–</td><td>0 of 4</td><td>0.72 / 0.72 / 0.65 / 0.72</td><td>98.4%</td></tr>
+<tr><th scope="row">128 environments, no clipping</th><td>128</td><td>–</td><td>1 of 2</td><td>0.22 / 0.72</td><td>97.7%</td></tr>
+<tr><th scope="row">64 environments, per-world clipping</th><td>64</td><td>–</td><td>0 of 2</td><td>0.71 / 0.73</td><td>95.7%</td></tr>
+<tr><th scope="row">128 environments × 4 branches, load trigger, no clipping</th><td>512</td><td>26%</td><td>0 of 4</td><td>0.73 / 0.41 / 0.72 / 0.72</td><td>90.0%</td></tr>
+<tr><th scope="row">128 environments × 4 unperturbed branches, no clipping</th><td>512</td><td>0%</td><td>0 of 2</td><td>0.73 / 0.72</td><td>100.0%</td></tr>
+<tr><th scope="row">64 environments × 8 branches, every step, no clipping</th><td>512</td><td>100%</td><td>0 of 2</td><td>0.73 / 0.73</td><td>99.6%</td></tr>
+<tr><th scope="row">64 environments × 8 branches, every step, per-world clipping</th><td>512</td><td>100%</td><td>0 of 2</td><td>0.74 / 0.72</td><td>100.0%</td></tr>
+<tr><th scope="row">64 environments × 8 branches, load trigger, per-world clipping</th><td>512</td><td>17%</td><td>0 of 1</td><td>0.74</td><td>82.8%</td></tr>
+<tr><th colspan="6" scope="rowgroup">Stiff contact onset (solimp 0, 0.95, 5 mm)</th></tr>
+<tr><th scope="row">512 environments, per-world clipping</th><td>512</td><td>–</td><td class="metric-best"><strong>2 of 2</strong></td><td>0.11 / 0.09</td><td>91.6%</td></tr>
+<tr><th scope="row">512 environments, no clipping</th><td>512</td><td>–</td><td class="metric-best"><strong>2 of 2</strong></td><td>0.08 / 0.07</td><td>92.2%</td></tr>
+<tr><th scope="row">128 environments, no clipping</th><td>128</td><td>–</td><td>1 of 2</td><td>0.11 / 0.72</td><td>94.5%</td></tr>
+<tr><th scope="row">128 environments × 4 branches, load trigger, no clipping</th><td>512</td><td>42%</td><td class="metric-best"><strong>2 of 2</strong></td><td>0.10 / 0.11</td><td>92.4%</td></tr>
+</tbody>
+
+</table>
+</div>
+<p class="figure-caption table-caption" id="table-caption-19">Table A11. Go1 after 400 epochs on the forward-command variant of the Isaac Lab Go1 task (5 ms physics, 8-step window), evaluated in the unbundled reference simulator. Per-world clipping acts on every branch before the average.</p>
+</details>
+</section>
+
+<!-- BODYEND -->
+
+</main>
+</div>
+<script src="https://cdn.plot.ly/plotly-basic-4.0.0.min.js" charset="utf-8" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/katex.min.js" integrity="sha384-+7Keh381hSkXmXqnjC0JBM/kzsN6TFj+wMKychSLjTvJ8/0ElMde2uKl8i6p6Buj" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.18.7/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous" defer></script>
+<script src="math.js" defer></script>
+<script src="report.js" defer></script>
+<script src="figures.js" defer></script>
+<script type="module" src="mermaid.js"></script>
+</body>
+</html>
