@@ -1,0 +1,52 @@
+# gh-pages is a STATIC-ONLY, PUBLIC branch (see AGENTS.md).
+# These patterns block the file classes that leaked internal information
+# in October 2026. Do not force-add around them.
+
+# Code
+*.py
+*.sh
+*.ipynb
+
+# Data and model files
+*.json
+*.jsonl
+*.csv
+*.tsv
+*.npz
+*.npy
+*.pt
+*.pth
+*.parquet
+*.toml
+*.yml
+*.yaml
+
+# Logs and agent transcripts
+*.log
+*.stderr
+*.out
+
+# Archives of work directories
+*.zip
+*.gz
+*.tgz
+*.tar
+
+# Internal notes and docs (this branch AGENTS.md is the one exception)
+*.md
+!AGENTS.md
+*.txt
+!robots.txt
+
+# Secrets-shaped files
+.env
+*.pem
+*.key
+id_rsa*
+
+# Leak-prone directories at any depth
+tools/
+scripts/
+evidence/
+data/
+__pycache__/
